@@ -28,6 +28,10 @@
   "include": [
     "next-env.d.ts",
     "**/*.ts",
+    // The template sweep is a .mts module, which "**/*.ts" does not match. It
+    // is the gate every later template change is measured against, so it is
+    // typechecked like anything else rather than trusted because it runs.
+    "**/*.mts",
     "**/*.tsx",
     ".next/types/**/*.ts",
     "src/payload-types.ts"

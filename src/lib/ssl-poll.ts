@@ -123,24 +123,13 @@ export const pollDomainSslStatus = async (args: {
           overrideAccess: true,
         })
 
-        // A domain that now serves our app for this site means the site is
-        // launched. Promote it out of the pre-launch 'draft' state so the public
-        // router stops 404-ing it. Only 'draft' is touched — 'paused'/'archived'
-        // are deliberate operator states we never override.
-        try {
-          const siteDoc = await payload.findByID({ collection: 'sites', id: args.siteId, overrideAccess: true })
-          if (siteDoc && (siteDoc as { status?: string }).status === 'draft') {
-            await payload.update({
-              collection: 'sites',
-              id: args.siteId,
-              data: { status: 'active' } as never,
-              overrideAccess: true,
-            })
-          }
-        } catch {
-          // best effort — never fail the SSL cutover over a status promotion
-        }
-
+        // Deliberately NOT promoting the Site out of 'draft' here.
+        //
+        // A certificate becoming valid is a statement about transport. It is not
+        // a decision to publish a brand, and this is a background promise nobody
+        // is watching, so the promotion happened with no operator present and no
+        // record of who chose it. Publication is an explicit act: the publish
+        // flow may OFFER to activate a draft Site, showing what will happen.
         invalidateHostCache()
       } catch {
         // best effort — the row may have been deleted while we were polling

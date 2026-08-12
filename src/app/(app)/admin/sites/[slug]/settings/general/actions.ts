@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { requireSiteAdmin } from '@/lib/authz'
+import { invalidateHostCache } from '@/lib/site-resolver'
 
 const toTel = (display: string | null | undefined): string => {
   if (!display) return ''
@@ -15,10 +17,10 @@ const toTel = (display: string | null | undefined): string => {
 
 export async function saveGeneralSettings(formData: FormData): Promise<{ ok: boolean; error?: string }> {
   const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
 
-  const siteId = Number(formData.get('site_id'))
-  if (!siteId) return { ok: false, error: 'missing site id' }
+  const authz = requireSiteAdmin(user, formData.get('site_id'))
+  if (!authz.ok) return authz.error === 'no site specified' ? { ok: false, error: 'missing site id' } : authz
+  const siteId = authz.siteId
 
   const phoneDisplay = String(formData.get('default_phone') ?? '')
 
@@ -64,4 +66,79 @@ export async function saveGeneralSettings(formData: FormData): Promise<{ ok: boo
 
   revalidatePath(`/admin/sites/${data.slug}/settings/general`)
   return { ok: true }
+}
+
+/* --------------------------------- Publication --------------------------------- */
+
+/**
+ * Site publication, as an explicit operator act.
+ *
+ * A Site's status used to change by side effect in two places: the SSL poller
+ * promoted 'draft' to 'active' from a detached background promise, and the site
+ * dashboard did the same from a GET render. Both are gone, which left no way at
+ * all to publish a Site — this is that way.
+ *
+ * Transitions are enumerated rather than "accept whatever status was posted",
+ * because the four states are not interchangeable:
+ *
+ *   draft   → active   publish for the first time
+ *   active  ⇄ paused   temporary, reversible, keeps configuration
+ *   *       → archived a decision, and NOT the same as unpublishing
+ *
+ * Archived is deliberately terminal here. Un-archiving is a restore, not a
+ * status flip, and giving it the same door as "unpause" is how a brand comes
+ * back online by accident.
+ */
+export type SiteStatus = 'draft' | 'active' | 'paused' | 'archived'
+
+const ALLOWED_TRANSITIONS: Record<SiteStatus, SiteStatus[]> = {
+  draft: ['active', 'archived'],
+  active: ['paused', 'archived'],
+  paused: ['active', 'archived'],
+  archived: [],
+}
+
+export async function setSiteStatus(args: {
+  siteId: number | string
+  /** The status the operator believes is current. Guards against acting on a stale screen. */
+  from: SiteStatus
+  to: SiteStatus
+}): Promise<{ ok: true; status: SiteStatus } | { ok: false; error: string }> {
+  const user = await getCurrentUser()
+  const authz = requireSiteAdmin(user, args.siteId)
+  if (!authz.ok) return authz
+
+  const payload = await getPayload({ config })
+  let site: { id: number | string; slug?: string | null; status?: string | null } | null = null
+  try {
+    site = await payload.findByID({ collection: 'sites', id: authz.siteId, overrideAccess: true })
+  } catch {
+    site = null
+  }
+  if (!site) return { ok: false, error: 'site not found' }
+
+  const current = (site.status ?? 'draft') as SiteStatus
+  // The operator acted on a screen that may be minutes old. Refusing a stale
+  // transition is the difference between "publish this draft" and "republish
+  // something a colleague paused thirty seconds ago".
+  if (current !== args.from) {
+    return { ok: false, error: `site is now ${current}, not ${args.from} — reload and try again` }
+  }
+  if (current === args.to) return { ok: true, status: current }
+  if (!ALLOWED_TRANSITIONS[current].includes(args.to)) {
+    return { ok: false, error: `cannot go from ${current} to ${args.to}` }
+  }
+
+  await payload.update({
+    collection: 'sites',
+    id: authz.siteId,
+    data: { status: args.to } as never,
+    user: user as never,
+    overrideAccess: false,
+  })
+  // The resolver caches primaryHost/redirectTo per host for 60s and does not key
+  // on Site status, so a paused Site would keep serving from cache without this.
+  invalidateHostCache()
+  if (site.slug) revalidatePath(`/admin/sites/${site.slug}`)
+  return { ok: true, status: args.to }
 }

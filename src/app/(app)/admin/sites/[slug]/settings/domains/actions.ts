@@ -4,6 +4,8 @@ import { revalidatePath } from 'next/cache'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { requireDomainSiteAdmin } from '@/lib/authz'
+import { mayBecomePrimary } from '@/lib/domain-eligibility'
 import { invalidateHostCache } from '@/lib/site-resolver'
 import { checkDomainDns } from '@/lib/dns-check'
 import { pollDomainSslStatus } from '@/lib/ssl-poll'
@@ -33,11 +35,17 @@ export async function verifyAndPromoteDomain(args: {
   skipDns?: boolean
 }): Promise<VerifyResult> {
   const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
   const payload = await getPayload({ config })
-  const domain = await payload.findByID({ collection: 'domains', id: args.domainId, overrideAccess: true })
-  if (!domain) return { ok: false, error: 'domain not found' }
-  if (!domain.site) return { ok: false, error: 'domain is unassigned — attach to a brand before verifying' }
+  // Authorized against the Site the DOMAIN names, not the `siteSlug` the caller
+  // passed — that argument only ever drove revalidatePath and was never compared
+  // to anything, so it could name a Site the domain does not belong to.
+  const authz = await requireDomainSiteAdmin(payload, user, args.domainId)
+  if (!authz.ok) {
+    return authz.error === 'domain is not attached to a brand'
+      ? { ok: false, error: 'domain is unassigned — attach to a brand before verifying' }
+      : authz
+  }
+  const domain = authz.domain
   if (domain.kind !== 'custom') return { ok: false, error: 'preview domains do not require verification' }
 
   // Dev-only escape hatch. Hard-gated on NODE_ENV so a stray LEGALOS_DEV_SKIP_DNS
@@ -124,7 +132,7 @@ export async function verifyAndPromoteDomain(args: {
   // The auto-verify poller filters on `pending|error`, so the row stays in the
   // retry pool — once the underlying issue is fixed (e.g. PLESK_API_URL env
   // corrected) the next tick will re-run the full pipeline and self-heal.
-  const siteId = typeof domain.site === 'object' ? domain.site.id : domain.site
+  const siteId = authz.siteId
   const localDevShortcut = !pleskIsConfigured() && skipAllowed
   const finalStatus = localDevShortcut ? 'active' : pleskOk ? 'provisioning' : 'error'
   // Never assume SSL. `ssl_status='active'` is reserved for the poller after a
@@ -192,10 +200,14 @@ export async function recheckDomainDns(args: {
   siteSlug: string
 }): Promise<RecheckResult> {
   const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
   const payload = await getPayload({ config })
-  const domain = await payload.findByID({ collection: 'domains', id: args.domainId, overrideAccess: true })
-  if (!domain) return { ok: false, error: 'domain not found' }
+  // Gate ABOVE the poller launch below. This previously sat under it, so an
+  // unauthorized caller's detached `pollDomainSslStatus` — which runs entirely
+  // with overrideAccess: true and could promote a domain and publish a Site —
+  // was already in flight by the time the scoped write threw.
+  const authz = await requireDomainSiteAdmin(payload, user, args.domainId)
+  if (!authz.ok) return authz
+  const domain = authz.domain
   if (domain.kind !== 'custom') return { ok: false, error: 'preview domains do not require verification' }
 
   const currentStatus = (domain.status ?? 'pending') as string
@@ -213,13 +225,14 @@ export async function recheckDomainDns(args: {
     }
   }
 
-  if (currentStatus === 'provisioning' && domain.site) {
+  if (currentStatus === 'provisioning') {
     // The SSL self-check poller is a detached promise that dies on every server
     // restart/deploy, which would otherwise leave the row stuck in
     // 'provisioning' forever (recheck previously only re-drove pending|error).
     // Re-launch it so a manual re-check drives the row to 'active'.
-    const siteId = typeof domain.site === 'object' ? domain.site.id : domain.site
-    void pollDomainSslStatus({ domainId: args.domainId, host: domain.host, siteId }).catch(() => {})
+    // `authz.siteId` is derived from the domain row, so the poller can no longer
+    // be aimed at a Site the domain does not belong to.
+    void pollDomainSslStatus({ domainId: args.domainId, host: domain.host, siteId: authz.siteId }).catch(() => {})
   }
 
   const now = new Date().toISOString()
@@ -250,18 +263,28 @@ export async function recheckDomainDns(args: {
 
 /* --------------------------------- Promote toggle ------------------------------ */
 
-export async function setPrimary(args: { domainId: number; siteId: number; siteSlug: string }): Promise<{ ok: boolean; error?: string }> {
+/**
+ * `siteId` is accepted for call-site compatibility and deliberately ignored: the
+ * Site is derived from the target domain. Passing it was the whole defect — the
+ * demotion loop below runs with `overrideAccess: true`, so a caller supplying
+ * another tenant's `siteId` demoted every primary domain on that tenant's Site.
+ */
+export async function setPrimary(args: { domainId: number; siteId?: number; siteSlug: string }): Promise<{ ok: boolean; error?: string }> {
   const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
   const payload = await getPayload({ config })
-  const target = await payload.findByID({ collection: 'domains', id: args.domainId, overrideAccess: true })
-  if (!target) return { ok: false, error: 'domain not found' }
-  if (target.kind === 'custom' && target.status !== 'active' && target.status !== 'verified') {
-    return { ok: false, error: 'domain must be verified before it can be primary' }
+  const authz = await requireDomainSiteAdmin(payload, user, args.domainId)
+  if (!authz.ok) return authz
+  const target = authz.domain
+  const promotable = mayBecomePrimary(target)
+  if (!promotable.eligible) {
+    // Previously 'verified' was enough, which means DNS resolved — not that the
+    // host serves us under a valid certificate. Primary decides the canonical
+    // host every generated link and 301 points at.
+    return { ok: false, error: `cannot be made primary: ${promotable.reason}` }
   }
   const others = await payload.find({
     collection: 'domains',
-    where: { and: [{ site: { equals: args.siteId } }, { primary: { equals: true } }, { id: { not_equals: args.domainId } }] },
+    where: { and: [{ site: { equals: authz.siteId } }, { primary: { equals: true } }, { id: { not_equals: args.domainId } }] },
     overrideAccess: true,
   })
   for (const d of others.docs) {
@@ -288,14 +311,14 @@ export async function setPrimary(args: { domainId: number; siteId: number; siteS
 
 export async function removeDomain(args: { domainId: number; siteSlug: string }): Promise<{ ok: boolean; error?: string }> {
   const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
   const payload = await getPayload({ config })
-  const domain = await payload.findByID({ collection: 'domains', id: args.domainId, overrideAccess: true })
-  if (!domain) return { ok: false, error: 'domain not found' }
+  const authz = await requireDomainSiteAdmin(payload, user, args.domainId)
+  if (!authz.ok) return authz
+  const domain = authz.domain
   if (domain.kind === 'preview') return { ok: false, error: 'preview domain cannot be removed' }
-  if (domain.primary && domain.site) {
+  if (domain.primary) {
     // Promote another domain (preferred: the preview) to primary first.
-    const siteId = typeof domain.site === 'object' ? domain.site.id : domain.site
+    const siteId = authz.siteId
     const others = await payload.find({
       collection: 'domains',
       where: { and: [{ site: { equals: siteId } }, { id: { not_equals: args.domainId } }] },

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { requireDomainSiteAdmin, requirePoolDomain } from '@/lib/authz'
 import { invalidateHostCache } from '@/lib/site-resolver'
 import { verifyAndPromoteDomain, setPrimary } from '@/app/(app)/admin/sites/[slug]/settings/domains/actions'
 import { unprovisionDomainInPlesk } from '@/lib/plesk/provision-domain'
@@ -58,16 +59,22 @@ export async function attachDomainToSite(args: { domainId: number; siteId: numbe
   { ok: true; verified: boolean } | { ok: false; error: string }
 > {
   const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
   const payload = await getPayload({ config })
-  const domain = await payload.findByID({ collection: 'domains', id: args.domainId, overrideAccess: true })
-  if (!domain) return { ok: false, error: 'domain not found' }
-  if (domain.site) return { ok: false, error: 'domain is already attached to a site' }
+  // The one place a caller-supplied siteId is legitimate — the row names no Site
+  // yet — so it is checked against the caller's own bindings. `overrideAccess:
+  // false` alone did NOT check it: Payload evaluates access against the row's
+  // current (site-less) state, so the incoming `site` value went unexamined.
+  const authz = await requirePoolDomain(payload, user, args.domainId, args.siteId)
+  if (!authz.ok) {
+    return authz.error === 'domain is already attached to a brand'
+      ? { ok: false, error: 'domain is already attached to a site' }
+      : authz
+  }
 
   await payload.update({
     collection: 'domains',
     id: args.domainId,
-    data: { site: args.siteId } as never,
+    data: { site: authz.siteId } as never,
     user: user as never,
     overrideAccess: false,
   })
@@ -85,10 +92,10 @@ export async function attachDomainToSite(args: { domainId: number; siteId: numbe
 /** Detach a domain from a site, returning it to the pool. Custom domains only. */
 export async function detachDomainFromSite(args: { domainId: number; siteSlug?: string }): Promise<{ ok: boolean; error?: string }> {
   const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
   const payload = await getPayload({ config })
-  const domain = await payload.findByID({ collection: 'domains', id: args.domainId, overrideAccess: true })
-  if (!domain) return { ok: false, error: 'domain not found' }
+  const authz = await requireDomainSiteAdmin(payload, user, args.domainId)
+  if (!authz.ok) return authz
+  const domain = authz.domain
   if (domain.kind === 'preview') return { ok: false, error: 'preview domains belong to their site permanently' }
 
   await payload.update({
@@ -147,6 +154,14 @@ export async function deletePoolDomain(args: { domainId: number }): Promise<{ ok
   const domain = await payload.findByID({ collection: 'domains', id: args.domainId, overrideAccess: true })
   if (!domain) return { ok: false, error: 'domain not found' }
   if (domain.kind === 'preview') return { ok: false, error: 'preview domain cannot be deleted' }
+  // An ATTACHED domain is deleted through the Site that owns it. The delete
+  // below is access-scoped, but the Plesk unprovision fired first and is not:
+  // without this an unauthorized caller could tear down another tenant's vhost
+  // and certificate and still be refused by the database afterwards.
+  if (domain.site) {
+    const authz = await requireDomainSiteAdmin(payload, user, args.domainId)
+    if (!authz.ok) return authz
+  }
 
   const pleskId = domain.plesk_domain_id
   if (pleskId && pleskIsConfigured()) {

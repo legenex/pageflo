@@ -4,7 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { AlertCircle, CheckCircle2, ExternalLink, FileText, Globe, Inbox, Layers, Pencil } from 'lucide-react'
 import { TestCaptureButton } from '@/components/app/TestCaptureModal'
-import { invalidateHostCache } from '@/lib/site-resolver'
+import { SitePublishControl } from '@/components/app/SitePublishControl'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,21 +56,19 @@ export default async function SiteOverviewPage({ params }: Props) {
 
   const primary = primaryDomain.docs[0]
 
-  // Self-heal: a brand whose primary domain is live but whose Site is still in
-  // the pre-launch 'draft' state would 404 publicly while this dashboard reads
-  // "Ready". Publishing here makes the live URL actually serve its Home page and
-  // keeps the badge honest. Only 'draft' is promoted — 'paused'/'archived' are
-  // deliberate states we leave alone. (Covers brands created before sites were
-  // born active; new brands are already active and skip this.)
-  if (site.status === 'draft' && primary?.status === 'active') {
-    try {
-      await payload.update({ collection: 'sites', id: site.id, data: { status: 'active' } as never, overrideAccess: true })
-      site.status = 'active'
-      invalidateHostCache()
-    } catch {
-      // best effort — non-fatal for rendering the dashboard
-    }
-  }
+  // A draft Site whose primary domain reads 'active' used to be published right
+  // here — from a GET, on render, with overrideAccess: true.
+  //
+  // Two things made that worse than a stray write. Every new Site is given a
+  // preview Domain row written `status: 'active'` with nothing verified, so the
+  // condition below was true for every brand the moment it was created: merely
+  // OPENING this dashboard published the brand to the internet, defeating the
+  // 'draft' the create action had just set on purpose. And because a render is
+  // not an action, there was no operator intent to record and nothing to audit.
+  //
+  // Publication is now explicit. The badge below already reports the true state
+  // (a draft Site reads 'partial', not 'ready'), which is the honest way to show
+  // the same fact.
 
   const livePreviewUrl = primary ? `https://${primary.host}` : `/?site=${site.slug}`
   // "Ready" must mean actually publicly served: a live primary domain AND a
@@ -109,6 +107,11 @@ export default async function SiteOverviewPage({ params }: Props) {
           </p>
         </div>
         <StatusChip status={status} />
+        <SitePublishControl
+          siteId={site.id}
+          status={(site.status ?? 'draft') as 'draft' | 'active' | 'paused' | 'archived'}
+          primaryHost={primary?.host ?? null}
+        />
         <TestCaptureButton siteSlug={slug} />
         <Link
           href={`/admin/sites/${slug}/settings/general`}
