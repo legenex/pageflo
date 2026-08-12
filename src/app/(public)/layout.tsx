@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import '../globals.css'
+import { getCurrentUser, isBoundToSite } from '@/lib/auth'
 import { resolveSiteByHost, isFallbackHost } from '@/lib/site-resolver'
 import { resolveBrandTokens } from '@/lib/brand/resolve-tokens'
 import { IDENTITY_FONTS_HREF } from '@/lib/lp-identities'
@@ -71,8 +72,15 @@ export default async function PublicLayout({ children }: { children: ReactNode }
 
   // Preview mode (?site=<slug>) — middleware stamps x-legalos-preview-site.
   // This must take precedence over host resolution because the host here
-  // is always mo.legenex.com (the admin host), which would otherwise resolve
-  // to no site and the brand CSS variables would never be emitted.
+  // is always the admin host, which would otherwise resolve to no site and the
+  // brand CSS variables would never be emitted.
+  //
+  // The header is request INTENT, forwarded by middleware, which performs no
+  // auth. This layout honoured it with no check of any kind, so an anonymous
+  // caller could name any tenant by slug and be served that brand's colours,
+  // fonts, logo and favicon. The route re-verifies the session for the body;
+  // the same verification has to happen here, or the chrome leaks what the body
+  // refuses. A binding to THIS Site is required, not merely a session.
   if (previewSiteSlug) {
     const payload = await getPayload({ config })
     const res = await payload.find({
@@ -81,7 +89,9 @@ export default async function PublicLayout({ children }: { children: ReactNode }
       limit: 1,
       overrideAccess: true,
     })
-    site = (res.docs[0] as Site) ?? null
+    const candidate = (res.docs[0] as Site) ?? null
+    const user = candidate ? await getCurrentUser() : null
+    site = candidate && isBoundToSite(user, (candidate as { id: string | number }).id) ? candidate : null
   } else if (host && !isFallbackHost(host)) {
     const resolved = await resolveSiteByHost(host)
     if (resolved) {

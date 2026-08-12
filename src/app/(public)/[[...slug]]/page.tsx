@@ -333,20 +333,23 @@ export default async function PublicCatchAll({ params, searchParams }: Props) {
     status?: string
   }
 
-  // Admin preview is gated on the request being authenticated as a user (the
-  // user was resolved up front). ?preview=1 additionally bypasses the status
-  // filter to render draft / scheduled content; ?site=<slug> (already proven
-  // authenticated above) selects which Site to preview.
-  const isAuthedAdminPreview = previewMode && Boolean(authedUser)
-  const isAdminPreview = Boolean(previewSiteSlug) || isAuthedAdminPreview
-
   // Someone bound to this Site may view it before it is published, on its own
-  // domain, without knowing to append a query string. This is narrower than it
-  // looks: it requires a real session AND a binding to THIS Site, so it grants
-  // nothing to an anonymous visitor and nothing across tenants. A super admin
-  // is bound to everything by definition.
+  // domain, without knowing to append a query string. This requires a real
+  // session AND a binding to THIS Site, so it grants nothing to an anonymous
+  // visitor and nothing across tenants. A super admin is bound to everything by
+  // definition.
   const ownsThisSite = isBoundToSite(authedUser, site.id)
-  const maySeeUnpublished = isAdminPreview || ownsThisSite
+
+  // Both preview bypasses require that binding too.
+  //
+  // They previously required only that SOME user was logged in: `?site=<slug>`
+  // selected any tenant by slug, and `?preview=1` relaxed the content filter on
+  // any host. Either one let any authenticated user of any tenant read another
+  // brand's draft and scheduled content. `isBoundToSite` was already computed
+  // here and fed only the same-host case, so the check existed and the bypasses
+  // simply did not consult it.
+  const isAdminPreview = ownsThisSite && (Boolean(previewSiteSlug) || previewMode)
+  const maySeeUnpublished = ownsThisSite
 
   if (site.status === 'archived') notFound()
   if (site.status === 'draft' && !maySeeUnpublished) notFound()
@@ -362,7 +365,7 @@ export default async function PublicCatchAll({ params, searchParams }: Props) {
   // to 'any non-archived status' so draft / scheduled / paused content also
   // renders — that's the whole point of the Preview button in the builder.
   const nowIso = new Date().toISOString()
-  const publishedOrLive: Where = isAuthedAdminPreview
+  const publishedOrLive: Where = isAdminPreview
     ? { status: { not_equals: 'archived' } }
     : {
         or: [
