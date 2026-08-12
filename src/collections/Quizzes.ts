@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 import { siteScopedRead, siteScopedWrite, siteScopedAdmin } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
 import { captureSlugRedirect } from '../hooks/slug-redirects'
+import { enforceSiteBinding } from '../hooks/enforce-site-binding'
 
 export const Quizzes: CollectionConfig = {
   slug: 'quizzes',
@@ -17,6 +18,7 @@ export const Quizzes: CollectionConfig = {
     delete: siteScopedAdmin,
   },
   hooks: {
+    beforeValidate: [enforceSiteBinding('editor')],
     beforeChange: [captureSlugRedirect],
     afterChange: [auditAfterChange],
     afterDelete: [auditAfterDelete],

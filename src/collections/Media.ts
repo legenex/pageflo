@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 import path from 'path'
 import { siteScopedRead, siteScopedWrite, isSuperAdmin } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
+import { enforceSiteBinding } from '../hooks/enforce-site-binding'
 
 // Tenant-scoped media library. Files land on disk under MEDIA_DIR (or a sane
 // fallback) and are served from /api/media/file/<filename> via Payload's
@@ -34,6 +35,7 @@ export const Media: CollectionConfig = {
     mimeTypes: ['image/*'],
   },
   hooks: {
+    beforeValidate: [enforceSiteBinding('editor')],
     afterChange: [auditAfterChange],
     afterDelete: [auditAfterDelete],
   },

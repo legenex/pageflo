@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { siteScopedRead, siteScopedWrite, siteScopedAdmin } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
+import { enforceSiteBinding } from '../hooks/enforce-site-binding'
 
 export const Numbers: CollectionConfig = {
   slug: 'numbers',
@@ -17,6 +18,7 @@ export const Numbers: CollectionConfig = {
     delete: siteScopedAdmin,
   },
   hooks: {
+    beforeValidate: [enforceSiteBinding('editor')],
     afterChange: [auditAfterChange],
     afterDelete: [auditAfterDelete],
   },

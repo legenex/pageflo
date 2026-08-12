@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 import { siteScopedRead, siteScopedAdmin } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
 import { invalidateHostCache } from '../lib/site-resolver'
+import { enforceSiteBinding } from '../hooks/enforce-site-binding'
 
 export const Domains: CollectionConfig = {
   slug: 'domains',
@@ -35,6 +36,7 @@ export const Domains: CollectionConfig = {
       },
     ],
     beforeValidate: [
+      enforceSiteBinding('admin'),
       async ({ data, req, operation, originalDoc }) => {
         if (!data?.host) return data
         const normalized = data.host.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/$/, '')

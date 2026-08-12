@@ -3,6 +3,7 @@ import { siteScopedRead, siteScopedWrite, siteScopedAdmin } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
 import { captureSlugRedirect } from '../hooks/slug-redirects'
 import { TEMPLATE_KEYS } from './SharedLegalTemplates'
+import { enforceSiteBinding } from '../hooks/enforce-site-binding'
 
 const bodyBlocks: Field = {
   name: 'body_blocks',
@@ -403,6 +404,7 @@ export const Pages: CollectionConfig = {
     delete: siteScopedAdmin,
   },
   hooks: {
+    beforeValidate: [enforceSiteBinding('editor')],
     beforeChange: [captureSlugRedirect],
     afterChange: [auditAfterChange],
     afterDelete: [auditAfterDelete],

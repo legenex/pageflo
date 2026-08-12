@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { siteScopedRead, siteScopedAdmin } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
+import { enforceSiteBinding } from '../hooks/enforce-site-binding'
 
 export const TrackingConfigs: CollectionConfig = {
   slug: 'tracking-configs',
@@ -16,6 +17,7 @@ export const TrackingConfigs: CollectionConfig = {
     delete: siteScopedAdmin,
   },
   hooks: {
+    beforeValidate: [enforceSiteBinding('admin')],
     afterChange: [auditAfterChange],
     afterDelete: [auditAfterDelete],
   },
