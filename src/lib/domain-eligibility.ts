@@ -14,7 +14,16 @@
  *                                     OTHER brand's domains.
  *
  * A rule with four implementations has no implementation. This module is the
- * rule; the surfaces call it and render the reason.
+ * rule.
+ *
+ * WIRED SO FAR: `mayBecomePrimary`, in the domain actions — promotion and the
+ * fallback promotion on removal. The resolver and the three pickers still each
+ * decide for themselves. Converting them is not a drop-in: the resolver's filter
+ * decides what the live site serves, and every existing preview row would need
+ * checking against real data first. Until that happens this header should say
+ * what is true rather than what was intended, because a module that claims
+ * callers it does not have is how the next reader concludes the problem is
+ * solved.
  *
  * ── On preview domains ────────────────────────────────────────────────────────
  *

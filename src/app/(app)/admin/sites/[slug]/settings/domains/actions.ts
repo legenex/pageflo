@@ -325,7 +325,15 @@ export async function removeDomain(args: { domainId: number; siteSlug: string })
       sort: 'kind',
       overrideAccess: true,
     })
-    const fallback = others.docs.find((d) => d.kind === 'preview') ?? others.docs[0]
+    // Preferred: the preview, which is the designed fallback. Otherwise the
+    // first domain that could actually serve as canonical — `others.docs[0]`
+    // alone would happily promote a `pending` or `error` row, and primary is
+    // what the resolver's 301s point at, so that redirected the whole Site to a
+    // host that does not answer.
+    const fallback =
+      others.docs.find((d) => d.kind === 'preview' && mayBecomePrimary(d).eligible) ??
+      others.docs.find((d) => mayBecomePrimary(d).eligible) ??
+      null
     if (fallback) {
       await payload.update({
         collection: 'domains',

@@ -55,11 +55,19 @@ export type DomainAuthz = { ok: true; siteId: number; domain: Domain }
  */
 export const relationId = (rel: unknown): number | null => {
   if (rel === null || rel === undefined) return null
-  if (typeof rel === 'object') {
-    const id = (rel as { id?: unknown }).id
-    return id === undefined || id === null ? null : Number(id)
-  }
-  const n = Number(rel)
+  // Both branches go through the same finite check. The object branch used to
+  // skip it, so `{ id: 'abc' }` returned NaN and `''`/`false`/`{ id: [] }`
+  // returned 0 — neither of which is an id, and both of which contradict this
+  // function's own contract. NaN never authorizes (NaN === NaN is false), but 0
+  // is a real comparison: `Number(null)` is also 0, so a binding row with a null
+  // site would have matched a caller who sent an empty form field.
+  const raw = typeof rel === 'object' ? (rel as { id?: unknown }).id : rel
+  if (raw === null || raw === undefined || typeof raw === 'boolean' || typeof raw === 'object') return null
+  // Trimmed, not just compared to '': `Number('   ')` is 0 too, and so is
+  // `Number(null)`, so a whitespace-only form field would have matched a binding
+  // row whose site was null.
+  if (typeof raw === 'string' && raw.trim() === '') return null
+  const n = Number(raw)
   return Number.isFinite(n) ? n : null
 }
 
@@ -139,7 +147,18 @@ export const requirePoolDomain = async (
     domain = null
   }
   if (!domain) return { ok: false, error: 'domain not found' }
-  if (relationId(domain.site) !== null) return { ok: false, error: 'domain is already attached to a brand' }
+
+  // "Already attached" must not be said about a domain the caller cannot see.
+  // Returning it unconditionally made this an oracle over the whole domain id
+  // space: probe an id with your own siteId, and the message told you whether
+  // that id existed and was somebody's. It is only said when the caller is bound
+  // to the Site that holds it, which is the case where it is also useful.
+  const attachedTo = relationId(domain.site)
+  if (attachedTo !== null) {
+    return isBoundToSite(user, attachedTo)
+      ? { ok: false, error: 'domain is already attached to a brand' }
+      : { ok: false, error: 'domain not found' }
+  }
 
   return { ok: true, siteId: gate.siteId, domain }
 }

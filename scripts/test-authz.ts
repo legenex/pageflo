@@ -94,6 +94,15 @@ t(relationId(null) === null, 'an unset relationship is null, not 0')
 t(relationId(undefined) === null, 'an absent relationship is null')
 t(relationId({}) === null, 'a populated object with no id is null, not NaN')
 t(relationId('abc') === null, 'an unparseable id is null rather than NaN, which would compare false against everything and read as a denial by accident')
+// The object branch used to skip the finite check the scalar branch had.
+t(relationId({ id: 'abc' }) === null, 'a populated relationship with an unparseable id is null, not NaN')
+t(relationId('') === null, "an empty form field is null, not 0 - Number('') is 0 and so is Number(null), so a binding with a null site would have matched it")
+t(relationId('  ') === null, 'whitespace is null, not 0')
+t(relationId(false) === null, 'a boolean is not an id')
+t(relationId(true) === null, 'true is not id 1')
+t(relationId({ id: [] }) === null, 'an array-valued id is null, not 0')
+t(relationId([]) === null, 'an array is not an id')
+t(relationId('1abc') === null, 'a partially-numeric string is null')
 
 // --- requireSiteAdmin -------------------------------------------------------
 
@@ -144,7 +153,14 @@ t((await requireDomainSiteAdmin(payload, root, 200)).ok === true, 'a super admin
 }
 {
   const r = await requirePoolDomain(payload, alice, 100, 1)
-  t(r.ok === false && r.error === 'domain is already attached to a brand', 'an already-attached domain cannot be re-attached, which would move it between tenants')
+  t(r.ok === false && r.error === 'domain is already attached to a brand', 'a domain already attached to the caller\'s OWN site says so, because there it is useful')
+}
+{
+  // Found by the adversarial verifier: this leaked an oracle over the whole
+  // domain id space. Probe any id with your own siteId and the message told you
+  // whether it existed and belonged to somebody.
+  const r = await requirePoolDomain(payload, alice, 200, 1)
+  t(r.ok === false && r.error === 'domain not found', "ATTACK: probing bob's domain id while attaching to alice's own site must not confirm the id exists")
 }
 
 // --- requireDeploymentSiteAdmin ---------------------------------------------

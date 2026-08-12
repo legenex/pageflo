@@ -101,7 +101,11 @@ export async function detachDomainFromSite(args: { domainId: number; siteSlug?: 
   await payload.update({
     collection: 'domains',
     id: args.domainId,
-    data: { site: null, primary: false, status: 'pending', ssl_status: 'unknown' } as never,
+    // `plesk_domain_id` is cleared with the rest. It holds the HOST, and it is
+    // what `unprovisionDomainInPlesk` deletes an nginx conf and revokes a
+    // certificate for. Leaving it on a row that has just lost its owner meant a
+    // pool domain carried a live teardown target for a host nobody now guards.
+    data: { site: null, primary: false, status: 'pending', ssl_status: 'unknown', plesk_domain_id: null } as never,
     user: user as never,
     overrideAccess: false,
   })
@@ -161,6 +165,13 @@ export async function deletePoolDomain(args: { domainId: number }): Promise<{ ok
   if (domain.site) {
     const authz = await requireDomainSiteAdmin(payload, user, args.domainId)
     if (!authz.ok) return authz
+  } else if (!user.super_admin) {
+    // An UNATTACHED row has no Site to authorize against, so there is nobody it
+    // can be checked out to — which previously meant it was checked against
+    // nothing at all. That mattered because a pool row can still carry a
+    // `plesk_domain_id`, and the teardown below runs before the scoped delete.
+    // The pool is LegalOS-wide, so deleting from it is a super-admin act.
+    return { ok: false, error: 'only a super admin can delete an unassigned domain' }
   }
 
   const pleskId = domain.plesk_domain_id
