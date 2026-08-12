@@ -36,6 +36,7 @@ import {
   domainOptionLabel,
   PREVIEW_REQUIRES_SSL,
 } from '../src/lib/domain-eligibility.ts'
+import { siteScopedRead, siteScopedWrite, siteScopedAdmin } from '../src/access/index.ts'
 import type { AuthedUser } from '../src/lib/auth.ts'
 
 let pass = 0
@@ -184,6 +185,36 @@ t((await requireDomainSiteAdmin(payload, root, 200)).ok === true, 'a super admin
 {
   const r = await requireDeploymentSiteAdmin(payload, alice, { collection: 'funnel-lp-deployments', existingId: 901, incomingSiteId: 2 })
   t(r.ok === false, "ATTACK: alice cannot push her own deployment onto bob's site")
+}
+
+// --- the collection access filters ------------------------------------------
+//
+// Found by the adversarial pass and confirmed against a real login on a scratch
+// database: `siteBindings[].site` is a POPULATED OBJECT, because Users.auth sets
+// no depth and Payload reads the user at defaultDepth 2. These rules mapped it
+// straight into `{ site: { in: [...] } }`, the drizzle adapter coerced each
+// entry with Number(...) to NaN, and the filter matched nothing.
+//
+// Not a leak - the exact opposite, and total: every site-scoped read and write
+// failed for every non-super-admin. Before the fix, a user bound `admin` to a
+// Site could not update that Site. These assertions are the shape of the filter,
+// which is the part that was wrong.
+{
+  const argsFor = (user: unknown) => ({ req: { user } }) as never
+  const populated = { siteBindings: [{ site: { id: 3, name: 'Three' }, role: 'admin' }] }
+  const raw = { siteBindings: [{ site: 4, role: 'admin' }] }
+
+  const p = siteScopedAdmin(argsFor(populated))
+  t(typeof p === 'object' && JSON.stringify(p) === '{"site":{"in":[3]}}', 'a POPULATED binding yields the id, not the object - this is the whole defect')
+  const r = siteScopedAdmin(argsFor(raw))
+  t(typeof r === 'object' && JSON.stringify(r) === '{"site":{"in":[4]}}', 'a raw binding still works, so the unwrap did not break the other shape')
+
+  t(siteScopedAdmin(argsFor({ siteBindings: [{ site: { id: 3 }, role: 'editor' }] })) === false, 'an editor does not clear the admin bar')
+  const w = siteScopedWrite(argsFor({ siteBindings: [{ site: { id: 3 }, role: 'editor' }] }))
+  t(typeof w === 'object' && JSON.stringify(w) === '{"site":{"in":[3]}}', 'an editor does clear the write bar')
+  t(siteScopedRead(argsFor({ super_admin: true, siteBindings: [] })) === true, 'a super admin reads everything')
+  t(siteScopedRead(argsFor(null)) === false, 'an anonymous request reads nothing')
+  t(siteScopedRead(argsFor({ siteBindings: [{ site: null, role: 'admin' }] })) === false, 'a binding with a null site contributes no id rather than id 0')
 }
 
 // --- domain eligibility -----------------------------------------------------

@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { isSuperAdmin } from '../access'
+import { relationId } from '../lib/authz'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
 import { cascadeDeleteSiteChildren } from '../hooks/site-cascade'
 
@@ -11,22 +12,32 @@ export const Sites: CollectionConfig = {
     group: 'LegalOS',
   },
   access: {
+    // `b.site` is a POPULATED OBJECT: Users.auth sets no depth, so Payload reads
+    // the user at config.defaultDepth (2). Mapping it straight through put an
+    // object into the id filter, which the drizzle adapter coerces with
+    // Number(...) to NaN, matching nothing. `relationId` is the shared unwrap.
     read: ({ req }) => {
-      const user = req.user as { super_admin?: boolean; siteBindings?: Array<{ site: string | number }> } | null
+      const user = req.user as { super_admin?: boolean; siteBindings?: Array<{ site: unknown }> } | null
       if (!user) return false
       if (user.super_admin) return true
-      const ids = user.siteBindings?.map((b) => b.site) ?? []
+      const ids = (user.siteBindings ?? []).map((b) => relationId(b.site)).filter((v): v is number => v !== null)
       if (ids.length === 0) return false
       return { id: { in: ids } }
     },
     create: isSuperAdmin,
     update: ({ req, id }) => {
-      const user = req.user as { super_admin?: boolean; siteBindings?: Array<{ site: string | number; role: string }> } | null
+      const user = req.user as { super_admin?: boolean; siteBindings?: Array<{ site: unknown; role: string }> } | null
       if (!user) return false
       if (user.super_admin) return true
-      const adminSiteIds = user.siteBindings?.filter((b) => b.role === 'admin').map((b) => b.site) ?? []
+      const adminSiteIds = (user.siteBindings ?? [])
+        .filter((b) => b.role === 'admin')
+        .map((b) => relationId(b.site))
+        .filter((v): v is number => v !== null)
       if (!id) return adminSiteIds.length > 0
-      return adminSiteIds.includes(id)
+      // Compared as numbers. `id` arrives as a string on a REST call and as a
+      // number from the local API, so `includes` alone missed half the callers
+      // even once the binding side was unwrapped.
+      return adminSiteIds.includes(Number(id))
     },
     delete: isSuperAdmin,
   },
