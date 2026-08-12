@@ -318,14 +318,43 @@ value that authorizes.
     pnpm test             106 assertions, 0 failed
     pnpm sweep:templates  200/27/24/0 — unchanged
 
+## Gate 3 — create scoping, proven against a database (done)
+
+The verifier's finding A was the last cross-tenant hole with teeth, and it is
+closed. Payload's `create` operation calls `executeAccess` and only tests the
+result for truthiness, so a rule returning `{ site: { in: [1] } }` reads as
+"allowed" and the constraint is thrown away. `updateByID`/`deleteByID`
+`combineQueries` it against the existing row, which is why this bit only on
+create and why the scoping looked like it worked.
+
+Eight collections use a `siteScoped*` helper as their `create` rule.
+`src/hooks/enforce-site-binding.ts` is the guard, as a `beforeValidate` hook
+rather than a better access rule — no access rule can express it, because the
+operation never consults the filter. It covers update too: `combineQueries`
+constrains which ROW may be updated, never what it may be changed TO.
+
+`scripts/test-tenant-isolation.mts` runs the attacks against a real database and
+a real login, creating and removing its own fixtures. It exists because neither
+this bug nor the populated-binding one is expressible without a database — both
+were invisible to every unit test and to review.
+
+**Negative control** (hook temporarily neutered, then restored):
+
+    4 attacks SUCCEEDED   create Page · create primary Domain ·
+                          create TrackingConfig · move Page between tenants
+    restored              all refused
+
+The `Numbers` case was already blocked by something else. Worth recording rather
+than assuming: 4 of the 5 were live.
+
+    pnpm typecheck   exit 0
+    pnpm test:all    116 assertions, 0 failed (37 brand + 69 authz + 10 isolation)
+
+`pnpm test` stays database-free so it runs anywhere; `pnpm test:all` adds the
+isolation suite and needs `DATABASE_URI` and a migrated schema.
+
 ### Still open, from the verifier
 
-* **`Domains.access.create = siteScopedAdmin` is a no-op.** Verified against
-  Payload's source in `node_modules`: `create.js` only tests the access result
-  for truthiness and discards the returned `Where`, so any user with one admin
-  binding can `POST /api/domains` with another tenant's `site` and
-  `primary: true`. The pattern (a `siteScoped*` helper used as `create`) is
-  repeated across collections, so it is systemic and wants one pass.
 * **`attachDomainToSite` cannot succeed for a non-super-admin at all**, and
   fails as an uncaught throw: `updateByID` evaluates access against the row's
   *current* state, and a pool row's site is null. Detach works, so a site admin
@@ -362,3 +391,8 @@ publication. 90 assertions green, sweep unchanged.
 that made gate 1's publish button unreachable: site-scoped access control was
 failing closed for every non-super-admin, repo-wide. Fixed and proven against a
 real login. 106 assertions green, sweep unchanged.
+
+**2026-08-12** — Gate 3. Create scoping: eight collections accepted any tenant's
+site because Payload discards a create rule's Where. Closed with a hook and
+proven with a database-backed isolation suite, including a negative control that
+shows four attacks succeeding without it. 116 assertions green.
