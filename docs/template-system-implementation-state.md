@@ -265,6 +265,77 @@ gate nobody reads.
   `requireDeploymentSiteAdmin` exists and is tested; the three `save*Deployment`
   actions have not yet been converted to call it.
 
+## Gate 2 — the adversarial pass (done)
+
+`legalos-adversarial-verifier` was given the acceptance criteria and told to
+refute them, with no description of the implementation. It broke one claim,
+found a hole gate 1 left open, and predicted a defect that turned out to make
+gate 1's headline feature unreachable. All of that is now fixed; the findings it
+raised that are NOT fixed are listed under "Still open" below.
+
+### It was right about the publish button
+
+The prediction: `setSiteStatus` writes with `overrideAccess: false`, so if the
+collection filters are broken it throws for exactly the site admins the button
+is for. Tested against a real login on a scratch database rather than reasoned
+about:
+
+    user bound `admin` to a Site, real payload.login()
+    before   scoped update FAILED — "You are not allowed to perform this action"
+    after    scoped update SUCCEEDED
+
+The cause is repo-wide and predates this run. `Users.auth` sets no `depth`, so
+Payload reads the user at `config.defaultDepth` (2) and `siteBindings[].site`
+arrives as a **populated Site object**. `src/access/index.ts` mapped it straight
+into `{ site: { in: [...] } }`; the drizzle adapter coerces query values with
+`Number(...)`, so every entry became `NaN` and matched nothing. `Sites.ts` had
+the same mistake twice more in its own rules.
+
+**So site-scoped access control did not work for any non-super-admin, on any
+scoped collection.** Not a leak — the opposite, and total. It survived because
+the rule was never wrong about *who* should be allowed, only about what shape an
+id is, which reads as a permissions problem in whatever feature you are using
+rather than as one bug in one place.
+
+### What else it found, and what changed
+
+| Finding | Verdict | Action |
+|---|---|---|
+| `requirePoolDomain` said "already attached" for **any** tenant's domain | claim 5 **broken** — an oracle over the whole id space | said only when the caller is bound to the Site holding it |
+| `deletePoolDomain` gated only the attached branch | hole gate 1 left | pool deletion is now super-admin; `detachDomainFromSite` clears `plesk_domain_id`, which holds the HOST and is what the Plesk teardown revokes |
+| `relationId` skipped the finite check on the object branch | real | one guarded path; the new whitespace assertion then caught that `Number('   ')` is 0 too |
+| `removeDomain` promoted `others.docs[0]` unchecked | real | promotes only an eligible domain — primary is what the resolver's 301s point at |
+| `domain-eligibility.ts` claimed callers it does not have | real | header corrected to say what is wired (`mayBecomePrimary` only) |
+
+Claims 1, 2 and 3 it could not break, and it says what it tried: it enumerated
+all ten domain-action exports, and ran the real coercion table through
+`relationId` (`{id:'2'}`, `'0x2'`, `'1e2'`, `[]`, `' 5 '`, `NaN`) looking for a
+value that authorizes.
+
+### Evidence
+
+    pnpm typecheck        exit 0, 0 errors
+    pnpm test             106 assertions, 0 failed
+    pnpm sweep:templates  200/27/24/0 — unchanged
+
+### Still open, from the verifier
+
+* **`Domains.access.create = siteScopedAdmin` is a no-op.** Verified against
+  Payload's source in `node_modules`: `create.js` only tests the access result
+  for truthiness and discards the returned `Where`, so any user with one admin
+  binding can `POST /api/domains` with another tenant's `site` and
+  `primary: true`. The pattern (a `siteScoped*` helper used as `create`) is
+  repeated across collections, so it is systemic and wants one pass.
+* **`attachDomainToSite` cannot succeed for a non-super-admin at all**, and
+  fails as an uncaught throw: `updateByID` evaluates access against the row's
+  *current* state, and a pool row's site is null. Detach works, so a site admin
+  can detach a domain and never re-attach it.
+* **`createPoolDomain` allows host squatting** — `host` is unique and
+  pre-checked, so any admin can permanently deny a host to the tenant that needs
+  it.
+* **Stale comments promise an auto-verify poller that does not exist**;
+  `recheckDomainDns` and `removeDomain` have zero callers in `src/`.
+
 ## Note on the production build
 
 `pnpm build` was attempted three times and terminated with SIGTERM (143) each
@@ -286,3 +357,8 @@ already closed and two documents found stale. SSH access found unavailable.
 **2026-08-12** — Gate 1. Five scouts; eight cross-tenant defects found, six
 closed. Authorization seam, domain-eligibility contract, explicit Site
 publication. 90 assertions green, sweep unchanged.
+
+**2026-08-12** — Gate 2. Adversarial pass broke one claim and found the hole
+that made gate 1's publish button unreachable: site-scoped access control was
+failing closed for every non-super-admin, repo-wide. Fixed and proven against a
+real login. 106 assertions green, sweep unchanged.
