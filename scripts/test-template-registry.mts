@@ -382,11 +382,34 @@ t(
     'the public quiz resolver resolves through the template records',
   )
 
-  // The save paths must refuse, not canonicalise-or-shrug.
+  /*
+   * BOTH save paths must resolve a quiz template through the RECORDS.
+   *
+   * They did not agree: the quiz side asked the records and the landing-page
+   * side asked the code registry for `embedded_quiz_template_id`, where a clone
+   * names nothing by design. So the LP editor offered every enabled record —
+   * clones included — and the save then rejected the whole form, losing every
+   * other edit on it. Asserted as "neither calls the registry helper directly"
+   * rather than "both call the shared one", because the failure mode is reaching
+   * PAST the seam, and a new caller can always be added.
+   */
   const quizActions = readFileSync(join(SRC, 'app/(app)/admin/(top)/quizzes/actions.ts'), 'utf8')
-  t(/canonicalTemplateId\(\s*'quiz'/.test(quizActions), 'saving a quiz deployment validates its template id')
-  t(/if\s*\(!template\.ok\)\s*return/.test(quizActions), 'and refuses the save when it does not resolve')
   const lpActions = readFileSync(join(SRC, 'app/(app)/admin/(top)/landing-pages/actions.ts'), 'utf8')
+  for (const [label, src] of [['quiz', quizActions], ['landing-page', lpActions]] as const) {
+    t(
+      /resolveQuizTemplateSelection/.test(src),
+      `the ${label} save path resolves a quiz template through the records`,
+    )
+    t(
+      !/canonicalTemplateId\(\s*'quiz'/.test(src),
+      `the ${label} save path does not reach past the records to the code registry (a clone names nothing there)`,
+    )
+  }
+  t(
+    /resolveLpTemplateSelection/.test(lpActions),
+    'saving a landing-page deployment checks the template record is selectable, not merely that its renderer exists',
+  )
+  t(/if\s*\(!template\.ok\)\s*return/.test(quizActions), 'and refuses the save when it does not resolve')
   t(/canonicalTemplateId\(\s*'lp'/.test(lpActions), 'saving a landing page validates its template id')
   t(/if\s*\(!template\.ok\)\s*return/.test(lpActions), 'and refuses the save when it does not resolve')
 }

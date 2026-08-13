@@ -396,9 +396,13 @@ export const lpDeploymentPreflight = async (
         ? pass('embedded-flow-published', 'The embedded quiz flow is published')
         : fail('embedded-flow-published', 'The embedded quiz flow is published', quiz?.is_archived ? 'it is archived' : 'it is not published'),
     )
+    // Through the RECORDS, like every other template check. Asking the code
+    // registry here refused every cloned skin, which is the same defect the
+    // landing-page save carried.
     const skin = str(deployment.embedded_quiz_template_id)
     if (skin) {
-      checks.push(checkTemplateResolves('quiz', skin, { id: 'embedded-quiz-template', label: 'Embedded quiz visual template resolves' }))
+      const check = await checkQuizTemplateRecord(ctx.payload, skin)
+      checks.push({ ...check, id: 'embedded-quiz-template', label: 'Embedded quiz visual template is available' })
     }
     checks.push(...checkQuizGraph(quiz))
     checks.push(checkConsent(quiz))
@@ -417,10 +421,29 @@ export const lpDeploymentPreflight = async (
           ? pass('embedded-quiz-tenant', 'The embedded quiz belongs to this brand')
           : fail('embedded-quiz-tenant', 'The embedded quiz belongs to this brand', 'it belongs to a different brand'),
       )
-      checks.push(checkTemplateResolves('quiz', quizDeployment.template_id, {
-        id: 'embedded-quiz-template',
-        label: 'Embedded quiz visual template resolves',
-      }))
+      /*
+       * The borrowed quiz deployment must be LIVE, and this is the check that
+       * earns its keep now.
+       *
+       * A landing page that binds a quiz it cannot resolve refuses to serve —
+       * a live lead-generation page with no form on it captures nothing and
+       * nothing in the funnel reports that as an error, so refusing is the
+       * safer failure. But the coupling is invisible: pausing the quiz
+       * deployment at `/s/<brand>` takes the brand's landing page at
+       * `/c/<brand>` to a 404, and the only other evidence is a log line. Every
+       * brand seeded by `seedStarterFunnelsForBrand` has exactly that pair.
+       */
+      checks.push(
+        String(quizDeployment.status ?? '') === 'live'
+          ? pass('embedded-quiz-live', 'The embedded quiz deployment is live')
+          : fail(
+              'embedded-quiz-live',
+              'The embedded quiz deployment is live',
+              `it is ${String(quizDeployment.status ?? 'draft')}, and this page does not serve without its form`,
+            ),
+      )
+      const borrowed = await checkQuizTemplateRecord(ctx.payload, str(quizDeployment.template_id))
+      checks.push({ ...borrowed, id: 'embedded-quiz-template', label: 'Embedded quiz visual template is available' })
       checks.push(...checkQuizGraph(quiz))
       checks.push(checkConsent(quiz))
     }

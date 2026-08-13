@@ -15,6 +15,7 @@
  */
 import type { Payload } from 'payload'
 import { SAMPLE_LP_DEPLOYMENTS } from '@/components/builder/lp/section-copy'
+import { ensureTemplateLibrary } from '@/lib/template-records'
 import { buildSeedQuiz } from '@/components/builder/quiz/seed-data'
 import { advBuildSeedAdvertorials } from '@/components/builder/advertorial/seed-data'
 
@@ -299,6 +300,18 @@ export const seedStarterFunnelsForBrand = async (
   siteId: number,
 ): Promise<StarterFunnelsResult | { ok: false; error: string }> => {
   const warnings: string[] = []
+
+  /*
+   * The library has to exist before a starter can bind to it.
+   *
+   * This is reached from `createBrandSite` as well as from the builder pages,
+   * and only the builder pages materialised the templates. So a brand created
+   * after a deploy but before anyone opened Landing Pages or Quizzes got no LP
+   * deployment at all — self-healing on the next builder visit, which is a
+   * confusing thing to have to discover. `ensureTemplateLibrary` is latched and
+   * never throws, so this costs nothing on the common path.
+   */
+  await ensureTemplateLibrary(payload)
 
   // Per-step try/catch so one failure (e.g. clashing brandless-quiz slug,
   // missing domain) doesn't take down the rest. The function still returns

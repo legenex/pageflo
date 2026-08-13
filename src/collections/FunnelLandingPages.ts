@@ -1,6 +1,11 @@
 import type { CollectionConfig } from 'payload'
 import { isAuthenticated } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
+import {
+  guardLpTemplateDelete,
+  guardStockLpTemplateIdentity,
+  guardLpSlotOverrides,
+} from '../hooks/template-guards'
 import { resolveTemplate } from '../lib/template-registry'
 
 /**
@@ -51,7 +56,16 @@ export const FunnelLandingPages: CollectionConfig = {
     update: isAuthenticated,
     delete: isAuthenticated,
   },
+  /*
+   * The guards are hooks rather than rules inside the server actions, because
+   * the actions are not the only door: this collection is `isAuthenticated` on
+   * all four verbs and a row is now the TEMPLATE every brand deploys, so a
+   * `/cms` delete would null `landing_page_id` on every other tenant's
+   * deployment of it. See src/hooks/template-guards.ts.
+   */
   hooks: {
+    beforeChange: [guardStockLpTemplateIdentity, guardLpSlotOverrides],
+    beforeDelete: [guardLpTemplateDelete],
     afterChange: [auditAfterChange],
     afterDelete: [auditAfterDelete],
   },

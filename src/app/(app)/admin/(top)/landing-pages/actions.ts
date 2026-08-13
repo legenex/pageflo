@@ -9,6 +9,7 @@ import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { invokeLLM } from '@/lib/ai/invoke'
 import { canonicalTemplateId, resolveTemplate } from '@/lib/template-registry'
+import { resolveQuizTemplateSelection, resolveLpTemplateSelection } from '@/lib/template-records/select'
 import { relationId, requireDeploymentSiteAdmin } from '@/lib/authz'
 import { asSlotted } from '@/lib/lp-templates'
 import { validateOverrides } from '@/lib/lp-slots/model'
@@ -69,6 +70,20 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
   })
   if (!gate.ok) return gate
 
+  /*
+   * What the row carries TODAY.
+   *
+   * Both template selections below are checked for selectability only when they
+   * CHANGE. Disabling a template stops it being chosen; it must not freeze the
+   * path and status edits of the deployments already on it, or tidying the
+   * library takes working pages hostage.
+   */
+  const existing = isExisting
+    ? ((await payload
+        .findByID({ collection: 'funnel-lp-deployments', id: dep.id as string, depth: 0, overrideAccess: true })
+        .catch(() => null)) as Record<string, unknown> | null)
+    : null
+
   // The template lives on the brandless page, not on the deployment, so this is
   // where a deployment learns its page's template does not resolve. Publishing
   // that would put a page nobody chose on a real host; refusing at save is the
@@ -80,6 +95,20 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
       .findByID({ collection: 'funnel-landing-pages', id: lpId, overrideAccess: true })
       .catch(() => null)) as Record<string, unknown> | null
     if (!lpDoc) return { ok: false, error: 'landing page not found' }
+
+    /*
+     * The RECORD, not just its renderer id.
+     *
+     * This checked only that the page's `template_id` named something the code
+     * registry knows, which says nothing about whether the template is enabled
+     * or has been deleted — so a disabled or archived landing-page template was
+     * fully deployable. Passing the row this deployment is already on means
+     * disabling a template stops it being CHOSEN without freezing the path and
+     * status edits of the deployments already on it.
+     */
+    const selection = await resolveLpTemplateSelection(payload, lpId, existing?.landing_page)
+    if (!selection.ok) return { ok: false, error: `landing page template: ${selection.error}` }
+
     const template = canonicalTemplateId('lp', lpDoc.template_id)
     if (!template.ok) return { ok: false, error: `landing page template: ${template.error}` }
 
@@ -109,11 +138,23 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
     }
   }
 
-  // The embedded quiz's skin. Validated exactly as the standalone one is: a
-  // skin that names nothing would draw the embed in a template nobody chose.
+  /*
+   * The embedded quiz's skin, resolved through the RECORDS.
+   *
+   * This asked `canonicalTemplateId`, which consults the code registry — where a
+   * cloned template names nothing by design. So the editor offered every enabled
+   * record in its dropdown, including clones, and the save then rejected the
+   * whole form: the operator lost every other edit and was told the id they had
+   * just picked from a list did not exist. Same helper as the standalone quiz
+   * side now, so the two cannot disagree again.
+   */
   let embeddedTemplateId = ''
   if (dep.embeddedQuizTemplateId) {
-    const t = canonicalTemplateId('quiz', dep.embeddedQuizTemplateId)
+    const t = await resolveQuizTemplateSelection(
+      payload,
+      dep.embeddedQuizTemplateId,
+      existing?.embedded_quiz_template_id,
+    )
     if (!t.ok) return { ok: false, error: `embedded quiz template: ${t.error}` }
     embeddedTemplateId = t.id
   }

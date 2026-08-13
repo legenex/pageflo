@@ -248,6 +248,92 @@ const main = async (): Promise<void> => {
     'and specifically does not fall back to the neutral skin',
   )
 
+  /* ------------------------------ the guards hold on the RAW doors too */
+
+  /*
+   * Everything below bypasses the server actions deliberately.
+   *
+   * The refusals used to live only in `template-actions.ts`, and both template
+   * collections are `isAuthenticated` on all four verbs with no `site` on them
+   * — so `DELETE /api/funnel-landing-pages/:id` and the raw `/cms` UI walked
+   * straight past all of it. A row is the TEMPLATE every brand deploys and the
+   * foreign key is ON DELETE SET NULL, so one delete would have 404d every
+   * other tenant's page and destroyed the reference rather than archiving it.
+   */
+  const refused = async (label: string, fn: () => Promise<unknown>): Promise<void> => {
+    try {
+      await fn()
+      fail++
+      console.log('  FAIL ' + label + ' (it SUCCEEDED)')
+    } catch {
+      pass++
+    }
+  }
+
+  await refused('deleting a REFERENCED landing-page template is refused on the raw door', () =>
+    payload.delete({ collection: 'funnel-landing-pages', id: B.id, overrideAccess: true }),
+  )
+  t(
+    (await payload.findByID({ collection: 'funnel-landing-pages', id: B.id, overrideAccess: true }).catch(() => null)) !== null,
+    'and the template is still there afterwards',
+  )
+  t(
+    (await resolveLpDeployment(siteId, HOST, `/${RUN}-b`, false)) !== null,
+    'and the deployment that referenced it still serves',
+  )
+
+  await refused('changing a STOCK template\'s renderer is refused on the raw door', () =>
+    payload.update({
+      collection: 'funnel-landing-pages',
+      id: A.id,
+      data: { template_id: B.templateId } as never,
+      overrideAccess: true,
+    }),
+  )
+  await refused('changing a stock template\'s library id is refused', () =>
+    payload.update({
+      collection: 'funnel-landing-pages',
+      id: A.id,
+      data: { stock_key: 'something_else' } as never,
+      overrideAccess: true,
+    }),
+  )
+  await refused('template copy naming a slot that does not exist is refused on the raw door', () =>
+    payload.update({
+      collection: 'funnel-landing-pages',
+      id: A.id,
+      data: { slot_overrides: { s99_headline_404: 'copy nobody will ever see' } } as never,
+      overrideAccess: true,
+    }),
+  )
+
+  // Editing a stock template's WORDS is the thing an operator is meant to do.
+  const realSlot = (await import('../src/lib/lp-templates/index.ts')).PORTED_TEMPLATES
+    .find((x) => x.slug === A.templateId)?.slots?.find((sl) => sl.role === 'headline')
+  if (realSlot) {
+    await payload.update({
+      collection: 'funnel-landing-pages',
+      id: A.id,
+      data: { slot_overrides: { [realSlot.id]: 'Our own words' } } as never,
+      overrideAccess: true,
+    })
+    const edited = await payload.findByID({ collection: 'funnel-landing-pages', id: A.id, depth: 0, overrideAccess: true })
+    t(
+      (edited?.slot_overrides as Record<string, string>)?.[realSlot.id] === 'Our own words',
+      'but rewriting a stock template\'s copy is allowed — that is the point of the library',
+    )
+    await payload.update({
+      collection: 'funnel-landing-pages',
+      id: A.id,
+      data: { slot_overrides: {} } as never,
+      overrideAccess: true,
+    })
+  }
+
+  await refused('deleting a REFERENCED quiz template is refused on the raw door', () =>
+    payload.delete({ collection: 'funnel-quiz-templates', id: cloneRec.id, overrideAccess: true }),
+  )
+
   /* ------------------- a DISABLED template keeps existing deployments rendering */
 
   await payload.update({

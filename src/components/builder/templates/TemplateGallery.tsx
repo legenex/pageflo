@@ -175,7 +175,20 @@ const PreviewModal = ({ template, kind, brand, onClose }) => {
         onClick={(e) => e.stopPropagation()}
         style={{ flex: 1, minHeight: 0, display: 'grid', placeItems: 'start center', overflow: 'auto' }}
       >
-        {kind === 'lp' ? (
+        {template.rendererError ? (
+          /*
+           * The card guards this and the modal did not, so Preview on a broken
+           * row drew template zero under the broken template's name and code —
+           * the exact substitution this change exists to remove, surviving in
+           * the one place an operator goes to check what a template looks like.
+           */
+          <div style={{ padding: 28, maxWidth: 520, textAlign: 'center', color: T.red, fontSize: 12.5, lineHeight: 1.6 }}>
+            {template.rendererError}
+            <div style={{ color: T.textMute, marginTop: 10 }}>
+              Another design is not shown in its place: that would look like a working template.
+            </div>
+          </div>
+        ) : kind === 'lp' ? (
           // Inline for the same reason the thumbnail is: an iframe here paints
           // nothing. Scaled to the chosen device width so a mobile preview is a
           // real narrow render rather than a squeezed desktop one.
@@ -324,6 +337,19 @@ export const TemplateGallery = ({
    */
   const selectionMissing = selectedId && !templates.some((t) => idOf(t) === selectedId)
 
+  /*
+   * A stored id with no record is not automatically broken.
+   *
+   * Three live quiz deployments still carry legacy aliases like `default`, and
+   * `resolveQuizTemplateRecordForRender` resolves those through the code
+   * registry on purpose — they render fine. Telling the operator "nothing will
+   * be rendered" would be false for exactly the rows the banner appears on, and
+   * a warning that is wrong the first time somebody checks it is a warning
+   * nobody reads the second time.
+   */
+  const selectionResolvesInCode =
+    Boolean(selectionMissing) && kind === 'quiz' && resolveTemplate('quiz', selectedId).ok
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {(onBrandChange || families.length > 1) && (
@@ -354,11 +380,26 @@ export const TemplateGallery = ({
 
       {selectionMissing && (
         <div
-          data-template-selection-missing="true"
-          style={{ padding: 12, borderRadius: 8, border: `1px solid ${T.red}`, color: T.red, fontSize: 11.5 }}
+          data-template-selection-missing={selectionResolvesInCode ? 'legacy' : 'true'}
+          style={{
+            padding: 12,
+            borderRadius: 8,
+            border: `1px solid ${selectionResolvesInCode ? T.warning : T.red}`,
+            color: selectionResolvesInCode ? T.warning : T.red,
+            fontSize: 11.5,
+          }}
         >
-          This deployment stores template id <strong>{selectedId}</strong>, which is not in the library.
-          Nothing will be rendered in its place — pick a template below before publishing.
+          {selectionResolvesInCode ? (
+            <>
+              This deployment stores the legacy id <strong>{selectedId}</strong>, which still renders but is
+              not in the library. Pick a template below to move it onto one.
+            </>
+          ) : (
+            <>
+              This deployment stores template id <strong>{selectedId}</strong>, which is not in the library.
+              Nothing will be rendered in its place — pick a template below before publishing.
+            </>
+          )}
         </div>
       )}
 

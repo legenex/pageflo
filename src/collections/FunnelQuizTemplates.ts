@@ -1,6 +1,7 @@
 import type { CollectionConfig, Validate } from 'payload'
 import { isAuthenticated } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
+import { guardQuizTemplateDelete, guardStockQuizTemplateIdentity } from '../hooks/template-guards'
 import { resolveTemplate } from '../lib/template-registry'
 import { QUIZ_TEMPLATE_ID_PATTERN } from '../lib/template-records/id'
 
@@ -72,7 +73,10 @@ export const FunnelQuizTemplates: CollectionConfig = {
     update: isAuthenticated,
     delete: isAuthenticated,
   },
+  // See FunnelLandingPages: the server actions are not the only door.
   hooks: {
+    beforeChange: [guardStockQuizTemplateIdentity],
+    beforeDelete: [guardQuizTemplateDelete],
     afterChange: [auditAfterChange],
     afterDelete: [auditAfterDelete],
   },
