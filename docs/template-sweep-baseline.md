@@ -43,7 +43,9 @@ actually renders a landing page today.
 ```
 36 templates × 13 fixtures
 200 template violations
- 27 fixture assertion failures
+ 25 fixture assertion failures  (27 when this baseline was first cut; two
+                                 cleared by later template work — re-measured
+                                 2026-08-13 on the integration branch)
  24 dead brand variables
   0 import-boundary breaches
 ```

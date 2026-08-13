@@ -328,6 +328,33 @@ five templates.
 
 **What an operator sees meanwhile:** nothing. This is the one place in the
 change where a failure is still silent, and it should be the next thing done.
+
+## RESOLVED at integration (2026-08-13)
+
+The section above described this branch in isolation, and it was the next
+thing done — on the release branch, in parallel. The integration branch
+carries both, and the requirement is now met on the first-class template
+records this document introduced:
+
+* The mount boundary is semantic, not guessed: `src/lib/lp-slots/quiz-mount.ts`
+  and the extractor (`scripts/extract-lp-templates.mjs`) refuse to write a
+  template without exactly one mount, and all twelve stock records resolve to
+  code modules that carry one (`generated-index.json`).
+* `PortedTemplateView` accepts `quiz`/`quizCtx` and portals the shared
+  `QuizRuntime` into the reference's own card
+  (`src/components/builder/lp/PortedTemplate.tsx`); the drawn answer tiles are
+  REPLACED in the mounted HTML, not left beside the runtime. A context without
+  a quiz (gallery card, editor before a flow is chosen) renders the reference's
+  inert drawing instead of a mount hole.
+* The resolver refuses to serve a ported page whose quiz cannot mount
+  (`src/lib/lp-deployment.ts`), the publish preflight blocks it earlier
+  (`quiz-bound` in `src/lib/publish-lifecycle.ts`), and the failure is no
+  longer silent: the admin deployment list names dangling legacy pointers.
+* Proven end to end in a production build: `pnpm test:e2e` drives a real
+  browser through an LP-embedded flow — answers advance, backtracking clears
+  stale state, consent renders, and exactly one lead POST produces exactly one
+  lead row. `pnpm test:ui` proves the same public page serves per-template
+  markers for two different templates under one brand.
 The recommendation architecture the brief asks to preserve is already in place
 and correct (`RECOMMENDED_QUIZ_BY_LP`, the override dropdown, and
 `resolveEmbeddedQuiz` hydrating through the standalone path) — it feeds a

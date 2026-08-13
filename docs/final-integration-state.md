@@ -71,6 +71,34 @@ here.
    merged rule (a ported LP whose funnel cannot mount is not served) is the
    product behavior, and identity fixtures must be servable to test identity.
 
+## Progress since the first checkpoint (2026-08-13, later)
+
+- **Production-only sign-in crash FOUND AND FIXED.** The merged module set
+  made the long-standing `access → authz → auth → payload.config →
+  collections → access` import ring evaluate in a crashing order in the
+  production chunker only (`Cannot access before initialization`; dev was
+  fine, which is why every dev-mode browser proof missed it). Fixed
+  structurally: `relationId` extracted to leaf `lib/relation-id.ts`;
+  `lib/auth.ts` + `lib/site-resolver.ts` import `@payload-config` lazily.
+  Sign-in verified in a production build.
+- **Gallery empty-box (R1) fixed**: `PortedTemplateView` renders the
+  mount-holed HTML only when a runtime will fill it; quiz-less admin contexts
+  get the reference's inert card drawing.
+- **Sample seeding defect fixed**: seedBase created live LP deployments
+  before the flow existed (no binding → correctly refused → live 404s).
+  Flow now seeds first and is bound directly; `healUnboundSampleLps` runs
+  before the seeded-marker early-return and heals recognized sample rows only.
+- **Suites on the integrated branch**: unit 2,565 (11 suites) · isolation 12 ·
+  identity 33 · release 27 · bootstrap 55 · dom 357 · **ui 85/85 (production
+  build, real login)** · **e2e 34/34 (production, exactly-one-lead)** ·
+  sweep runs 36×13 with the documented baseline (200/25/24 — see
+  docs/template-sweep-baseline.md; 25 ≤ the 27 first cut).
+- **Docs amended**: template-model-correction.md carries a dated RESOLVED
+  section; sweep baseline re-measured; requirements-traceability.md drafted.
+- **In flight (builder agents)**: quiz "Create with Claude" (B-C),
+  requirement-H browser checks incl. mobile/keyboard/console (B-F),
+  security G1/G2/G3 + raw-door publish context gate + negative controls (B-E).
+
 ## Known open work (gates not yet run)
 
 - **Gallery empty-box regression (R1, scouts 2+6):** release's
