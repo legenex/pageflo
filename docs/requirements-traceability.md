@@ -58,7 +58,7 @@ merged in.
 |---|---|---|---|
 | R4.1 | Tabs exactly Quiz Flows \| Templates \| Deployments | `test:ui` quiz-tab assertions | PASS |
 | R4.2 | 20 stock quiz templates as manageable records | `test:identity` "twenty records"; `test:records` | PASS |
-| R4.3 | Template CRUD incl. create custom + with Claude | `test:ui`; createQuizTemplateWithClaude (B-C) | IN PROGRESS |
+| R4.3 | Template CRUD incl. create custom + with Claude | `test:ui`; createQuizTemplateWithClaude + AINewQuizTemplateWizard; `test:ai` 100 | PASS |
 | R4.4 | Stable template id separate from renderer key; clones use existing renderer + own config | funnel-quiz-templates schema (template_id vs renderer_key) | PASS |
 | R4.5 | Disabled: not selectable for new; existing keep rendering + admin warning | `test:identity` disable case; `test:ui` warning assertions | PASS |
 | R4.6 | Unknown template ids fail visibly, never default/first-template | `test:identity` bad-id refuses; hydrateQuizDeployment → 404 + log | PASS |
@@ -100,7 +100,7 @@ merged in.
 
 | ID | Requirement | Proof | Status |
 |---|---|---|---|
-| R8.1 | New-with-Claude creates real records (LP + quiz) | LP wizard (merged) + quiz wizard (B-C) | IN PROGRESS |
+| R8.1 | New-with-Claude creates real records (LP + quiz) | LP wizard (merged) + quiz wizard; `test:ai` 100 incl. refusal cases | PASS |
 | R8.2 | LP AI output conforms to section/content/mount schema; quiz AI to visual-config schema | zod schemas via invokeLLM forced tool_use | PASS |
 | R8.3 | No arbitrary executable code; unsafe HTML/unknown slot/missing mount refused | validateOverrides + schema closure; `test:ai` negative cases | PASS |
 | R8.4 | AI unavailable / invalid schema / partial acceptance / human edit / reset / clone-after-AI / selection / preview / render identity | `test:ai` 58 + records/identity suites | PASS |
@@ -111,7 +111,7 @@ merged in.
 |---|---|---|---|
 | R9.1 | Dedicated publish/unpublish lifecycle; preflight on publish AND resume; down never gated | publish-actions + decideTransition; `test:publish` 184 | PASS |
 | R9.2 | THE preflight list (authz, parent, template enabled+identity, flow validation, brand, consent, overrides, destinations, tracking, domain ownership/eligibility, path claims, hydration, LP mount) | publish-lifecycle.ts checks; `test:publish` names each | PASS |
-| R9.3 | Every publish door preflights (UI save path included) | saveDeployment/saveQuizDeployment delegate live-flips to set*DeploymentStatus (done); raw-door context gate (B-E) pending | IN PROGRESS |
+| R9.3 | Every publish door preflights (UI save path included) | saveDeployment/saveQuizDeployment delegate live-flips; deployment-tenancy hook refuses unpreflighted userful go-lives (context stamp from the one preflighted door); `test:isolation` 44 | PASS |
 | R9.4 | One effective-path model across Pages/quiz/LP deployments | src/lib/path-claims.ts; `test:publish` path sections | PASS |
 | R9.5 | Unpublish preserves records, removes public access; admins keep draft preview | resolver status filters + includeUnpublished re-verified auth | PASS |
 | R9.6 | Domain eligibility not weakened | domain-eligibility.ts single contract; `test:publish` domain-ssl warning case | PASS |
@@ -122,11 +122,12 @@ merged in.
 | ID | Requirement | Proof | Status |
 |---|---|---|---|
 | R10.1 | Template raw doors: no stock delete, no identity rewrite, no disabled-selection via REST/CMS/local | template-guards hooks; `test:records` | PASS |
-| R10.2 | Tenant isolation: no cross-tenant template/deployment writes, no cross-bind of flow/domain, no cross-tenant unpublished reads, no preview-header crossing | authz gates (done); deployment-tenancy hook + extended `test:isolation` (B-E) pending; `test:authz` 69 | IN PROGRESS |
+| R10.2 | Tenant isolation: no cross-tenant template/deployment writes, no cross-bind of flow/domain, no cross-tenant unpublished reads, no preview-header crossing | authz gates + deployment-tenancy hook on all three deployment collections; `test:isolation` 44 (attacks + positive controls), `test:authz` 69; preview bypass re-verifies auth in the route | PASS |
 | R10.3 | SSRF/TrustedForm host/webhook target/image-host/XSS/log-redaction preserved | union verified (scout-security); webhook 133 + brand-identity 721 + observability 44 | PASS |
 | R10.4 | overrideAccess uses documented/justified | scout-security audit: no unjustified elevated write | PASS |
-| R10.5 | Negative controls: disable guard → test fails for the right reason → restore | B-E three-control confirmation pending | IN PROGRESS |
-| R10.6 | Advertorial deployment actions gated (G1) | advertorials/actions.ts + requireDeploymentSiteAdmin (B-E) | IN PROGRESS |
+| R10.5 | Negative controls: disable guard → test fails for the right reason → restore | three controls run: advertorial gate off → 2 named failures; tenancy hook off → 16 attack assertions fail as vulnerabilities; preflight-context off → exactly the two unpreflighted-publish cases fail. Restored, 44/44 green | PASS |
+| R10.6 | Advertorial deployment actions gated (G1) | advertorials/actions.ts: save/delete via requireDeploymentSiteAdmin + domain-brand check, site derived from the gate | PASS |
+| R10.7 | Audited users deletable; audit rows outlive their author | AuditLog.user optional + 20260813_230000 migration; `test:bootstrap` 58 proves delete + surviving row with author nulled | PASS |
 
 ## 11 · Migration & release (section 16)
 
