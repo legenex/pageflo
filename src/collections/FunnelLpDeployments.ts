@@ -1,14 +1,19 @@
 import type { CollectionConfig } from 'payload'
 import { isAuthenticated } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
-import { resolveTemplate } from '../lib/template-registry'
+import { validateStoredQuizTemplateId } from '../lib/template-records/id'
 
-/** See FunnelLandingPages: the server actions are not the only writer. */
-const validateQuizTemplateId = (value: unknown): true | string => {
-  if (value == null || value === '') return true
-  const r = resolveTemplate('quiz', value)
-  return r.ok ? true : r.error
-}
+/**
+ * See FunnelLandingPages: the server actions are not the only writer.
+ *
+ * SHAPE, not existence. Quiz templates are records now, and a clone's
+ * `template_id` names no code renderer by design, so checking against the code
+ * registry here would refuse every cloned skin at every door. Existence is
+ * checked where a database read is safe — the server action, the publish
+ * preflight, and the render path, which refuses to serve rather than drawing a
+ * stand-in. `src/lib/template-records/id.ts` states the full division.
+ */
+const validateQuizTemplateId = validateStoredQuizTemplateId
 
 // A deployment binds a brandless FunnelLandingPage to a brand (Site) + domain +
 // path, and (later) a quiz deployment. Mirrors the artifact's LPDeployment.

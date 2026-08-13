@@ -353,10 +353,34 @@ t(
   t(/resolveForRender\(\s*'lp'/.test(lpRender), "the LP builder's templateFor resolves through the registry")
   const quizTheme = readFileSync(join(SRC, 'lib/quiz-theme.ts'), 'utf8')
   t(/resolveForRender\(\s*'quiz'/.test(quizTheme), 'quiz-theme resolves through the registry')
+  /*
+   * The two PUBLIC resolvers are held to a stronger rule than the builder
+   * seams above: they must not call `resolveForRender` at all.
+   *
+   * That function exists so a render path cannot 500 over a bad row, and it
+   * pays for that by returning a stand-in. On a public deployment the stand-in
+   * IS the bug — it serves a different law firm's design than the one an
+   * operator chose, and the only evidence is that the page looks wrong. Both
+   * resolvers refuse now, and refusing is only meaningful if nothing downstream
+   * quietly supplies a substitute.
+   */
   const quizDep = readFileSync(join(SRC, 'lib/quiz-deployment.ts'), 'utf8')
-  t(/resolveForRender\(\s*'quiz'/.test(quizDep), 'the public quiz deployment resolver goes through the registry')
   const lpDep = readFileSync(join(SRC, 'lib/lp-deployment.ts'), 'utf8')
-  t(/resolveForRender\(\s*'lp'/.test(lpDep), 'the public LP deployment resolver goes through the registry')
+  const calls = (src: string, fn: string): boolean =>
+    src
+      .split('\n')
+      .some((l) => !/^\s*(\/\/|\*|\/\*)/.test(l) && new RegExp(`\\b${fn}\\(`).test(l))
+
+  t(!calls(quizDep, 'resolveForRender'), 'the public quiz resolver never draws a stand-in template')
+  t(!calls(lpDep, 'resolveForRender'), 'the public LP resolver never draws a stand-in template')
+  t(/REFUSED/.test(quizDep), 'the public quiz resolver refuses an unresolvable template, by name')
+  t(/REFUSED/.test(lpDep), 'the public LP resolver refuses an unresolvable template, by name')
+  // The quiz resolver must reach the RECORD, not the code registry: a cloned
+  // template's id names no renderer, which is the point of the two id fields.
+  t(
+    /getQuizTemplateRecordByTemplateId/.test(quizDep),
+    'the public quiz resolver resolves through the template records',
+  )
 
   // The save paths must refuse, not canonicalise-or-shrug.
   const quizActions = readFileSync(join(SRC, 'app/(app)/admin/(top)/quizzes/actions.ts'), 'utf8')

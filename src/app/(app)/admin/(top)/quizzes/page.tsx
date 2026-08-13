@@ -6,6 +6,7 @@ import { QuizBuilderApp } from '@/components/builder/quiz/QuizBuilderApp'
 import { buildBrandsFromSites } from '@/lib/brand-map'
 import { ensureFunnelSamples, ensureStarterFunnelsForAllBrands } from '@/lib/funnel-samples'
 import { ensureBrandTokensSyncedForAllBrands } from '@/app/(app)/admin/(top)/brands/brand-identities/actions'
+import { ensureTemplateLibrary, listQuizTemplateRecords } from '@/lib/template-records'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,11 +17,20 @@ export default async function QuizzesPage() {
   await ensureFunnelSamples(payload)
   await ensureStarterFunnelsForAllBrands(payload)
   await ensureBrandTokensSyncedForAllBrands()
-  const [qRes, depRes, sitesRes, domainsRes] = await Promise.all([
+  // Before the list read, not beside it: the stock rows have to exist before
+  // anything asks what templates there are, or the first render of a fresh
+  // database shows an empty library and the operator's first impression is that
+  // the twenty templates are gone.
+  await ensureTemplateLibrary(payload)
+  const [qRes, depRes, sitesRes, domainsRes, quizTemplates] = await Promise.all([
     payload.find({ collection: 'funnel-quizzes', limit: 500, sort: '-updatedAt', overrideAccess: true }),
     payload.find({ collection: 'funnel-quiz-deployments', limit: 1000, depth: 0, overrideAccess: true }),
     payload.find({ collection: 'sites', limit: 500, sort: 'name', overrideAccess: true }),
     payload.find({ collection: 'domains', limit: 1000, sort: ['-primary'], overrideAccess: true }),
+    // Tolerated rather than awaited blindly: on a database where the template
+    // migration has not run the table is missing, and a builder that 500s is
+    // worse than one whose gallery is empty and says so.
+    listQuizTemplateRecords(payload).catch(() => []),
   ])
 
   const quizzes = qRes.docs.map((r) => ({
@@ -59,13 +69,22 @@ export default async function QuizzesPage() {
       status: r.status ?? 'draft',
       embedPreviewBg: r.embed_preview_bg ?? '',
       destinationOverrides: r.destination_overrides ?? null,
-      headerConfig: r.header_config ?? {},
-      footerConfig: r.footer_config ?? {},
-      bodySectionOverrides: r.body_section_overrides ?? null,
+      // No header_config / footer_config / body_section_overrides. Page chrome
+      // and body sections are authored on Brand Identity now; hydrating the
+      // deprecated columns was what put an empty bordered header strip in the
+      // builder preview (`?? {}` is truthy, so the renderer's chrome branch fired
+      // for a deployment that had never configured one).
       utm: r.utm ?? {},
       pixels: r.pixels ?? {},
     }
   })
 
-  return <QuizBuilderApp initialQuizzes={quizzes} initialDeployments={deployments} brands={brands} />
+  return (
+    <QuizBuilderApp
+      initialQuizzes={quizzes}
+      initialDeployments={deployments}
+      brands={brands}
+      quizTemplates={quizTemplates}
+    />
+  )
 }

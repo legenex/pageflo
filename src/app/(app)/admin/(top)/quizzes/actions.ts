@@ -9,6 +9,7 @@ import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { invokeLLM } from '@/lib/ai/invoke'
 import { canonicalTemplateId } from '@/lib/template-registry'
+import { getQuizTemplateRecordByTemplateId, selectabilityProblem } from '@/lib/template-records'
 import { relationId, requireDeploymentSiteAdmin } from '@/lib/authz'
 
 const PATH = '/admin/quizzes'
@@ -17,6 +18,47 @@ const numFromBrandId = (brandId) => {
   if (typeof brandId !== 'string') return null
   const n = Number(brandId.replace('site_', ''))
   return Number.isFinite(n) ? n : null
+}
+
+/**
+ * The template id this deployment is allowed to STORE.
+ *
+ * Records first, code registry second, and never a silent default.
+ *
+ * The records are asked first because a quiz template is a row now: a clone
+ * carries its own `template_id` and deliberately names no code renderer, so
+ * resolving against the registry alone - which is what this did - refuses every
+ * template an operator created and accepts only the twenty stock ids.
+ *
+ * The registry is still consulted when no row matches, for two real cases: the
+ * six legacy aliases still stored on live deployments, and the window between a
+ * deploy and the first `ensureTemplateRecords` run, where the stock ids resolve
+ * in code before their rows exist.
+ *
+ * Selectability (disabled / deleted) is enforced only when the id is CHANGING.
+ * Disabling a template is a statement about what new deployments may choose;
+ * blocking an unrelated path or status edit on a deployment that was already on
+ * it would make tidying the library take working pages hostage.
+ */
+const resolveDeploymentTemplateId = async (payload, requestedRaw, currentStoredId) => {
+  const requested = typeof requestedRaw === 'string' ? requestedRaw.trim() : ''
+  if (!requested) return { ok: false, error: 'pick a visual template for this deployment first' }
+
+  // Tolerates the table not existing (the funnel_* schema drift): a missing
+  // library falls through to the registry rather than failing every save.
+  const record = await getQuizTemplateRecordByTemplateId(payload, requested).catch(() => null)
+  if (record) {
+    if (record.rendererError) {
+      return { ok: false, error: `that template is broken: ${record.rendererError}` }
+    }
+    if (requested !== currentStoredId) {
+      const problem = selectabilityProblem(record)
+      if (problem) return { ok: false, error: `that template cannot be selected: ${problem}` }
+    }
+    return { ok: true, id: record.templateId }
+  }
+
+  return canonicalTemplateId('quiz', requested)
 }
 
 // ---------------------------------------------------------------------------
@@ -163,10 +205,22 @@ export async function saveQuizDeployment(args: { deployment: Record<string, unkn
   })
   if (!gate.ok) return gate
 
+  // What the row already stores, so a template that has since been disabled does
+  // not block an edit that leaves the choice alone. Read separately from the
+  // authz gate on purpose: that helper derives the Site and returns nothing else,
+  // and widening it for one caller's convenience is how a gate grows a bypass.
+  let currentTemplateId = ''
+  if (isExisting) {
+    const existing = await payload
+      .findByID({ collection: 'funnel-quiz-deployments', id: dep.id, depth: 0, overrideAccess: true })
+      .catch(() => null)
+    currentTemplateId = typeof existing?.template_id === 'string' ? existing.template_id : ''
+  }
+
   // A template id that names nothing must stop the save. It used to default to
   // `'default'` and resolve silently at render time, so a typo produced a page
   // that looked wrong with nothing anywhere saying why.
-  const template = canonicalTemplateId('quiz', dep.templateId ?? 'default')
+  const template = await resolveDeploymentTemplateId(payload, dep.templateId, currentTemplateId)
   if (!template.ok) return { ok: false, error: template.error }
 
   // The host is resolved with `overrideAccess: true`, so the row it finds may
@@ -198,9 +252,11 @@ export async function saveQuizDeployment(args: { deployment: Record<string, unkn
     status: dep.status || 'draft',
     embed_preview_bg: dep.embedPreviewBg || '',
     destination_overrides: dep.destinationOverrides ?? null,
-    header_config: dep.headerConfig ?? {},
-    footer_config: dep.footerConfig ?? {},
-    body_section_overrides: dep.bodySectionOverrides ?? null,
+    // header_config / footer_config / body_section_overrides are deliberately
+    // absent. The columns are deprecated (Brand Identity owns page chrome and
+    // body sections); writing `{}` into them on every save kept resurrecting an
+    // empty header strip and would overwrite what an author wrote before the
+    // move. Omitting the keys leaves the stored values untouched.
     utm: dep.utm ?? {},
     pixels: dep.pixels ?? {},
   }

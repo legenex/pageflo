@@ -2,6 +2,7 @@ import type { CollectionConfig, Validate } from 'payload'
 import { isAuthenticated } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
 import { resolveTemplate } from '../lib/template-registry'
+import { QUIZ_TEMPLATE_ID_PATTERN } from '../lib/template-records/id'
 
 /**
  * The authoritative, manageable set of quiz visual templates.
@@ -30,9 +31,6 @@ import { resolveTemplate } from '../lib/template-registry'
  * existing renderer. Collapsing the two into one field would make a clone
  * either unrenderable or indistinguishable from its source.
  */
-
-/** Ids we mint ourselves. Kept narrow so a stored id cannot be arbitrary text. */
-export const QUIZ_TEMPLATE_ID_PATTERN = /^[a-z0-9][a-z0-9_]{2,63}$/
 
 const validateTemplateId: Validate = (value) => {
   const id = typeof value === 'string' ? value.trim() : ''

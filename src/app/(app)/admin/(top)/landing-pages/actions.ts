@@ -82,55 +82,21 @@ export async function saveLP(args: { id: string; patch: Record<string, unknown> 
   }
 }
 
-export async function cloneLP(args: { id: string }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
-  const payload = await getPayload({ config })
-  try {
-    const src = (await payload.findByID({ collection: 'funnel-landing-pages', id: args.id, overrideAccess: true })) as Record<string, unknown>
-    if (!src) return { ok: false, error: 'not found' }
-    // A clone is a new row, so it gets the canonical id rather than inheriting a
-    // legacy one. A source row whose template no longer resolves cannot be
-    // cloned into the same broken state: the clone is refused and names the id.
-    const template = canonicalTemplateId('lp', src.template_id)
-    if (!template.ok) return { ok: false, error: `cannot clone: ${template.error}` }
-    const created = (await payload.create({
-      collection: 'funnel-landing-pages',
-      data: {
-        name: `${src.name} (copy)`,
-        slug: `${src.slug}-copy-${Date.now().toString(36).slice(-4)}`,
-        template_id: template.id,
-        angle: src.angle,
-        is_published: false,
-        sections: src.sections ?? [],
-      } as never,
-      user: user as never,
-      overrideAccess: false,
-    })) as { id: number | string }
-    revalidatePath(PATH)
-    return { ok: true, id: String(created.id) }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'clone failed' }
-  }
-}
-
-export async function deleteLP(args: { id: string }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
-  const payload = await getPayload({ config })
-  try {
-    // Remove deployments that reference this page first.
-    const deps = await payload.find({ collection: 'funnel-lp-deployments', where: { landing_page: { equals: args.id } }, limit: 500, overrideAccess: true })
-    for (const d of deps.docs) {
-      await payload.delete({ collection: 'funnel-lp-deployments', id: d.id, user: user as never, overrideAccess: false })
-    }
-    await payload.delete({ collection: 'funnel-landing-pages', id: args.id, user: user as never, overrideAccess: false })
-    revalidatePath(PATH)
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'delete failed' }
-  }
-}
+/*
+ * `cloneLP` and `deleteLP` lived here and are gone.
+ *
+ * They were written when a row was one brand's page. A row is now the TEMPLATE
+ * every brand deploys, and `deleteLP` cascade-deleted every referencing
+ * deployment — on a collection that is `isAuthenticated` with no Site on it, so
+ * one operator tidying the library would have taken down other tenants' live
+ * pages without being asked to confirm anything.
+ *
+ * `cloneLpTemplate` and `deleteLpTemplate` in ../template-actions.ts replace
+ * them, with the reference check and the archive-instead-of-drop rule for stock
+ * rows. Both are deleted rather than kept as thin wrappers: a second delete path
+ * that skips the guard is exactly the kind of duplicate this change exists to
+ * remove, and a wrapper is one refactor away from being called directly.
+ */
 
 // ---------------------------------------------------------------------------
 // Deployments

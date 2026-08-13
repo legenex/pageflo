@@ -45,12 +45,33 @@ export type SampleReconcileResult = {
 }
 
 /**
+ * A stable stringification: object keys sorted, array order preserved.
+ *
+ * `JSON.stringify` alone is wrong here and the identity suite caught it against
+ * a real database. Postgres normalises `jsonb` and does NOT preserve key
+ * insertion order, so a row read back from the column has the same content as
+ * the seed constant with its keys in a different sequence. Comparing the raw
+ * strings declared all three samples "edited by an operator" and kept them —
+ * which is the safe direction to be wrong in, but it meant the retirement
+ * silently never happened.
+ *
+ * Array order stays significant on purpose: a reordered list of settlement
+ * amounts or eligibility criteria IS an edit.
+ */
+const canonical = (v: unknown): string => {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v) ?? 'null'
+  if (Array.isArray(v)) return `[${v.map(canonical).join(',')}]`
+  const entries = Object.entries(v as Record<string, unknown>).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+  return `{${entries.map(([k, val]) => `${JSON.stringify(k)}:${canonical(val)}`).join(',')}}`
+}
+
+/**
  * Is this row still exactly what the seeder wrote?
  *
  * The seeder mints a fresh `id` per section on every run, so ids cannot be
  * compared. Everything else can: the section types in order, every section
- * visible, and each section's copy deep-equal to the seed constant. An operator
- * who changed one headline fails this and keeps their page.
+ * visible, and each section's copy equal to the seed constant. An operator who
+ * changed one headline fails this and keeps their page.
  */
 export const isUnmodifiedSampleSections = (sections: unknown): boolean => {
   if (!Array.isArray(sections)) return false
@@ -62,7 +83,7 @@ export const isUnmodifiedSampleSections = (sections: unknown): boolean => {
     if (s.type !== DEFAULT_SECTION_ORDER[i]) return false
     if (s.isVisible !== true) return false
     const expected = SEED_SECTION_COPY[DEFAULT_SECTION_ORDER[i]] || {}
-    return JSON.stringify(s.copy ?? {}) === JSON.stringify(expected)
+    return canonical(s.copy ?? {}) === canonical(expected)
   })
 }
 
