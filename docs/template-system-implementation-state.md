@@ -365,6 +365,45 @@ isolation suite and needs `DATABASE_URI` and a migrated schema.
 * **Stale comments promise an auto-verify poller that does not exist**;
   `recheckDomainDns` and `removeDomain` have zero callers in `src/`.
 
+## Gate 4 — the template registry (done)
+
+First piece of the composition system. `src/lib/template-registry.ts` is one
+typed seam over both stock libraries; the libraries stay the source of truth for
+what a template IS.
+
+Both resolved an unknown id by silently returning something —
+`resolveQuizTemplate` gave `sq_editorial_inline`, `templateFor` gave
+`TEMPLATES[0]`. The second matters more than it looks: **`bold_modern` is the
+stored default on every `funnel-landing-pages` row and names no real template**,
+so the silent path was the common path and every such page has been rendering
+`editorial_investigation_v2` by accident.
+
+The rule is that resolution either succeeds or says why. `resolveTemplate`
+returns a discriminated result and never guesses. `resolveForRender` still falls
+back — a visitor must not get a 500 over a database row — but returns
+`usedFallback` and `requestedId` so a caller can surface it. That difference is
+the module.
+
+`bold_modern` is now an explicit alias to the template it was already rendering,
+so every existing page renders exactly as it does today while the accident
+becomes a decision. The registry also carries what the library UIs need and had
+no source for: family, channels, quiz placement, ground, and a recommended
+embedded quiz skin per landing page.
+
+**Negative control** (`listQuizTemplates` returning `[]`): 4 assertions fail,
+exit 1, including "the quiz registry is not empty". That property is the one most
+easily lost — a resolver that answers everything with the first template passes
+any test that only asks whether a template came back.
+
+    pnpm typecheck   exit 0
+    pnpm test        159 assertions, 0 failed (37 brand + 69 authz + 53 registry)
+    pnpm test:all    adds 12 isolation assertions, needs a database
+
+Not yet done on the composition system: the registry is a seam with no consumers
+yet. The library UIs, the deployment save paths and the publish preflight still
+resolve ids their own way. Wiring them is the next gate, and it is the point at
+which `usedFallback` starts being visible to an operator.
+
 ## Note on the production build
 
 `pnpm build` was attempted three times and terminated with SIGTERM (143) each
@@ -396,3 +435,12 @@ real login. 106 assertions green, sweep unchanged.
 site because Payload discards a create rule's Where. Closed with a hook and
 proven with a database-backed isolation suite, including a negative control that
 shows four attacks succeeding without it. 116 assertions green.
+
+**2026-08-12** — Gate 3b. Attaching a pool domain was impossible for every
+non-super-admin and threw uncaught; fixed, with the hook proven to hold under
+`overrideAccess: true`. 118 assertions green.
+
+**2026-08-12** — Gate 4. Template registry: strict resolution that fails
+visibly, explicit aliases including the `bold_modern` default that never named a
+template, and a negative control proving an empty registry cannot pass. 159
+assertions green (171 with isolation).
