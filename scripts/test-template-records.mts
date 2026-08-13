@@ -11,9 +11,13 @@
  * there were two of them.
  *
  * So the load-bearing assertion in this file is not about output. It is
- * §"one library, one direction": no product surface may read the code
- * registry's list functions. If one does, the duplication is back and every
- * other test still passes.
+ * "one library, one direction": a surface that lists what an operator may
+ * DEPLOY must read records, not the code library. If one reads code, the
+ * duplication is back and every other test still passes.
+ *
+ * The rule is per-purpose rather than blanket, because "which renderer draws
+ * this" is a genuinely different question from "which template may I deploy"
+ * and only the second one has an answer a database can hold.
  *
  * The renderer-identity acceptance conditions — save template A, render, prove
  * A was used — need a database and live in `scripts/test-renderer-identity.mts`.
@@ -82,32 +86,79 @@ const code = (f: string): string =>
  *
  *      product surfaces -> template records (DB) -> template registry (code)
  *
- * A component that calls `listLpTemplates()` is building a catalogue out of the
- * code library again, beside the records, and the two will disagree the moment
- * anybody disables or clones anything. `src/lib/template-records/` is the only
- * module allowed to reach past the middle box, because materialising the stock
- * rows is exactly what it is for.
+ * A surface that lists deployable templates out of the code library builds a
+ * catalogue beside the records, and the two disagree the moment anybody
+ * disables or clones anything.
  */
 {
-  const LIST_FNS = /\blist(LpTemplates|QuizTemplates|AllLpTemplates|LegacyLpTemplates|Templates)\s*\(/
-  const ALLOWED = [
-    'src/lib/template-records/',
-    'src/lib/template-registry.ts',
+  /*
+   * Two different questions, and only one of them may be answered from code.
+   *
+   *   "which TEMPLATE may I deploy"  -> records. There is one library and an
+   *                                     operator can disable, clone and delete
+   *                                     what is in it.
+   *   "which RENDERER draws this"    -> code. The twelve ports and the four
+   *                                     identities are generated design assets;
+   *                                     a database row cannot add one.
+   *
+   * So a code catalogue in a product surface is not automatically the
+   * duplication being repaired — it is duplication when it answers the FIRST
+   * question. The allow-list below is therefore per-file AND per-purpose, and
+   * each entry says which question it answers.
+   */
+  const CATALOGUES = /\b(listLpTemplates|listQuizTemplates|listAllLpTemplates|listLegacyLpTemplates|listTemplates|GALLERY_TEMPLATES|SKELETON_TEMPLATES|PORTED_TEMPLATES|QUIZ_TEMPLATES)\b/
+
+  const ALLOWED: Array<[string, string]> = [
+    ['src/lib/template-records/', 'materialises the records FROM the code library — this is the seam'],
+    ['src/lib/template-registry.ts', 'is the code library'],
+    ['src/lib/quiz-templates/', 'is the code library'],
+    ['src/lib/lp-templates/', 'is the code library'],
+    ['src/lib/quiz-theme.ts', 'themes a renderer, never selects a template'],
+    ['src/components/builder/lp/render.tsx', 'maps renderer ids to their draw functions'],
+    ['src/components/builder/quiz/config.tsx', 'exposes renderer option tables'],
+    ['src/components/builder/quiz/templates.tsx', 'draws a renderer'],
+    ['src/components/builder/quiz/TemplatePreview.tsx', 'draws a renderer'],
+    ['src/components/builder/templates/TemplateGallery.tsx', 'resolves a record to its renderer for preview'],
+    ['src/components/builder/quiz/QuizTemplatesPanel.tsx', 'offers the RENDERER choice when creating or editing a template record'],
+    ['src/components/builder/lp/LandingPagesApp.tsx', 'offers the RENDERER choice in "which design draws this template"'],
+    ['src/components/public/quiz/QuizRuntime.tsx', 'draws a renderer'],
   ]
 
   const offenders = ALL_SRC.filter((f) => {
     const rel = f.slice(f.indexOf('/src/') + 1)
-    if (ALLOWED.some((a) => rel.startsWith(a))) return false
-    return LIST_FNS.test(code(f))
+    if (ALLOWED.some(([a]) => rel.startsWith(a))) return false
+    return CATALOGUES.test(code(f))
   })
 
   t(
     offenders.length === 0,
-    `no product surface builds a catalogue from the code registry (found: ${offenders.map((f) => f.split('/src/')[1]).join(', ') || 'none'})`,
+    `no unlisted surface builds a template catalogue from code (found: ${offenders.map((f) => f.split('/src/')[1]).join(', ') || 'none'})`,
   )
 
-  // The specific component that used to do it. Named so a reintroduction under
-  // the old name fails loudly rather than merely failing the rule above.
+  /*
+   * The allow-list must not rot into a place things get added to. Every entry
+   * has to still be a real file, so deleting one fails here rather than quietly
+   * widening the rule.
+   */
+  for (const [path, why] of ALLOWED) {
+    const exists = path.endsWith('/')
+      ? ALL_SRC.some((f) => f.includes(`/${path}`))
+      : ALL_SRC.some((f) => f.endsWith(path.slice(path.lastIndexOf('src/') + 4)))
+    t(exists, `the code-catalogue allowance for ${path} still names a real file (${why})`)
+  }
+
+  /*
+   * The two DEPLOYMENT surfaces are the ones that must never reach code. They
+   * are where an operator picks what goes live, so a code catalogue there is
+   * exactly the defect: a list that cannot be disabled, cloned or deleted,
+   * offered as if it could.
+   */
+  for (const f of ['src/components/builder/lp/LPDeploymentEditor.tsx', 'src/components/builder/quiz/QuizBuilderApp.tsx']) {
+    const src = code(join(SRC, f.slice(4)))
+    t(!CATALOGUES.test(src), `${f.split('/').pop()} picks templates from records only`)
+  }
+
+  // The specific component that used to answer the first question from code.
   t(
     !ALL_SRC.some((f) => f.endsWith('templates/TemplateLibrary.tsx')),
     'TemplateLibrary — the browse-only catalogue nothing could select — is gone',
