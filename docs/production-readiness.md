@@ -341,3 +341,58 @@ second defect on the same path.
 
 **Gate 14 / production release: NOT PASS.** Criterion 1 alone is disqualifying,
 and it needs DNS and certificate access this session did not have.
+
+## Adversarial verification of this pass
+
+An independent read tried to refute each finding above. All four were
+**CONFIRMED**, and it then found five defects in the repairs themselves. Two
+were serious enough to matter, and both are fixed:
+
+- **The fetch deadline did not cover the body read.** `clearTimeout` fired when
+  the headers arrived, so a server that answered 200 and then trickled bytes
+  under the size cap held the read open indefinitely. This was not theoretical:
+  `safePost` made `dispatch-webhooks` read response bodies it had never read
+  before, and that runs synchronously inside `POST /api/leads`, so one slow
+  receiver could hang a visitor's lead submission. The timer now stays armed
+  through the read, an abort mid-body is reported as a timeout, and unread
+  bodies are cancelled rather than pinning a socket.
+- **The author's HTTP verb was ignored.** `safePost` hardcoded POST while the
+  builder offers five verbs, so a GET verification node received a POST with an
+  empty body, got 405, and the flow routed on nothing — the exact silent failure
+  the change set out to end.
+
+Three more, also fixed: LP-embedded quizzes were still not executing webhooks
+(`resolveEmbeddedQuiz` synthesises `lp:<id>`, which `findByID` could not parse,
+so the binding the product now prefers stayed broken); a deployment id was
+effectively a bearer token for another tenant's funnel, because nothing checked
+the deployment belonged to the Site serving the request; and the JSON payload
+template was interpolated textually, so an answer of `x","tier":"1` could forge
+sibling fields in what the buyer received.
+
+### Open, and deliberately not changed in this pass
+
+- **`/_next/image` is an open image proxy.** `next.config.mjs` sets
+  `remotePatterns: [{ protocol: 'https', hostname: '**' }]`, so
+  `/_next/image?url=https://<anything>` is an unauthenticated server-side fetch
+  of an attacker-chosen host on every public tenant domain. Narrower than the
+  fixed paths (https only, image content types only) but the same shape. The fix
+  is an explicit host allowlist; it was not applied because tenant brand logos
+  are remote URLs and a wrong list breaks image rendering on live sites. Needs
+  the real list of image hosts first.
+- **Webhook node config reaches the browser.** `quiz-deployment.ts` ships the
+  full node array to the client component, so `webhookUrl`, `webhookHeaders`
+  (keys *and* values) and `webhookPayload` are in the RSC payload of every
+  public quiz page. No shipped node contains a literal secret today (the seeded
+  HLR header is `Bearer {{twilio_token}}`, which resolves empty), so this is a
+  latent hazard rather than an active leak — but the builder invites exactly the
+  habit that would make it one. The fix is to send the runtime a boolean
+  "this node calls a webhook" instead of the configuration.
+- **The builder's "Run Test" button lies.** It interpolates the URL and uses the
+  author's verb from the admin's browser; the server never interpolates the URL.
+  So a node can test green and 404 in production.
+- **Cache staleness across hosts, bounded at 60s.** `Domains.afterChange`
+  invalidates only the mutated host, so a sibling host can keep a stale
+  `primaryHost` for up to a minute after a primary flips to `error`.
+- **`brand-map.ts` link emission is still unfiltered** — it picks the primary
+  host with no eligibility test, so funnel-rendered links can point at a host
+  the resolver refuses.
