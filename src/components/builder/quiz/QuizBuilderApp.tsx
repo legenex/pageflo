@@ -11,6 +11,7 @@ import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, Settings, Eye, Power, PowerOff, ListChecks, Rocket, Edit3, Copy, Trash2,
   Plus, Code2, Save, X, Undo2, Redo2, Archive, ArchiveRestore, Loader2, Check, AlertTriangle, LayoutTemplate,
+  Sparkles,
 } from 'lucide-react'
 import { T, Btn, Input, Select, Label, Pill, IconBtn, ConfirmDialog, Toast, PageHeader } from '../ui'
 import { NODE_TYPE_FOR_QTYPE, RENDER_MODES, PIXEL_PROVIDERS } from './config'
@@ -21,6 +22,7 @@ import { QuizPreviewView, NodePreviewModal } from './preview'
 import { auditQuizTemplateColors, PROGRESS_FORM_LABELS } from './templates'
 import { Section } from './section'
 import { QuizTemplatesPanel, quizSpecForRecord, defaultProgressFor } from './QuizTemplatesPanel'
+import { AINewQuizTemplateWizard } from './AINewQuizTemplateWizard'
 import { brandShortName } from '../ui'
 import {
   moveStepBy, duplicateStep, duplicateNode, deleteStep,
@@ -291,7 +293,7 @@ const DeploymentListView = ({ deployments, quizzes, brands, templates, onOpen, o
   </div>
 }
 
-const ListShell = ({ tab, onTabChange, onCreate, children }) => {
+const ListShell = ({ tab, onTabChange, onCreate, onCreateWithClaude, children }) => {
   const createLabel = { quizzes: 'New Quiz Flow', templates: 'New Template', deployments: 'New Deployment' }[tab]
   const subheading = {
     quizzes: 'Flow logic. The questions, routing, tier conditions.',
@@ -301,8 +303,24 @@ const ListShell = ({ tab, onTabChange, onCreate, children }) => {
   return <div style={{ flex: 1, padding: '24px 32px', overflowY: 'auto' }}>
     {/* Templates is a workspace now, not a catalogue: it creates, clones,
         disables and deletes records, so it carries a create action like the
-        other two. */}
-    <PageHeader title="Quizzes" subtitle={subheading} primaryAction={createLabel ? <Btn variant="primary" size="md" icon={Plus} onClick={onCreate}>{createLabel}</Btn> : null} />
+        other two. It carries TWO, mirroring Landing Pages: Claude is the
+        primary door into the library and the blank create stays one step to
+        its left, because a described template beats an empty one and a wizard
+        must never be the only way in. */}
+    <PageHeader
+      title="Quizzes"
+      subtitle={subheading}
+      primaryAction={
+        tab === 'templates'
+          ? <Btn variant="primary" size="md" icon={Sparkles} onClick={onCreateWithClaude} data-quiz-template-ai="">New with Claude</Btn>
+          : createLabel ? <Btn variant="primary" size="md" icon={Plus} onClick={onCreate}>{createLabel}</Btn> : null
+      }
+      secondaryAction={
+        tab === 'templates'
+          ? <Btn variant="secondary" size="md" icon={Plus} onClick={onCreate}>New Template</Btn>
+          : null
+      }
+    />
     <QuizBuilderTabBar active={tab} onChange={onTabChange} />
     <div style={{ marginTop: 18 }}>{children}</div>
   </div>
@@ -735,6 +753,8 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
   // Owned here rather than by the panel because the button that opens it lives
   // in the page header, which the shell renders.
   const [createTemplateOpen, setCreateTemplateOpen] = useState(false)
+  // Same reasoning for the Claude wizard, which is the header's primary action.
+  const [aiTemplateWizardOpen, setAiTemplateWizardOpen] = useState(false)
 
   // --- save state -----------------------------------------------------------
   // The builder autosaves on a debounce, so "dirty" is not a boolean the UI can
@@ -1204,7 +1224,7 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
       previewSource={previewSource}
     />}
 
-    {view === 'list' && <ListShell tab={tab} onTabChange={setTab} onCreate={tab === 'quizzes' ? createQuizHandler : tab === 'templates' ? () => setCreateTemplateOpen(true) : createDeployment}>
+    {view === 'list' && <ListShell tab={tab} onTabChange={setTab} onCreate={tab === 'quizzes' ? createQuizHandler : tab === 'templates' ? () => setCreateTemplateOpen(true) : createDeployment} onCreateWithClaude={() => setAiTemplateWizardOpen(true)}>
       {tab === 'quizzes' && <QuizListView
         quizzes={quizzes}
         brands={brands}
@@ -1272,6 +1292,15 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
     {showAddStep && <AddStepModal open={showAddStep} onClose={() => { setShowAddStep(false); setPendingTiers(null) }} onPick={pendingTiers ? handleAddVariantPick : handleAddStepPick} />}
 
     {showEmbed && <EmbedCodeModal deployment={deployments.find((d) => d.id === showEmbed)} onClose={() => setShowEmbed(null)} />}
+
+    {/* The record lands via router.refresh() like every other library change,
+        so the new template appears in the same list the panel already draws. */}
+    {aiTemplateWizardOpen && <AINewQuizTemplateWizard
+      open
+      onClose={() => setAiTemplateWizardOpen(false)}
+      onToast={setToast}
+      onCreated={() => router.refresh()}
+    />}
 
     <ConfirmDialog
       open={!!pendingDelete}

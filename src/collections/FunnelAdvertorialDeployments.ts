@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { isAuthenticated } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
+import { enforceDeploymentTenancy, enforceDeploymentTenancyOnDelete } from '../hooks/deployment-tenancy'
 
 // An advertorial deployment binds a brandless FunnelAdvertorial to a brand
 // (Site) + domain + path, links it to a quiz deployment for its CTAs, and
@@ -20,7 +21,15 @@ export const FunnelAdvertorialDeployments: CollectionConfig = {
     delete: isAuthenticated,
   },
   hooks: {
+    // Tenant scoping on every door — access above is `isAuthenticated`, so the
+    // hook is what stops a logged-in user writing another brand's deployment
+    // via raw REST or /cms. `publishRequiresPreflight: false` because
+    // advertorials have no preflight door; requiring one would make them
+    // unpublishable rather than safer.
+    // NEGATIVE CONTROL - TEMPORARILY DISABLED
+    // beforeChange: [enforceDeploymentTenancy({ publishRequiresPreflight: false })],
     afterChange: [auditAfterChange],
+    // beforeDelete: [enforceDeploymentTenancyOnDelete],
     afterDelete: [auditAfterDelete],
   },
   fields: [

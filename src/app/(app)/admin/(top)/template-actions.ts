@@ -37,6 +37,8 @@ import { revalidatePath } from 'next/cache'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { invokeLLM } from '@/lib/ai/invoke'
+import { proposeQuizTemplate, QuizTemplateProposalSchema } from '@/lib/ai-content/quiz-template'
 import { canonicalTemplateId, resolveTemplate } from '@/lib/template-registry'
 import { asSlotted } from '@/lib/lp-templates'
 import { validateOverrides } from '@/lib/lp-slots/model'
@@ -369,6 +371,76 @@ export async function createQuizTemplate(args: {
     return { ok: true, id: String(created.id), templateId }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'create failed' }
+  }
+}
+
+/**
+ * "New with Claude": a real, manageable template record proposed by the model.
+ *
+ * The model's authority ends at the proposal. It picks one of the twenty stock
+ * renderers as the base, names the template, writes the blurb, and may set the
+ * one visual knob a record supports (`config_overrides.progressForm`). The
+ * schema and filter in `src/lib/ai-content/quiz-template.ts` are the boundary:
+ * markup, colours, URLs, invented renderers and invented config fields are
+ * refused there rather than stored, so nothing arbitrary or executable can
+ * reach a row through this door.
+ *
+ * The ROW is then minted by the same two verbs every other door uses -
+ * `createQuizTemplate` for the identity (unique `template_id`, renderer
+ * validation, `origin: 'blank'`) and `saveQuizTemplate` for the mutable rest -
+ * because a third write path into the library is how the three rules at the
+ * top of this file stop being rules.
+ *
+ * `origin` stays `'blank'`: the column's enum is ('stock','clone','blank') and
+ * widening it is a migration, so provenance is noted in the blurb instead.
+ */
+export async function createQuizTemplateWithClaude(args: {
+  instruction: string
+  name?: string
+}): Promise<Result<{ id: string; templateId: string; name: string; warning: string | null }>> {
+  const user = await getCurrentUser()
+  if (!user) return { ok: false, error: 'unauthenticated' }
+
+  const proposed = await proposeQuizTemplate(
+    { instruction: args.instruction },
+    async ({ system, user: prompt }) =>
+      invokeLLM({
+        system,
+        user: prompt,
+        schema: QuizTemplateProposalSchema,
+        schemaName: 'quiz_template_proposal',
+        model: 'claude-sonnet-4-6',
+        maxTokens: 1024,
+        enforceNoBannedVocab: true,
+      }),
+  )
+  if (!proposed.ok) return { ok: false, error: proposed.error }
+
+  // The operator's own name wins when they typed one; a name is theirs to
+  // choose on every other door too, and it goes through the same template-id
+  // minting either way.
+  const name = (args.name || '').trim() || proposed.record.name
+  const created = await createQuizTemplate({ name, rendererKey: proposed.record.rendererKey })
+  if (!created.ok) return created
+
+  const blurb = proposed.record.blurb
+    ? `${proposed.record.blurb} (drafted with Claude)`
+    : 'Drafted with Claude.'
+  const saved = await saveQuizTemplate({
+    id: created.id,
+    patch: { blurb, configOverrides: proposed.record.configOverrides },
+  })
+  return {
+    ok: true,
+    id: created.id,
+    templateId: created.templateId,
+    name,
+    // The row exists either way. A failed second write is reported rather than
+    // rolled back - the operator can finish the blurb by hand, which beats a
+    // delete that throws their template away over a description.
+    warning: saved.ok
+      ? null
+      : `Template created, but its blurb and visual configuration did not save: ${saved.error}`,
   }
 }
 

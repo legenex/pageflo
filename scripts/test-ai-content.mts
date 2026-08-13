@@ -1,5 +1,6 @@
 /**
- * Assertions for the AI deployment-content adapter.
+ * Assertions for the AI adapters: deployment content, and quiz template
+ * proposals ("New with Claude").
  *
  *   pnpm test:ai
  *
@@ -27,6 +28,18 @@ import {
   type ContentModel,
   type ContentRequest,
 } from '../src/lib/ai-content/adapter.ts'
+import {
+  proposeQuizTemplate,
+  filterQuizTemplateProposal,
+  buildQuizTemplateSystemPrompt,
+  buildQuizTemplateUserPrompt,
+  QuizTemplateProposalSchema,
+  AI_QUIZ_RENDERER_KEYS,
+  AI_QUIZ_PROGRESS_FORMS,
+  AI_QUIZ_NAME_MAX,
+  type QuizTemplateModel,
+} from '../src/lib/ai-content/quiz-template.ts'
+import { QUIZ_TEMPLATE_ID_PATTERN } from '../src/lib/template-records/id.ts'
 import { PORTED_TEMPLATES, asSlotted } from '../src/lib/lp-templates/index.ts'
 import { composeTemplate } from '../src/lib/lp-slots/model.ts'
 
@@ -288,6 +301,177 @@ t(ContentProposalSchema.safeParse({ items: [{ id: 'a', text: 'b', style: 'red' }
   const r = filterProposal(req, shape.success ? shape.data : { items: [] })
   t(r.accepted.length === 1, '...and are simply not part of the result')
   t(!('templateId' in r) && !('colors' in r) && !('destinations' in r), 'the result carries no template, colour, or destination — there is nowhere for one to go')
+}
+
+/* =================================================== quiz template proposals */
+//
+// The second thing a model may do: propose a NEW quiz template record for
+// "New with Claude". Same architecture as the deployment copy above - injected
+// model, schema as the boundary, a filter that does not trust zod's stripping -
+// but the supported surface is even narrower: one of the twenty stock renderers
+// as the base, a name, a blurb, and progressForm as the ONLY configurable
+// visual field. Everything else a template shows is the renderer's or the
+// brand's, and the proof is that there is no field to put it in.
+
+{
+  t(AI_QUIZ_RENDERER_KEYS.length === 20, `the model picks from exactly the twenty stock renderers (${AI_QUIZ_RENDERER_KEYS.length})`)
+  t(AI_QUIZ_PROGRESS_FORMS.length === 20, `and from the twenty progress forms (${AI_QUIZ_PROGRESS_FORMS.length})`)
+  t(!AI_QUIZ_RENDERER_KEYS.includes('default'), 'the legacy aliases are not in the set - an alias names one of the twenty, it is not a base')
+
+  const sys = buildQuizTemplateSystemPrompt()
+  t(/presentation only/i.test(sys), 'the system prompt states that a template is presentation only')
+  t(/progressForm only/.test(sys), 'and that progressForm is the only configurable field')
+  t(/No HTML/.test(sys) && /Never use em dashes/.test(sys), 'and the output rules')
+  t(/Never name a colour/.test(sys), 'and that colour is never the template\'s to name')
+
+  const user = buildQuizTemplateUserPrompt({ instruction: 'Calm and institutional for desktop retargeting.' })
+  t(user.includes('Calm and institutional for desktop retargeting.'), 'the user prompt carries the operator instruction')
+  for (const id of ['sq_editorial_inline', 'sq_case_dossier', 'sq_fullscreen_focus', 'sq_evidence_checklist']) {
+    t(user.includes(`"${id}"`), `and offers renderer "${id}" by id`)
+  }
+  t(user.includes('"rule_count"'), 'and lists the progress forms the one knob may name')
+}
+
+/* ------------------------------------------------------ quiz: happy path */
+
+/** A proposal the filter should accept, with per-case overrides. */
+function qProposal(over: Record<string, unknown> = {}) {
+  return {
+    name: 'Institutional Casework',
+    blurb: 'Measured case-file presentation for retargeting traffic.',
+    rendererKey: 'sq_case_dossier',
+    configOverrides: {},
+    ...over,
+  }
+}
+
+{
+  let calls = 0
+  const model: QuizTemplateModel = async () => { calls += 1; return qProposal() as never }
+  const r = await proposeQuizTemplate({ instruction: 'Calm and institutional.' }, model)
+  t(r.ok, 'a well-formed template proposal is accepted')
+  t(calls === 1, 'after exactly one model call')
+  if (r.ok) {
+    t(r.record.name === 'Institutional Casework', 'the record carries the proposed name')
+    t(r.record.rendererKey === 'sq_case_dossier', 'and the chosen stock renderer')
+    t(
+      Object.keys(r.record).sort().join(',') === 'blurb,configOverrides,name,rendererKey',
+      'and exactly the four fields a row needs - record-shaped, nothing else',
+    )
+  }
+}
+
+{
+  const r = filterQuizTemplateProposal(qProposal({ configOverrides: { progressForm: 'mono_hairline' } }))
+  t(r.ok && r.record.configOverrides.progressForm === 'mono_hairline', 'a supported progress form survives into the record')
+}
+{
+  const r = filterQuizTemplateProposal(qProposal())
+  t(r.ok && Object.keys(r.record.configOverrides).length === 0, 'an empty config means "renderer default" and stays empty')
+}
+{
+  t(QuizTemplateProposalSchema.safeParse(qProposal()).success, 'the zod schema accepts what the filter accepts')
+  t(
+    !QuizTemplateProposalSchema.safeParse(qProposal({ rendererKey: 'sq_no_such' })).success,
+    'and is a closed enum, so invokeLLM retries an invented renderer instead of ever returning it',
+  )
+}
+
+/* -------------------------------------------- quiz: what cannot come back */
+
+{
+  const r = filterQuizTemplateProposal(qProposal({ rendererKey: 'sq_totally_invented' }))
+  t(!r.ok && r.error.includes('sq_totally_invented'), 'an unknown rendererKey is refused, by name')
+}
+{
+  const r = filterQuizTemplateProposal(qProposal({ rendererKey: 'default' }))
+  t(!r.ok, 'a legacy alias is refused even though the registry resolves it - the base must be one of the twenty')
+}
+{
+  const r = filterQuizTemplateProposal(qProposal({ rendererKey: '' }))
+  t(!r.ok, 'a missing rendererKey is refused - there is no such thing as a template drawn by nothing')
+}
+{
+  const r = filterQuizTemplateProposal(qProposal({ configOverrides: { accentColor: '#ff0000' } }))
+  t(!r.ok && r.error.includes('accentColor'), "a config field outside the supported set is refused, by name - colour is the brand's")
+}
+{
+  const r = filterQuizTemplateProposal(qProposal({ configOverrides: { customCss: '.quiz{display:none}' } }))
+  t(!r.ok && r.error.includes('customCss'), 'and so is anything shaped like code - the whole proposal fails, nothing is silently dropped')
+}
+{
+  const r = filterQuizTemplateProposal(qProposal({ configOverrides: { progressForm: 'spinning_wheel' } }))
+  t(!r.ok && r.error.includes('spinning_wheel'), 'an invented progress form is refused')
+}
+{
+  const r = filterQuizTemplateProposal(qProposal({ configOverrides: ['rule_count'] }))
+  t(!r.ok, 'a config that is not an object is refused')
+}
+{
+  const r = filterQuizTemplateProposal(qProposal({ name: '<b>Bold</b> Template' }))
+  t(!r.ok, 'markup in the name is refused')
+}
+{
+  const r = filterQuizTemplateProposal(qProposal({ blurb: 'See https://example.com for details' }))
+  t(!r.ok, 'a URL in the blurb is refused')
+}
+{
+  const r = filterQuizTemplateProposal(qProposal({ name: '!!!' }))
+  t(!r.ok, 'a name with no letters is refused - it would slugify to the generic fallback id')
+}
+{
+  const r = filterQuizTemplateProposal(qProposal({ name: 'x'.repeat(AI_QUIZ_NAME_MAX + 1) }))
+  t(!r.ok, 'a name past the ceiling is refused')
+  // The ceiling is not taste: 48 name characters slugify to at most 48, and
+  // with the underscore and six-character suffix the minted template_id is at
+  // most 55 characters - inside the stored pattern's 64. An accepted name can
+  // therefore never mint an id the collection refuses to store.
+  t(
+    QUIZ_TEMPLATE_ID_PATTERN.test(`${'x'.repeat(AI_QUIZ_NAME_MAX)}_ab12cd`),
+    'the name ceiling composes with the stored-id pattern',
+  )
+}
+{
+  const r = filterQuizTemplateProposal({ ...qProposal(), colors: { primary: '#f00' }, questions: ['Q1?'] })
+  t(r.ok, 'extra top-level keys do not sink the proposal...')
+  if (r.ok) {
+    t(
+      !('colors' in r.record) && !('questions' in r.record),
+      '...and are simply not part of the record - there is no field for a colour or a question to land in',
+    )
+  }
+}
+
+/* --------------------------------------- quiz: failure modes of the model */
+
+{
+  let calls = 0
+  const model: QuizTemplateModel = async () => { calls += 1; return qProposal() as never }
+  const r = await proposeQuizTemplate({ instruction: '   ' }, model)
+  t(!r.ok, 'an empty instruction is refused')
+  t(calls === 0, 'before the model is ever called - no brief, no invoice')
+}
+{
+  const r = await proposeQuizTemplate({ instruction: 'x' }, async () => { throw new Error('ANTHROPIC_API_KEY is not set') })
+  t(!r.ok && r.error.includes('unavailable'), 'an unavailable model fails in words an operator can act on, and nothing is created')
+}
+{
+  const r = await proposeQuizTemplate({ instruction: 'x' }, (async () => 'just a string') as never)
+  t(!r.ok, 'a response that is not an object is refused by shape')
+}
+{
+  const r = await proposeQuizTemplate({ instruction: 'x' }, (async () => qProposal({ name: '' })) as never)
+  t(!r.ok, 'a proposal that names no template is refused')
+}
+{
+  const r = await proposeQuizTemplate(
+    { instruction: 'Warm and encouraging for story traffic.' },
+    (async () => qProposal({ rendererKey: 'sq_recovery_soft', configOverrides: { progressForm: 'rounded_encourage' } })) as never,
+  )
+  t(
+    r.ok && r.record.rendererKey === 'sq_recovery_soft' && r.record.configOverrides.progressForm === 'rounded_encourage',
+    'the full happy path through proposeQuizTemplate yields the storable record',
+  )
 }
 
 /* ------------------------------------------------------------------ report */

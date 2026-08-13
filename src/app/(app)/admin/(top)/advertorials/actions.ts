@@ -8,6 +8,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { invokeLLM } from '@/lib/ai/invoke'
+import { relationId, requireDeploymentSiteAdmin } from '@/lib/authz'
 
 const PATH = '/admin/advertorials'
 
@@ -79,16 +80,40 @@ export async function saveAdvertorialDeployment(args: { deployment: Record<strin
   const dep = args.deployment || {}
   const payload = await getPayload({ config })
 
+  const siteId = numFromBrandId(dep.brandId)
+  const isExisting = typeof dep.id === 'string' && /^\d+$/.test(dep.id)
+
+  // The three funnel deployment collections are `isAuthenticated` on every verb,
+  // so `overrideAccess: false` alone lets any logged-in user write any tenant's
+  // deployment. Both the incoming Site and, on an update, the one already on the
+  // row must belong to the caller.
+  const gate = await requireDeploymentSiteAdmin(payload, user, {
+    collection: 'funnel-advertorial-deployments',
+    existingId: isExisting ? dep.id : undefined,
+    incomingSiteId: siteId,
+  })
+  if (!gate.ok) return gate
+
+  // The host is resolved with `overrideAccess: true`, so the row it finds may
+  // belong to ANY tenant. Binding a deployment to another brand's domain wrote a
+  // cross-tenant reference that the resolver happens to ignore today; a check
+  // here is cheaper than relying on that staying true.
   let domainId = null
   if (typeof dep.domain === 'string' && dep.domain) {
     const dr = await payload.find({ collection: 'domains', where: { host: { equals: dep.domain } }, limit: 1, overrideAccess: true })
-    domainId = dr.docs[0] ? Number(dr.docs[0].id) : null
+    const found = dr.docs[0]
+    if (found) {
+      if (relationId(found.site) !== gate.siteId) return { ok: false, error: 'that domain belongs to a different brand' }
+      domainId = Number(found.id)
+    }
   }
 
   const data = {
     name: dep.name || '',
     advertorial: dep.advertorialId && /^\d+$/.test(String(dep.advertorialId)) ? Number(dep.advertorialId) : null,
-    site: numFromBrandId(dep.brandId),
+    // Derived by the gate off the caller's bindings, never trusted from the
+    // client — see authz.ts: DERIVE, NEVER ACCEPT.
+    site: gate.siteId,
     domain: domainId,
     path: dep.path || '',
     quiz_deployment_id: dep.quizDeploymentId || '',
@@ -98,7 +123,6 @@ export async function saveAdvertorialDeployment(args: { deployment: Record<strin
     pixels: dep.pixels ?? {},
   }
 
-  const isExisting = typeof dep.id === 'string' && /^\d+$/.test(dep.id)
   try {
     let id
     if (isExisting) {
@@ -119,6 +143,12 @@ export async function deleteAdvertorialDeployment(args: { id: string }) {
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: 'unauthenticated' }
   const payload = await getPayload({ config })
+
+  // No gate at all before this: the collections are `isAuthenticated` on every
+  // verb, so any logged-in user could delete any tenant's deployment. A delete
+  // carries no incoming Site, so the record's own is the subject.
+  const gate = await requireDeploymentSiteAdmin(payload, user, { collection: 'funnel-advertorial-deployments', existingId: args.id })
+  if (!gate.ok) return gate
   try {
     await payload.delete({ collection: 'funnel-advertorial-deployments', id: args.id, user, overrideAccess: false })
     revalidatePath(PATH)

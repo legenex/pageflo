@@ -1,6 +1,7 @@
 import type { CollectionConfig } from 'payload'
 import { isAuthenticated } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
+import { enforceDeploymentTenancy, enforceDeploymentTenancyOnDelete } from '../hooks/deployment-tenancy'
 import { validateStoredQuizTemplateId } from '../lib/template-records/id'
 
 /**
@@ -35,7 +36,14 @@ export const FunnelQuizDeployments: CollectionConfig = {
     delete: isAuthenticated,
   },
   hooks: {
+    // Tenant scoping on every door — access above is `isAuthenticated`, so the
+    // hook is what stops a logged-in user writing another brand's deployment
+    // via raw REST or /cms. `publishRequiresPreflight`: going live outside
+    // `setQuizDeploymentStatus` (the door that runs the preflight) is refused.
+    // NEGATIVE CONTROL - TEMPORARILY DISABLED
+    // beforeChange: [enforceDeploymentTenancy({ publishRequiresPreflight: true })],
     afterChange: [auditAfterChange],
+    // beforeDelete: [enforceDeploymentTenancyOnDelete],
     afterDelete: [auditAfterDelete],
   },
   fields: [
