@@ -27,6 +27,8 @@ import {
 import { BrandQuickEdit } from '../brand/BrandQuickEdit'
 import { NodeTree } from './NodeTree'
 import { PortedTemplateView } from './PortedTemplate'
+import { listQuizTemplates, recommendedQuizTemplateFor } from '@/lib/template-registry'
+import { PROGRESS_FORM_LABELS } from '@/lib/quiz-templates/model'
 import { NodeInspector } from './NodeInspector'
 import { treeIcon } from './nodes/icons'
 import {
@@ -106,8 +108,20 @@ const LPDeploymentListView = ({ deployments, landingPages, brands, quizDeploymen
         const lp = landingPages.find((p) => p.id === dep.landingPageId)
         const brand = brands.find((b) => b.id === dep.brandId)
         const orphaned = !!dep.brandId && !brand
-        const qdep = quizDeployments.find((q) => q.id === dep.quizDeploymentId)
-        const quiz = quizzes.find((q) => q.id === qdep?.quizId)
+        // The flow this deployment runs, resolved the way the RESOLVER resolves
+        // it: the deployment's own binding first, and the legacy standalone
+        // pointer only when it has none. Reading the legacy id first is how a
+        // list ends up naming the quiz a page stopped running.
+        const legacyDep = dep.quizDeploymentId ? quizDeployments.find((q) => q.id === dep.quizDeploymentId) : null
+        const quiz = dep.quizId
+          ? quizzes.find((q) => q.id === dep.quizId)
+          : legacyDep
+            ? quizzes.find((q) => q.id === legacyDep.quizId)
+            : null
+        // A legacy pointer at a deployment that no longer exists renders nothing
+        // at all. Three of four live rows were in this state in production, and
+        // nothing in the product said so.
+        const brokenLegacy = Boolean(dep.quizDeploymentId) && !dep.quizId && !legacyDep
         const refDomain = dep.domainId ? domains.find((d) => d.id === dep.domainId) : null
         const orphanedDomain = !!dep.domainId && !refDomain
         const domainStr = refDomain?.domain || dep.domain || ''
@@ -131,6 +145,8 @@ const LPDeploymentListView = ({ deployments, landingPages, brands, quizDeploymen
                 {!domainStr && <Pill color={T.info}>PREVIEW URL</Pill>}
                 {orphaned && <Pill color={T.warning}>Brand missing, select a new brand to fix</Pill>}
                 {orphanedDomain && <Pill color={T.warning}>Domain missing, falling back to preview URL</Pill>}
+                {brokenLegacy && <Pill color={T.danger}>Quiz missing, this page has no funnel</Pill>}
+                {!dep.quizId && !dep.quizDeploymentId && <Pill color={T.warning}>No quiz attached</Pill>}
               </div>
               <div style={{ fontSize: 11, color: T.textMute, fontFamily: '"JetBrains Mono", monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</div>
               <div style={{ fontSize: 10, color: T.textLow, marginTop: 3, display: 'flex', gap: 10 }}>
@@ -139,6 +155,7 @@ const LPDeploymentListView = ({ deployments, landingPages, brands, quizDeploymen
                 <span>{brand?.displayName || 'No brand'}</span>
                 <span>{'·'}</span>
                 <span>Quiz: {quiz?.name || 'none'}</span>
+                {dep.quizDeploymentId && !dep.quizId ? <><span>{'·'}</span><span style={{ color: T.warning }}>legacy binding</span></> : null}
               </div>
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -661,13 +678,23 @@ const LPDeploymentEditor = ({ deployment, landingPages, brands, domains, quizDep
   if (!draft) return null
 
   const brandDomains = domains.filter((d) => d.brandId === draft.brandId)
-  const brandQuizDeps = quizDeployments.filter((qd) => qd.brandId === draft.brandId)
+  // The legacy pointer is DISPLAYED and never edited. A row that still carries
+  // one keeps working until a flow is chosen; see the note in the panel below.
+  const legacyQuizDep = Boolean(draft.quizDeploymentId)
+  const legacyQuizDepMissing = legacyQuizDep && !quizDeployments.some((qd) => qd.id === draft.quizDeploymentId)
+  const quizSkins = listQuizTemplates()
   const previewURL = `https://preview.legenex.com/lp/${draft.id || 'new'}`
   const finalURL = draft.domain ? `https://${draft.domain}${draft.path || ''}` : previewURL
 
   const handleSave = () => {
     if (!draft.landingPageId) { onToast?.({ message: 'Pick a landing page first.', type: 'error' }); return }
     if (!draft.brandId) { onToast?.({ message: 'Pick a brand first.', type: 'error' }); return }
+    // A landing page's whole job is the quiz in it. Going live without one puts
+    // an empty card where the funnel goes, so it is refused here as well as in
+    // the publish preflight - the earlier of the two is the useful one.
+    if (!draft.quizId && !draft.quizDeploymentId && draft.status === 'live') {
+      onToast?.({ message: 'Pick a quiz flow before going live.', type: 'error' }); return
+    }
     const next = { ...draft, id: draft.id || genId('ldep'), status: draft.status || 'draft', path: draft.path || '' }
     onSave(next)
     onToast?.({ message: draft.domain ? 'Deployment saved.' : 'Deployment saved as preview URL.', type: 'success' })
@@ -676,6 +703,12 @@ const LPDeploymentEditor = ({ deployment, landingPages, brands, domains, quizDep
   const lp = landingPages.find((p) => p.id === draft.landingPageId)
   const tplName = lp ? templateFor(lp.templateId).name : null
   const angleName = ANGLES.find((a) => a.id === lp?.angle)?.label
+  // What the embed is drawn in when the deployment does not choose: the landing
+  // page's own recommendation, named rather than left as "default" so an
+  // operator can see what they are accepting.
+  const recommendedSkinName = lp
+    ? quizSkins.find((t) => t.id === recommendedQuizTemplateFor(lp.templateId))?.name ?? null
+    : null
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
@@ -711,7 +744,7 @@ const LPDeploymentEditor = ({ deployment, landingPages, brands, domains, quizDep
             </div>
             <div>
               <Label>Brand</Label>
-              <Select value={draft.brandId || ''} onChange={(e) => setDraft({ ...draft, brandId: e.target.value, domain: '', quizDeploymentId: '' })}>
+              <Select value={draft.brandId || ''} onChange={(e) => setDraft({ ...draft, brandId: e.target.value, domain: '' })}>
                 <option value="">Pick a brand</option>
                 {selectableOptions({
                 records: brands,
@@ -737,18 +770,46 @@ const LPDeploymentEditor = ({ deployment, landingPages, brands, domains, quizDep
               </div>
             </div>
             <div>
-              <Label>Quiz deployment</Label>
-              <Select value={draft.quizDeploymentId || ''} onChange={(e) => setDraft({ ...draft, quizDeploymentId: e.target.value })} disabled={!draft.brandId}>
-                <option value="">None (use the LP&apos;s default)</option>
-                {brandQuizDeps.map((qd) => {
-                  const qz = quizzes.find((q) => q.id === qd.quizId)
-                  return <option key={qd.id} value={qd.id}>{qz?.name || qd.id} {'·'} {qd.path}</option>
-                })}
+              <Label>Quiz flow</Label>
+              <Select value={draft.quizId || ''} onChange={(e) => setDraft({ ...draft, quizId: e.target.value })}>
+                <option value="">Pick the flow this page runs</option>
+                {quizzes.map((q) => (
+                  <option key={q.id} value={q.id} disabled={q.isArchived}>
+                    {q.name}{q.isArchived ? ' - ARCHIVED' : q.isPublished ? '' : ' - unpublished'}
+                  </option>
+                ))}
               </Select>
-              <div style={{ fontSize: 11, color: T.textMute, marginTop: 6 }}>
-                {brandQuizDeps.length === 0 && draft.brandId ? <span style={{ color: T.warning }}>This brand has no quiz deployments yet. Create one in Funnels {'›'} Quizzes.</span> : 'Override the quiz embedded in this specific deployment. Filtered to quizzes deployed under the selected brand.'}
+              <div style={{ fontSize: 11, color: T.textMute, marginTop: 6, lineHeight: 1.55 }}>
+                The flow itself, not a second published quiz page. Flows are brandless, so the
+                same one runs under every brand and this deployment supplies the brand.
               </div>
             </div>
+            <div>
+              <Label>Embedded quiz look</Label>
+              <Select value={draft.embeddedQuizTemplateId || ''} onChange={(e) => setDraft({ ...draft, embeddedQuizTemplateId: e.target.value })}>
+                <option value="">Recommended for this landing page{recommendedSkinName ? ` (${recommendedSkinName})` : ''}</option>
+                {quizSkins.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </Select>
+              <div style={{ fontSize: 11, color: T.textMute, marginTop: 6 }}>
+                How the quiz is DRAWN inside this page. The landing page owns the page; this owns the card.
+              </div>
+            </div>
+            <div>
+              <Label>Progress treatment</Label>
+              <Select value={draft.embeddedProgressForm || ''} onChange={(e) => setDraft({ ...draft, embeddedProgressForm: e.target.value })}>
+                <option value="">The quiz look&apos;s own</option>
+                {PROGRESS_FORM_LABELS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </Select>
+            </div>
+            {legacyQuizDep && (
+              <div style={{ padding: 12, border: `1px solid ${T.warning}`, borderRadius: 8, fontSize: 11.5, color: T.textMute, lineHeight: 1.6 }}>
+                <span style={{ color: T.warning, fontWeight: 600 }}>Legacy binding.</span>{' '}
+                This deployment still points at the standalone quiz deployment{' '}
+                <span style={{ fontFamily: '"JetBrains Mono", monospace', color: T.text }}>{draft.quizDeploymentId}</span>
+                {legacyQuizDepMissing ? ', which no longer exists' : ''}. It is read only and is used
+                only while no flow is chosen above. Picking a flow replaces it on save.
+              </div>
+            )}
             <div>
               <Label>Status</Label>
               <Select value={draft.status || 'draft'} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
@@ -1035,7 +1096,7 @@ export function LandingPagesApp({ initialLandingPages, initialDeployments, brand
               ? null
               : lpTab === 'pages'
                 ? <Btn variant="primary" size="md" icon={Sparkles} onClick={() => setAiWizardOpen(true)}>New with Claude</Btn>
-                : <Btn variant="primary" size="md" icon={Plus} onClick={() => { setEditingDeployment({ id: '', landingPageId: '', brandId: '', domain: '', path: '/c/', quizDeploymentId: '', status: 'draft' }); setSubView('lp_deployment_edit') }}>New Deployment</Btn>
+                : <Btn variant="primary" size="md" icon={Plus} onClick={() => { setEditingDeployment({ id: '', landingPageId: '', brandId: '', domain: '', path: '/c/', quizId: '', embeddedQuizTemplateId: '', embeddedProgressForm: '', quizDeploymentId: '', status: 'draft' }); setSubView('lp_deployment_edit') }}>New Deployment</Btn>
           }
           secondaryAction={lpTab === 'pages' ? <Btn variant="secondary" size="md" icon={Plus} onClick={createBlankLP}>Blank LP</Btn> : null}
         />

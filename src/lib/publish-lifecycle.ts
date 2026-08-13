@@ -320,6 +320,36 @@ export const lpDeploymentPreflight = async (
     }
   }
 
+  /*
+   * A LANDING PAGE WITH A QUIZ CARD MUST HAVE A QUIZ.
+   *
+   * The twelve ported templates all draw one, and the live render replaces that
+   * drawing with the real runtime. With nothing bound, the visitor gets the
+   * card's empty box where the funnel goes — which is a worse outcome than the
+   * static card it replaced, and exactly the state three of four live rows were
+   * in when their legacy pointers went stale.
+   *
+   * Checked against the TEMPLATE rather than assumed, so a future template with
+   * no quiz mount is not held to a rule that does not apply to it.
+   */
+  if (templateCheck.ok) {
+    const canonical = canonicalTemplateId('lp', landingPage?.template_id)
+    const entry = canonical.ok ? resolveTemplate('lp', canonical.id) : null
+    const ported = entry?.ok && entry.template.kind === 'lp' ? entry.template.template : null
+    if (ported?.quizMount) {
+      const bound = relationId(deployment.quiz) !== null || str(deployment.quiz_deployment_id) !== ''
+      checks.push(
+        bound
+          ? pass('quiz-bound', 'This page runs a quiz')
+          : fail(
+              'quiz-bound',
+              'This page runs a quiz',
+              'this template has a quiz card and this deployment names no flow, so the card would render empty',
+            ),
+      )
+    }
+  }
+
   // The deployment's OWN flow, when it names one. Checked on the flow and its
   // chosen skin rather than on a standalone deployment it deliberately does not
   // have — requiring one was the thing gate 10 removed.

@@ -30,14 +30,17 @@
  * enters means a new caller cannot forget.
  */
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { TEMPLATE_FONTS_HREF, asSlotted } from '@/lib/lp-templates'
 import { templateStyle } from '@/lib/lp-templates/tokens'
-import { composeTemplate } from '@/lib/lp-slots/model'
+import { composeTemplate, composeTemplateWithQuizMount, QUIZ_MOUNT_ATTR } from '@/lib/lp-slots/model'
 import { resolveTokensForHtml } from './tokens'
 import { resolveForRender, reportTemplateFallback } from '@/lib/template-registry'
 import { resolveLpPalette } from '@/lib/lp-nodes/palette'
 import { getLpIdentity } from '@/lib/lp-identities'
+import { QuizRuntime } from '@/components/public/quiz/QuizRuntime'
+import { resolveCssColor } from '@/lib/lp-templates/resolve-css-color'
 
 /**
  * The ported markup for a stored id, or null.
@@ -74,12 +77,76 @@ const portedFor = (slug, context) => {
  */
 const useComposed = (template, brand, overrides) =>
   useMemo(() => {
-    if (!template) return { html: '', refused: [], unknownOverrides: [] }
-    const composed = composeTemplate(asSlotted(template), overrides ?? {})
-    return { ...composed, html: resolveTokensForHtml(composed.html, { brand }) }
+    if (!template) return { html: '', htmlWithMount: '', refused: [], unknownOverrides: [], mountedSlotIds: [] }
+    const composed = composeTemplateWithQuizMount(asSlotted(template), overrides ?? {})
+    return {
+      ...composed,
+      html: resolveTokensForHtml(composed.html, { brand }),
+      htmlWithMount: resolveTokensForHtml(composed.htmlWithMount, { brand }),
+    }
   }, [template, brand, overrides])
 
-export const PortedTemplateView = ({ slug, brand, overrides = null, className = '', onDiagnostics = null }) => {
+/**
+ * The live quiz, portalled into the card the reference drew.
+ *
+ * WHY A PORTAL. The composed page is one HTML string mounted with
+ * `dangerouslySetInnerHTML`, because the quiz card is nested several elements
+ * deep: splitting the string at the card and setting each half as the innerHTML
+ * of a separate node would have the parser close and reopen every open element
+ * at the seam, and the page would come out with a different tree from the
+ * reference. Mounting the page WHOLE and moving the runtime into the marked box
+ * keeps the DOM the design's by construction rather than by care.
+ *
+ * `useLayoutEffect` rather than `useEffect` so the box is filled in the same
+ * commit the page is mounted in, before the browser paints. With `useEffect` the
+ * visitor gets one painted frame of an empty card.
+ *
+ * The trade this makes, stated rather than hidden: the quiz's first question is
+ * not in the server-rendered HTML the way it is on a standalone quiz page. It
+ * costs nothing a visitor can use — a quiz with no JavaScript is a picture
+ * either way, which is exactly the defect this replaces — and it costs no
+ * layout, because the box is the reference's own tag with its own padding,
+ * border and width.
+ */
+const QuizMount = ({ host, quiz, quizCtx, brand, surface, htmlKey }) => {
+  const [node, setNode] = useState(null)
+
+  useLayoutEffect(() => {
+    setNode(host.current ? host.current.querySelector(`[${QUIZ_MOUNT_ATTR}]`) : null)
+  }, [host, htmlKey])
+
+  if (!node || !quiz) return null
+
+  return createPortal(
+    <QuizRuntime
+      quiz={quiz}
+      // The quiz belongs to its own brand — its number, its destinations, its
+      // legal text — and is READ against the landing page's card. Those are two
+      // different questions and conflating them is how a dark-brand quiz ends up
+      // unreadable inside a light page.
+      brand={quizCtx?.brand ?? brand}
+      deployment={quizCtx?.deployment ?? null}
+      site={quizCtx?.site ?? null}
+      inline
+      surfaceColor={surface}
+      // Defaults to preview when no context declares otherwise, so a caller that
+      // forgets to say it is live gets the safe behaviour: no lead written, no
+      // redirect followed.
+      previewMode={quizCtx ? quizCtx.preview !== false : true}
+    />,
+    node,
+  )
+}
+
+export const PortedTemplateView = ({
+  slug,
+  brand,
+  overrides = null,
+  className = '',
+  onDiagnostics = null,
+  quiz = null,
+  quizCtx = null,
+}) => {
   const template = useMemo(() => portedFor(slug, 'ported template view'), [slug])
 
   // The identity is only a fallback source of colour for a brand that has set
@@ -87,6 +154,22 @@ export const PortedTemplateView = ({ slug, brand, overrides = null, className = 
   const palette = useMemo(() => resolveLpPalette(getLpIdentity('a'), brand), [brand])
   const style = useMemo(() => (template ? templateStyle(template, palette) : {}), [template, palette])
   const composed = useComposed(template, brand, overrides)
+  const host = useRef(null)
+
+  /*
+   * The opaque colour the quiz card will actually paint as, under this brand.
+   *
+   * Resolved through the same variables the wrapper sets, so it is the colour
+   * the visitor sees rather than the colour the reference was drawn in. Falling
+   * back to the page surface when a template declares nothing resolvable is the
+   * conservative answer: the runtime then derives against a colour it can
+   * verify instead of against an empty string, which it would read as "no host"
+   * and answer with its own page palette.
+   */
+  const surface = useMemo(() => {
+    if (!template) return null
+    return resolveCssColor(template.quizMount?.surface, style) ?? palette.surface ?? null
+  }, [template, style, palette])
 
   useEffect(() => {
     // An override that named no slot, or that was refused, is the operator's
@@ -102,7 +185,15 @@ export const PortedTemplateView = ({ slug, brand, overrides = null, className = 
   return (
     <div className={`lp-ported ${className}`} style={style}>
       <link rel="stylesheet" href={TEMPLATE_FONTS_HREF} />
-      <div dangerouslySetInnerHTML={{ __html: composed.html }} />
+      <div ref={host} dangerouslySetInnerHTML={{ __html: composed.htmlWithMount }} />
+      <QuizMount
+        host={host}
+        quiz={quiz}
+        quizCtx={quizCtx}
+        brand={brand}
+        surface={surface}
+        htmlKey={composed.htmlWithMount}
+      />
     </div>
   )
 }

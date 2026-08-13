@@ -68,7 +68,14 @@ export default async function LandingPagesPage() {
       domainId: domId,
       domain: domId ? domainHostById.get(domId) ?? '' : '',
       path: r.path ?? '',
+      // The flow this deployment runs. The editor binds THIS; the legacy
+      // standalone-deployment pointer below is carried read-only so a row that
+      // still has one can be seen and migrated rather than silently reset.
+      quizId: relId(r.quiz),
+      embeddedQuizTemplateId: r.embedded_quiz_template_id ?? '',
+      embeddedProgressForm: r.embedded_progress_form ?? '',
       quizDeploymentId: r.quiz_deployment_id ?? '',
+      contentOverrides: (r.content_overrides ?? {}) as Record<string, string>,
       status: r.status ?? 'draft',
     }
   })
@@ -81,6 +88,11 @@ export default async function LandingPagesPage() {
   const quizzes = quizRes.docs.map((r) => ({
     id: String(r.id),
     name: r.name,
+    // Publication state travels with the flow so the picker can say which ones
+    // a deployment could actually go live with, rather than offering all of
+    // them and letting the publish preflight be the first to mention it.
+    isPublished: Boolean(r.is_published),
+    isArchived: Boolean(r.is_archived),
     tiers: Array.isArray(r.tiers) ? r.tiers : [],
     steps: Array.isArray(r.steps) ? r.steps : [],
     nodes: Array.isArray(r.nodes) ? r.nodes : [],

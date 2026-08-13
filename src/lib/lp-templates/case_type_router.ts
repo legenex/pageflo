@@ -11,6 +11,7 @@
 // the template, so a corrected template reaches every deployment at once.
 
 import type { LpSlot, LpUnsupportedRegion } from '@/lib/lp-slots/model'
+import type { LpQuizMount } from '@/lib/lp-slots/quiz-mount'
 
 export const slug = "case_type_router"
 export const source = "LP11-Case-Type-Router.html"
@@ -818,3 +819,44 @@ export const slots: LpSlot[] = [
 
 /** Regions the markup alone cannot carry. Empty means the template is complete. */
 export const unsupported: LpUnsupportedRegion[] = []
+
+/**
+ * Where the live quiz replaces the reference's drawing of one.
+ *
+ * The card in the markup above is a PICTURE of a quiz: it has answer buttons
+ * that do not answer and a progress rail that does not progress. The public
+ * render composes the template either side of this region and mounts the same
+ * runtime a standalone quiz deployment mounts, so a landing page runs the real
+ * flow rather than a lookalike. See src/lib/lp-slots/quiz-mount.ts.
+ */
+export const quizMount: LpQuizMount = {
+  "startPart": 29,
+  "startOffset": 20,
+  "endPart": 43,
+  "endOffset": 15,
+  "slotIds": [
+    "s04_eyebrow_4",
+    "s04_trust_line_1",
+    "s04_eyebrow_5",
+    "s04_eyebrow_6",
+    "s04_eyebrow_7",
+    "s04_faq_question_1",
+    "s04_faq_answer_1",
+    "s04_cta_label_1",
+    "s04_cta_label_2",
+    "s04_cta_label_3",
+    "s04_cta_label_4",
+    "s04_cta_label_5",
+    "s04_trust_line_2",
+    "s04_disclaimer_1"
+  ],
+  "tag": "div",
+  "openTag": "<div style=\"flex:1 1 340px;min-width:min(100%,330px);background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:12px;padding:22px clamp(16px,3vw,26px);box-shadow:0 14px 32px -18px rgba(40,40,40,.28);display:flex;flex-direction:column\">",
+  "surface": "var(--lp-n1000, #ffffff)",
+  "evidence": {
+    "answerButtons": 4,
+    "stepIndicator": true,
+    "navControl": true,
+    "absorbedRail": false
+  }
+}

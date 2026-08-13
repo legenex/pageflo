@@ -28,6 +28,7 @@ import * as sixty_second_check from './sixty_second_check'
 import * as answer_first from './answer_first'
 
 import type { LpSlot, LpSlottedTemplate, LpUnsupportedRegion } from '@/lib/lp-slots/model'
+import type { LpQuizMount } from '@/lib/lp-slots/quiz-mount'
 
 export type PortedTemplate = {
   slug: string
@@ -59,6 +60,14 @@ export type PortedTemplate = {
   slots: LpSlot[]
   /** Regions the markup alone cannot carry. Empty means complete. */
   unsupported: LpUnsupportedRegion[]
+  /**
+   * Where the live quiz runtime replaces the reference's static quiz card.
+   *
+   * Non-null for all twelve: the extractor refuses to write a template whose
+   * card it could not locate, because a landing page that mounts a live quiz in
+   * the wrong place is worse than one that fails to build.
+   */
+  quizMount: LpQuizMount
 }
 
 const meta = [
@@ -107,6 +116,7 @@ type GeneratedModule = {
   slotIds: string[]
   slots: LpSlot[]
   unsupported: LpUnsupportedRegion[]
+  quizMount: LpQuizMount
 }
 
 export const PORTED_TEMPLATES: PortedTemplate[] = meta.map(
@@ -120,6 +130,7 @@ export const PORTED_TEMPLATES: PortedTemplate[] = meta.map(
       slotIds: m.slotIds,
       slots: m.slots,
       unsupported: m.unsupported,
+      quizMount: m.quizMount,
     }
   },
 )
@@ -131,6 +142,7 @@ export const asSlotted = (t: PortedTemplate): LpSlottedTemplate => ({
   slotIds: t.slotIds,
   slots: t.slots,
   unsupported: t.unsupported,
+  quizMount: t.quizMount,
 })
 
 export const PORTED_BY_SLUG: Record<string, PortedTemplate> =

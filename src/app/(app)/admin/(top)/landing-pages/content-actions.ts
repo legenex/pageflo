@@ -27,7 +27,7 @@ import { relationId, requireDeploymentSiteAdmin } from '@/lib/authz'
 import { invokeLLM } from '@/lib/ai/invoke'
 import { canonicalTemplateId, resolveTemplate } from '@/lib/template-registry'
 import { asSlotted } from '@/lib/lp-templates'
-import { validateOverrides } from '@/lib/lp-slots/model'
+import { validateOverrides, editableSlots, isInsideQuizMount } from '@/lib/lp-slots/model'
 import {
   ContentProposalSchema,
   applyAccepted,
@@ -114,6 +114,11 @@ export async function setDeploymentCopy(args: {
   for (const [id, value] of Object.entries(args.edits ?? {})) {
     if (value === null) { next = resetToDefault(next, [id]); continue }
     if (typeof value !== 'string') return { ok: false, error: `"${id}" is not text` }
+    // Refused rather than stored. The quiz card is replaced by the live runtime,
+    // so an override here would be written, validated, saved, and never appear.
+    if (isInsideQuizMount(asSlotted(ctx.ported), id)) {
+      return { ok: false, error: `"${id}" is inside the quiz card; that copy comes from the quiz flow` }
+    }
     // Typing the stock wording back in is a reset, not a pin: the two look the
     // same today and behave differently when the template is corrected.
     if (stock.get(id) === value) next = resetToDefault(next, [id])
@@ -144,32 +149,57 @@ export async function writeDeploymentCopy(args: {
   const site = await payload.findByID({ collection: 'sites', id: ctx.siteId, depth: 0, overrideAccess: true }).catch(() => null)
   const identity = (site?.brand_identity ?? {}) as Record<string, unknown>
 
-  // The quiz this page runs, as READ-ONLY context, so the copy can promise what
-  // is actually asked. Nothing about it is writable and the prompt says so.
+  /*
+   * The quiz this page runs, as READ-ONLY context, so the copy can promise what
+   * is actually asked. Nothing about it is writable and the prompt says so.
+   *
+   * Resolved in the RESOLVER's order: the deployment's own flow first, the
+   * legacy standalone pointer only when it has none. This file read the legacy
+   * pointer first and nothing else, so a page moved onto a flow directly - the
+   * binding the product now prefers - described its copy against no flow at
+   * all, and a page whose legacy pointer had gone stale described it against a
+   * deployment that no longer existed.
+   */
+  const summarize = (quiz: Record<string, unknown> | null): QuizFlowSummary | null => {
+    if (!quiz) return null
+    const nodes = Array.isArray(quiz.nodes) ? (quiz.nodes as Array<Record<string, unknown>>) : []
+    return {
+      name: String(quiz.name ?? ''),
+      stepCount: Array.isArray(quiz.steps) ? quiz.steps.length : 0,
+      questions: nodes
+        .filter((n) => n?.isVisible !== false && (n?.type === 'question' || n?.type === 'form'))
+        .map((n) => String(n.question || n.headline || '').trim())
+        .filter(Boolean),
+      tiers: (Array.isArray(quiz.tiers) ? (quiz.tiers as Array<Record<string, unknown>>) : []).map((x) => String(x?.id ?? '')),
+    }
+  }
+
   let flow: QuizFlowSummary | null = null
+  const ownQuizId = relationId(ctx.deployment.quiz)
   const quizDepId = typeof ctx.deployment.quiz_deployment_id === 'string' ? ctx.deployment.quiz_deployment_id : ''
-  if (quizDepId) {
+  if (ownQuizId !== null) {
+    flow = summarize(
+      await payload.findByID({ collection: 'funnel-quizzes', id: ownQuizId, depth: 0, overrideAccess: true }).catch(() => null),
+    )
+  } else if (quizDepId) {
     const qd = await payload.findByID({ collection: 'funnel-quiz-deployments', id: quizDepId, depth: 0, overrideAccess: true }).catch(() => null)
     // Cross-tenant: the link is a bare text id, so the Site is re-checked here
     // rather than trusted, exactly as the publish preflight does.
     if (qd && relationId(qd.site) === ctx.siteId) {
-      const quiz = await payload.findByID({ collection: 'funnel-quizzes', id: relationId(qd.quiz), depth: 0, overrideAccess: true }).catch(() => null)
-      if (quiz) {
-        const nodes = Array.isArray(quiz.nodes) ? quiz.nodes : []
-        flow = {
-          name: String(quiz.name ?? ''),
-          stepCount: Array.isArray(quiz.steps) ? quiz.steps.length : 0,
-          questions: nodes
-            .filter((n) => n?.isVisible !== false && (n?.type === 'question' || n?.type === 'form'))
-            .map((n) => String(n.question || n.headline || '').trim())
-            .filter(Boolean),
-          tiers: (Array.isArray(quiz.tiers) ? quiz.tiers : []).map((x) => String(x?.id ?? '')),
-        }
-      }
+      flow = summarize(
+        await payload.findByID({ collection: 'funnel-quizzes', id: relationId(qd.quiz), depth: 0, overrideAccess: true }).catch(() => null),
+      )
     }
   }
 
-  const targets = targetsFromSlots(ctx.ported.slots, ctx.overrides, args.slotIds?.length ? { ids: args.slotIds } : {})
+  // Only the slots the QUIZ does not own. The card's question, its answers and
+  // its Back/Continue labels are the flow's, so a model writing into them would
+  // be writing copy no visitor is ever shown.
+  const targets = targetsFromSlots(
+    editableSlots(asSlotted(ctx.ported)),
+    ctx.overrides,
+    args.slotIds?.length ? { ids: args.slotIds } : {},
+  )
 
   const result = await generateContent(
     {

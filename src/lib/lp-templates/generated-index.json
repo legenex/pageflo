@@ -7,6 +7,17 @@
     "slots": 92,
     "loopsExpanded": 0,
     "valid": true,
+    "quizMount": {
+      "tag": "div",
+      "bytes": 7851,
+      "slotsInside": 13,
+      "evidence": {
+        "answerButtons": 4,
+        "stepIndicator": true,
+        "navControl": true,
+        "absorbedRail": false
+      }
+    },
     "problems": []
   },
   {
@@ -17,6 +28,17 @@
     "slots": 97,
     "loopsExpanded": 0,
     "valid": true,
+    "quizMount": {
+      "tag": "div",
+      "bytes": 6981,
+      "slotsInside": 11,
+      "evidence": {
+        "answerButtons": 4,
+        "stepIndicator": true,
+        "navControl": true,
+        "absorbedRail": false
+      }
+    },
     "problems": []
   },
   {
@@ -27,6 +49,17 @@
     "slots": 148,
     "loopsExpanded": 0,
     "valid": true,
+    "quizMount": {
+      "tag": "div",
+      "bytes": 6925,
+      "slotsInside": 11,
+      "evidence": {
+        "answerButtons": 4,
+        "stepIndicator": true,
+        "navControl": false,
+        "absorbedRail": false
+      }
+    },
     "problems": []
   },
   {
@@ -37,6 +70,17 @@
     "slots": 145,
     "loopsExpanded": 0,
     "valid": true,
+    "quizMount": {
+      "tag": "div",
+      "bytes": 7326,
+      "slotsInside": 14,
+      "evidence": {
+        "answerButtons": 4,
+        "stepIndicator": true,
+        "navControl": true,
+        "absorbedRail": false
+      }
+    },
     "problems": []
   },
   {
@@ -47,6 +91,17 @@
     "slots": 61,
     "loopsExpanded": 0,
     "valid": true,
+    "quizMount": {
+      "tag": "div",
+      "bytes": 6327,
+      "slotsInside": 10,
+      "evidence": {
+        "answerButtons": 4,
+        "stepIndicator": true,
+        "navControl": true,
+        "absorbedRail": false
+      }
+    },
     "problems": []
   },
   {
@@ -57,6 +112,17 @@
     "slots": 43,
     "loopsExpanded": 0,
     "valid": true,
+    "quizMount": {
+      "tag": "div",
+      "bytes": 6858,
+      "slotsInside": 10,
+      "evidence": {
+        "answerButtons": 4,
+        "stepIndicator": true,
+        "navControl": true,
+        "absorbedRail": false
+      }
+    },
     "problems": []
   },
   {
@@ -67,6 +133,17 @@
     "slots": 63,
     "loopsExpanded": 0,
     "valid": true,
+    "quizMount": {
+      "tag": "div",
+      "bytes": 6649,
+      "slotsInside": 11,
+      "evidence": {
+        "answerButtons": 4,
+        "stepIndicator": true,
+        "navControl": true,
+        "absorbedRail": false
+      }
+    },
     "problems": []
   },
   {
@@ -77,6 +154,17 @@
     "slots": 68,
     "loopsExpanded": 0,
     "valid": true,
+    "quizMount": {
+      "tag": "div",
+      "bytes": 5413,
+      "slotsInside": 9,
+      "evidence": {
+        "answerButtons": 4,
+        "stepIndicator": true,
+        "navControl": true,
+        "absorbedRail": true
+      }
+    },
     "problems": []
   },
   {
@@ -87,6 +175,17 @@
     "slots": 26,
     "loopsExpanded": 0,
     "valid": true,
+    "quizMount": {
+      "tag": "div",
+      "bytes": 6890,
+      "slotsInside": 11,
+      "evidence": {
+        "answerButtons": 4,
+        "stepIndicator": true,
+        "navControl": true,
+        "absorbedRail": false
+      }
+    },
     "problems": []
   },
   {
@@ -97,6 +196,17 @@
     "slots": 33,
     "loopsExpanded": 0,
     "valid": true,
+    "quizMount": {
+      "tag": "div",
+      "bytes": 6174,
+      "slotsInside": 10,
+      "evidence": {
+        "answerButtons": 4,
+        "stepIndicator": true,
+        "navControl": true,
+        "absorbedRail": false
+      }
+    },
     "problems": []
   },
   {
@@ -107,6 +217,17 @@
     "slots": 74,
     "loopsExpanded": 2,
     "valid": true,
+    "quizMount": {
+      "tag": "div",
+      "bytes": 5213,
+      "slotsInside": 14,
+      "evidence": {
+        "answerButtons": 4,
+        "stepIndicator": true,
+        "navControl": true,
+        "absorbedRail": false
+      }
+    },
     "problems": []
   },
   {
@@ -117,6 +238,17 @@
     "slots": 79,
     "loopsExpanded": 0,
     "valid": true,
+    "quizMount": {
+      "tag": "div",
+      "bytes": 5931,
+      "slotsInside": 16,
+      "evidence": {
+        "answerButtons": 4,
+        "stepIndicator": true,
+        "navControl": true,
+        "absorbedRail": false
+      }
+    },
     "problems": []
   }
 ]

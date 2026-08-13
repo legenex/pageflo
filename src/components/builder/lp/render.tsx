@@ -228,6 +228,11 @@ export const LivePreview = ({
   // A ported template renders the handoff's own markup. Its copy is not yet
   // node-backed, so the element tree and the click-to-edit affordances are not
   // offered for one - showing them would advertise an edit that does nothing.
+  //
+  // The quiz is the exception, and it is not markup: the reference's quiz card
+  // is replaced by the real runtime, the same one a standalone deployment
+  // mounts. Passing `quiz` and `quizCtx` through here is what closes the defect
+  // where a landing page's answer buttons did nothing at all.
   if (isPortedTemplate(templateId)) {
     return (
       <div
@@ -241,6 +246,8 @@ export const LivePreview = ({
           brand={previewBrand}
           overrides={slotOverrides}
           onDiagnostics={onSlotDiagnostics}
+          quiz={quiz}
+          quizCtx={quizCtx}
         />
       </div>
     )

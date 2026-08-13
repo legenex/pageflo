@@ -33,6 +33,7 @@ import {
 } from '../src/lib/publish-lifecycle.ts'
 import { summarize, pass, fail } from '../src/lib/publish-preflight.ts'
 import { PORTED_TEMPLATES } from '../src/lib/lp-templates/index.ts'
+import { classifyLpQuizBinding, LOSSY_QUIZ_DEPLOYMENT_FIELDS, NEEDS_A_DECISION } from '../src/lib/lp-quiz-binding.ts'
 
 let passed = 0
 let failed = 0
@@ -321,24 +322,158 @@ const ACTIVE_DOMAIN = { id: 5, site: 1, host: 'acme.example', status: 'active', 
   t(r.warnings.some((c) => c.id === 'domain-ssl'), 'but the operator is TOLD, rather than discovering it')
 }
 
+/* ------------------------------------------- landing-page quiz binding */
+//
+// The production defect, as fixtures. Three of four live LP deployments pointed
+// at standalone quiz deployments that had been deleted; the rows looked bound
+// and the pages had no funnel. Every state below existed or can exist, and the
+// classifier is what the admin list, the preflight and the reconciliation
+// report all read.
+
+{
+  const LP = (over: Record<string, unknown> = {}): Record<string, unknown> => {
+    return { id: 1, site: 7, quiz: null, quiz_deployment_id: '', ...over }
+  }
+  const QD = (over: Record<string, unknown> = {}): Record<string, unknown> => {
+    return { id: 11, site: 7, quiz: 70, template_id: 'sq_quiz_first', progress_form: null, ...over }
+  }
+
+  {
+    const b = classifyLpQuizBinding(LP({ quiz: 70 }), null)
+    t(b.verdict === 'flow', 'a deployment naming a flow is classified as bound to a flow')
+    t(b.servesAQuiz, 'and serves a quiz')
+    t(b.migration === null, 'and has nothing to migrate')
+  }
+  {
+    // The pointer sits beside the flow, unread. Clearing it is lossless.
+    const b = classifyLpQuizBinding(LP({ quiz: 70, quiz_deployment_id: '11' }), QD())
+    t(b.verdict === 'flow', 'a flow binding wins over a legacy pointer beside it')
+    t(b.migration?.quiz === '70', 'and the clean-up keeps the flow it already runs')
+    t(b.migration?.quiz_deployment_id === '', 'and clears the pointer nothing reads')
+  }
+  {
+    const b = classifyLpQuizBinding(LP(), null)
+    t(b.verdict === 'unbound', 'a deployment with neither is unbound')
+    t(!b.servesAQuiz, 'and serves nothing')
+    t(b.migration === null, 'and is NOT migrated automatically: nothing knows what it should run')
+  }
+  {
+    // The production case.
+    const b = classifyLpQuizBinding(LP({ quiz_deployment_id: '11' }), null)
+    t(b.verdict === 'legacy-dangling', 'a pointer at a deployment that no longer exists is dangling')
+    t(!b.servesAQuiz, 'and the page has no funnel, whatever the row looks like')
+    t(b.migration === null, 'and is never repaired by guessing')
+  }
+  {
+    const b = classifyLpQuizBinding(LP({ quiz_deployment_id: '11' }), QD({ quiz: null }))
+    t(b.verdict === 'legacy-dangling', 'a pointer at a deployment that names no flow is dangling too')
+  }
+  {
+    const b = classifyLpQuizBinding(LP({ quiz_deployment_id: '11' }), QD({ site: 9 }))
+    t(b.verdict === 'legacy-cross-tenant', "a pointer at another brand's deployment is cross-tenant")
+    t(!b.servesAQuiz, 'and serves nothing, because the resolver refuses it')
+    t(b.migration === null, "and is never migrated: picking another brand's flow is how leads reach the wrong dashboard")
+  }
+  {
+    const b = classifyLpQuizBinding(LP({ quiz_deployment_id: '11' }), QD())
+    t(b.verdict === 'legacy-migratable', 'a resolving same-tenant pointer with no extra config is migratable')
+    t(b.migration?.quiz === '70', 'and migrates to the flow that deployment ran')
+    t(b.migration?.embedded_quiz_template_id === 'sq_quiz_first', "and carries the standalone deployment's own skin across")
+    t(b.servesAQuiz, 'and serves a quiz meanwhile')
+  }
+  {
+    const b = classifyLpQuizBinding(LP({ quiz_deployment_id: '11' }), QD({ progress_form: 'segmented' }))
+    t(b.migration?.embedded_progress_form === 'segmented', 'and carries its progress treatment across')
+  }
+  for (const field of LOSSY_QUIZ_DEPLOYMENT_FIELDS) {
+    const b = classifyLpQuizBinding(LP({ quiz_deployment_id: '11' }), QD({ [field]: { a: 1 } }))
+    t(b.verdict === 'legacy-needs-decision', `a standalone deployment carrying ${field} is NOT migrated automatically`)
+    t(b.migration === null, `and ${field} is never silently dropped`)
+  }
+  {
+    // Empty jsonb is not configuration. Treating `{}` as "carries destinations"
+    // would make every row need a decision and the tool useless.
+    const b = classifyLpQuizBinding(LP({ quiz_deployment_id: '11' }), QD({ destination_overrides: {}, utm: [], pixels: null }))
+    t(b.verdict === 'legacy-migratable', 'empty jsonb columns are not configuration')
+  }
+  {
+    // Determinism: the same input twice must give the same answer, or a diff
+    // between two reports means nothing.
+    const a = classifyLpQuizBinding(LP({ quiz_deployment_id: '11' }), QD())
+    const c = classifyLpQuizBinding(LP({ quiz_deployment_id: '11' }), QD())
+    t(JSON.stringify(a) === JSON.stringify(c), 'the classification is deterministic')
+  }
+  {
+    const needs = ['legacy-dangling', 'legacy-cross-tenant', 'legacy-needs-decision', 'unbound']
+    t(needs.every((v) => NEEDS_A_DECISION.has(v as never)), 'every verdict that cannot be automated is marked as needing a person')
+    t(!NEEDS_A_DECISION.has('flow') && !NEEDS_A_DECISION.has('legacy-migratable'), 'and the two that can be are not')
+  }
+}
+
 /* ------------------------------------------------------- landing-page preflight */
 
 const LP_TPL = PORTED_TEMPLATES[0]
 const GOOD_LP = { id: 30, is_published: true, template_id: LP_TPL.slug, sections: [{ type: 'hero' }] }
 const GOOD_LP_DEP = { id: 40, site: 1, landing_page: 30, domain: null, path: '/c/lp', status: 'draft', content_overrides: {}, quiz_deployment_id: '' }
 
+// The twelve ported templates all draw a quiz card, and the live render replaces
+// that drawing with the runtime. A deployment that names no flow therefore ships
+// the card's EMPTY BOX where the funnel goes - worse than the static card it
+// replaced, and the exact state a stale legacy pointer leaves a row in.
+const GOOD_FLOW = { ...GOOD_QUIZ, id: 70, is_published: true, is_archived: false }
+const BOUND_LP_DEP = { ...GOOD_LP_DEP, quiz: 70 }
+
 {
   const r = await lpDeploymentPreflight(CTX(), { deployment: GOOD_LP_DEP, landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: null })
-  t(r.ok, `a landing-page deployment with no embedded quiz passes${r.ok ? '' : ' — ' + r.blocking.map((c) => c.id).join(',')}`)
-  t(r.checks.some((c) => c.id === 'hydration'), 'and the renderer-hydration check ran')
+  t(!r.ok && r.blocking.some((c) => c.id === 'quiz-bound'), 'a landing-page deployment with NO quiz at all is refused')
+  t(r.checks.some((c) => c.id === 'hydration'), 'and the renderer-hydration check still ran')
+}
+{
+  const r = await lpDeploymentPreflight(CTX(), { deployment: BOUND_LP_DEP, landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: GOOD_FLOW })
+  t(r.ok, `a deployment that names a flow directly passes${r.ok ? '' : ' — ' + r.blocking.map((c) => c.id).join(',')}`)
+  t(r.checks.some((c) => c.id === 'quiz-bound' && c.ok), 'and the quiz-bound check is the one that cleared it')
+}
+{
+  // The legacy binding still satisfies the rule while it resolves. It is a
+  // migration fallback, not a defect, and refusing it would take four live
+  // pages down to make a point about the data model.
+  const legacyDep = { ...GOOD_LP_DEP, quiz_deployment_id: '55' }
+  const legacyQuizDep = { id: 55, site: 1, quiz: 70, template_id: 'sq_editorial_inline' }
+  const r = await lpDeploymentPreflight(CTX(), {
+    deployment: legacyDep, landingPage: GOOD_LP, site: SITE, domain: null,
+    quizDeployment: legacyQuizDep, quiz: GOOD_FLOW,
+  })
+  t(r.checks.some((c) => c.id === 'quiz-bound' && c.ok), 'a legacy standalone-deployment pointer still counts as bound')
+  t(r.ok, `and such a deployment publishes${r.ok ? '' : ' — ' + r.blocking.map((c) => c.id).join(',')}`)
+}
+{
+  // ...but only while it RESOLVES. A pointer at a deployment that no longer
+  // exists is the production defect: the row looked bound and the page had no
+  // funnel.
+  const r = await lpDeploymentPreflight(CTX(), {
+    deployment: { ...GOOD_LP_DEP, quiz_deployment_id: '9999' }, landingPage: GOOD_LP, site: SITE, domain: null,
+    quizDeployment: null, quiz: null,
+  })
+  t(!r.ok && r.blocking.some((c) => c.id === 'embedded-quiz'), 'a legacy pointer at a deployment that no longer exists is refused')
 }
 {
   const headline = LP_TPL.slots.find((s) => s.role === 'headline')!
   const r = await lpDeploymentPreflight(CTX(), {
-    deployment: { ...GOOD_LP_DEP, content_overrides: { [headline.id]: 'A real headline' } },
-    landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: null,
+    deployment: { ...BOUND_LP_DEP, content_overrides: { [headline.id]: 'A real headline' } },
+    landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: GOOD_FLOW,
   })
-  t(r.ok, 'a deployment with valid overrides passes')
+  t(r.ok, `a deployment with valid overrides passes${r.ok ? '' : ' — ' + r.blocking.map((c) => c.id).join(',')}`)
+}
+{
+  // Copy written into the quiz card is copy the visitor never sees, because the
+  // card is replaced. It must not be storable, and the preflight is the last
+  // place that can say so.
+  const inside = LP_TPL.quizMount.slotIds[0]
+  const r = await lpDeploymentPreflight(CTX(), {
+    deployment: { ...BOUND_LP_DEP, content_overrides: { [inside]: 'copy nobody will read' } },
+    landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: GOOD_FLOW,
+  })
+  t(!r.ok && r.blocking.some((c) => c.id === 'overrides'), 'an override inside the quiz card is refused')
 }
 {
   const r = await lpDeploymentPreflight(CTX(), {

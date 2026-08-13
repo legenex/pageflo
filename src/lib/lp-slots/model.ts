@@ -37,6 +37,7 @@
  */
 
 import { RESOLVABLE_TOKEN_KEYS } from '@/components/builder/lp/tokens'
+import type { LpQuizMount } from './quiz-mount'
 
 /* ------------------------------------------------------------------- roles */
 
@@ -170,6 +171,15 @@ export type LpSlottedTemplate = {
   slotIds: string[]
   slots: LpSlot[]
   unsupported: LpUnsupportedRegion[]
+  /**
+   * Where the live quiz replaces the reference's drawing of one.
+   *
+   * Optional in the TYPE and mandatory in the DATA: the extractor refuses to
+   * write a template whose card it could not locate. It is nullable here so a
+   * synthetic template in a test, or a future non-quiz template, composes whole
+   * rather than being unrepresentable.
+   */
+  quizMount?: LpQuizMount | null
 }
 
 export type LpSlotOverrides = Record<string, string>
@@ -305,6 +315,163 @@ export const composeTemplate = (
 export const defaultHtml = (template: LpSlottedTemplate): string =>
   composeTemplate(template, {}).html
 
+/* ------------------------------------------------------------- quiz mount */
+
+/**
+ * The attribute the live render marks the quiz mount with.
+ *
+ * A data attribute rather than an id: an id is a document-wide name a tenant's
+ * own copy could collide with, and `querySelector('#...')` would then attach the
+ * quiz to whichever came first.
+ */
+export const QUIZ_MOUNT_ATTR = 'data-legalos-quiz-mount'
+
+export type ComposeWithMountResult = ComposeResult & {
+  /** Markup before the quiz card. */
+  before: string
+  /** Markup after it. */
+  after: string
+  /** The card's own markup, which the live render does NOT emit. */
+  reference: string
+  /**
+   * The card's own box, EMPTY, marked for the runtime to mount into.
+   *
+   * The reference's opening tag verbatim with one attribute added, so the quiz
+   * inherits the card's width, flex basis, padding, border, radius and shadow
+   * from the design rather than from a description of the design.
+   */
+  mountHtml: string
+  /**
+   * The whole page with the static card replaced by that empty box.
+   *
+   * ONE string, not two, and that is the load-bearing detail: `before` ends
+   * inside an open element and `after` begins with its closing tag, so setting
+   * them as the innerHTML of two separate nodes would have the parser repair
+   * each half and produce a different tree. The page is mounted whole and the
+   * runtime is portalled into the marked box, which keeps the DOM the
+   * reference's by construction.
+   */
+  htmlWithMount: string
+  /**
+   * Slot ids that live inside the card.
+   *
+   * They have no position on a live landing page: the quiz owns that copy now.
+   * Returned rather than dropped in silence so the deployment editor can stop
+   * offering them and a preflight can tell an operator that a line they wrote
+   * is not on the page.
+   */
+  mountedSlotIds: string[]
+}
+
+/**
+ * The card's opening tag with the mount marker added.
+ *
+ * Inserted immediately after the tag name so it cannot land inside an attribute
+ * value, and written with an explicit empty value so the result is well-formed
+ * for a strict parser as well as for a browser.
+ */
+const markMountTag = (openTag: string): string =>
+  openTag.replace(/^<([a-zA-Z][\w:-]*)/, (_m, tag) => `<${tag} ${QUIZ_MOUNT_ATTR}=""`)
+
+/**
+ * Compose a template split around its quiz card.
+ *
+ * The two halves are exactly what `composeTemplate` would have produced, cut at
+ * a coordinate fixed at extraction time. Nothing is parsed, nothing is
+ * re-serialised, and the cut cannot drift with an override because it is
+ * expressed in the part stream rather than in byte offsets into the output.
+ *
+ * `before + reference + after === composeTemplate(template, overrides).html`
+ * whenever no override targets a slot inside the card, and that identity is
+ * asserted for all twelve templates in `scripts/test-lp-slots.mts`. It is the
+ * proof that mounting the runtime moves nothing else on the page.
+ *
+ * A template with no recorded mount composes whole, with `after` empty. That is
+ * the honest degradation: the page still renders, and the caller sees there is
+ * nowhere to put a quiz rather than getting one dropped at the end.
+ */
+export const composeTemplateWithQuizMount = (
+  template: LpSlottedTemplate,
+  overrides: LpSlotOverrides = {},
+): ComposeWithMountResult => {
+  const mount = template.quizMount
+  const base = composeTemplate(template, overrides)
+  if (!mount) {
+    return {
+      ...base,
+      before: base.html,
+      after: '',
+      reference: '',
+      mountHtml: '',
+      htmlWithMount: base.html,
+      mountedSlotIds: [],
+    }
+  }
+
+  /**
+   * The composed value of ONE slot in the stream.
+   *
+   * Deliberately delegates to `composeTemplate` on a one-slot template rather
+   * than repeating its escaping rules. A second implementation of "escape an
+   * override" is precisely the drift this module's header warns about, and the
+   * one that would matter most: it is the boundary between operator copy and
+   * markup. An image slot's paired alt override travels with it, because the
+   * alt is written into the `<img>` the src slot emits and dropping it here
+   * would make an image lose its alt text only on landing pages.
+   */
+  const slotAt = (index: number): string => {
+    const id = template.slotIds[index]
+    if (id === undefined) return ''
+    const slot = template.slots.find((s) => s.id === id)
+    const keys = [id, ...(slot?.pairedWith ? [slot.pairedWith] : [])]
+    const scoped: LpSlotOverrides = {}
+    for (const k of keys) {
+      if (Object.prototype.hasOwnProperty.call(overrides, k)) scoped[k] = overrides[k]
+    }
+    return composeTemplate({ ...template, parts: ['', ''], slotIds: [id], quizMount: null }, scoped).html
+  }
+
+  /**
+   * The stream from `parts[from]` up to but NOT including `parts[to]`:
+   * `parts[from] slot[from] parts[from+1] … slot[to-1]`. Empty when `to <= from`.
+   */
+  const run = (from: number, to: number): string => {
+    const out: string[] = []
+    for (let i = from; i < to; i++) out.push(template.parts[i], slotAt(i))
+    return out.join('')
+  }
+
+  const lastPart = template.parts.length - 1
+  const { startPart, startOffset, endPart, endOffset } = mount
+
+  const before = run(0, startPart) + template.parts[startPart].slice(0, startOffset)
+
+  const after =
+    template.parts[endPart].slice(endOffset) +
+    (endPart === lastPart ? '' : slotAt(endPart) + run(endPart + 1, lastPart) + template.parts[lastPart])
+
+  const reference =
+    startPart === endPart
+      ? template.parts[startPart].slice(startOffset, endOffset)
+      : template.parts[startPart].slice(startOffset) +
+        slotAt(startPart) +
+        run(startPart + 1, endPart) +
+        template.parts[endPart].slice(0, endOffset)
+
+  const closeTag = `</${mount.tag}>`
+  const mountHtml = `${markMountTag(mount.openTag)}${closeTag}`
+
+  return {
+    ...base,
+    before,
+    after,
+    reference,
+    mountHtml,
+    htmlWithMount: before + mountHtml + after,
+    mountedSlotIds: mount.slotIds,
+  }
+}
+
 /* --------------------------------------------------------------- validation */
 
 export type SlotProblem = {
@@ -318,6 +485,8 @@ export type SlotProblem = {
     | 'orphan_slot'
     | 'unsupported_region'
     | 'unsafe_override'
+    /** Copy written into the region the live quiz replaces. It would never render. */
+    | 'override_inside_quiz_mount'
   detail: string
 }
 
@@ -465,6 +634,17 @@ export const validateOverrides = (
       problems.push({ code: 'unsafe_override', detail: `"${id}" is not a string` })
       continue
     }
+    // The quiz card is replaced by the live runtime, so copy written into it is
+    // stored, validated, published and never seen. Refusing it here means an
+    // operator is told at the point they can still put the words somewhere that
+    // renders, rather than discovering it on a live page.
+    if (isInsideQuizMount(template, id)) {
+      problems.push({
+        code: 'override_inside_quiz_mount',
+        detail: `"${id}" is inside the quiz card, which the live quiz replaces; that copy comes from the flow`,
+      })
+      continue
+    }
     if (URL_ROLES.has(slot.role) && !isSafeImageUrl(value)) {
       problems.push({ code: 'unsafe_override', detail: `"${id}" is not an allowed image URL` })
     }
@@ -476,12 +656,27 @@ export const validateOverrides = (
   return { ok: problems.length === 0, problems }
 }
 
+/**
+ * Whether a slot lives inside the quiz card and therefore never renders.
+ *
+ * The card is replaced by the live runtime, so the question it asks, the answers
+ * it offers and its Back/Continue labels come from the FLOW. An editor that kept
+ * offering those as template copy would be inviting an operator to write a
+ * question the visitor is never asked.
+ */
+export const isInsideQuizMount = (template: LpSlottedTemplate, slotId: string): boolean =>
+  Boolean(template.quizMount?.slotIds.includes(slotId))
+
+/** The slots an operator can actually change: everything the quiz does not own. */
+export const editableSlots = (template: LpSlottedTemplate): LpSlot[] =>
+  template.slots.filter((s) => !isInsideQuizMount(template, s.id))
+
 /** Slots grouped by section, in document order. What an editor renders. */
 export const slotsBySection = (
   template: LpSlottedTemplate,
 ): Array<{ section: number; label: string; slots: LpSlot[] }> => {
   const out: Array<{ section: number; label: string; slots: LpSlot[] }> = []
-  for (const s of template.slots) {
+  for (const s of editableSlots(template)) {
     const last = out[out.length - 1]
     if (last && last.section === s.section) last.slots.push(s)
     else out.push({ section: s.section, label: s.sectionLabel, slots: [s] })

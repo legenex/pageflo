@@ -20,7 +20,8 @@
  * byte-for-byte what a visitor is served. Testing a rebuilt approximation of the
  * page would prove something about the approximation.
  */
-import { chromium, type Browser, type Page } from 'playwright'
+import { type Browser, type Page } from 'playwright'
+import { launchChromium, browserProvenance } from './lib/browser.ts'
 
 import { PORTED_TEMPLATES, asSlotted, TEMPLATE_FONTS_HREF } from '../src/lib/lp-templates/index.ts'
 import { composeTemplate } from '../src/lib/lp-slots/model.ts'
@@ -509,13 +510,13 @@ const run = async (browser: Browser): Promise<void> => {
 
 /* --------------------------------------------------------------------- boot */
 
-const browser = await chromium.launch()
+const browser = await launchChromium()
 try {
   await run(browser)
 } finally {
   await browser.close()
 }
 
-console.log(`\n${pass} passed, ${fail} failed`)
+console.log(`\n${pass} passed, ${fail} failed  [${browserProvenance()}]`)
 if (fail > 0) process.exit(1)
 if (pass === 0) { console.log('no assertions ran'); process.exit(2) }

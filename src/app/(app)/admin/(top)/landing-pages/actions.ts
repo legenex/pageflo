@@ -203,8 +203,10 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
   // A quiz flow this deployment names must belong to nobody in particular — the
   // flows are brandless — but it must EXIST, or the page renders without the
   // thing it is for.
-  if (dep.quizId) {
-    const q = await payload.findByID({ collection: 'funnel-quizzes', id: Number(dep.quizId), overrideAccess: true }).catch(() => null)
+  const quizId = dep.quizId ? Number(dep.quizId) : null
+  if (quizId !== null) {
+    if (!Number.isFinite(quizId)) return { ok: false, error: 'quiz flow id is not a number' }
+    const q = await payload.findByID({ collection: 'funnel-quizzes', id: quizId, overrideAccess: true }).catch(() => null)
     if (!q) return { ok: false, error: 'quiz flow not found' }
   }
 
@@ -223,22 +225,35 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
     }
   }
 
-  const data = {
+  /*
+   * `quiz_deployment_id` IS A MIGRATION FALLBACK AND NOTHING ELSE.
+   *
+   * It is never read from the request. The comment above this object used to
+   * say exactly that while the line below it wrote the client's value straight
+   * through, which is how three of four live rows ended up pointing at
+   * standalone quiz deployments that had since been deleted: the id was carried
+   * forward by every save, and nothing ever checked the target still existed.
+   *
+   * On CREATE it is not written at all — a new deployment binds a flow, and
+   * requiring a second published quiz page first is the thing this replaced.
+   * On UPDATE it is CLEARED once the row names a flow, because the flow is now
+   * the answer and a stale pointer beside it is a second one. A row that still
+   * names no flow keeps its pointer untouched: it is the only binding that row
+   * has, and dropping it would take the page's funnel away.
+   */
+  const data: Record<string, unknown> = {
     name: (dep.name as string) || '',
     landing_page: lpId,
     site: gate.siteId,
     domain: domainId,
     path: (dep.path as string) || '',
-    // The flow this page runs. `quiz_deployment_id` is kept for rows that still
-    // carry it and is never written from here any more: embedding a quiz must
-    // not require publishing a separate standalone quiz page first.
-    quiz: dep.quizId ? Number(dep.quizId) : null,
+    quiz: quizId,
     embedded_quiz_template_id: embeddedTemplateId,
     embedded_progress_form: (dep.embeddedProgressForm as string) || null,
-    quiz_deployment_id: (dep.quizDeploymentId as string) || '',
     content_overrides: overrides,
     status: (dep.status as string) || 'draft',
   }
+  if (quizId !== null) data.quiz_deployment_id = ''
 
   try {
     let id: string
