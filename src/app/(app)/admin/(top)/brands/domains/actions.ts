@@ -71,12 +71,25 @@ export async function attachDomainToSite(args: { domainId: number; siteId: numbe
       : authz
   }
 
+  // `overrideAccess: true` here, and the reason is structural rather than a
+  // shortcut. Payload's updateByID evaluates access against the row's CURRENT
+  // state; a pool row's site is null, so `siteScopedAdmin`'s `{site:{in:[…]}}`
+  // matches nothing and the update throws Forbidden for every non-super-admin.
+  // Attaching a pool domain was therefore impossible for the site admins it is
+  // for, while detaching worked — so a domain could be sent back to the pool and
+  // never recovered.
+  //
+  // Authorization is not skipped, it is done twice and earlier: `requirePoolDomain`
+  // above checked the caller against the incoming Site, and the `enforceSiteBinding`
+  // beforeValidate hook on Domains re-checks the incoming `site` against the
+  // caller's bindings on the way through — hooks run whatever `overrideAccess`
+  // says, so passing `user` keeps that second check live.
   await payload.update({
     collection: 'domains',
     id: args.domainId,
     data: { site: authz.siteId } as never,
     user: user as never,
-    overrideAccess: false,
+    overrideAccess: true,
   })
   invalidateHostCache()
   revalidatePath('/admin/brands/domains')
@@ -165,13 +178,18 @@ export async function deletePoolDomain(args: { domainId: number }): Promise<{ ok
   if (domain.site) {
     const authz = await requireDomainSiteAdmin(payload, user, args.domainId)
     if (!authz.ok) return authz
-  } else if (!user.super_admin) {
+  } else if (domain.plesk_domain_id && !user.super_admin) {
     // An UNATTACHED row has no Site to authorize against, so there is nobody it
-    // can be checked out to — which previously meant it was checked against
-    // nothing at all. That mattered because a pool row can still carry a
-    // `plesk_domain_id`, and the teardown below runs before the scoped delete.
-    // The pool is LegalOS-wide, so deleting from it is a super-admin act.
-    return { ok: false, error: 'only a super admin can delete an unassigned domain' }
+    // can be checked out to. What made that dangerous is narrower than "it is in
+    // the pool": a pool row can still carry a `plesk_domain_id`, which holds the
+    // HOST, and the teardown below unlinks an nginx conf and revokes that host's
+    // certificate — before the scoped delete runs.
+    //
+    // So the bar is the teardown, not the pool. A plain unprovisioned pool row
+    // is deletable by whoever is cleaning up, which matters because the same
+    // people add them; requiring a super admin for all of them would have made
+    // an operator's own typo unremovable by that operator.
+    return { ok: false, error: 'this domain is still provisioned — a super admin must remove it' }
   }
 
   const pleskId = domain.plesk_domain_id

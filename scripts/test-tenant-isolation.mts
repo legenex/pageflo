@@ -149,6 +149,38 @@ try {
   await refused('ATTACK: push my own Page onto another tenant\'s site - combineQueries constrains WHICH row is updated, never what it is changed TO', () =>
     payload.update({ collection: 'pages', id: mine.id, data: { site: siteB.id } as never, ...asUser }))
 
+  // --- the attach path ------------------------------------------------------
+  //
+  // attachDomainToSite writes with overrideAccess: true, because Payload's
+  // updateByID evaluates access against the row's CURRENT state and a pool row
+  // has no site — so the scoped write threw Forbidden for every non-super-admin
+  // and attaching was impossible for the people it is for. These two assertions
+  // are what makes that safe: the beforeValidate hook runs whatever
+  // overrideAccess says, so the incoming site is still checked.
+  const pool = track('domains', await payload.create({
+    collection: 'domains',
+    data: { host: `${RUN}-pool.example.test`, kind: 'custom', primary: false, status: 'pending' } as never,
+    overrideAccess: true,
+  }))
+
+  await refused('ATTACK: attach a pool domain to another tenant, the way the action writes it - overrideAccess: true must NOT bypass the hook', () =>
+    payload.update({
+      collection: 'domains',
+      id: pool.id,
+      data: { site: siteB.id } as never,
+      user: user as never,
+      overrideAccess: true,
+    }))
+
+  await allowed('a site admin can attach a pool domain to their OWN site (this threw Forbidden before)', () =>
+    payload.update({
+      collection: 'domains',
+      id: pool.id,
+      data: { site: siteA.id } as never,
+      user: user as never,
+      overrideAccess: true,
+    }))
+
   // --- reads ----------------------------------------------------------------
   const visible = await payload.find({ collection: 'sites', where: { slug: { like: RUN } }, ...asUser })
   t(visible.docs.length === 1 && String(visible.docs[0].id) === String(siteA.id),
