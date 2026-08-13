@@ -1,3 +1,5 @@
+import { safePost } from '@/lib/net/ssrf'
+
 export type SlackNotificationArgs = {
   webhookUrl: string
   siteName: string
@@ -36,15 +38,13 @@ export const sendSlackNotification = async (args: SlackNotificationArgs): Promis
     ],
   }
 
-  try {
-    const resp = await fetch(webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    if (!resp.ok) return { ok: false, error: `slack returned ${resp.status}` }
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'unknown error' }
-  }
+  // The Slack hook URL is configuration a super-admin types, which still makes
+  // it a user-supplied address this server POSTs lead data to. See lib/net/ssrf.
+  const resp = await safePost(webhookUrl, {
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  if (!resp.ok) return { ok: false, error: resp.reason }
+  if (resp.status < 200 || resp.status >= 300) return { ok: false, error: `slack returned ${resp.status}` }
+  return { ok: true }
 }

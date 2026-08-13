@@ -1,6 +1,7 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { invalidateHostCache } from './site-resolver'
+import { safeFetch } from './net/ssrf'
 
 /**
  * Post-provision verifier. After a Domain is DNS-verified AND Plesk has
@@ -37,39 +38,37 @@ type SelfCheckBody = {
 type ReachResult = { ok: true } | { ok: false; error: string }
 
 const tryReach = async (args: { host: string; expectedSiteId: string }): Promise<ReachResult> => {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
-  try {
-    const url = `https://${args.host}/api/legalos/self-check`
-    const resp = await fetch(url, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      redirect: 'follow',
-      signal: controller.signal,
-      cache: 'no-store',
-    })
-    if (!resp.ok) return { ok: false, error: `http ${resp.status} from ${args.host}` }
-    const contentType = resp.headers.get('content-type') ?? ''
-    if (!contentType.includes('application/json')) {
-      return { ok: false, error: `expected JSON, got ${contentType || 'unknown'} (likely default vhost / unconfigured server)` }
-    }
-    let body: SelfCheckBody
-    try {
-      body = (await resp.json()) as SelfCheckBody
-    } catch (err) {
-      return { ok: false, error: `invalid JSON: ${err instanceof Error ? err.message : 'parse failed'}` }
-    }
-    if (body.app !== APP_MARKER) return { ok: false, error: `wrong app marker: ${body.app ?? '(none)'} — this host is not pointed at LegalOS` }
-    if (!body.ok) return { ok: false, error: 'self-check returned ok:false (host not mapped to a site)' }
-    if (String(body.site_id ?? '') !== String(args.expectedSiteId)) {
-      return { ok: false, error: `wrong site: served ${body.site_id ?? '(none)'}, expected ${args.expectedSiteId}` }
-    }
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'unknown network error' }
-  } finally {
-    clearTimeout(timer)
+  // The host comes off a Domain row an operator typed, so this GET is the
+  // server fetching a user-supplied address. `safeFetch` also re-admits every
+  // redirect hop, which matters more here than usual: this probe is what
+  // authorises `ssl_status='active'`, and a host that 302s somewhere else must
+  // not be able to answer for itself. See lib/net/ssrf.
+  const res = await safeFetch(`https://${args.host}/api/legalos/self-check`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+    timeoutMs: FETCH_TIMEOUT_MS,
+  })
+  if (!res.ok) {
+    return { ok: false, error: res.code === 'http_error' ? `${res.reason} (from ${args.host})` : res.reason }
   }
+  if (!res.contentType.includes('application/json')) {
+    return {
+      ok: false,
+      error: `expected JSON, got ${res.contentType || 'unknown'} (likely default vhost / unconfigured server)`,
+    }
+  }
+  let body: SelfCheckBody
+  try {
+    body = JSON.parse(res.body) as SelfCheckBody
+  } catch (err) {
+    return { ok: false, error: `invalid JSON: ${err instanceof Error ? err.message : 'parse failed'}` }
+  }
+  if (body.app !== APP_MARKER) return { ok: false, error: `wrong app marker: ${body.app ?? '(none)'} — this host is not pointed at LegalOS` }
+  if (!body.ok) return { ok: false, error: 'self-check returned ok:false (host not mapped to a site)' }
+  if (String(body.site_id ?? '') !== String(args.expectedSiteId)) {
+    return { ok: false, error: `wrong site: served ${body.site_id ?? '(none)'}, expected ${args.expectedSiteId}` }
+  }
+  return { ok: true }
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))

@@ -6,6 +6,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { invokeLLM } from '@/lib/ai/invoke'
+import { safeFetch } from '@/lib/net/ssrf'
 import { BlockSchema, normalizeAIBlocks } from '@/lib/builder/block-schemas'
 
 // Clone a public URL into a new Page. We fetch the source HTML, hand it to
@@ -68,22 +69,22 @@ export async function createPageFromUrl(args: {
   let html = ''
   let lastError: string | null = null
   for (const ua of UAS) {
-    try {
-      const res = await fetch(sourceUrl, {
-        headers: { 'User-Agent': ua, Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
-        redirect: 'follow',
-      })
-      if (!res.ok) {
-        lastError = `Source URL returned ${res.status} ${res.statusText}`
-        continue
-      }
-      const body = await res.text()
-      if (body && body.length > html.length) html = body
-      // Anything over ~30 KB is plenty to extract real content from; stop early.
-      if (html.length > 30_000) break
-    } catch (err) {
-      lastError = err instanceof Error ? err.message : 'network error'
+    // `safeFetch`, not `fetch`: the address is typed by an operator and read by
+    // the SERVER, which can reach the metadata endpoint and the database that
+    // the operator cannot. It re-admits the host on every redirect hop, so a
+    // public URL that 302s to 127.0.0.1 is refused at the hop rather than
+    // followed. See lib/net/ssrf.
+    const res = await safeFetch(sourceUrl, {
+      method: 'GET',
+      headers: { 'User-Agent': ua, Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
+    })
+    if (!res.ok) {
+      lastError = res.reason
+      continue
     }
+    if (res.body.length > html.length) html = res.body
+    // Anything over ~30 KB is plenty to extract real content from; stop early.
+    if (html.length > 30_000) break
   }
   if (!html) {
     return { ok: false, error: lastError ? `Could not fetch source URL: ${lastError}` : 'Could not fetch source URL.' }

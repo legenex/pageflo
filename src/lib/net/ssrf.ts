@@ -1,11 +1,16 @@
 /**
  * URL admission control for anything this server fetches on a user's behalf.
  *
- * A brand-extraction request is a URL typed by an operator that the SERVER then
- * fetches. That is a confused-deputy: the server can reach the metadata
+ * A brand-extraction URL, a page-clone URL, an outbound lead webhook, a quiz
+ * flow's webhook node: each is an address supplied by a user that the SERVER
+ * then fetches. That is a confused-deputy: the server can reach the metadata
  * endpoint, the database, Redis, and every other service on the private
- * network, and the operator cannot. Nothing in this repo guarded that before
- * this file existed.
+ * network, and the user cannot. Nothing in this repo guarded that before this
+ * file existed.
+ *
+ * Every such path in the codebase goes through `safeFetch` (GET/HEAD) or
+ * `safePost` (bodies). A raw `fetch()` of a user-supplied address is a bug -
+ * the guard existing is not the control, the guard being ON THE PATH is.
  *
  * The two rules that make the guard real rather than decorative:
  *
@@ -347,7 +352,14 @@ export type SafeFetchResponse = {
 
 export type FetchLike = (
   url: string,
-  init: { method: string; headers: Record<string, string>; redirect: 'manual'; signal: AbortSignal },
+  init: {
+    method: string
+    headers: Record<string, string>
+    redirect: 'manual'
+    signal: AbortSignal
+    /** Present only for the POST path; GET/HEAD never carry one. */
+    body?: string
+  },
 ) => Promise<SafeFetchResponse>
 
 export type SafeFetchRejectionCode =
@@ -377,6 +389,13 @@ export type SafeFetchOptions = AssertSafeUrlOptions & {
   headers?: Record<string, string>
   /** Hard ceiling on the response body. Exceeding it is a refusal, not a truncation. */
   maxBytes?: number
+  /**
+   * Return as soon as the headers are in, without reading the body - what HEAD
+   * does, but for callers that must send GET because the host refuses HEAD and
+   * still only want the content type. Without this a ranged GET whose server
+   * ignores `Range` would buffer a whole asset just to read one header.
+   */
+  headersOnly?: boolean
   maxRedirects?: number
   /** Budget for the WHOLE chain, not per hop. */
   timeoutMs?: number
@@ -392,7 +411,14 @@ const USER_AGENT = 'LegalOS-BrandIdentity/1 (+https://os.legenex.com)'
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 
-const defaultFetchImpl: FetchLike = (url, init) => fetch(url, init)
+/**
+ * `cache: 'no-store'` is not optional here. Next patches the global fetch with
+ * its own caching, and every caller of this module is reading LIVE external
+ * state - a brand page being extracted, a domain being verified, a webhook
+ * receiver's answer. A cached response would make a re-check silently return
+ * the previous run's result, which is the opposite of what all of them want.
+ */
+const defaultFetchImpl: FetchLike = (url, init) => fetch(url, { ...init, cache: 'no-store' })
 
 /**
  * Fetch a URL that has been admitted, re-admitting the host on every hop.
@@ -484,7 +510,7 @@ export const safeFetch = async (raw: string, options: SafeFetchOptions = {}): Pr
         hops,
       }
     }
-    if (method === 'HEAD') {
+    if (method === 'HEAD' || options.headersOnly) {
       return { ok: true, status: res.status, finalUrl: current, contentType, body: '', bytes: 0, hops }
     }
 
@@ -494,6 +520,88 @@ export const safeFetch = async (raw: string, options: SafeFetchOptions = {}): Pr
   }
 
   return { ok: false, code: 'too_many_redirects', reason: `More than ${maxRedirects} redirects.`, hops }
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                  safePost                                   */
+/* -------------------------------------------------------------------------- */
+
+export type SafePostRejectionCode = SafeFetchRejectionCode | 'redirect_refused'
+
+export type SafePostResult =
+  | { ok: true; status: number; url: string; contentType: string; body: string; bytes: number }
+  | { ok: false; code: SafePostRejectionCode; reason: string; status?: number }
+
+export type SafePostOptions = AssertSafeUrlOptions & {
+  headers?: Record<string, string>
+  body?: string
+  maxBytes?: number
+  timeoutMs?: number
+  fetchImpl?: FetchLike
+}
+
+/**
+ * POST to a URL the server was told to call by a user - an outbound lead
+ * webhook, a Slack hook, a quiz flow's webhook node.
+ *
+ * These are the same confused-deputy shape as `safeFetch`, with one difference
+ * that changes the design: they carry a body.
+ *
+ * REDIRECTS ARE REFUSED RATHER THAN FOLLOWED, and that is deliberate. Following
+ * a 301/302/303 turns a POST into a GET per the HTTP spec, which silently drops
+ * the payload - a webhook that reports "delivered" and delivered nothing is
+ * worse than one that reports a failure. 307/308 do preserve the body, but the
+ * destination is chosen by the receiver rather than by the operator, and
+ * forwarding a signed lead payload to an address nobody configured is not a
+ * thing to do quietly. A receiver that redirects is misconfigured; saying so is
+ * the useful behaviour.
+ */
+export const safePost = async (raw: string, options: SafePostOptions = {}): Promise<SafePostResult> => {
+  const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
+  const fetchImpl = options.fetchImpl ?? defaultFetchImpl
+
+  const admission = await assertSafeUrl(raw, options)
+  if (!admission.ok) return { ok: false, code: admission.code, reason: admission.reason }
+
+  const url = admission.url.toString()
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  let res: SafeFetchResponse
+  try {
+    res = await fetchImpl(url, {
+      method: 'POST',
+      headers: { 'User-Agent': USER_AGENT, Accept: '*/*', ...(options.headers ?? {}) },
+      redirect: 'manual',
+      signal: controller.signal,
+      body: options.body ?? '',
+    })
+  } catch (err) {
+    clearTimeout(timer)
+    if (controller.signal.aborted) return { ok: false, code: 'timeout', reason: `Timed out after ${timeoutMs}ms.` }
+    return {
+      ok: false,
+      code: 'network',
+      reason: `Could not reach ${url}: ${err instanceof Error ? err.message : 'unknown network error'}.`,
+    }
+  }
+  clearTimeout(timer)
+
+  if (REDIRECT_STATUSES.has(res.status)) {
+    return {
+      ok: false,
+      code: 'redirect_refused',
+      reason: `${url} answered ${res.status} (a redirect). A POST is not redirected, because that would drop the payload or send it somewhere nobody configured.`,
+      status: res.status,
+    }
+  }
+
+  const contentType = (res.headers.get('content-type') ?? '').toLowerCase()
+  // The status is reported rather than judged: a caller dispatching a webhook
+  // wants the receiver's 4xx, not a generic failure.
+  const read = await readCapped(res, maxBytes)
+  if (!read.ok) return { ok: false, code: read.code, reason: `${url}: ${read.reason}`, status: res.status }
+  return { ok: true, status: res.status, url, contentType, body: read.text, bytes: read.bytes }
 }
 
 /**

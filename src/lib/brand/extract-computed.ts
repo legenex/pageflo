@@ -1,6 +1,7 @@
 import 'server-only'
 import type { Sample, FontSample } from './extract-score'
 import { applyRejections, proposeTokens, proposeFonts } from './extract-score'
+import { assertSafeUrl } from '../net/ssrf'
 
 /**
  * Brand extraction by computed-style sampling.
@@ -307,7 +308,13 @@ const samplePage = async (): Promise<RawSample> => {
  * primary action on mobile, and the desktop reading alone would miss it.
  */
 export const extractBrandFromRender = async (rawUrl: string): Promise<ComputedExtraction | null> => {
-  const url = /^https?:\/\//i.test(rawUrl) ? rawUrl : `https://${rawUrl}`
+  // A browser is still the server fetching a user-supplied address, and a
+  // headless Chrome pointed at 169.254.169.254 reads cloud credentials just as
+  // happily as curl would. Admission runs BEFORE the browser launches, so a
+  // refused address never costs a process either. See lib/net/ssrf.
+  const admission = await assertSafeUrl(rawUrl)
+  if (!admission.ok) return null
+  const url = admission.url.toString()
 
   // Imported lazily so that merely importing this module does not require
   // Playwright to be installed - the app must boot on a machine without it.
@@ -325,7 +332,34 @@ export const extractBrandFromRender = async (rawUrl: string): Promise<ComputedEx
     // browser exists only to read public pages, so images are re-served to it
     // with a permissive CORS header. Nothing is written and no credentials are
     // attached; it changes only what our own canvas is allowed to read back.
+    // Admitting only the top-level URL would leave the hole open one level
+    // down: the page being read chooses its own subresources, so an
+    // `<img src="http://169.254.169.254/...">` would be fetched by this browser
+    // on its behalf. Every http(s) request the page makes is admitted too.
+    // Verdicts are memoised per host because a page pulls dozens of assets from
+    // a handful of hosts and each miss costs a DNS round trip.
+    const hostVerdicts = new Map<string, boolean>()
+    const admitted = async (requestUrl: string): Promise<boolean> => {
+      let host: string
+      try {
+        host = new URL(requestUrl).host
+      } catch {
+        return false
+      }
+      const cached = hostVerdicts.get(host)
+      if (cached !== undefined) return cached
+      const verdict = await assertSafeUrl(requestUrl)
+      hostVerdicts.set(host, verdict.ok)
+      return verdict.ok
+    }
+
     await context.route('**/*', async (route) => {
+      const requestUrl = route.request().url()
+      // data: and blob: never leave the browser, so they are not this guard's
+      // business; anything that speaks http(s) is.
+      if (/^https?:/i.test(requestUrl) && !(await admitted(requestUrl))) {
+        return route.abort('blockedbyclient')
+      }
       if (route.request().resourceType() !== 'image') return route.continue()
       try {
         const response = await route.fetch()

@@ -3,7 +3,7 @@
  *
  * Everything a caller needs is here - build a profile, refresh it, reduce it to
  * the brand shape the product already renders from. The pieces underneath
- * (profile.ts, precedence.ts, sources.ts, ssrf.ts) are exported too, but a
+ * (profile.ts, precedence.ts, sources.ts, net/ssrf.ts) are exported too, but a
  * caller that reaches past this file is choosing its own precedence, and two
  * places deciding precedence is how the old extractor ended up with four
  * palettes.
@@ -39,12 +39,15 @@ import {
   type RejectedContribution,
 } from './precedence'
 import { collectFromSource, collectNeutralFallback, type BrandSourceInput, type SourceDeps, type SourceOutcome } from './sources'
-import { nodeDnsResolver, type DnsResolver, type FetchLike } from './ssrf'
+import { nodeDnsResolver, type DnsResolver, type FetchLike } from '../net/ssrf'
 
 export * from './profile'
 export * from './precedence'
 export * from './sources'
-export * from './ssrf'
+// URL admission moved to `lib/net/ssrf` once it stopped being a brand concern -
+// six subsystems fetch on a user's behalf now. Re-exported here so the callers
+// and the suite that already read it through this barrel keep working.
+export * from '../net/ssrf'
 
 /* -------------------------------------------------------------------------- */
 /*                                 AI gap fill                                 */

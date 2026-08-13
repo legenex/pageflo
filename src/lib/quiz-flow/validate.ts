@@ -452,9 +452,9 @@ const checkValidReferences = (quiz: Quiz): CheckResult => {
 
   for (const field of conditionFields) {
     if (responseOnly.has(field)) {
-      c.error({
-        code: 'route_depends_on_unapplied_response',
-        message: `Routing reads "${field}", which is only ever written by a webhook response mapping. The runtime advances past webhook nodes without calling them, so that field is always empty and the conditions on it can never match.`,
+      c.warn({
+        code: 'route_depends_on_webhook_response',
+        message: `Routing reads "${field}", which is only ever written by a webhook response mapping. The runtime does call those nodes, so this can work - but whether it does depends on the buyer's endpoint actually returning that key, which cannot be checked from here. Verify it against the live endpoint.`,
       })
     }
   }
@@ -731,8 +731,24 @@ const checkTierReachability = (quiz: Quiz, walk: PathEnumeration): CheckResult =
   }
 
   const active = new Set(walk.activeTiers)
+  // A reachable webhook node that maps a response onto `tier` can put the flow
+  // into ANY declared tier, and what it actually returns lives on the buyer's
+  // endpoint rather than in this quiz. So a tier that no answer sets is not
+  // called unreachable when such a node exists - it is called unverifiable, and
+  // the difference matters: the old ERROR here was correct only while the
+  // runtime skipped webhook nodes, and it now reads as a flow defect when the
+  // real question is whether the endpoint returns that value.
+  const tierMayComeFromWebhook = setByResponse.size > 0
   for (const tier of quiz.tiers) {
     if (active.has(tier.id)) continue
+    if (tierMayComeFromWebhook) {
+      c.warn({
+        code: 'tier_depends_on_webhook_response',
+        tierId: tier.id,
+        message: `${tier.name} is never set by an answer. It becomes active only when the tier lookup (${[...setByResponse].join(', ')}) returns "${tier.id}". Confirm the live endpoint returns exactly that id - a value the quiz does not declare leaves the visitor on the shared fallback variant.`,
+      })
+      continue
+    }
     const reason = setByAnswer.has(tier.id)
       ? 'nothing that sets it is reachable'
       : 'no answer sets it'
@@ -741,12 +757,6 @@ const checkTierReachability = (quiz: Quiz, walk: PathEnumeration): CheckResult =
       tierId: tier.id,
       message: `${tier.name} is declared but never becomes active: ${reason}.`,
     })
-  }
-
-  if (setByResponse.size > 0 && active.size < quiz.tiers.length) {
-    c.note(
-      `The "tier" field is written by a webhook response mapping (${[...setByResponse].join(', ')}). The runtime advances past webhook nodes without calling them, so a tier assigned that way never takes effect.`,
-    )
   }
 
   const tierMatched = new Set(walk.tierMatchedNodeIds)

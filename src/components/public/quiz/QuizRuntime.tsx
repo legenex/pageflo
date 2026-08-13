@@ -18,6 +18,11 @@
  *  - Non-visual nodes execute instead of rendering a debug button. Decision,
  *    webhook, verification and transition nodes are builder concepts; a visitor
  *    must never see one, so they advance on their own behind a neutral spinner.
+ *    "Execute" is literal for webhook and verification nodes: they POST to
+ *    `/api/legalos/quiz-webhook`, which reads the URL and payload out of the
+ *    stored node and hands back only the fields the author mapped. They were
+ *    previously advanced past WITHOUT being called, which silently disabled
+ *    every tier the flow assigns from a lookup response.
  *  - The lead is submitted BEFORE the endpoint renders. An endpoint can be
  *    configured to redirect 800ms after it appears, so persisting the lead
  *    afterwards would race the redirect and lose leads on slow connections.
@@ -48,6 +53,12 @@ import { withHostSurface } from '@/lib/quiz-theme'
 // Node types that exist for the flow author, not for the visitor. They resolve
 // and advance without ever painting a question card.
 const INVISIBLE_NODE_TYPES = new Set(['decision', 'webhook', 'verification', 'transition'])
+
+// The subset of those that make a server call before advancing. Both node types
+// carry the identical shape (webhookUrl / webhookHeaders / webhookPayload /
+// responseMappings), so one executor covers them; only the builder's labelling
+// differs.
+const WEBHOOK_NODE_TYPES = new Set(['webhook', 'verification'])
 
 // Page-level palette for the standalone chrome. Mirrors resolvePagePalette in
 // the builder preview so the live page and the preview shade identically.
@@ -239,10 +250,63 @@ export function QuizRuntime({
       }
     }
 
+    // Webhook and verification nodes run server-side, for the same reason AI
+    // nodes do: the URL, headers and payload live in the database and are read
+    // from the deployment, so a visitor can never aim this server at an address
+    // of their choosing. Only the fields the author mapped come back.
+    //
+    // This used to be skipped entirely, and that was the bug: in the shipped MVA
+    // flow the tier lookup's response mapping is the ONLY thing that assigns
+    // tiers 1, 2 and 4, so every visitor walked the whole quiz with no tier and
+    // every tier-scoped variant was dead.
+    let webhookTier = ''
+    if (node && WEBHOOK_NODE_TYPES.has(node.type) && node.webhookUrl && deployment?.id && !previewMode) {
+      const mappings = (node.responseMappings || []).filter((m) => m?.jsonPath && m?.fieldKey)
+      if (mappings.length > 0) {
+        setBusy(true)
+        try {
+          const resp = await fetch('/api/legalos/quiz-webhook', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deployment_id: String(deployment.id), node_id: node.id, values: newValues }),
+          })
+          const out = await resp.json()
+          if (out?.ok && out.fields && typeof out.fields === 'object') {
+            for (const [key, value] of Object.entries(out.fields)) {
+              if (key) newValues[key] = value
+            }
+          }
+        } catch {
+          // A buyer's endpoint being slow or down must not dead-end a visitor
+          // mid-funnel. The flow continues untier'd and the lead still lands.
+        } finally {
+          setBusy(false)
+        }
+
+        // A returned tier only steers ROUTING when it names a tier this quiz
+        // actually declares. Anything else is kept as a value (it still reaches
+        // the lead) but is not allowed to select question variants, because a
+        // tier id nothing is scoped to would silently show the visitor the
+        // shared fallback and look like it worked.
+        const returned = String(newValues.tier ?? '')
+        if (returned && (quiz.tiers || []).some((t) => t.id === returned)) {
+          webhookTier = returned
+        } else if (returned && returned !== currentTier) {
+          // eslint-disable-next-line no-console
+          console.error(
+            `[legalos] quiz webhook returned tier "${returned}", which this quiz does not declare ` +
+              `(${(quiz.tiers || []).map((t) => t.id).join(', ') || 'no tiers'}). Routing tier left unchanged.`,
+          )
+        }
+      }
+    }
+
     setFieldValues(newValues)
 
-    const nextTier = answer.setTier || currentTier
-    if (answer.setTier) setCurrentTier(answer.setTier)
+    // An answer's explicit setTier still wins: it is a decision the flow author
+    // wrote down, and a lookup must not override it.
+    const nextTier = answer.setTier || webhookTier || currentTier
+    if (nextTier !== currentTier) setCurrentTier(nextTier)
 
     if (node?.type === 'decision' && node.conditions) {
       for (const cond of node.conditions) {

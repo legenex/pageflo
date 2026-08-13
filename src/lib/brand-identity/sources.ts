@@ -64,7 +64,7 @@ import {
   type BrandSourceRecord,
 } from './profile'
 import { SOURCE_KIND_PRIORITY, type FieldContribution } from './precedence'
-import { assertSafeUrl, safeFetch, type DnsResolver, type FetchLike } from './ssrf'
+import { assertSafeUrl, safeFetch, type DnsResolver, type FetchLike } from '../net/ssrf'
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                     */

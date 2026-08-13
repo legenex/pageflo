@@ -6,24 +6,44 @@
 
 import { load, type CheerioAPI } from 'cheerio'
 
+import { safeFetch, type DnsResolver, type FetchLike } from '@/lib/net/ssrf'
+
 const UA_BROWSER =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36'
 
-export async function fetchTextSafe(url: string, timeoutMs = 8000, headers: Record<string, string> = {}): Promise<string | null> {
-  try {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs)
-    const res = await fetch(url, {
-      headers: { 'User-Agent': UA_BROWSER, Accept: '*/*', ...headers },
-      redirect: 'follow',
-      signal: ctrl.signal,
-    })
-    clearTimeout(timer)
-    if (!res.ok) return null
-    return await res.text()
-  } catch {
-    return null
-  }
+/**
+ * Side effects, injected.
+ *
+ * Every fetch in this file is of an address a user supplied - a brand URL typed
+ * into the builder, a stylesheet that URL linked to, a logo that page pointed
+ * at. All of them are SSRF vectors, and all of them now go through `safeFetch`.
+ *
+ * The deps are threaded through rather than hardcoded for the reason stated in
+ * `lib/net/ssrf`: admission is only provably ON the path if the suite can run
+ * the blocked-range matrix through THESE functions, and it can only do that if
+ * it can supply a resolver. A guard that is never exercised where it is used is
+ * how this file passed review while fetching 169.254.169.254 on request.
+ */
+export type RemoteFetchDeps = { resolver?: DnsResolver; fetchImpl?: FetchLike }
+
+export async function fetchTextSafe(
+  url: string,
+  timeoutMs = 8000,
+  headers: Record<string, string> = {},
+  deps: RemoteFetchDeps = {},
+): Promise<string | null> {
+  const res = await safeFetch(url, {
+    method: 'GET',
+    // The browser UA is kept: some hosts serve a stub to an unknown agent, and
+    // that behaviour predates this guard and is not what is being changed here.
+    headers: { 'User-Agent': UA_BROWSER, Accept: '*/*', ...headers },
+    timeoutMs,
+    resolver: deps.resolver,
+    fetchImpl: deps.fetchImpl,
+  })
+  // Best-effort by contract: a refusal reads the same as a 404 to every caller,
+  // so a blocked address degrades to "no data" instead of erroring the request.
+  return res.ok ? res.body : null
 }
 
 // HEAD-check that a URL resolves AND is actually an image (not an HTML page).
@@ -31,23 +51,22 @@ export async function fetchTextSafe(url: string, timeoutMs = 8000, headers: Reco
 export async function headOk(
   url: string,
   timeoutMs = 2500,
+  deps: RemoteFetchDeps = {},
 ): Promise<{ ok: boolean; contentType: string }> {
   const check = async (method: 'HEAD' | 'GET') => {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), timeoutMs)
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: { 'User-Agent': UA_BROWSER, ...(method === 'GET' ? { Range: 'bytes=0-0' } : {}) },
-        redirect: 'follow',
-        signal: ctrl.signal,
-      })
-      clearTimeout(timer)
-      return { ok: res.ok, contentType: (res.headers.get('content-type') || '').toLowerCase() }
-    } catch {
-      clearTimeout(timer)
-      return { ok: false, contentType: '' }
-    }
+    const res = await safeFetch(url, {
+      method,
+      headers: { 'User-Agent': UA_BROWSER, ...(method === 'GET' ? { Range: 'bytes=0-0' } : {}) },
+      timeoutMs,
+      // Only the content type is wanted, so the body is never read - a host that
+      // ignores the Range header would otherwise have a whole asset buffered to
+      // answer one header, times every logo candidate, in parallel.
+      headersOnly: true,
+      resolver: deps.resolver,
+      fetchImpl: deps.fetchImpl,
+    })
+    if (!res.ok) return { ok: false, contentType: '' }
+    return { ok: true, contentType: res.contentType }
   }
   let r = await check('HEAD')
   if (!r.ok) r = await check('GET')
@@ -55,9 +74,14 @@ export async function headOk(
 }
 
 export function normalizeUrl(raw: string): string | null {
-  let u = (raw || '').trim()
-  if (!u) return null
-  if (!/^https?:\/\//i.test(u)) u = 'https://' + u
+  const u0 = (raw || '').trim()
+  if (!u0) return null
+  // Refused rather than encoded. `new URL()` would turn an embedded space into
+  // %20 and hand admission a URL that no longer looks suspicious - laundering
+  // the input before the guard sees it. The rule lives in lib/net/ssrf and is
+  // not restated with different consequences here.
+  if (/[\s\x00-\x1f\x7f]/.test(u0)) return null
+  const u = /^https?:\/\//i.test(u0) ? u0 : 'https://' + u0
   try {
     return new URL(u).toString()
   } catch {
@@ -96,10 +120,10 @@ export type UrlBundle = {
 }
 
 // Fetch a page + its stylesheets + manifest into one bundle for extraction.
-export async function fetchUrlBundle(rawUrl: string): Promise<UrlBundle | null> {
+export async function fetchUrlBundle(rawUrl: string, deps: RemoteFetchDeps = {}): Promise<UrlBundle | null> {
   const finalUrl = normalizeUrl(rawUrl)
   if (!finalUrl) return null
-  const html = await fetchTextSafe(finalUrl, 8000)
+  const html = await fetchTextSafe(finalUrl, 8000, {}, deps)
   if (!html) return null
 
   const $ = load(html)
@@ -141,7 +165,7 @@ export async function fetchUrlBundle(rawUrl: string): Promise<UrlBundle | null> 
     if (sheetHrefs.length < 3) sheetHrefs.push(abs)
   })
   for (const sheet of sheetHrefs) {
-    const text = await fetchTextSafe(sheet, 4000)
+    const text = await fetchTextSafe(sheet, 4000, {}, deps)
     if (text) css += '\n' + text
     if (css.length > 400_000) break
   }
@@ -152,7 +176,7 @@ export async function fetchUrlBundle(rawUrl: string): Promise<UrlBundle | null> 
   if (manifestHref) {
     const manifestUrl = resolveUrl(manifestHref, finalUrl)
     if (manifestUrl) {
-      const text = await fetchTextSafe(manifestUrl, 4000)
+      const text = await fetchTextSafe(manifestUrl, 4000, {}, deps)
       if (text) {
         try {
           manifest = JSON.parse(text)
@@ -203,12 +227,14 @@ const ghHeaders = (): Record<string, string> => {
   return t ? { Authorization: `Bearer ${t}` } : {}
 }
 
-async function detectDefaultBranch(owner: string, repo: string): Promise<string> {
+async function detectDefaultBranch(owner: string, repo: string, deps: RemoteFetchDeps = {}): Promise<string> {
   // Try the API (respects token for higher limits), then probe main/master.
-  const api = await fetchTextSafe(`https://api.github.com/repos/${owner}/${repo}`, 4000, {
-    Accept: 'application/vnd.github+json',
-    ...ghHeaders(),
-  })
+  const api = await fetchTextSafe(
+    `https://api.github.com/repos/${owner}/${repo}`,
+    4000,
+    { Accept: 'application/vnd.github+json', ...ghHeaders() },
+    deps,
+  )
   if (api) {
     try {
       const j = JSON.parse(api) as { default_branch?: string }
@@ -218,19 +244,19 @@ async function detectDefaultBranch(owner: string, repo: string): Promise<string>
     }
   }
   for (const b of ['main', 'master']) {
-    const probe = await headOk(`https://raw.githubusercontent.com/${owner}/${repo}/${b}/README.md`, 3000)
+    const probe = await headOk(`https://raw.githubusercontent.com/${owner}/${repo}/${b}/README.md`, 3000, deps)
     if (probe.ok) return b
   }
   return 'main'
 }
 
-export async function fetchGithubBundle(repoUrl: string): Promise<GithubBundle | null> {
+export async function fetchGithubBundle(repoUrl: string, deps: RemoteFetchDeps = {}): Promise<GithubBundle | null> {
   const parsed = parseGitHubUrl(repoUrl)
   if (!parsed) return null
   const { owner, repo } = parsed
-  const branch = await detectDefaultBranch(owner, repo)
+  const branch = await detectDefaultBranch(owner, repo, deps)
   const baseRaw = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}`
-  const raw = (path: string, ms = 3000) => fetchTextSafe(`${baseRaw}/${path}`, ms, ghHeaders())
+  const raw = (path: string, ms = 3000) => fetchTextSafe(`${baseRaw}/${path}`, ms, ghHeaders(), deps)
 
   // First hit of each candidate group.
   const firstHit = async (paths: string[]): Promise<string | null> => {
@@ -279,7 +305,7 @@ export async function fetchGithubBundle(repoUrl: string): Promise<GithubBundle |
   await Promise.all(
     assetCandidates.map(async (p) => {
       const url = `${baseRaw}/${p}`
-      const r = await headOk(url, 2500)
+      const r = await headOk(url, 2500, deps)
       if (r.ok && /image|svg/i.test(r.contentType || extractFilename(p))) {
         assetUrls.push({ url, filename: extractFilename(p), contentType: r.contentType })
       }

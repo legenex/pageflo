@@ -190,7 +190,21 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
   t(/\(answer\.fieldMappings \|\| \[\]\)/.test(runtime), 'the runtime still applies answer.fieldMappings')
   t(/if \(answer\.isDQ\) newValues\.dq_lead = 'yes'/.test(runtime), "the runtime still sets dq_lead from answer.isDQ")
   t(/if \(answer\.setTier\) newValues\.tier = answer\.setTier/.test(runtime), 'the runtime still writes the tier field from answer.setTier')
-  t(/const nextTier = answer\.setTier \|\| currentTier/.test(runtime), 'the runtime still derives the routing tier from answer.setTier')
+  // The routing tier now has a second source: a webhook node whose response
+  // maps onto `tier`. `answer.setTier` still comes FIRST, so a decision the
+  // flow author wrote by hand is never overridden by a lookup.
+  t(
+    /const nextTier = answer\.setTier \|\| webhookTier \|\| currentTier/.test(runtime),
+    'the runtime derives the routing tier from answer.setTier first, then a webhook-assigned tier',
+  )
+  t(
+    /WEBHOOK_NODE_TYPES = new Set\(\['webhook', 'verification'\]\)/.test(runtime),
+    'the runtime executes both webhook and verification nodes, which carry the identical shape',
+  )
+  t(
+    /\/api\/legalos\/quiz-webhook/.test(runtime),
+    'and it executes them server-side, so the destination is never chosen by the visitor',
+  )
   t(/nextSequentialStepIndex\(quiz, stepIdx, nextTier\)/.test(runtime), 'the runtime still falls through sequentially with the new tier')
   t(/explicitStepIndex\(quiz, answer\.nextStepKey\)/.test(runtime), 'the runtime still honours an explicit answer route')
   t(/explicitStepIndex\(quiz, node\.defaultNextStepKey\)/.test(runtime), 'the runtime still honours a decision default route')
@@ -277,11 +291,17 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
   const v = validateQuizFlow(seed)
   const failing = v.checks.filter((c) => !c.ok).map((c) => c.id)
 
-  // The seed is a REAL flow with two real defects, and the suite pins them: a
-  // regression that silences either one is a regression in the validator.
+  // The seed is a REAL flow with one real defect, and the suite pins it: a
+  // regression that silences it is a regression in the validator.
+  //
+  // It used to be two. `tier_reachability` no longer FAILS because the runtime
+  // calls the tier lookup now, so tiers 1, 2 and 4 are reported as
+  // lookup-assigned (warnings) instead of unreachable (errors). The variants
+  // scoped to them are still flagged by `reachability`, which is correct: a
+  // static walk cannot see a tier that only a live endpoint hands out.
   t(
-    json(failing) === json(['reachability', 'tier_reachability']),
-    `the seed quiz fails exactly reachability and tier reachability (failing: ${failing.join(', ') || 'none'})`,
+    json(failing) === json(['reachability']),
+    `the seed quiz fails exactly reachability (failing: ${failing.join(', ') || 'none'})`,
   )
 
   const reach = getCheck(v, 'reachability')
@@ -294,12 +314,25 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
   t(reach.notes.some((n) => n.includes('exact')), 'the reachability result says it is exact rather than leaving the caller to guess')
 
   const tiers = getCheck(v, 'tier_reachability')
-  const dead = tiers.errors.filter((e) => e.code === 'unreachable_tier').map((e) => e.tierId).sort()
-  t(json(dead) === json(['t1', 't2', 't4']), `Tier 1, 2 and 4 are reported unreachable (found: ${dead.join(', ')})`)
-  t(json(enumeratePaths(seed).activeTiers) === json(['t3']), 'only Tier 3 ever becomes active, because only an answer sets it')
+  // The runtime CALLS webhook nodes now, so a tier the lookup assigns is no
+  // longer statically dead - it is statically unverifiable, which is a
+  // different claim and the only honest one from here.
+  const fromLookup = tiers.warnings
+    .filter((e) => e.code === 'tier_depends_on_webhook_response')
+    .map((e) => e.tierId)
+    .sort()
+  t(json(fromLookup) === json(['t1', 't2', 't4']), `Tier 1, 2 and 4 are reported as lookup-assigned (found: ${fromLookup.join(', ')})`)
   t(
-    tiers.notes.some((n) => n.includes('webhook response mapping')),
-    'and the report explains why: the tier is assigned by a webhook the runtime never calls',
+    !tiers.errors.some((e) => e.code === 'unreachable_tier'),
+    'and none of them is called unreachable any more, because the tier lookup does execute',
+  )
+  t(
+    tiers.warnings.some((w) => w.message.includes('returns exactly that id')),
+    'the warning tells the operator what to check: that the endpoint returns the declared tier id',
+  )
+  t(
+    json(enumeratePaths(seed).activeTiers) === json(['t3']),
+    'only Tier 3 is reachable by ANSWER alone; the other three arrive from the lookup response',
   )
   t(hasIssue(tiers, 'variant_shown_outside_its_tier'), 'variants shown to untiered visitors as a fallback are surfaced')
 
@@ -657,8 +690,12 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
   })
   const hookRefs = getCheck(validateQuizFlow(webhookRouted), 'valid_references')
   t(
-    !hookRefs.ok && hasIssue(hookRefs, 'route_depends_on_unapplied_response'),
-    'routing on a field only a webhook response writes fails valid_references - the runtime never calls the webhook',
+    hasIssue(hookRefs, 'route_depends_on_webhook_response'),
+    'routing on a field only a webhook response writes is surfaced on valid_references',
+  )
+  t(
+    hookRefs.ok,
+    'but it no longer FAILS the check: the runtime calls the webhook, so this is a thing to verify against the endpoint rather than a defect in the flow',
   )
 }
 

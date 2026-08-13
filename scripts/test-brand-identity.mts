@@ -78,9 +78,13 @@ import {
   type ImagePalette,
   type MergeResult,
   type SourceDeps,
+  safePost,
   type UrlAdmission,
 } from '../src/lib/brand-identity/index.ts'
 import { ALL_TOKENS } from '../src/lib/brand/tokens.ts'
+// Imported from the REAL extractor module, not re-exported through the service
+// barrel: these tests exist to prove the product's own fetchers are guarded.
+import { fetchTextSafe, headOk, fetchUrlBundle } from '../src/lib/builder/extract/fetch-bundle.ts'
 
 let pass = 0
 let fail = 0
@@ -1085,6 +1089,113 @@ t(classifyAddress('nonsense').allowed === false, 'an address that cannot be clas
   }
   const res = await safeFetch('https://public.example/', { resolver, fetchImpl: boom })
   t(!res.ok && res.code === 'network' && res.reason.includes('ECONNRESET'), 'a network error is reported, never thrown')
+}
+
+/* -------------------------------------------------------------------------- */
+/*             7b. The guard is ON THE PATH, not merely in the repo            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Everything above proves `assertSafeUrl` and `safeFetch` are correct. None of
+ * it proves the product CALLS them, and that distinction is the entire bug this
+ * section exists for: `lib/builder/extract/fetch-bundle.ts` shipped a raw
+ * `fetch(url, { redirect: 'follow' })` while a complete, well-tested admission
+ * control sat one directory away. A passing SSRF suite reported the codebase as
+ * protected while the brand extractor would still fetch 169.254.169.254 on
+ * request.
+ *
+ * So the same matrix is run again THROUGH the real entry points. If someone
+ * reintroduces a bare `fetch` in any of them, these fail even though every test
+ * above still passes.
+ */
+
+/** Answers 200 to anything that gets past admission, so only the guard decides. */
+const anythingAdmitted = (body: string, contentType: string): FetchLike => async () => ({
+  status: 200,
+  headers: { get: (n: string) => (n.toLowerCase() === 'content-type' ? contentType : null) },
+  body: null,
+  text: async () => body,
+})
+
+const admitted = (): UrlAdmission => ({ ok: true, url: new URL('https://public.example/'), addresses: ['93.184.216.34'] })
+const refused = (): UrlAdmission => ({ ok: false, code: 'blocked_address', reason: 'refused by the guard on the path' })
+
+{
+  const viaFetchTextSafe: AssertFn = async (raw, options) => {
+    const out = await fetchTextSafe(raw, 5000, {}, { resolver: options?.resolver, fetchImpl: anythingAdmitted('OK', 'text/html') })
+    return out === null ? refused() : admitted()
+  }
+  for (const check of await sweepSsrf(viaFetchTextSafe)) t(check.pass, `fetchTextSafe is guarded: ${check.label}`)
+}
+
+{
+  const viaHeadOk: AssertFn = async (raw, options) => {
+    const out = await headOk(raw, 2500, { resolver: options?.resolver, fetchImpl: anythingAdmitted('', 'image/svg+xml') })
+    return out.ok ? admitted() : refused()
+  }
+  for (const check of await sweepSsrf(viaHeadOk)) t(check.pass, `headOk is guarded: ${check.label}`)
+}
+
+{
+  // The whole product path: this is what the "extract a brand from a URL"
+  // button actually calls.
+  const page = '<html><head><title>x</title></head><body><h1>Brand</h1></body></html>'
+  const viaBundle: AssertFn = async (raw, options) => {
+    const bundle = await fetchUrlBundle(raw, { resolver: options?.resolver, fetchImpl: anythingAdmitted(page, 'text/html') })
+    return bundle === null ? refused() : admitted()
+  }
+  for (const check of await sweepSsrf(viaBundle)) t(check.pass, `fetchUrlBundle is guarded: ${check.label}`)
+}
+
+{
+  // A page that LINKS to the metadata endpoint must not drag the extractor
+  // there. The stylesheet href is attacker-controlled in exactly the way the
+  // top-level URL is not: the operator vetted the domain they typed, not the
+  // markup it served back.
+  const hostile =
+    '<html><head><link rel="stylesheet" href="http://169.254.169.254/latest/meta-data/iam/security-credentials/">' +
+    '<link rel="manifest" href="http://127.0.0.1:80/manifest.json"></head><body>hi</body></html>'
+  const reached: string[] = []
+  const recording: FetchLike = async (url) => {
+    reached.push(url)
+    return {
+      status: 200,
+      headers: { get: (n: string) => (n.toLowerCase() === 'content-type' ? 'text/html' : null) },
+      body: null,
+      text: async () => hostile,
+    }
+  }
+  const bundle = await fetchUrlBundle('https://public.example/', { resolver, fetchImpl: recording })
+  t(bundle !== null, 'a page that links to internal addresses is still extracted')
+  t(!reached.some((u) => u.includes('169.254.169.254')), 'but its link to the cloud metadata endpoint is never fetched')
+  t(!reached.some((u) => u.includes('127.0.0.1')), 'and neither is its loopback manifest')
+  t(reached.length === 1 && reached[0].includes('public.example'), 'only the vetted page itself was read')
+}
+
+{
+  // safePost is the POST half, used by outbound lead webhooks, the Slack hook,
+  // the TrustedForm claim and the quiz webhook node.
+  const viaSafePost: AssertFn = async (raw, options) => {
+    const out = await safePost(raw, {
+      resolver: options?.resolver,
+      fetchImpl: anythingAdmitted('{}', 'application/json'),
+      body: '{}',
+    })
+    return out.ok ? admitted() : refused()
+  }
+  for (const check of await sweepSsrf(viaSafePost)) t(check.pass, `safePost is guarded: ${check.label}`)
+
+  const redirecting: FetchLike = async () => ({
+    status: 302,
+    headers: { get: (n: string) => (n.toLowerCase() === 'location' ? 'http://127.0.0.1/' : null) },
+    body: null,
+    text: async () => '',
+  })
+  const bounced = await safePost('https://public.example/', { resolver, fetchImpl: redirecting, body: '{}' })
+  t(
+    !bounced.ok && bounced.code === 'redirect_refused',
+    'a POST is never redirected: the payload would be dropped or sent somewhere nobody configured',
+  )
 }
 
 /* -------------------------------------------------------------------------- */

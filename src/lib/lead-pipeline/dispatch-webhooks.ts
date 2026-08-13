@@ -1,5 +1,7 @@
 import crypto from 'crypto'
 
+import { safePost } from '@/lib/net/ssrf'
+
 export type WebhookConfig = {
   name: string
   url: string
@@ -48,11 +50,25 @@ export const dispatchWebhooks = async (args: {
           'X-LegalOS-Event': event,
         }
         if (w.hmac_secret) headers['X-LegalOS-Signature'] = `sha256=${signBody(body, w.hmac_secret)}`
-        const resp = await fetch(w.url, { method: 'POST', headers, body })
+        // An outbound webhook URL is typed by a tenant admin, so it is a
+        // user-supplied address the server posts a LEAD to. Unguarded, it
+        // doubles as a port scanner and a way to POST a signed payload at
+        // anything on the private network. See lib/net/ssrf.
+        const resp = await safePost(w.url, { headers, body })
+        if (!resp.ok) {
+          return {
+            webhook: w.name,
+            url: w.url,
+            ok: false,
+            status: resp.status,
+            error: resp.reason,
+            duration_ms: Date.now() - started,
+          }
+        }
         return {
           webhook: w.name,
           url: w.url,
-          ok: resp.ok,
+          ok: resp.status >= 200 && resp.status < 300,
           status: resp.status,
           duration_ms: Date.now() - started,
         }
