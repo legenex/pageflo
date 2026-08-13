@@ -41,6 +41,8 @@ import {
 export type SampleReconcileResult = {
   removed: Array<{ slug: string; repointedTo: string; deployments: number }>
   kept: Array<{ slug: string; reason: string }>
+  /** Deployments whose NAME quoted a sample that no longer exists. */
+  renamedDeployments: Array<{ from: string; to: string }>
   problems: string[]
 }
 
@@ -96,7 +98,7 @@ const sampleBySlug = new Map(RETIRED_SAMPLE_LANDING_PAGES.map((s) => [s.slug, s]
  * decided to keep is marked `legacy` so it is never reconsidered.
  */
 export const retireSampleLandingPages = async (payload: Payload): Promise<SampleReconcileResult> => {
-  const out: SampleReconcileResult = { removed: [], kept: [], problems: [] }
+  const out: SampleReconcileResult = { removed: [], kept: [], renamedDeployments: [], problems: [] }
 
   const res = await payload.find({
     collection: 'funnel-landing-pages',
@@ -105,7 +107,10 @@ export const retireSampleLandingPages = async (payload: Payload): Promise<Sample
     depth: 0,
     overrideAccess: true,
   })
-  if (res.docs.length === 0) return out
+  if (res.docs.length === 0) {
+    await renameDeploymentsQuotingRetiredSamples(payload, out)
+    return out
+  }
 
   for (const raw of res.docs) {
     const row = raw as Record<string, unknown>
@@ -164,11 +169,29 @@ export const retireSampleLandingPages = async (payload: Payload): Promise<Sample
       overrideAccess: true,
     })
 
+    /*
+     * The deployment's NAME is repointed too, when it quotes the sample.
+     *
+     * The seeder built names like "Check My Claim · MVA Pain First", so after
+     * the row is gone those deployments read as pointing at a record that does
+     * not exist — which is precisely the stale reference this whole correction
+     * is about, left behind by the cleanup for it. Only the quoted fragment is
+     * replaced, and only with the name of the template the deployment is now
+     * bound to, so "Check My Claim · Human Recovery Story" still says which
+     * brand and which template. A name an operator chose contains no sample
+     * name and is untouched.
+     */
+    const stockName = String(stock.name ?? '')
     for (const dep of deps.docs) {
+      const currentName = String(dep.name ?? '')
+      const data: Record<string, unknown> = { landing_page: stock.id }
+      if (stockName && currentName.includes(sample.name)) {
+        data.name = currentName.split(sample.name).join(stockName)
+      }
       await payload.update({
         collection: 'funnel-lp-deployments',
         id: dep.id as string,
-        data: { landing_page: stock.id },
+        data,
         overrideAccess: true,
       })
     }
@@ -186,5 +209,63 @@ export const retireSampleLandingPages = async (payload: Payload): Promise<Sample
     })
   }
 
+  await renameDeploymentsQuotingRetiredSamples(payload, out)
   return out
+}
+
+/**
+ * Deployments still named after a sample that has already been removed.
+ *
+ * Separate from the loop above and run unconditionally, because the two can get
+ * out of step: a database where the retirement ran under an earlier build has
+ * the rows gone and the names stale, and the loop returns early for exactly
+ * those. Resolving the replacement from the deployment's CURRENT landing page
+ * rather than from the sample table means this is correct whichever order the
+ * two ran in.
+ */
+const renameDeploymentsQuotingRetiredSamples = async (
+  payload: Payload,
+  out: SampleReconcileResult,
+): Promise<void> => {
+  const stale = await payload
+    .find({
+      collection: 'funnel-lp-deployments',
+      where: { or: RETIRED_SAMPLE_LANDING_PAGES.map((s) => ({ name: { contains: s.name } })) },
+      limit: 500,
+      depth: 0,
+      overrideAccess: true,
+    })
+    .catch(() => null)
+  if (!stale || stale.docs.length === 0) return
+
+  for (const dep of stale.docs) {
+    const lpId = dep.landing_page == null
+      ? null
+      : typeof dep.landing_page === 'object'
+        ? (dep.landing_page as { id: unknown }).id
+        : dep.landing_page
+    if (lpId == null) continue
+
+    const lp = await payload
+      .findByID({ collection: 'funnel-landing-pages', id: lpId as string, depth: 0, overrideAccess: true })
+      .catch(() => null)
+    const replacement = String(lp?.name ?? '')
+    // A deployment still bound to a sample row is the loop's business, not this
+    // one's — renaming it here would erase the evidence before the repoint.
+    if (!replacement || RETIRED_SAMPLE_LANDING_PAGES.some((s) => s.name === replacement)) continue
+
+    let name = String(dep.name ?? '')
+    for (const s of RETIRED_SAMPLE_LANDING_PAGES) {
+      if (name.includes(s.name)) name = name.split(s.name).join(replacement)
+    }
+    if (name === String(dep.name ?? '')) continue
+
+    await payload.update({
+      collection: 'funnel-lp-deployments',
+      id: dep.id as string,
+      data: { name },
+      overrideAccess: true,
+    })
+    out.renamedDeployments.push({ from: String(dep.name ?? ''), to: name })
+  }
 }

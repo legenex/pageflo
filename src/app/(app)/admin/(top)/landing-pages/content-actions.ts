@@ -75,7 +75,24 @@ const loadContext = async (payload, user, deploymentId: string) => {
     if (typeof v === 'string') overrides[k] = v
   }
 
-  return { ok: true as const, deployment, lp, ported, overrides, siteId: gate.siteId }
+  /*
+   * What this deployment INHERITS when it says nothing: the template's own copy
+   * where it has any, else the reference's.
+   *
+   * This used to be the reference's wording alone, which was right while a
+   * template had no copy of its own. Now that a template does, an operator who
+   * types the template's wording into a deployment field would have had it
+   * PINNED as a deployment override — so a later correction to the template
+   * would reach every deployment except the ones that agreed with it.
+   */
+  const inherited = new Map<string, string>()
+  const templateSlotOverrides = (lp.slot_overrides ?? {}) as Record<string, unknown>
+  for (const slot of ported.slots) {
+    const own = templateSlotOverrides[slot.id]
+    inherited.set(slot.id, typeof own === 'string' ? own : slot.default)
+  }
+
+  return { ok: true as const, deployment, lp, ported, overrides, inherited, siteId: gate.siteId }
 }
 
 const writeOverrides = async (payload, user, deployment, ported, next: Record<string, string>) => {
@@ -109,14 +126,16 @@ export async function setDeploymentCopy(args: {
   const ctx = await loadContext(payload, user, args.deploymentId)
   if (!ctx.ok) return ctx
 
-  const stock = new Map(ctx.ported.slots.map((s) => [s.id, s.default]))
   let next = { ...ctx.overrides }
   for (const [id, value] of Object.entries(args.edits ?? {})) {
     if (value === null) { next = resetToDefault(next, [id]); continue }
     if (typeof value !== 'string') return { ok: false, error: `"${id}" is not text` }
-    // Typing the stock wording back in is a reset, not a pin: the two look the
-    // same today and behave differently when the template is corrected.
-    if (stock.get(id) === value) next = resetToDefault(next, [id])
+    // Typing the INHERITED wording back in is a reset, not a pin: the two look
+    // the same today and behave differently when the template is corrected.
+    // Compared against what this deployment would inherit — the template's copy
+    // where it has any — not against the reference, which is a different string
+    // the moment somebody edits the template.
+    if (ctx.inherited.get(id) === value) next = resetToDefault(next, [id])
     else next[id] = value
   }
 
@@ -169,7 +188,14 @@ export async function writeDeploymentCopy(args: {
     }
   }
 
-  const targets = targetsFromSlots(ctx.ported.slots, ctx.overrides, args.slotIds?.length ? { ids: args.slotIds } : {})
+  /*
+   * The assistant is shown what this deployment currently SAYS, which for an
+   * un-overridden slot is the template's copy rather than the reference's. It
+   * was shown the reference's, so on a template whose wording had been edited
+   * it was rewriting text nobody would ever see.
+   */
+  const inheritedSlots = ctx.ported.slots.map((s) => ({ ...s, default: ctx.inherited.get(s.id) ?? s.default }))
+  const targets = targetsFromSlots(inheritedSlots, ctx.overrides, args.slotIds?.length ? { ids: args.slotIds } : {})
 
   const result = await generateContent(
     {
