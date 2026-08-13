@@ -476,47 +476,67 @@ export const safeFetch = async (raw: string, options: SafeFetchOptions = {}): Pr
         hops,
       }
     }
-    clearTimeout(timer)
 
-    if (REDIRECT_STATUSES.has(res.status)) {
-      const location = res.headers.get('location')
-      if (!location) {
-        return { ok: false, code: 'redirect_without_location', reason: `${current} redirected with no destination.`, hops }
+    // The timer stays ARMED through the body read. Clearing it here - which is
+    // where it used to be cleared - disarms the deadline the moment the headers
+    // land, so a server that answers 200 and then dribbles bytes under the size
+    // cap holds the read open forever. "Budget for the WHOLE chain" has to
+    // include the part where the bytes arrive, or it is not a budget.
+    try {
+      if (REDIRECT_STATUSES.has(res.status)) {
+        await discard(res)
+        const location = res.headers.get('location')
+        if (!location) {
+          return { ok: false, code: 'redirect_without_location', reason: `${current} redirected with no destination.`, hops }
+        }
+        if (hop === maxRedirects) {
+          return { ok: false, code: 'too_many_redirects', reason: `More than ${maxRedirects} redirects.`, hops }
+        }
+        // Relative destinations are resolved against the hop we are on, then go
+        // back through admission like any other address.
+        try {
+          target = new URL(location, current).toString()
+        } catch {
+          return { ok: false, code: 'malformed', reason: `${current} redirected to an unreadable address.`, hops }
+        }
+        continue
       }
-      if (hop === maxRedirects) {
-        return { ok: false, code: 'too_many_redirects', reason: `More than ${maxRedirects} redirects.`, hops }
-      }
-      // Relative destinations are resolved against the hop we are on, then go
-      // back through admission like any other address.
-      try {
-        target = new URL(location, current).toString()
-      } catch {
-        return { ok: false, code: 'malformed', reason: `${current} redirected to an unreadable address.`, hops }
-      }
-      continue
-    }
 
-    if (res.status < 200 || res.status >= 300) {
-      return { ok: false, code: 'http_error', reason: `${current} answered ${res.status}.`, hops }
-    }
-
-    const contentType = (res.headers.get('content-type') ?? '').toLowerCase()
-    const declared = Number(res.headers.get('content-length') ?? '')
-    if (Number.isFinite(declared) && declared > maxBytes) {
-      return {
-        ok: false,
-        code: 'too_large',
-        reason: `${current} declares ${declared} bytes, over the ${maxBytes}-byte ceiling.`,
-        hops,
+      if (res.status < 200 || res.status >= 300) {
+        await discard(res)
+        return { ok: false, code: 'http_error', reason: `${current} answered ${res.status}.`, hops }
       }
-    }
-    if (method === 'HEAD' || options.headersOnly) {
-      return { ok: true, status: res.status, finalUrl: current, contentType, body: '', bytes: 0, hops }
-    }
 
-    const read = await readCapped(res, maxBytes)
-    if (!read.ok) return { ok: false, code: read.code, reason: `${current}: ${read.reason}`, hops }
-    return { ok: true, status: res.status, finalUrl: current, contentType, body: read.text, bytes: read.bytes, hops }
+      const contentType = (res.headers.get('content-type') ?? '').toLowerCase()
+      const declared = Number(res.headers.get('content-length') ?? '')
+      if (Number.isFinite(declared) && declared > maxBytes) {
+        await discard(res)
+        return {
+          ok: false,
+          code: 'too_large',
+          reason: `${current} declares ${declared} bytes, over the ${maxBytes}-byte ceiling.`,
+          hops,
+        }
+      }
+      if (method === 'HEAD' || options.headersOnly) {
+        await discard(res)
+        return { ok: true, status: res.status, finalUrl: current, contentType, body: '', bytes: 0, hops }
+      }
+
+      const read = await readCapped(res, maxBytes)
+      if (!read.ok) {
+        const timedOut = controller.signal.aborted
+        return {
+          ok: false,
+          code: timedOut ? 'timeout' : read.code,
+          reason: timedOut ? `Timed out after ${timeoutMs}ms.` : `${current}: ${read.reason}`,
+          hops,
+        }
+      }
+      return { ok: true, status: res.status, finalUrl: current, contentType, body: read.text, bytes: read.bytes, hops }
+    } finally {
+      clearTimeout(timer)
+    }
   }
 
   return { ok: false, code: 'too_many_redirects', reason: `More than ${maxRedirects} redirects.`, hops }
@@ -532,7 +552,13 @@ export type SafePostResult =
   | { ok: true; status: number; url: string; contentType: string; body: string; bytes: number }
   | { ok: false; code: SafePostRejectionCode; reason: string; status?: number }
 
+/** The verbs a caller can send a body with. GET is here so a caller that lets an
+ *  author choose the method does not have to fall back to POST and send a body
+ *  the author never asked for. */
+export type SafePostMethod = 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'GET'
+
 export type SafePostOptions = AssertSafeUrlOptions & {
+  method?: SafePostMethod
   headers?: Record<string, string>
   body?: string
   maxBytes?: number
@@ -557,6 +583,7 @@ export type SafePostOptions = AssertSafeUrlOptions & {
  * the useful behaviour.
  */
 export const safePost = async (raw: string, options: SafePostOptions = {}): Promise<SafePostResult> => {
+  const method = options.method ?? 'POST'
   const maxBytes = options.maxBytes ?? DEFAULT_MAX_BYTES
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS
   const fetchImpl = options.fetchImpl ?? defaultFetchImpl
@@ -570,11 +597,13 @@ export const safePost = async (raw: string, options: SafePostOptions = {}): Prom
   let res: SafeFetchResponse
   try {
     res = await fetchImpl(url, {
-      method: 'POST',
+      method,
       headers: { 'User-Agent': USER_AGENT, Accept: '*/*', ...(options.headers ?? {}) },
       redirect: 'manual',
       signal: controller.signal,
-      body: options.body ?? '',
+      // A GET carries no body. Sending one where the author chose GET is how a
+      // verification node ends up with a 405 and a flow that routes on nothing.
+      ...(method === 'GET' ? {} : { body: options.body ?? '' }),
     })
   } catch (err) {
     clearTimeout(timer)
@@ -585,23 +614,51 @@ export const safePost = async (raw: string, options: SafePostOptions = {}): Prom
       reason: `Could not reach ${url}: ${err instanceof Error ? err.message : 'unknown network error'}.`,
     }
   }
-  clearTimeout(timer)
 
-  if (REDIRECT_STATUSES.has(res.status)) {
-    return {
-      ok: false,
-      code: 'redirect_refused',
-      reason: `${url} answered ${res.status} (a redirect). A POST is not redirected, because that would drop the payload or send it somewhere nobody configured.`,
-      status: res.status,
+  // Armed through the read, as in `safeFetch`, and it matters more here: this
+  // runs inside the SYNCHRONOUS lead pipeline, so a receiver that answers 200
+  // and then trickles bytes would hold a visitor's lead submission open.
+  try {
+    if (REDIRECT_STATUSES.has(res.status)) {
+      await discard(res)
+      return {
+        ok: false,
+        code: 'redirect_refused',
+        reason: `${url} answered ${res.status} (a redirect). A POST is not redirected, because that would drop the payload or send it somewhere nobody configured.`,
+        status: res.status,
+      }
     }
-  }
 
-  const contentType = (res.headers.get('content-type') ?? '').toLowerCase()
-  // The status is reported rather than judged: a caller dispatching a webhook
-  // wants the receiver's 4xx, not a generic failure.
-  const read = await readCapped(res, maxBytes)
-  if (!read.ok) return { ok: false, code: read.code, reason: `${url}: ${read.reason}`, status: res.status }
-  return { ok: true, status: res.status, url, contentType, body: read.text, bytes: read.bytes }
+    const contentType = (res.headers.get('content-type') ?? '').toLowerCase()
+    // The status is reported rather than judged: a caller dispatching a webhook
+    // wants the receiver's 4xx, not a generic failure.
+    const read = await readCapped(res, maxBytes)
+    if (!read.ok) {
+      const timedOut = controller.signal.aborted
+      return {
+        ok: false,
+        code: timedOut ? 'timeout' : read.code,
+        reason: timedOut ? `Timed out after ${timeoutMs}ms.` : `${url}: ${read.reason}`,
+        status: res.status,
+      }
+    }
+    return { ok: true, status: res.status, url, contentType, body: read.text, bytes: read.bytes }
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
+/**
+ * Let go of a response body we are not going to read.
+ *
+ * An unconsumed body pins its socket in undici until GC. `headOk` fans out
+ * across ~20 candidate asset URLs per brand extraction and never reads one of
+ * them, so "never" is a real number of sockets.
+ */
+const discard = async (res: SafeFetchResponse): Promise<void> => {
+  const stream = res.body
+  if (!stream || typeof stream.cancel !== 'function') return
+  await stream.cancel().catch(() => undefined)
 }
 
 /**

@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { safePost } from '@/lib/net/ssrf'
+import { safePost, type SafePostMethod } from '@/lib/net/ssrf'
+import { resolveSiteByHost } from '@/lib/site-resolver'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,6 +89,25 @@ const interpolate = (template: string, values: Record<string, unknown>): string 
   template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => scalar(values[key]).slice(0, 500))
 
 /**
+ * Substitute into a JSON template WITHOUT letting a visitor's answer end the
+ * string it is being placed in.
+ *
+ * The payload template is JSON the author wrote (`{"mobile": "{{mobile}}"}`),
+ * and the values are typed by the visitor. Plain textual substitution lets an
+ * answer of `x","tier":"1` close the string and forge sibling fields, so the
+ * buyer receives invented data attributed to the brand. Each value is therefore
+ * JSON-encoded and the surrounding quotes the author already wrote are removed,
+ * which leaves the template's shape intact and the value inert.
+ */
+const interpolateJson = (template: string, values: Record<string, unknown>): string =>
+  // The author's own quotes around a slot are consumed, because JSON.stringify
+  // supplies its own. A bare {{x}} in a numeric position also becomes a quoted
+  // string, which is the honest reading of an answer that is always text.
+  template.replace(/"?\{\{(\w+)\}\}"?/g, (_match, key: string) =>
+    JSON.stringify(scalar(values[key]).slice(0, 500)),
+  )
+
+/**
  * Header values get the same substitution, then have anything that could start
  * a second header stripped. A newline in a header value is request splitting;
  * refusing to carry one costs nothing legitimate.
@@ -153,13 +173,39 @@ export async function POST(req: NextRequest) {
 
   const payload = await getPayload({ config })
 
+  // A quiz embedded in a landing page has no row of its own: `resolveEmbeddedQuiz`
+  // synthesises the id `lp:<lpDeploymentId>` so it cannot collide with a real
+  // deployment. Looking that up as an integer fails, which is how the first cut
+  // of this endpoint left every LP-embedded quiz exactly as broken as before -
+  // and the LP embed is the binding the product now prefers.
+  const embeddedLpId = deployment_id.startsWith('lp:') ? deployment_id.slice(3) : ''
+
   const dep = (await payload
-    .findByID({ collection: 'funnel-quiz-deployments', id: deployment_id, depth: 0, overrideAccess: true })
+    .findByID({
+      collection: embeddedLpId ? 'funnel-lp-deployments' : 'funnel-quiz-deployments',
+      id: embeddedLpId || deployment_id,
+      depth: 0,
+      overrideAccess: true,
+    })
     .catch(() => null)) as Record<string, unknown> | null
   if (!dep || dep.status !== 'live') {
     return NextResponse.json({ ok: false, error: 'not found' }, { status: 404 })
   }
 
+  // The deployment must belong to the Site whose host is serving this request.
+  // Without it, a deployment id is a bearer token for somebody else's funnel:
+  // anyone could walk the integers and make this server POST to another
+  // tenant's buyer endpoint, carrying that tenant's configured headers, with a
+  // body of the caller's choosing.
+  const host = (req.headers.get('x-legalos-host') ?? req.headers.get('host') ?? '').toLowerCase()
+  const site = await resolveSiteByHost(host)
+  const depSite = dep.site == null ? '' : typeof dep.site === 'object' ? String((dep.site as { id: unknown }).id) : String(dep.site)
+  if (!site || !depSite || String(site.siteId) !== depSite) {
+    return NextResponse.json({ ok: false, error: 'not found' }, { status: 404 })
+  }
+
+  // Both collections name the flow in `quiz`; on an LP deployment that is the
+  // embedded-flow binding the runtime is actually walking.
   const quizId = dep.quiz == null ? '' : typeof dep.quiz === 'object' ? String((dep.quiz as { id: unknown }).id) : String(dep.quiz)
   if (!quizId) return NextResponse.json({ ok: false, error: 'not found' }, { status: 404 })
 
@@ -194,14 +240,23 @@ export async function POST(req: NextRequest) {
     headers[key] = headerValue(String(h?.value ?? ''), values)
   }
 
-  const bodyText = interpolate(typeof node.webhookPayload === 'string' ? node.webhookPayload : '', values)
+  // JSON-aware substitution. The template is JSON and the values are typed by
+  // a visitor, so plain text replacement would let an answer close the string
+  // it sits in and forge sibling fields in what the buyer receives.
+  const bodyText = interpolateJson(typeof node.webhookPayload === 'string' ? node.webhookPayload : '', values)
 
-  // GET is honoured if the author chose it, but there is no body to send then.
-  const method = String(node.webhookMethod ?? 'POST').toUpperCase()
+  // The builder offers five verbs, so the author's choice is honoured rather
+  // than coerced. Forcing POST onto a GET verification node produced a 405 and
+  // a flow that then routed on nothing - the exact silent failure this endpoint
+  // exists to end.
+  const chosen = String(node.webhookMethod ?? 'POST').toUpperCase()
+  const method: SafePostMethod =
+    chosen === 'GET' || chosen === 'PUT' || chosen === 'PATCH' || chosen === 'DELETE' ? chosen : 'POST'
 
   const res = await safePost(url, {
+    method,
     headers,
-    body: method === 'GET' ? '' : bodyText,
+    body: bodyText,
     // A visitor is on a spinner. A buyer's slow endpoint must not hold the
     // funnel open longer than a person will wait.
     timeoutMs: 6000,

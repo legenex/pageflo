@@ -1203,6 +1203,48 @@ const refused = (): UrlAdmission => ({ ok: false, code: 'blocked_address', reaso
     !bounced.ok && bounced.code === 'redirect_refused',
     'a POST is never redirected: the payload would be dropped or sent somewhere nobody configured',
   )
+
+  // The author's verb is honoured. Forcing POST onto a GET node produced a 405
+  // and a flow that then routed on nothing.
+  const seen: Array<{ method: string; hasBody: boolean }> = []
+  const recordVerb: FetchLike = async (_u, init) => {
+    seen.push({ method: init.method, hasBody: Object.prototype.hasOwnProperty.call(init, 'body') })
+    return {
+      status: 200,
+      headers: { get: (n: string) => (n.toLowerCase() === 'content-type' ? 'application/json' : null) },
+      body: null,
+      text: async () => '{}',
+    }
+  }
+  for (const m of ['GET', 'PUT', 'PATCH', 'DELETE', 'POST'] as const) {
+    await safePost('https://public.example/', { resolver, fetchImpl: recordVerb, method: m, body: '{"a":1}' })
+  }
+  t(
+    JSON.stringify(seen.map((s) => s.method)) === JSON.stringify(['GET', 'PUT', 'PATCH', 'DELETE', 'POST']),
+    'safePost sends the verb it was given',
+  )
+  t(seen[0].hasBody === false, 'and a GET carries no body')
+  t(seen[4].hasBody === true, 'while a POST does')
+
+  // The deadline has to cover the body read, not just the headers. A server
+  // that answers 200 and then trickles bytes was previously able to hold a
+  // lead submission open forever, because this runs inside POST /api/leads.
+  const trickle: FetchLike = async (_u, init) => ({
+    status: 200,
+    headers: { get: () => null },
+    body: new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new Uint8Array([104, 105]))
+        // Never closes; only the abort signal can end this.
+        init.signal.addEventListener('abort', () => controller.error(new Error('aborted')))
+      },
+    }),
+    text: async () => 'hi',
+  })
+  const started = Date.now()
+  const hung = await safePost('https://public.example/', { resolver, fetchImpl: trickle, timeoutMs: 300, body: '{}' })
+  t(!hung.ok && hung.code === 'timeout', 'a body that never ends is a timeout, not a hang')
+  t(Date.now() - started < 5000, 'and it gives up on schedule rather than waiting on the socket')
 }
 
 /* -------------------------------------------------------------------------- */
