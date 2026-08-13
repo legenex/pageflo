@@ -157,9 +157,11 @@ export type FlowState = {
 }
 
 /**
- * The id recorded for a hop the visitor did not choose. It is never one of the
- * quiz's own answer ids (those are `a_...` from `genId`), so an enumerated
- * answer sequence contains only real choices.
+ * The id on the synthetic answer used for a hop the visitor did not choose.
+ *
+ * It is never written into a path's `answerIds`: an auto-advanced hop is not a
+ * choice, so recording it would put something in the answer sequence that no
+ * visitor could ever have supplied, and the sequence has to be replayable.
  */
 export const AUTO_ANSWER_ID = '__auto__'
 
@@ -350,6 +352,8 @@ export type PathRow = {
   values: Record<string, string>
   terminalNodeId: string | null
   terminalStepKey: string | null
+  /** Index of the step the path stopped on, so the (step, tier) state is known. */
+  terminalStepIndex: number | null
   terminalKind: TerminalKind
   destination: PathDestination
   /** True where the runtime persists the lead: an endpoint, or out of steps. */
@@ -403,7 +407,7 @@ export const enumeratePaths = (quiz: Quiz, options: EnumerationOptions = {}): Pa
   const maxDepth = options.maxDepth ?? MAX_DEPTH
 
   const rows: PathRow[] = []
-  let truncationReason: string | null = null
+  let depthCut = false
   const visitedStateKeys = new Set<string>()
   const visitedStepKeys = new Set<string>()
   const visitedNodeIds = new Set<string>()
@@ -415,17 +419,30 @@ export const enumeratePaths = (quiz: Quiz, options: EnumerationOptions = {}): Pa
   const formNodeIds: string[] = []
   const onPath = new Set<string>()
 
-  const truncate = (reason: string): void => {
-    if (!truncationReason) truncationReason = reason
-  }
+  /**
+   * The walk is allowed to produce ONE row past the cap, and that row is
+   * dropped at the end.
+   *
+   * That extra row is what makes "truncated" exact. Stopping at exactly
+   * `maxPaths` cannot distinguish a flow with more paths from a flow with
+   * precisely that many, and guessing either way is wrong in a way that
+   * matters: reporting a complete table as partial fails a quiz that is fine,
+   * and reporting a partial one as complete is the failure mode this limit
+   * exists to prevent.
+   */
+  const overflowAt = maxPaths + 1
 
   const emit = (
     kind: TerminalKind,
     node: QuizNode | null,
-    stepKey: string | null,
+    stepIndex: number,
     values: FlowValues,
     tier: string | null,
   ): void => {
+    // Enforced in the ONE place a row is created, so the bound holds however
+    // the walk is later reorganised. The checks at the branch points below only
+    // stop a full walk from descending further; they are an early exit.
+    if (rows.length >= overflowAt) return
     rows.push({
       answerIds: [...answerIds],
       nodeIds: [...nodeIds],
@@ -434,7 +451,8 @@ export const enumeratePaths = (quiz: Quiz, options: EnumerationOptions = {}): Pa
       dqLead: values.dq_lead === 'yes',
       values: { ...values },
       terminalNodeId: node?.id ?? null,
-      terminalStepKey: stepKey,
+      terminalStepKey: quiz.steps[stepIndex]?.key ?? null,
+      terminalStepIndex: quiz.steps[stepIndex] ? stepIndex : null,
       terminalKind: kind,
       destination: kind === 'endpoint' ? destinationFor(node, values) : { kind: 'none' },
       submitsLead: kind === 'endpoint' || kind === 'out_of_steps',
@@ -442,26 +460,18 @@ export const enumeratePaths = (quiz: Quiz, options: EnumerationOptions = {}): Pa
   }
 
   const walk = (state: FlowState, depth: number): void => {
-    if (rows.length >= maxPaths) {
-      truncate(`path limit of ${maxPaths} reached`)
-      return
-    }
+    if (rows.length >= overflowAt) return
 
     const step = quiz.steps[state.stepIndex]
     const signature = stateSignature(state)
     if (onPath.has(signature)) {
-      emit('cycle', null, step?.key ?? null, state.values, state.tier)
-      return
-    }
-    if (depth > maxDepth) {
-      truncate(`depth limit of ${maxDepth} reached`)
-      emit('depth_limit', null, step?.key ?? null, state.values, state.tier)
+      emit('cycle', null, state.stepIndex, state.values, state.tier)
       return
     }
 
     const situation = situationAt(quiz, state)
     if (situation.kind === 'missing') {
-      emit('missing_variant', null, step?.key ?? null, state.values, state.tier)
+      emit('missing_variant', null, state.stepIndex, state.values, state.tier)
       return
     }
 
@@ -480,22 +490,25 @@ export const enumeratePaths = (quiz: Quiz, options: EnumerationOptions = {}): Pa
     onPath.add(signature)
 
     if (situation.kind === 'terminal') {
-      emit('endpoint', node, step?.key ?? null, state.values, state.tier)
+      emit('endpoint', node, state.stepIndex, state.values, state.tier)
     } else if (situation.kind === 'dead_end') {
-      emit('dead_end', node, step?.key ?? null, state.values, state.tier)
+      emit('dead_end', node, state.stepIndex, state.values, state.tier)
+    } else if (depth >= maxDepth) {
+      // Tested here rather than on entry so that a path which ENDS at this
+      // depth is recorded as the outcome it is, and only a path with somewhere
+      // left to go is reported as cut.
+      depthCut = true
+      emit('depth_limit', node, state.stepIndex, state.values, state.tier)
     } else {
       const choices = situation.kind === 'auto' ? [situation.answer] : situation.answers
       for (const answer of choices) {
         const chosen = situation.kind === 'choose'
         if (chosen) answerIds.push(answer.id)
         const result = advanceFrom(quiz, state, node, answer)
-        if (result.kind === 'end') emit('out_of_steps', node, step?.key ?? null, result.values, result.tier)
+        if (result.kind === 'end') emit('out_of_steps', node, state.stepIndex, result.values, result.tier)
         else walk(result.state, depth + 1)
         if (chosen) answerIds.pop()
-        if (rows.length >= maxPaths) {
-          truncate(`path limit of ${maxPaths} reached`)
-          break
-        }
+        if (rows.length >= overflowAt) break
       }
     }
 
@@ -507,12 +520,19 @@ export const enumeratePaths = (quiz: Quiz, options: EnumerationOptions = {}): Pa
   const start = entryStepIndex(quiz, null)
   if (start >= 0) walk({ stepIndex: start, tier: null, values: {} }, 0)
 
+  const overflowed = rows.length > maxPaths
+  if (overflowed) rows.length = maxPaths
+
+  const reasons: string[] = []
+  if (overflowed) reasons.push(`path limit of ${maxPaths} reached`)
+  if (depthCut) reasons.push(`depth limit of ${maxDepth} reached`)
+
   const sorted = (s: Set<string>): string[] => [...s].sort()
 
   return {
     rows,
-    truncated: truncationReason !== null,
-    truncationReason,
+    truncated: reasons.length > 0,
+    truncationReason: reasons.length > 0 ? reasons.join('; ') : null,
     limits: { maxPaths, maxDepth },
     visitedStateKeys: sorted(visitedStateKeys),
     visitedStepKeys: sorted(visitedStepKeys),
@@ -554,7 +574,7 @@ export const replayAnswerIds = (
   const row = (
     kind: TerminalKind,
     node: QuizNode | null,
-    stepKey: string | null,
+    stepIndex: number,
     values: FlowValues,
     tier: string | null,
   ): PathRow => ({
@@ -565,21 +585,37 @@ export const replayAnswerIds = (
     dqLead: values.dq_lead === 'yes',
     values: { ...values },
     terminalNodeId: node?.id ?? null,
-    terminalStepKey: stepKey,
+    terminalStepKey: quiz.steps[stepIndex]?.key ?? null,
+    terminalStepIndex: quiz.steps[stepIndex] ? stepIndex : null,
     terminalKind: kind,
     destination: kind === 'endpoint' ? destinationFor(node, values) : { kind: 'none' },
     submitsLead: kind === 'endpoint' || kind === 'out_of_steps',
   })
 
+  // A sequence with ids left over does not describe a path through this flow.
+  // Accepting it would let a caller "replay" an answer list that the quiz can
+  // no longer produce and get a confident answer back.
+  const done = (
+    kind: TerminalKind,
+    node: QuizNode | null,
+    stepIndex: number,
+    values: FlowValues,
+    tier: string | null,
+  ): ReplayResult => {
+    if (cursor < ids.length) {
+      return { ok: false, error: `${ids.length - cursor} answer id(s) left over at the end of the flow` }
+    }
+    return { ok: true, row: row(kind, node, stepIndex, values, tier) }
+  }
+
   for (let depth = 0; depth <= maxDepth; depth += 1) {
-    const step = quiz.steps[state.stepIndex]
     const signature = stateSignature(state)
-    if (seen.has(signature)) return { ok: true, row: row('cycle', null, step?.key ?? null, state.values, state.tier) }
+    if (seen.has(signature)) return done('cycle', null, state.stepIndex, state.values, state.tier)
     seen.add(signature)
 
     const situation = situationAt(quiz, state)
     if (situation.kind === 'missing') {
-      return { ok: true, row: row('missing_variant', null, step?.key ?? null, state.values, state.tier) }
+      return done('missing_variant', null, state.stepIndex, state.values, state.tier)
     }
 
     const node = situation.node
@@ -587,10 +623,10 @@ export const replayAnswerIds = (
     if (node.type === 'form') formNodeIds.push(node.id)
 
     if (situation.kind === 'terminal') {
-      return { ok: true, row: row('endpoint', node, step?.key ?? null, state.values, state.tier) }
+      return done('endpoint', node, state.stepIndex, state.values, state.tier)
     }
     if (situation.kind === 'dead_end') {
-      return { ok: true, row: row('dead_end', node, step?.key ?? null, state.values, state.tier) }
+      return done('dead_end', node, state.stepIndex, state.values, state.tier)
     }
 
     let answer: Answer
@@ -610,10 +646,7 @@ export const replayAnswerIds = (
     }
 
     const result = advanceFrom(quiz, state, node, answer)
-    if (result.kind === 'end') {
-      if (cursor < ids.length) return { ok: false, error: `${ids.length - cursor} answer ids left over at the end of the flow` }
-      return { ok: true, row: row('out_of_steps', node, step?.key ?? null, result.values, result.tier) }
-    }
+    if (result.kind === 'end') return done('out_of_steps', node, state.stepIndex, result.values, result.tier)
     state = result.state
   }
 

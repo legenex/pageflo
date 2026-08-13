@@ -40,7 +40,9 @@ import {
   summarize,
   type PreflightCheck,
   type PreflightResult,
+  type PreflightSeverity,
 } from '@/lib/publish-preflight'
+import { validateQuizFlow } from '@/lib/quiz-flow'
 import { canonicalTemplateId, resolveTemplate } from '@/lib/template-registry'
 import { asSlotted } from '@/lib/lp-templates'
 import { validateOverrides } from '@/lib/lp-slots/model'
@@ -100,63 +102,76 @@ const checkBrand = (site: Record<string, unknown> | null): PreflightCheck => {
 }
 
 /**
- * The graph must be able to finish.
+ * The graph must be able to finish, and the real validator decides that.
  *
- * A quiz whose first step resolves to nothing shows a visitor a blank card, and
- * one with no terminal collects answers and never delivers a lead. Both are
- * silent: the page renders, the visitor answers, and nothing arrives.
+ * `validateQuizFlow` walks the flow through `quiz-graph`'s own navigation
+ * primitives in `QuizRuntime.advance()`'s exact order, so a verdict here cannot
+ * disagree with what a visitor experiences. A shallower check written into this
+ * file would be a second opinion about routing, which is the class of bug the
+ * whole graph module exists to remove.
+ *
+ * Each of its ten checks becomes a named preflight line, so an operator sees
+ * WHICH property failed rather than "the flow is invalid". Warnings are carried
+ * through as warnings: a legitimate back-edge or a partial path table is worth
+ * seeing and is not a reason to refuse.
+ *
+ * `path_table` truncation is deliberately NOT a blocker here. It means the flow
+ * has more branches than the enumerator's safe limit, which is a fact about a
+ * large quiz rather than a defect in it, and blocking on it would make the
+ * biggest funnels the ones that cannot be published.
  */
+const NON_BLOCKING_FLOW_CHECKS = new Set(['path_table'])
+
 const checkQuizGraph = (quiz: Record<string, unknown> | null): PreflightCheck[] => {
   if (!quiz) return [fail('graph', 'Quiz flow is valid', 'the quiz could not be loaded')]
+
   const steps = arr(quiz.steps)
   const nodes = arr(quiz.nodes)
-  const out: PreflightCheck[] = []
-
-  out.push(
-    steps.length > 0 && nodes.length > 0
-      ? pass('graph-nonempty', 'Quiz has steps and nodes')
-      : fail('graph-nonempty', 'Quiz has steps and nodes', `${steps.length} steps, ${nodes.length} nodes`),
-  )
-
-  // Every route must name a step that exists. A dangling `nextStepKey` sends a
-  // visitor to the sequential next question instead of where the author sent
-  // them, which is a routing change nobody made and nobody can see.
-  const stepKeys = new Set(steps.map((s) => str((s as Record<string, unknown>).key)))
-  const dangling: string[] = []
-  for (const n of nodes as Array<Record<string, unknown>>) {
-    for (const a of arr(n.answers) as Array<Record<string, unknown>>) {
-      const k = str(a.nextStepKey)
-      if (k && !stepKeys.has(k)) dangling.push(`${str(n.id)} -> "${k}"`)
-    }
-    for (const c of arr(n.conditions) as Array<Record<string, unknown>>) {
-      const k = str(c.nextStepKey)
-      if (k && !stepKeys.has(k)) dangling.push(`${str(n.id)} -> "${k}"`)
-    }
-    const d = str(n.defaultNextStepKey)
-    if (d && !stepKeys.has(d)) dangling.push(`${str(n.id)} -> "${d}"`)
+  if (steps.length === 0 || nodes.length === 0) {
+    return [fail('graph-nonempty', 'Quiz has steps and nodes', `${steps.length} steps, ${nodes.length} nodes`)]
   }
-  out.push(
-    dangling.length === 0
-      ? pass('graph-references', 'Every route names a step that exists')
-      : fail('graph-references', 'Every route names a step that exists', dangling.slice(0, 5).join(', ')),
-  )
 
-  // A terminal is where the lead is delivered. Without one the runtime falls off
-  // the end of the step list, which does still submit, but nothing in the flow
-  // says so and no destination is chosen.
-  const hasTerminal = (nodes as Array<Record<string, unknown>>).some(
-    (n) => n.type === 'endpoint' || n.type === 'form',
-  )
-  out.push(
-    hasTerminal
-      ? pass('graph-terminal', 'The flow reaches a form or endpoint')
-      : fail('graph-terminal', 'The flow reaches a form or endpoint', 'no node in this quiz collects or delivers a lead'),
-  )
+  // The four graph columns are jsonb and nullable, so a row can reach here with
+  // `tiers: null`. Normalising is the resolver's job rather than the caller's:
+  // a preflight that throws on a real row is a preflight that gets bypassed.
+  const normalized = {
+    ...quiz,
+    tiers: arr(quiz.tiers),
+    steps,
+    nodes,
+    customFields: arr(quiz.custom_fields ?? quiz.customFields),
+  }
 
-  return out
+  let validation
+  try {
+    validation = validateQuizFlow(normalized as never)
+  } catch (err) {
+    // A validator that throws must not make a quiz unpublishable on the basis of
+    // its own bug, but it must not wave the quiz through either.
+    return [fail('graph', 'Quiz flow is valid', `the flow validator could not run: ${err instanceof Error ? err.message : 'unknown'}`)]
+  }
+
+  return validation.checks.map((c) => {
+    const severity: PreflightSeverity = NON_BLOCKING_FLOW_CHECKS.has(c.id) ? 'warn' : 'block'
+    if (c.ok) return pass(`flow-${c.id}`, c.label, severity)
+    return fail(
+      `flow-${c.id}`,
+      c.label,
+      c.errors.slice(0, 4).map((e) => e.message).join('; ') || 'failed',
+      severity,
+    )
+  })
 }
 
-/** Consent has to be reachable, or the lead cannot lawfully be contacted. */
+/**
+ * Consent has to be reachable, or the lead cannot lawfully be contacted.
+ *
+ * The flow validator's own `reachable_consent` check is the authority and is
+ * already included above. This adds the cheaper text-level question it cannot
+ * answer — is there any consent language in this quiz AT ALL — because a flow
+ * whose every path reaches a form still says nothing to the visitor if nobody
+ * wrote the line.
+ */
 const checkConsent = (quiz: Record<string, unknown> | null): PreflightCheck => {
   const nodes = arr(quiz?.nodes) as Array<Record<string, unknown>>
   const hasConsent = nodes.some((n) => {

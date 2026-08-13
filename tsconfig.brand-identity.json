@@ -1,5 +1,0 @@
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": { "incremental": false },
-  "include": ["src/lib/brand-identity/**/*.ts", "scripts/test-brand-identity.mts"]
-}

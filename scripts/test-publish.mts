@@ -215,14 +215,25 @@ t(!decideTransition('live', 'live', okPre).ok, 'a no-op transition is refused ra
 /* --------------------------------------------------------------- preflight */
 
 const SITE = { id: 1, name: 'Acme', brand_display_name: 'Acme Claims', default_phone: '(800) 000-0000', legal_default_disclaimer: 'Not a law firm.' }
+/**
+ * A small but REALISTIC flow: question -> form -> endpoint.
+ *
+ * The first version had the form as the last node with no answers, which the
+ * flow validator correctly refused: a form the visitor reaches with nothing to
+ * answer and no route out is where the funnel stops without ending. The seed
+ * quiz models it the same way this does — the form routes on to a terminal.
+ */
 const GOOD_QUIZ = {
   id: 10,
+  tiers: [],
+  custom_fields: [],
   is_published: true,
   is_archived: false,
-  steps: [{ key: 'a', label: 'A' }, { key: 'b', label: 'B' }],
+  steps: [{ key: 'a', label: 'A' }, { key: 'b', label: 'B' }, { key: 'c', label: 'C' }],
   nodes: [
-    { id: 'n1', stepKey: 'a', type: 'question', answers: [{ id: 'x', label: 'Yes', nextStepKey: 'b' }] },
-    { id: 'n2', stepKey: 'b', type: 'form', tcpaText: 'By clicking you consent to be contacted.', answers: [] },
+    { id: 'n1', stepKey: 'a', type: 'question', tiers: [], answers: [{ id: 'x', label: 'Yes', nextStepKey: 'b' }] },
+    { id: 'n2', stepKey: 'b', type: 'form', tiers: [], tcpaText: 'By clicking you consent to be contacted.', answers: [{ id: 'y', label: 'Submit', nextStepKey: 'c' }] },
+    { id: 'n3', stepKey: 'c', type: 'endpoint', tiers: [], answers: [] },
   ],
 }
 const GOOD_DEP = { id: 20, site: 1, quiz: 10, domain: null, path: '/c/pain', status: 'draft', template_id: 'sq_quiz_first', utm: {}, pixels: {} }
@@ -236,6 +247,9 @@ const CTX = (rows: Record<string, Array<Record<string, unknown>>> = {}) => ({ pa
   t(r.checks.some((c) => c.id === 'authz'), 'authorization is a named check')
   t(r.checks.some((c) => c.id === 'path'), 'the path is a named check')
   t(r.checks.some((c) => c.id === 'consent'), 'consent is a named check')
+  // The real flow validator, not a second opinion written into the preflight.
+  t(r.checks.some((c) => c.id === 'flow-valid_entry'), 'the flow validator supplies its own named checks')
+  t(r.checks.filter((c) => c.id.startsWith('flow-')).length === 10, 'all ten of them')
 }
 
 // Each failure mode, one at a time, so a fix to one cannot mask another.
@@ -256,8 +270,11 @@ await quizCase('a template that names nothing blocks publication', { deployment:
 await quizCase('a brand with no disclaimer blocks publication', { site: { legal_default_disclaimer: '' } }, 'brand')
 await quizCase('a brand with no phone blocks publication', { site: { default_phone: '' } }, 'brand')
 await quizCase('an empty graph blocks publication', { quiz: { steps: [], nodes: [] } }, 'graph-nonempty')
-await quizCase('a dangling route blocks publication', { quiz: { nodes: [{ id: 'n1', stepKey: 'a', type: 'question', answers: [{ id: 'x', nextStepKey: 'nowhere' }] }, { id: 'n2', stepKey: 'b', type: 'form', tcpaText: 'consent' }] } }, 'graph-references')
-await quizCase('a flow with no terminal blocks publication', { quiz: { nodes: [{ id: 'n1', stepKey: 'a', type: 'question', tcpaText: 'consent', answers: [] }] } }, 'graph-terminal')
+// The check ids are the flow validator's own, prefixed. Naming them here rather
+// than asserting "something failed" is what stops a preflight regression looking
+// like a passing test with a different reason.
+await quizCase('a dangling route blocks publication', { quiz: { nodes: [{ id: 'n1', stepKey: 'a', type: 'question', answers: [{ id: 'x', nextStepKey: 'nowhere' }] }, { id: 'n2', stepKey: 'b', type: 'form', tcpaText: 'consent' }] } }, 'flow-valid_references')
+await quizCase('a flow with no terminal blocks publication', { quiz: { steps: [{ key: 'a', label: 'A' }], nodes: [{ id: 'n1', stepKey: 'a', type: 'question', tiers: [], tcpaText: 'consent', answers: [] }] } }, 'flow-valid_terminals')
 await quizCase('a flow with no consent language blocks publication', { quiz: { nodes: [{ id: 'n1', stepKey: 'a', type: 'question', answers: [] }, { id: 'n2', stepKey: 'b', type: 'form', answers: [] }] } }, 'consent')
 await quizCase('the root path blocks publication', { deployment: { path: '/' } }, 'path')
 await quizCase('malformed pixels block publication', { deployment: { pixels: 'not an object' } }, 'pixels')
@@ -360,7 +377,7 @@ const GOOD_LP_DEP = { id: 40, site: 1, landing_page: 30, domain: null, path: '/c
   })
   t(r.ok, `embedding this brand's own quiz deployment passes${r.ok ? '' : ' — ' + r.blocking.map((c) => c.id).join(',')}`)
   t(r.checks.some((c) => c.id === 'embedded-quiz-template'), "and the embedded quiz's own visual template is checked")
-  t(r.checks.some((c) => c.id === 'graph-terminal'), "and the embedded quiz's graph is checked, not just its existence")
+  t(r.checks.some((c) => c.id === 'flow-valid_terminals'), "and the embedded quiz's graph is checked, not just its existence")
 }
 {
   const own = { id: 77, site: 1, quiz: 10, template_id: 'sq_ghost', path: '/x', status: 'live' }
