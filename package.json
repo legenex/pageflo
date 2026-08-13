@@ -17,6 +17,7 @@
     "test:registry": "tsx scripts/test-template-registry.mts",
     "test:records": "tsx scripts/test-template-records.mts",
     "test:identity": "tsx scripts/test-renderer-identity.mts",
+    "test:ui": "tsx scripts/test-admin-ui.mts",
     "test:slots": "tsx scripts/test-lp-slots.mts",
     "test:dom": "tsx scripts/test-render-dom.mts",
     "test:publish": "tsx scripts/test-publish.mts",

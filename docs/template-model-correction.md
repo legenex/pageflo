@@ -247,9 +247,54 @@ right side of that trade.
 
 ---
 
+## The architecture review broke this design twice before it was built
+
+An adversarial reviewer was given the design above and the acceptance criteria,
+told to refute them, and given no description of the implementation. Eight
+claims went in. Two came back broken in ways that would have taken every live
+funnel landing page to a 404, and five more needed changing. All are fixed; the
+design text above has been corrected in place, and what it got wrong is here.
+
+| # | Claim | Verdict | What changed |
+|---|---|---|---|
+| 1 | Reusing `funnel-landing-pages` is safe | **broken** | `deleteLP` cascade-deleted every referencing deployment. Survivable when a row was one brand's page; a template is shared by every brand and the collection is `isAuthenticated` with no Site on it, so one operator tidying the library could take down another tenant's live pages. `deleteLP` and `cloneLP` are deleted, not wrapped. |
+| 2 | The sample repoint is identity-preserving | **broken** | `lp-deployment.ts:172` refused any landing page whose row had no `sections`. The twelve ported templates have none by construction. Repointing `/c/pain` onto a stock row would have 404d it. The gate is now asked of the renderer that reads sections. Metadata was a second, quieter half: `lpDeploymentMeta` read the hero section, so every stock-template page would have got a canned description — it reads slots now. |
+| 3 | Disabling leaves live pages rendering | **broken, and self-contradictory** | The design's own "fail visibly" section had the render path consult `is_enabled`, which is exactly the thing the `is_enabled` section forbade. The render path consults existence only. `is_enabled` is enforced at publish and nowhere else. |
+| 4 | Template-level slot overrides are safe | survives on XSS and byte-parity, **broken on preflight** | `composeTemplate` escapes every override identically whatever its origin, so a merged map is just more overrides. But the preflight validated only the deployment's half, so a template-level override naming a dead slot passed and landed silently in `unknownOverrides` at render. It validates the merge now. |
+| 5 | A clone can share a `renderer_key` | **broken** | Six places treated a stored quiz `template_id` as one of the twenty code ids, so a clone could not be saved or published by any door. Validators check SHAPE; existence is checked where a database read is safe. The reviewer's argument against an async validator is recorded in `src/lib/template-records/id.ts` and was decisive: it runs inside the write transaction, and on a database where the migration has not run it would throw — turning a skipped migration into a total write outage, while the resolvers deliberately degrade to a 404. |
+| 6 | Refusing to render is safe | **survives** | Verified: a clean 404 on the same tenant, no crash, no cross-tenant fall-through, and `generateMetadata` agrees. |
+| 7 | Chrome falls back to the brand | **broken claim** | It fell back to *nothing*. There was no brand-chrome branch anywhere, so dropping the deployment reads would have removed the entire header and footer — including `brand.legal.copyright`, which on an attorney-advertising page is a compliance-visible regression rather than a cosmetic one. Brand Identity gained real `defaultHeader` / `defaultFooter` before the deployment reads were removed. |
+| 8 | — | — | Also raised: one row is now what every tenant renders from on an `isAuthenticated` collection. Bounded by refusing to delete a referenced template and archiving stock rows rather than dropping them. Not fully closed — see "Not done". |
+
+## What the tests found that review did not
+
+The identity suite runs against a real database, and three of its findings were
+invisible to every pure test and to the review:
+
+* **The sample retirement never ran.** `isUnmodifiedSampleSections` compared
+  `JSON.stringify` output, and Postgres normalises `jsonb` without preserving
+  key insertion order. All three samples read as "edited by an operator" and
+  were kept. Keys are sorted before comparison now; array order stays
+  significant, because a reordered list of settlement figures IS an edit.
+* **`FunnelQuizDeployments` still validated against the code registry**, so a
+  cloned template could not be attached to a quiz deployment. Only the
+  landing-page half of finding 5 had been repaired.
+* **`progress_form` was read by `QuizRuntime` and never set** on the resolved
+  deployment, so the override an operator could edit reached the public page as
+  `undefined` on every request since it shipped.
+
 ## Log
 
 **2026-08-13** — Reconnaissance. Three read-only passes mapped the template
 systems, the funnel data model and both builder UIs. Environment brought up
 locally: Postgres 16, 26 migrations applied, types generated, `pnpm typecheck`
 exit 0, `pnpm test` green at baseline, `next dev` serving.
+
+**2026-08-13** — Architecture review, then the data model. Eight design claims
+attacked, two broken. Migration `20260813_210000_template_records`, the
+`funnel-quiz-templates` collection, `src/lib/template-records/`, strict
+resolution and the two live 404s.
+
+**2026-08-13** — Renderer identity proven against a database: 25 assertions
+covering A-renders-A, B-renders-B, repointing, clones, and refusal on an id that
+names nothing. Publish gates made record-aware: 136 assertions.
