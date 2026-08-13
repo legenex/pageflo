@@ -124,7 +124,7 @@ const LPDeploymentListView = ({ deployments, templates, brands, quizzes, domains
         const primary = brand?.colors?.primary
         const background = brand?.colors?.background
         return (
-          <div key={dep.id} style={{ padding: 14, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div key={dep.id} data-lp-deployment={dep.id} style={{ padding: 14, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 42, height: 42, borderRadius: 9, background: primary ? `linear-gradient(135deg, ${primary}, ${background || primary})` : T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12, flexShrink: 0, overflow: 'hidden' }}>
               {brand?.faviconUrl ? <img loading="lazy" decoding="async" src={brand.faviconUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : brand ? brandShortName(brand) : <Rocket size={18} />}
             </div>
@@ -476,7 +476,18 @@ export const LandingPageBuilder = ({ template, brands, onBrandSaved, quizzes, on
 
   const previewBrand = brands.find((b) => b.id === previewBrandId) || PREVIEW_BRAND_DEFAULT
   const previewQuiz = quizzes.find((q) => q.id === previewQuizId) || null
+  /*
+   * A row whose design does not resolve is drawn as NOTHING, deliberately.
+   *
+   * `templateFor` falls back to the first template so a render path always has
+   * something, which is right for a visitor and wrong here: previewing template
+   * zero under this row's name is precisely the "looks correct, is not" failure
+   * the record's `rendererError` exists to make visible. So the fallback is used
+   * only where a design is known to resolve.
+   */
+  const broken = Boolean(template.rendererError)
   const renderer = templateFor(template.templateId)
+  const rendererName = broken ? (template.templateId || 'none') : renderer.name
 
   const slotGroups = useMemo(() => slotGroupsFor(template.templateId), [template.templateId])
   const usesSlots = Boolean(slotGroups)
@@ -568,7 +579,7 @@ export const LandingPageBuilder = ({ template, brands, onBrandSaved, quizzes, on
         actions={
           <>
             <Pill color={template.isEnabled ? T.success : T.textLow}>{template.isEnabled ? 'ENABLED' : 'DISABLED'}</Pill>
-            <Btn variant="ghost" size="sm" icon={Palette} onClick={() => setRendererOpen(true)}>Design: {renderer.name}</Btn>
+            <Btn variant="ghost" size="sm" icon={Palette} onClick={() => setRendererOpen(true)}>Design: {rendererName}</Btn>
             <Btn variant="secondary" size="sm" icon={template.isEnabled ? PowerOff : Power} onClick={() => onToggleEnabled(template)}>
               {template.isEnabled ? 'Disable' : 'Enable'}
             </Btn>
@@ -595,7 +606,7 @@ export const LandingPageBuilder = ({ template, brands, onBrandSaved, quizzes, on
             <div>
               <Label>Design</Label>
               <Btn variant="secondary" size="sm" icon={Palette} onClick={() => setRendererOpen(true)} style={{ width: '100%', justifyContent: 'space-between' }}>
-                {renderer.name}
+                {rendererName}
                 <ChevronRight size={12} />
               </Btn>
               {template.rendererError ? (
@@ -633,7 +644,11 @@ export const LandingPageBuilder = ({ template, brands, onBrandSaved, quizzes, on
             )}
           </div>
 
-          {usesSlots ? (
+          {broken ? (
+            <div style={{ fontSize: 11.5, color: T.textMute, lineHeight: 1.55 }}>
+              There is no structure to show until this template names a design that exists.
+            </div>
+          ) : usesSlots ? (
             <SlotSectionNav groups={slotGroups} selectedSection={activeSection} onSelect={setSlotSection} overrides={overrides} />
           ) : (
             <NodeTree
@@ -655,6 +670,18 @@ export const LandingPageBuilder = ({ template, brands, onBrandSaved, quizzes, on
         {/* -------------------------------------------------------- centre */}
         <div style={{ overflowY: 'auto', backgroundColor: '#0c1118', padding: 24 }} onClick={() => setSelectedId(null)}>
           <div style={{ maxWidth: 1180, margin: '0 auto' }} onClick={(e) => e.stopPropagation()}>
+            {broken ? (
+              <div style={{ padding: 40, backgroundColor: T.bg, border: `1px solid ${T.danger}`, borderRadius: 10, textAlign: 'center' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>Nothing is drawn for this template</div>
+                <div style={{ fontSize: 12.5, color: T.danger, marginTop: 8, lineHeight: 1.6 }}>{template.rendererError}</div>
+                <div style={{ fontSize: 12, color: T.textMute, marginTop: 8, lineHeight: 1.6, maxWidth: 460, margin: '8px auto 0' }}>
+                  Another design is not shown in its place: that would look like a working template and deploy like one.
+                </div>
+                <div style={{ marginTop: 16 }}>
+                  <Btn variant="primary" size="md" icon={Palette} onClick={() => setRendererOpen(true)}>Pick a design</Btn>
+                </div>
+              </div>
+            ) : (
             <LivePreview
               landingPage={{ ...template, sections }}
               brand={previewBrand}
@@ -665,6 +692,7 @@ export const LandingPageBuilder = ({ template, brands, onBrandSaved, quizzes, on
               slotOverrides={usesSlots ? overrides : null}
               onSlotDiagnostics={usesSlots ? onSlotDiagnostics : null}
             />
+            )}
           </div>
         </div>
 
@@ -677,7 +705,12 @@ export const LandingPageBuilder = ({ template, brands, onBrandSaved, quizzes, on
             </div>
           )}
 
-          {usesSlots ? (
+          {broken ? (
+            <>
+              <SectionHeading eyebrow="Inspector" title="Fix the design first" hint="A template that names no design has no copy to edit: which fields exist depends on which design draws it." />
+              <Btn variant="primary" size="sm" icon={Palette} onClick={() => setRendererOpen(true)}>Pick a design</Btn>
+            </>
+          ) : usesSlots ? (
             activeGroup ? (
               <>
                 <SectionHeading
@@ -757,7 +790,16 @@ const LPPreviewModal = ({ previewState, templates, brands, deployments, quizzes,
     : `https://preview.legenex.com/lp/${template.slug}`
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 150, backgroundColor: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column' }}>
+    // Announced as a dialog, and addressable by the template it is showing. It
+    // is a full-viewport overlay, so it is the element most in need of being
+    // reachable by what it is.
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Preview: ${template.name}`}
+      data-preview-modal={template.id}
+      style={{ position: 'fixed', inset: 0, zIndex: 150, backgroundColor: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column' }}
+    >
       <div style={{ height: 56, flexShrink: 0, padding: '0 20px', backgroundColor: T.bg, borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Eye size={15} color={T.primary} />
@@ -784,14 +826,26 @@ const LPPreviewModal = ({ previewState, templates, brands, deployments, quizzes,
       </div>
       <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#0c1118', padding: 24 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-          <LivePreview
-            landingPage={template}
-            brand={brand}
-            quiz={quiz}
-            quizDepLabel={quiz?.name}
-            editable={false}
-            slotOverrides={slotOverrides}
-          />
+          {/* One guard for every way into this modal. A broken row must not be
+              previewed as some other design: the public resolver refuses to
+              serve it, so a preview that draws something is a lie about what a
+              visitor would get. */}
+          {template.rendererError ? (
+            <div style={{ padding: 40, backgroundColor: T.bg, border: `1px solid ${T.danger}`, borderRadius: 10, textAlign: 'center' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>There is nothing to preview</div>
+              <div style={{ fontSize: 12.5, color: T.danger, marginTop: 8, lineHeight: 1.6 }}>{template.rendererError}</div>
+              <div style={{ fontSize: 12, color: T.textMute, marginTop: 8 }}>This template does not serve either. Open it and pick a design.</div>
+            </div>
+          ) : (
+            <LivePreview
+              landingPage={template}
+              brand={brand}
+              quiz={quiz}
+              quizDepLabel={quiz?.name}
+              editable={false}
+              slotOverrides={slotOverrides}
+            />
+          )}
         </div>
       </div>
     </div>

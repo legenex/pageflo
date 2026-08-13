@@ -19,9 +19,26 @@
 
 import { T } from '../ui'
 
+/**
+ * A slug for the heading, derived when the caller does not supply one.
+ *
+ * `data-section-heading={id}` with no `id` renders NO ATTRIBUTE at all, so a
+ * heading that looked correct on screen was invisible to anything selecting on
+ * it — which is how two whole tabs reported having no structure while plainly
+ * showing it. Deriving from the title means the marker exists for every
+ * heading rather than only the ones somebody remembered to name.
+ */
+const headingSlug = (id, title) =>
+  id ||
+  String(title ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') ||
+  'section'
+
 export const Section = ({ title, hint, right, divider = true, id, children }) => (
   <section
-    data-quiz-section={id}
+    data-quiz-section={headingSlug(id, title)}
     style={{
       // The first section of a tab sits under the tab rule already; a second
       // line 20px below it reads as a mistake rather than as structure.
@@ -36,7 +53,7 @@ export const Section = ({ title, hint, right, divider = true, id, children }) =>
         style={{ width: 3, height: 18, borderRadius: 2, backgroundColor: T.primary, flexShrink: 0, marginTop: 2 }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <h3 data-section-heading={id} style={{ margin: 0, fontSize: 16, fontWeight: 700, color: T.text, letterSpacing: '-0.015em' }}>{title}</h3>
+        <h3 data-section-heading={headingSlug(id, title)} style={{ margin: 0, fontSize: 16, fontWeight: 700, color: T.text, letterSpacing: '-0.015em' }}>{title}</h3>
         {hint ? (
           <div style={{ fontSize: 12, color: T.textMute, marginTop: 4, lineHeight: 1.55, maxWidth: 720 }}>{hint}</div>
         ) : null}

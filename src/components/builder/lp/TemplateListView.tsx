@@ -83,6 +83,8 @@ export const TemplateListView = ({
           <div
             key={t.id}
             data-lp-template={t.id}
+            data-lp-template-name={t.name}
+            data-lp-template-origin={t.origin}
             data-enabled={t.isEnabled ? 'true' : 'false'}
             style={{
               padding: 14,

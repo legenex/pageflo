@@ -237,7 +237,15 @@ export const IconBtn = ({ icon: Icon, style, ...props }) => (
 export const ConfirmDialog = ({ open, title, message, confirmText = 'Confirm', cancelText = 'Cancel', tertiaryText, onConfirm, onCancel, onTertiary }) => {
   if (!open) return null
   return (
+    // `role`/`aria-modal`/`aria-label` so the dialog announces itself as one
+    // rather than as an anonymous div — and so a keyboard or a test can find it
+    // by what it IS. It covers the whole viewport and swallows clicks, which is
+    // exactly the thing that most needs to be reachable by name.
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={title}
+      data-confirm-dialog=""
       onClick={onCancel}
       style={{
         position: 'fixed',
@@ -288,7 +296,14 @@ export const ConfirmDialog = ({ open, title, message, confirmText = 'Confirm', c
 export const Modal = ({ open, onClose, title, maxWidth = 720, footer, children }) => {
   if (!open) return null
   return (
+    // Announced as a dialog for the same reason ConfirmDialog is: it covers the
+    // viewport and swallows clicks, so it is the element that most needs to be
+    // reachable by what it is rather than by where it sits.
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={typeof title === 'string' ? title : undefined}
+      data-modal=""
       onClick={onClose}
       style={{ position: 'fixed', inset: 0, zIndex: 150, backgroundColor: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '60px 20px 20px', overflowY: 'auto' }}
     >
