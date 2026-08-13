@@ -168,3 +168,176 @@ visibly broken, so the instrument has to match the claim.
 3. Is the `don-t-settle.preview -> getwhatyoureowed.co` 307 intended? A preview
    domain that redirects to production cannot preview anything.
 4. P1.2: make ported templates editable, or accept colour-only reskin for now?
+
+---
+
+# 2026-08-13: verification pass against the real server
+
+SSH access was restored, so everything below was measured on production rather
+than reasoned about. Where a claim could not be verified, it says so.
+
+## The 2026-08-11 blocking finding is CONFIRMED and still open
+
+Re-measured from an external vantage, with certificate verification ON:
+
+    host                                       DNS              cert CN         curl
+    auto-claim-eval.preview.legenex.com        51.81.202.161    crashclaim.co   000 (cert rejected)
+    don-t-settle.preview.legenex.com           51.81.202.161    crashclaim.co   000 (cert rejected)
+    settlementassist-co.preview.legenex.com    51.81.202.161    crashclaim.co   000 (cert rejected)
+    getwhatyoureowed.co        162.255.119.42 + 51.81.202.161   crashclaim.co   000 (cert rejected)
+    os.legenex.com                             51.81.202.161    os.legenex.com  200 (valid)
+
+`plesk bin domain --list` contains none of the four tenant hosts. **No tenant
+domain can serve valid HTTPS.** The app layer is not the problem: forced to our
+IP with `--resolve`, every host returns the correct `site_id` from
+`/api/legalos/self-check`.
+
+Two additional facts the earlier pass did not have:
+
+- `getwhatyoureowed.co` resolves to **two** A records, and `162.255.119.42` is
+  not this server. Roughly half of real traffic never reaches us, and ACME
+  HTTP-01 validation would fail intermittently for the same reason.
+- `*.preview.legenex.com` wildcard DNS is correct and points only here (a random
+  nonexistent subdomain resolves to 51.81.202.161), but the `legenex.com` zone
+  is **not** authoritative in Plesk, so a wildcard certificate needs DNS-01 at
+  whoever holds the zone.
+
+### What it takes to clear it
+
+1. **Previews**: a wildcard certificate for `*.preview.legenex.com`, issued via
+   DNS-01 at the external DNS provider. Per-host Plesk vhosts would also work
+   but create one Plesk domain per tenant preview, which is a product decision
+   rather than a fix.
+2. **getwhatyoureowed.co**: point the registrar A record at 51.81.202.161 only,
+   then re-run domain verification so the vhost and certificate are actually
+   provisioned.
+
+Both need access this session does not have. Neither was attempted, because a
+failed ACME order burns a Let's Encrypt rate limit that locks out retries.
+
+## Database rows now tell the truth
+
+`domains.ssl_status` was `active` for `getwhatyoureowed.co` — a value the SSL
+poller is only supposed to write after a real HTTPS handshake, which cannot have
+happened. Its `plesk_domain_id` held the hostname rather than a Plesk id, so
+nothing was ever provisioned. Corrected against the measurements above:
+
+    64/65/69  preview  status active  ssl_status unknown -> pending  (never issued)
+    67        custom   status active  ssl_status active  -> error/error
+
+Taken with a verified `pg_dump` backup first (1.1 MB, 86 tables, restored row
+counts checked): `/root/legalos-backups/legalos-20260813T121137Z.sql.gz`. The
+system `pg_dump` is version 15 against a 16.13 server and produces a **20-byte
+empty file with a zero exit status** — use the container's binary:
+`docker exec molegenexcom-postgres-1 pg_dump`.
+
+## Two controls existed, were tested, and were never on the code path
+
+This turned out to be the theme of the day, and it is worth naming as a pattern
+rather than as two bugs.
+
+1. **SSRF admission.** `lib/brand-identity/ssrf.ts` was complete and had a
+   52-case blocked-range matrix passing against it. Nothing called it. The brand
+   extractor, the AI page clone, the Playwright render, the outbound webhooks
+   and the SSL probe all used bare `fetch()`. Now wired into every one, and the
+   matrix is re-run **through** `fetchTextSafe`, `headOk`, `fetchUrlBundle` and
+   `safePost`, so a future bare `fetch` fails the suite.
+
+2. **Domain eligibility.** `site-resolver.ts` imported `domainEligibility`,
+   declared `ENFORCE_DOMAIN_ELIGIBILITY`, named a log prefix and described
+   enforcement in its header. `resolveSiteByHost` called none of it. Verified
+   live: with the switch on and a domain corrected to `status=error`, the host
+   still answered 200 and nothing was logged.
+
+A control that is present, imported, documented and untested *at its call site*
+is indistinguishable from no control. Both now have tests that read the calling
+module and fail when the gate leaves the path.
+
+### A third, found only by driving a browser
+
+Gating the resolved host was not enough. Site 13's preview host was eligible;
+its primary (`getwhatyoureowed.co`) was not; the resolver kept 307-ing every
+visitor onto the refused domain, which then fell through to the LegalOS
+marketing page. **The brand was reachable on neither of its hosts**, off two
+rows each handled correctly on its own. `curl` of the preview host showed 307
+and looked fine; a real browser failed with `ERR_CERT_COMMON_NAME_INVALID`.
+
+## The shipped MVA quiz never ran its own tier lookup
+
+`webhook` and `verification` nodes were listed as invisible and advanced past
+without any HTTP call, so `responseMappings` never wrote anything.
+
+In the live MVA Tiered Quiz — deployed to all three sites — exactly one answer
+sets a tier by hand (`t3`). Tiers 1, 2 and 4 are assigned **only** by the tier
+lookup's response mapping. Every visitor therefore walked the entire quiz
+untiered and every tier-scoped question variant was dead. The flow validator was
+already reporting this as `route_depends_on_unapplied_response`.
+
+Both node types now execute server-side via `/api/legalos/quiz-webhook`, which
+reads the URL, headers and payload from the stored node and never from the
+client. Verified live in a real browser: **2 webhook executions** on one run.
+
+**Still open, and not a code problem:** the configured endpoint
+`https://api.legenex.com/mva-tier-lookup` is a Base44 web app, not an API. GET
+returns an HTML shell; POST, PUT and OPTIONS all return 405. Production logs the
+real answer:
+
+    [legalos] quiz-webhook n_tier_lookup answered 405
+    [legalos] quiz-webhook n_hlr_lookup  answered 400
+
+So the mechanism works and fails safe, but tiers 1, 2 and 4 cannot become active
+until that URL points at a service that returns `{"tier": "t1"|"t2"|"t3"|"t4"}`.
+A returned tier that is not a declared tier id is kept as a value and logged,
+never used for routing.
+
+## Live results
+
+Driven against production, TLS bypassed at the app port so the certificate
+blocker does not mask application behaviour.
+
+| Test | Result |
+|---|---|
+| Publish / unpublish / republish — Page | 200 (marker present) -> 404 (marker gone) -> 200. Control: unknown slug 404s |
+| Publish / unpublish / republish — LP deployment | 200 -> 404 -> 200 |
+| Publish / unpublish / republish — quiz deployment | 200 -> 404 -> 200 |
+| Exactly one lead, standalone quiz | **1** lead POST, **1** row, from a full 10-step browser run |
+| Exactly one lead, LP flow | **Not provable — the LP-embedded quiz is inert.** See below |
+| Eligibility enforcement | previews serve; `getwhatyoureowed.co` refused with a logged reason |
+| Migrations | 3 pending applied; all F001 columns and `funnel_*` tables present |
+| Local suite | 1,625 assertions, 8 suites, 0 failures |
+
+`/partners` and `/privacy-policy` stay 200 while their Page is draft. That is the
+`SharedLegalTemplate` fallback working as designed, not a publish bug — proven
+by a purpose-made page on a slug with no fallback, which 404s correctly.
+
+## New blocker: the landing-page funnel cannot capture a lead
+
+The quiz card on a landing page is **static markup from the LP template HTML
+string, not the real runtime**. Measured in-browser on `/c/don-t-settle`:
+
+    standalone /s/don-t-settle   button type=button  React props: YES  [LOGO SLOT]: no
+    LP-embedded /c/don-t-settle  button type=submit  React props: NO   [LOGO SLOT]: YES
+
+Clicking an answer changes nothing in the DOM. Seven clicks produced zero lead
+POSTs. React hydrates the page; it does not own that button. A visible
+`[LOGO SLOT]` placeholder is rendering on a live public landing page.
+
+Separately, cross-references are stored as text ids with no foreign key, and
+**3 of 4 live LP deployments point at quiz deployments that no longer exist**
+(11 and 16 are absent; only 14 resolves). That is not the cause of the inert
+quiz — deployment 13 has a valid target and is equally inert — but it is a
+second defect on the same path.
+
+## Corrected exit-criteria status
+
+| # | Criterion | Status |
+|---|---|---|
+| 1 | HTTPS with no browser warning | **FAIL** — no tenant certificate exists |
+| 2 | Fresh deploy against an empty DB | **FAIL** — F001: production columns exist only via dev push |
+| 3 | Lead persisted and delivered | **PARTIAL** — quiz flow proven end to end; LP flow cannot capture |
+| 4 | Every Site renders as its own brand | PASS at the app layer; every host returned the right `site_id` |
+| 5 | Changed without an undocumented step | **PARTIAL** — Plesk's GitHub deploy key is revoked; `--fetch` fails |
+| 6 | A way to find out at 3am | **FAIL** — still no error tracking |
+
+**Gate 14 / production release: NOT PASS.** Criterion 1 alone is disqualifying,
+and it needs DNS and certificate access this session did not have.
