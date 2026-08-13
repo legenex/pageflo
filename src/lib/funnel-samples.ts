@@ -21,6 +21,7 @@ import {
 } from '@/components/builder/lp/section-copy'
 import { buildSeedQuiz } from '@/components/builder/quiz/seed-data'
 import { advBuildSeedAdvertorials } from '@/components/builder/advertorial/seed-data'
+import { reportError } from '@/lib/observability/report'
 
 const primaryDomainId = async (payload: Payload, siteId: number): Promise<number | null> => {
   const dom = await payload.find({
@@ -307,7 +308,7 @@ export type StarterFunnelsResult = {
 const logStep = (siteId: number, step: string, err: unknown): string => {
   const msg = err instanceof Error ? `${err.name}: ${err.message}` : String(err)
   // eslint-disable-next-line no-console
-  console.error(`[funnel-samples] site=${siteId} step=${step} failed:`, msg)
+  reportError('job', msg, { siteId, operation: `funnel-samples:${step}` })
   return `${step}: ${msg}`
 }
 
@@ -475,7 +476,7 @@ export const ensureStarterFunnelsForAllBrands = async (payload: Payload): Promis
     }
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error('[funnel-samples] backfill failed:', err)
+    reportError('job', err, { operation: 'funnel-samples:backfill' })
   }
 }
 
@@ -492,7 +493,7 @@ export const ensureFunnelSamples = async (payload: Payload): Promise<void> => {
       await seedOnce(payload)
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error('[funnel-samples] auto-seed failed (page still renders):', err)
+      reportError('job', err, { operation: 'funnel-samples:auto-seed' })
     } finally {
       inFlight = null
     }

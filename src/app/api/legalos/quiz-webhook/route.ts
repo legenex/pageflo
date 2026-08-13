@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { executeWebhookNode, EXECUTABLE_NODE_TYPES, type WebhookNode } from '@/lib/quiz-webhook/execute'
 import { resolveSiteByHost } from '@/lib/site-resolver'
+import { reportError } from '@/lib/observability/report'
 
 export const dynamic = 'force-dynamic'
 
@@ -158,8 +159,15 @@ export async function POST(req: NextRequest) {
     if (outcome.code === 'not_executable') {
       return NextResponse.json({ ok: false, error: 'node is not a webhook or verification node' }, { status: 400 })
     }
-    // eslint-disable-next-line no-console
-    console.error(`[legalos] quiz-webhook ${node_id} ${outcome.code}: ${outcome.reason}`)
+    // Through the one reporter, so this is greppable, groupable and - once a
+    // destination is chosen - forwarded, rather than being a line in a log
+    // whose wording is unique to this file.
+    reportError('integration', `quiz-webhook ${outcome.code}: ${outcome.reason}`, {
+      siteId: site.siteId,
+      route: 'POST /api/legalos/quiz-webhook',
+      operation: `quiz-webhook:${node_id}`,
+      extra: { status: outcome.status ?? null, deployment: deployment_id },
+    })
     return NextResponse.json({ ok: false, error: 'webhook unavailable' }, { status: 502 })
   }
 

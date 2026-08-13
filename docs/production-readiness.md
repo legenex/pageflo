@@ -396,3 +396,31 @@ sibling fields in what the buyer received.
 - **`brand-map.ts` link emission is still unfiltered** — it picks the primary
   host with no eligibility test, so funnel-rendered links can point at a host
   the resolver refuses.
+
+
+---
+
+# 2026-08-13, later: the repository-side gates
+
+Written after the cloud pass recorded in
+`docs/template-system-implementation-state.md`. Only the criteria whose STATUS
+changed are restated; everything else stands as measured above.
+
+| # | Criterion | Was | Now |
+|---|---|---|---|
+| 2 | Fresh deploy against an empty DB | **FAIL** | **PASS** — `pnpm test:bootstrap`, 54 assertions, 24 collections read against a migration-only schema. Two more drifts were found and fixed doing it (`20260813_210000`, `20260813_213000`); neither was in F001's list. |
+| 3 | Lead persisted and delivered | **PARTIAL** — LP flow could not capture | **PASS at the app layer** — the LP quiz card is the real runtime; one lead from the standalone path and one from the LP path, in a browser, against a local database. Not a production measurement. |
+| 5 | Changed without an undocumented step | **PARTIAL** | **PASS** — `scripts/release.sh` migrates while the service is down and verifies before starting. `pnpm test:release`, 26 assertions against a scratch database at the previous release's schema. |
+| 6 | A way to find out at 3am | **FAIL** | **PARTIAL** — one reporter, one stable event shape, redaction proven, error boundaries added. The destination is an external decision: EB-3. |
+| 1 | HTTPS with no browser warning | **FAIL** | **FAIL, unchanged.** Namecheap is down; see EB-2. Nothing in this pass touched it and nothing in this pass should be read as progress on it. |
+
+**Gate 14 / production release: still NOT PASS.** Criterion 1 alone is
+disqualifying and it is blocked on DNS this session did not have.
+
+Also corrected in this pass, because both were load-bearing and false:
+
+* `CLAUDE.md` said `src/migrations/index.ts` "is what runs, not the directory
+  listing". Payload reads the DIRECTORY and skips `index.ts`.
+* `20260518_134859_site_status_draft.down` had never worked — it set a column to
+  `text` while its DEFAULT was still an enum value, so every rollback that
+  reached it failed with 42804.

@@ -10,6 +10,7 @@ import { dispatchWebhooks, type WebhookConfig } from './dispatch-webhooks'
 import { sendSlackNotification } from './slack'
 import { deriveFbc, type Attribution } from './attribution'
 import { newEventId } from './event-id'
+import { reportError } from '@/lib/observability/report'
 
 export type LeadCaptureInput = {
   // Resolved server-side
@@ -112,6 +113,8 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
       detail: err instanceof Error ? err.message : 'unknown',
       duration_ms: t(writeStarted),
     })
+    // The one failure a visitor actually feels: the lead did not persist.
+    reportError('pipeline', err, { siteId: input.siteId, route: 'lead-pipeline', operation: 'lead-pipeline:lead.create', extra: { event_id } })
     return { ok: false, lead_id: null, event_id, steps, error: 'lead write failed' }
   }
 
@@ -469,6 +472,31 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
     steps.push({ step: 'hlr.enqueue', ok: true, detail: 'fired async' })
   } else {
     steps.push({ step: 'hlr.enqueue', ok: true, detail: 'no phone, skipped' })
+  }
+
+  /*
+   * EVERY FAILED STEP, REPORTED ONCE, HERE.
+   *
+   * A step's outcome was already persisted onto the lead's `delivery_log`, which
+   * is the right record and the wrong instrument: nothing reads it until
+   * somebody opens that lead, and nobody opens a lead they do not know went
+   * wrong. A CAPI post that stops working fails silently on every lead until a
+   * buyer complains about volume.
+   *
+   * Reported at the END rather than per step, so one visitor's submission
+   * produces one report per failed step and not one per retry, and so the report
+   * can name how far the pipeline got. The contact details are NOT included -
+   * `reportError` redacts anyway, and a lead's identity has no business in an
+   * error stream.
+   */
+  const failed = steps.filter((s) => s.ok === false)
+  for (const step of failed) {
+    reportError('pipeline', `${step.step}: ${step.detail ?? 'failed'}`, {
+      siteId: input.siteId,
+      route: 'lead-pipeline',
+      operation: `lead-pipeline:${step.step}`,
+      extra: { lead_id: leadId, event_id, steps_total: steps.length, steps_failed: failed.length },
+    })
   }
 
   return { ok: true, lead_id: leadId, event_id, steps }

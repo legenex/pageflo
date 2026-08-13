@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { invokeLLM } from '@/lib/ai/invoke'
+import { reportError } from '@/lib/observability/report'
 
 export const dynamic = 'force-dynamic'
 
@@ -135,7 +136,7 @@ export async function POST(req: NextRequest) {
     // internals and help nobody, so the runtime just continues without the
     // enrichment.
     // eslint-disable-next-line no-console
-    console.error('[legalos] quiz-ai failed:', err instanceof Error ? err.message : err)
+    reportError('integration', err, { route: 'POST /api/legalos/quiz-ai', operation: 'quiz-ai' })
     return NextResponse.json({ ok: false, error: 'ai unavailable' }, { status: 502 })
   }
 }

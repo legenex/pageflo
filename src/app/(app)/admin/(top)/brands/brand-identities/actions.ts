@@ -33,6 +33,7 @@ import {
 } from '@/lib/brand/source-limits'
 // The one implementation of the WCAG maths, per the house rule against a second.
 import { contrastRatio } from '@/lib/builder/page-lint'
+import { reportError } from '@/lib/observability/report'
 
 // In production a "brand" is a Site. The funnel builder's brand object (the
 // artifact shape) is stored verbatim on Site.brand_identity (JSON). These
@@ -177,7 +178,7 @@ export const ensureBrandTokensSyncedForAllBrands = async (): Promise<void> => {
     }
   } catch (err) {
     // eslint-disable-next-line no-console
-    console.error('[brand-identities] brand-token backfill walk failed:', err)
+    reportError('job', err, { operation: 'brand-identities:token-backfill' })
   }
 }
 
@@ -807,7 +808,7 @@ export async function proposeBrandTokens(args: {
           renderError || '',
         )
         if (browserMissing) {
-          console.error('[brand-extract] the rendering browser is unavailable:', renderError)
+          reportError('integration', renderError, { operation: 'brand-extract:render' })
           notes.push(
             'The rendering browser is not available on this server, so these came from the stylesheet instead of from what the page paints. That is a server configuration problem, not a problem with this site, and the values below are the weaker kind of evidence.',
           )
