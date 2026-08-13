@@ -42,6 +42,7 @@ import * as migration_20260813_180000_lp_deployment_embedded_quiz from './202608
 import * as migration_20260813_210000_locked_documents_funnel_rels from './20260813_210000_locked_documents_funnel_rels'
 import * as migration_20260813_213000_integration_config_sample_markers from './20260813_213000_integration_config_sample_markers'
 import * as migration_20260813_220000_template_records from './20260813_220000_template_records'
+import * as migration_20260813_230000_audit_log_user_nullable from './20260813_230000_audit_log_user_nullable'
 
 export const migrations = [
   {
@@ -191,5 +192,10 @@ export const migrations = [
     up: migration_20260813_220000_template_records.up,
     down: migration_20260813_220000_template_records.down,
     name: '20260813_220000_template_records',
+  },
+  {
+    up: migration_20260813_230000_audit_log_user_nullable.up,
+    down: migration_20260813_230000_audit_log_user_nullable.down,
+    name: '20260813_230000_audit_log_user_nullable',
   },
 ];

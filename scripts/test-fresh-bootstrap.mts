@@ -270,6 +270,33 @@ try {
   })
   created.push({ collection: 'leads', id: lead.id })
   t(Boolean(lead.id), 'a lead persists')
+
+  /*
+   * An AUDITED user can be deleted. audit_log.user_id was NOT NULL over an
+   * ON DELETE SET NULL FK, so the SET NULL the delete triggers violated the
+   * constraint and every user with audit history was undeletable. The row
+   * must survive the delete with its author nulled - attribution is
+   * best-effort, the record is not.
+   */
+  const probeUser = await payload.create({
+    collection: 'users',
+    data: { name: 'Bootstrap Probe', email: `bootstrap-probe-${Date.now()}@example.test`, password: 'probe-pass-1234' } as never,
+    overrideAccess: true,
+  })
+  const auditRow = await payload.create({
+    collection: 'audit-log',
+    data: { user: probeUser.id, action: 'update', entity_type: 'sites', entity_id: String(site.id), diff: {} } as never,
+    overrideAccess: true,
+  })
+  created.push({ collection: 'audit-log', id: auditRow.id })
+  const deleted = await payload
+    .delete({ collection: 'users', id: probeUser.id, overrideAccess: true })
+    .then(() => true)
+    .catch((e) => (e instanceof Error ? e.message.split('\n')[0] : String(e)))
+  t(deleted === true, `a user with audit history can be deleted${deleted === true ? '' : ` — ${deleted}`}`)
+  const orphanedAudit = await payload.findByID({ collection: 'audit-log', id: auditRow.id, depth: 0, overrideAccess: true }).catch(() => null)
+  t(orphanedAudit != null, 'and the audit row survives the delete')
+  t(orphanedAudit?.user == null, 'with its author nulled, not invented')
 } catch (err) {
   fail++
   console.log(`  FAIL the CRUD and publish walk completed — ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`)
