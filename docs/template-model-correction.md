@@ -298,3 +298,47 @@ resolution and the two live 404s.
 **2026-08-13** — Renderer identity proven against a database: 25 assertions
 covering A-renders-A, B-renders-B, repointing, clones, and refusal on an id that
 names nothing. Publish gates made record-aware: 136 assertions.
+
+**2026-08-13** — Both builder UIs rebuilt, and 83 browser assertions in a real
+Chromium against a real login. Four screenshots in `docs/screenshots/`.
+
+## What the browser found that nothing else could
+
+Three of these were passing every structural check at the moment they were
+broken, which is the whole argument for the browser suite existing.
+
+* **The landing-page gallery cards painted nothing.** Each mounted its template
+  in an `<iframe srcdoc>`. The iframe existed, had the right bounding box, and
+  its `contentDocument` reported 1172px of real content — so a count, a
+  measurement and a DOM read all passed while the card was solid black. It
+  renders blank in this Chromium with and without `sandbox`, with and without
+  `contain: paint`, with `zoom` in place of `transform`, and at native width
+  with no transform at all. `docs/production-readiness.md` records this same
+  gallery falling into the same trap once before, which is why the fix is not a
+  fifth measurement: previews now mount through `PortedTemplateView` — the
+  component the public page and the builder's centre pane already render — and
+  the suite samples the card's PIXELS.
+* **`SectionHeading` dropped its marker attribute.** It rendered
+  `data-section-heading={id}` and every caller passed no `id`, so React omitted
+  the attribute entirely and two whole tabs reported having no structure while
+  plainly showing it. Derived from the title now.
+* **Three overlays were anonymous `div`s.** `ConfirmDialog`, `Modal` and the LP
+  preview cover the viewport and swallow clicks, so they are the elements most
+  in need of announcing what they are. All three carry `role`/`aria-modal`/
+  `aria-label` now.
+
+### And two of the suite's own claims were false
+
+Worth recording separately, because a test that lies is worse than no test.
+
+* **`fetch` silently drops a `Host` header.** It is forbidden by the fetch spec
+  and undici discards it without error, so the public-render proof sent every
+  request as `Host: 127.0.0.1:3000`, resolved to the fallback site, and compared
+  two pages that were not the ones under test — while reporting success. `curl`
+  honours the header, which is how the discrepancy surfaced. It uses `node:http`
+  now, and asserts the strong property: each page must carry its OWN template's
+  headline copy and not the other's. A length comparison alone would never have
+  caught the old fallback, because it made both pages identical.
+* **The cross-tenant assertion was asking for a regression.** It keyed on HOST,
+  but the resolver matches on `(site, path)` deliberately, so a deployment is
+  reachable on every domain its own Site owns. Rewritten to key on site.
