@@ -444,3 +444,242 @@ non-super-admin and threw uncaught; fixed, with the hook proven to hold under
 visibly, explicit aliases including the `bold_modern` default that never named a
 template, and a negative control proving an empty registry cannot pass. 159
 assertions green (171 with isolation).
+
+---
+
+# Second session — gates 5 through 13
+
+Started 2026-08-13, continuing from `4b88790`. Same rule as above: every claim
+was measured in this codespace and the command that measured it is given.
+
+## What this codespace can do that the first session's record does not mention
+
+| Capability | State | Evidence |
+|---|---|---|
+| Headless Chromium | **works** | `npx playwright install chromium --with-deps`, exit 0 |
+| Browser-level DOM proofs | **works** | `pnpm test:dom` — 267 assertions |
+| `pnpm dev` | starts, then OOMs | serves one request (`GET / 200 in 19438ms`), dies under concurrent load on a 7.9 GB box |
+| `pnpm payload migrate` | works, needs `y` piped | a `dev` row in `payload_migrations` makes it prompt; `echo "y" \| pnpm payload migrate` |
+| Production `pnpm build` | still OOMs | unchanged from the first session |
+| SSH to production | **still NO** | unchanged — see "External blocker" above |
+
+Chromium is the significant one. It converts "the renderer is probably fine"
+into a measured claim, and it immediately found three defects that no unit test
+could have seen. See gate 7.
+
+## Gate 5 — the registry has consumers (done)
+
+`02f82b5`. The registry existed with no callers; seven places still resolved a
+template id their own way and two did it silently.
+
+**Removed rather than fixed**: `resolveQuizTemplate` in `quiz-templates/model.ts`
+(answered every id with `sq_editorial_inline`) and `quiz-theme`'s private
+accept-list (kept its own copy of the legacy table). A second resolver next to
+the data it resolves is how the first survived — every caller had one within
+reach and none had to think about it. `model.ts` is data now, and
+`test:registry` fails if a resolver reappears next to it.
+
+**The LP id space is 16, not 12.** The four identity templates render through a
+different path (nodes + skeleton, not ported markup) and are what the AI wizard
+builds into. Registered as non-stock rather than aliased: an alias would move
+those pages onto markup that has no copy for them, and the failure would look
+like an empty page rather than a bad mapping. `listLpTemplates()` is still
+exactly twelve.
+
+### Three defects found by the registry refusing to guess
+
+* **`LivePreview` branched on the RAW stored id.** `'bold_modern'` — the stored
+  default on every landing page — took the node branch, asked for an identity it
+  does not have, and drew the wrong page under the right name.
+* **Two of three seeded sample landing pages named templates that do not exist**
+  (`classic_authority`, `editorial_investigation`). All three rendered as
+  `TEMPLATES[0]`, so the samples were one page under three names.
+* **`saveQuizDeployment` and `saveDeployment` had no authorization at all.** Both
+  now call `requireDeploymentSiteAdmin`, closing the last of the three the first
+  session's adversarial pass left open.
+
+Migration `20260813_090000` moves the column defaults to real ids, for rows
+created straight in `/cms` which never reach a server action. Stored ids are NOT
+rewritten: an operator who chose `bold_modern` and one who never chose are
+indistinguishable in the data, so the alias stays and does that work.
+
+    negative control   reinstating the silent resolver + one bad seed id
+                       -> 2 assertions fail
+    pnpm test:registry 113 passed
+
+## Gate 6 — landing-page content slots (done)
+
+`92574f8`. The twelve were one HTML string each, so two deployments of one
+template under two brands said the same words.
+
+**The slots are derived, not written.** The generated modules are overwritten
+wholesale on every extraction, so a slot hand-authored into one lasts until the
+next run. `src/lib/lp-slots/extract.ts` reads the reference's own structure —
+`h1` is a headline, `summary` is an FAQ question, small tracked upper-case is an
+eyebrow — and the test re-derives from each shipped module and fails if one was
+edited by hand.
+
+**Nothing is ever re-serialised.** parse5 (so cheerio, so jsdom) requotes
+attributes and re-encodes entities, and the whole port rests on being the
+handoff's bytes. `src/lib/lp-slots/scan.ts` reports OFFSETS and the caller
+slices, so a round trip is byte-identical by construction. Joining the parts
+with every default reproduces the reference exactly — asserted for all twelve,
+and by the extractor before it writes.
+
+    slots per template   33 to 164, 1,046 in total
+    roles present        all 15, including image_src / image_alt / faq_*
+
+### Three defects that had shipped
+
+* **Every `{{brand.*}}` in all twelve was written `{<U+200B>{brand.x}<U+200B>}`** —
+  a zero-width space the designer used to stop their own template engine
+  resolving it. No token regex matches that, so **not one brand placeholder in
+  any ported page ever resolved**: visitors saw literal braces. Invisible in
+  every editor and every diff.
+* **`PortedTemplateView` never called `resolveTokens` at all**, so even with the
+  braces fixed nothing would have substituted. Both halves had to be fixed for
+  one placeholder to work.
+* **`{{brand.logo}}` and `{{quiz.estimatedDuration}}`** are used across the
+  library and were in neither lookup. The validator now checks the REAL key
+  table rather than the namespace, which is how both got waved through.
+
+### `case_type_router` is complete for the first time
+
+Its eight case cards and four quiz options are repeated by `<sc-for>` from
+arrays inside the reference's own `<script>`, so its markup held `{{ct.name}}`
+and would have printed it to a visitor — the 105-of-174 the audit records. The
+extractor now RUNS that script in `node:vm` at build time with a stubbed React
+and reads its initial render, rather than transcribing the arrays into our code
+where they would drift. 74 slots, valid.
+
+Not reproduced, and recorded rather than faked: the router's INTERACTIVITY.
+Clicking a card repaints its playbook in the reference; a static export shows
+the initial state. That is genuine behaviour that is lost.
+
+### Images
+
+None of the twelve references contains a single `<img>` — every image is a
+dashed box labelled `[LOGO SLOT]`. So an image slot's default IS that box, and a
+supplied URL replaces it with a real `<img>` carrying its paired alt. An empty
+override renders the reference unchanged, which is what keeps parity true.
+33 image slots, each refusing `javascript:` and `data:text/html`.
+
+    negative controls  hand-editing one slot default -> 2 assertions fail
+                       restoring the zero-width spaces in one template -> 5 fail
+    pnpm test:slots    409 passed
+
+## Gate 7 — the libraries as product surfaces (done)
+
+`40a34e8`. Quizzes gained a Templates tab beside Quiz Builder and Deployments;
+Landing Pages gained one beside Pages and Deployments. Both read the REGISTRY,
+never database rows — listing what people have built under the catalogue's name
+is how a library stops describing what exists.
+
+The gallery thumbnail is back after being removed for painting over its card.
+The missing piece was `contain: paint`; `overflow` alone does not stop a
+positioned or transformed descendant. This time the claim is checked by
+SCREENSHOT rather than by bounding box, because measuring the box is exactly
+what reported success on a visibly broken card four times.
+
+### The browser disagreed with us three times, all in `lp-templates/tokens.ts`
+
+1. **The ladder collapsed.** A brand with a dark-mode ink and a fallback surface
+   has two ends 0.002 luminance apart. Every rung mixes to the same near-white:
+   page, cards, headings and copy all one colour. **Measured at 1.01 contrast on
+   every text run in all twelve templates** — a blank sheet. Now repaired, with
+   an achromatic last resort so white-on-white is unreachable rather than
+   unlikely.
+2. **The mix was in the wrong colour space.** A token is named for its LUMINANCE
+   and was placed by sRGB position. sRGB is gamma-encoded, so `#949494` on
+   `#17191d` — a 5.4 ratio in the reference — came out at 2.47. Every dark
+   section in the library was losing more than half its contrast.
+3. **The accent was never checked.** The brand's raw primary went straight into a
+   slot the reference drew in a different colour. A gold-accented brand produced
+   up to 143 unreadable runs in one template.
+
+**Proof that 1 and 2 are fixed rather than improved**: the branded render now
+has EXACTLY the reference's contrast profile, template by template.
+
+    with brand remap        1 1 10 6 16 1 0 0 0 2 0 0
+    reference, no variables 1 1 10 6 16 1 0 0 0 2 0 0   (identical)
+
+So the suite asserts the property that matters — **no brand makes any template
+less readable than the design as drawn** — plus a hard floor that no brand may
+introduce text at or under 1.2:1.
+
+**A design-level finding, not ours**: the handoff itself draws 38 text runs
+below 3:1 (greyed `$ ———` value placeholders, small monospace labels, a
+copyright line). Recorded, not hidden, and not silently "fixed" — they are the
+designer's decisions and belong in a conversation with them.
+
+Also fixed: 16 `{{deployment.*}}`/`{{page.*}}` annotation chips reached visitors
+as literal braces across five templates. Nothing resolves them and there is no
+source for most — "resolving" `{{page.network.attorneys}}` would mean inventing
+a number about an attorney network on a legal advertising page. Stripped at
+extraction with their dangling labels, like the toolbar already was.
+
+    pnpm test:dom   267 passed, in Chromium
+
+## Gates 12 and 13 — publishing and path claims (done)
+
+`f397586`. Going live meant writing `status: 'live'` through a generic save,
+which ran no preflight and — because the funnel deployment collections are
+`isAuthenticated` on every verb — no real authorization either.
+
+`src/lib/path-claims.ts` is one answer to "who owns this URL" for all five
+things that can own one. The resolver already matches `/C/Pain/` and `/c/pain`
+interchangeably, so they must collide at SAVE time; otherwise the product
+accepts two records it then serves by insertion order. Scope is part of the
+claim: a domain-bound deployment claims one host, a site-wide one claims all of
+them, so that pair is genuinely ambiguous even though the resolver breaks the
+tie. Precedence is the router's existing order written down as data rather than
+changed, so this lands without moving any live page.
+
+`src/lib/publish-lifecycle.ts` makes publication a verb with a gate covering
+authorization, parent publication state, brand completeness, template
+resolution, graph validity, content-override validity, consent, destinations,
+tracking, domain ownership, domain eligibility, path claims and renderer
+hydration. It returns EVERY check rather than the first failure — an operator
+fixing four things one refusal at a time is how a preflight becomes the thing
+people ask to have switched off.
+
+Two asymmetries, both deliberate: **resume is gated as hard as publish** (a
+paused deployment's world moves while it is paused), and **going down is never
+gated** (something live that fails a check is exactly what needs taking
+offline). Unpublishing preserves the record, removes access immediately, and
+does not cascade.
+
+The check that will earn its keep: an LP's `quiz_deployment_id` is a bare text
+id with no foreign key behind it, so nothing at the database level stops brand A
+embedding brand B's quiz and delivering its leads to brand B's destinations.
+Preflight refuses it by name.
+
+    pnpm test:publish   105 passed, database-free
+
+## Gate 11 — the AI content adapter (done)
+
+`20a24e7`. Three AI writers existed with no shared statement of what a model may
+not touch, and two returned a free-form record.
+
+The output schema is now the boundary: `{ id, text }` and nothing else. An id
+the request did not ask about is rejected rather than merged. **There is no
+field in the schema that could carry a template id, a colour, a route, an answer
+value, a tier, a consent line, a destination, a domain or a pixel** — a stronger
+guarantee than instructing a model, because a prompt is advice and a filter is a
+fact.
+
+The model is injected, so the contract is exercised with no API key: 58
+assertions run the real filtering, prompts and override maths under a
+deterministic double, including AI-unavailable, malformed response, partial
+acceptance, a human edit beating the model, and reset-to-default.
+
+**Not proven, and listed as an external test**: that a real Claude obeys the
+prompt. It matters less than it looks, because disobedience is refused by shape.
+
+## Test surface after this session
+
+    pnpm test         brand 37 · authz 69 · registry 113 · slots 409 · publish 105 · ai 58
+    pnpm test:dom     267   (Chromium, no server)
+    pnpm test:isolation  12  (needs DATABASE_URI)
+    pnpm typecheck    exit 0
+    pnpm sweep:templates  200/27/24/0 — unchanged from baseline, no regression
