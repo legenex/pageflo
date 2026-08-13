@@ -49,6 +49,7 @@ import {
 } from '@/lib/lead-capture-client'
 import { splitQuizAnswers, isDeliverableContact } from '@/lib/quiz-lead'
 import { withHostSurface } from '@/lib/quiz-theme'
+import { decideTier, rejectedTierMessage } from '@/lib/quiz-webhook/tier'
 
 // Node types that exist for the flow author, not for the visitor. They resolve
 // and advance without ever painting a question card.
@@ -284,19 +285,19 @@ export function QuizRuntime({
         }
 
         // A returned tier only steers ROUTING when it names a tier this quiz
-        // actually declares. Anything else is kept as a value (it still reaches
-        // the lead) but is not allowed to select question variants, because a
-        // tier id nothing is scoped to would silently show the visitor the
-        // shared fallback and look like it worked.
-        const returned = String(newValues.tier ?? '')
-        if (returned && (quiz.tiers || []).some((t) => t.id === returned)) {
-          webhookTier = returned
-        } else if (returned && returned !== currentTier) {
+        // actually declares. The rule lives in `lib/quiz-webhook/tier` rather
+        // than here, because written inline the only way to check any of it was
+        // to drive a browser through a quiz and hope the right branch ran.
+        const decision = decideTier({
+          returned: newValues.tier,
+          declared: quiz.tiers,
+          current: currentTier,
+          answerTier: answer.setTier,
+        })
+        if (decision.fromProvider) webhookTier = decision.tier
+        if (decision.rejected) {
           // eslint-disable-next-line no-console
-          console.error(
-            `[legalos] quiz webhook returned tier "${returned}", which this quiz does not declare ` +
-              `(${(quiz.tiers || []).map((t) => t.id).join(', ') || 'no tiers'}). Routing tier left unchanged.`,
-          )
+          console.error(rejectedTierMessage(decision.rejected))
         }
       }
     }

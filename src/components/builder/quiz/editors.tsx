@@ -165,12 +165,24 @@ export const FieldPicker = ({ customFields, onInsert, anchor = 'top-right', onCr
   </div>
 }
 
-export const WebhookTester = ({ method, url, headers, payload, customFields }) => {
+/**
+ * Test a webhook node THE WAY PRODUCTION RUNS IT.
+ *
+ * This fetched the endpoint from the operator's own browser and interpolated the
+ * URL. The server does neither: it sends the URL verbatim, from the server, and
+ * reads the answer through `responseMappings` and then through the tier rule. So
+ * a node could test green here and fail live, and the shipped MVA tier lookup
+ * did exactly that - it answers 405 to the server while a browser test against
+ * the same address shows an application that loads.
+ *
+ * A test that runs a different code path from the thing it tests is worse than
+ * no test, because it is believed.
+ */
+export const WebhookTester = ({ method, url, headers, payload, customFields, responseMappings = [], tiers = [] }) => {
   const [open, setOpen] = useState(false)
   const [testValues, setTestValues] = useState({})
   const [result, setResult] = useState(null)
   const [busy, setBusy] = useState(false)
-  const interpolate = (str) => str.replace(/\{\{(\w+)\}\}/g, (_, k) => testValues[k] || `{{${k}}}`)
   const usedKeys = useMemo(() => {
     const all = [url, payload, ...headers.map((h) => h.value)].join(' ')
     const matches = all.matchAll(/\{\{(\w+)\}\}/g)
@@ -180,18 +192,21 @@ export const WebhookTester = ({ method, url, headers, payload, customFields }) =
   const runTest = async () => {
     setBusy(true); setResult(null)
     try {
-      const finalUrl = interpolate(url)
-      const finalHeaders = {}
-      headers.forEach((h) => { if (h.key) finalHeaders[h.key] = interpolate(h.value) })
-      const opts = { method, headers: finalHeaders }
-      if (['POST', 'PUT', 'PATCH'].includes(method) && payload) opts.body = interpolate(payload)
-      const t0 = performance.now()
-      const res = await fetch(finalUrl, opts)
-      const text = await res.text()
-      let parsed; try { parsed = JSON.parse(text) } catch { parsed = text }
-      setResult({ ok: res.ok, status: res.status, time: Math.round(performance.now() - t0), body: parsed })
+      const res = await fetch('/api/legalos/quiz-webhook-test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url, method, payload,
+          headers: headers.filter((h) => h.key).map((h) => ({ key: h.key, value: h.value ?? '' })),
+          responseMappings: (responseMappings || []).filter((m) => m?.jsonPath && m?.fieldKey).map((m) => ({ jsonPath: m.jsonPath, fieldKey: m.fieldKey })),
+          values: testValues,
+          tiers: (tiers || []).map((t) => t.id).filter(Boolean),
+        }),
+      })
+      const out = await res.json()
+      setResult(out)
     } catch (err) {
-      setResult({ ok: false, error: err.message })
+      setResult({ ok: false, reason: err.message, code: 'unreachable' })
     } finally { setBusy(false) }
   }
 
@@ -214,18 +229,33 @@ export const WebhookTester = ({ method, url, headers, payload, customFields }) =
       </div>}
       <Btn variant="success" size="md" icon={busy ? Loader2 : Send} onClick={runTest} disabled={busy} style={busy ? { opacity: 0.7 } : {}}>{busy ? 'Sending...' : 'Run Test'}</Btn>
       {result && <div style={{ padding: 10, backgroundColor: T.bg, border: `1px solid ${result.ok ? T.success : T.danger}`, borderRadius: 6, fontFamily: '"JetBrains Mono", monospace', fontSize: 11 }}>
-        <div style={{ display: 'flex', gap: 10, marginBottom: 8 }}>
-          <Pill color={result.ok ? T.success : T.danger}>{result.status || 'ERROR'}</Pill>
-          {result.time != null && <span style={{ color: T.textMute }}>{result.time}ms</span>}
+        <div style={{ display: 'flex', gap: 10, marginBottom: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Pill color={result.ok ? T.success : T.danger}>{result.ok ? 'OK' : (result.code || 'ERROR').toUpperCase()}</Pill>
+          {result.status != null && <Pill color={T.textMute}>HTTP {result.status}</Pill>}
+          {result.elapsedMs != null && <span style={{ color: T.textMute }}>{result.elapsedMs}ms</span>}
+          <span style={{ color: T.textMute }}>{result.sent?.method} {result.sent?.url}</span>
         </div>
-        {result.error ? <div style={{ color: T.danger }}>{result.error}</div> :
-          <pre style={{ margin: 0, color: T.textDim, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 200, overflow: 'auto' }}>{typeof result.body === 'string' ? result.body : JSON.stringify(result.body, null, 2)}</pre>}
+        {!result.ok && <div style={{ color: T.danger, marginBottom: 8 }}>{result.reason}</div>}
+        {result.ok && <>
+          {/* What production would take from the answer - not the answer. A body
+              a person can read tells them nothing about which fields the flow
+              extracts, and extracting nothing is the failure that looks green. */}
+          <div style={{ color: T.textMute, marginBottom: 4 }}>fields the flow would take</div>
+          <pre style={{ margin: '0 0 8px', color: T.textDim, whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: 160, overflow: 'auto' }}>{JSON.stringify(result.fields ?? {}, null, 2)}</pre>
+          {result.tier?.returned != null && <div style={{ color: result.tier.routes ? T.success : T.warning }}>
+            tier &quot;{result.tier.returned}&quot; {result.tier.routes
+              ? 'is declared by this quiz and would steer routing'
+              : `is NOT declared by this quiz (${(result.tier.declared || []).join(', ') || 'no tiers'}) - it would be carried on the lead but would not steer routing`}
+          </div>}
+          {result.called === false && <div style={{ color: T.warning }}>nothing was called: this node has no URL or no response mapping</div>}
+        </>}
+        <div style={{ color: T.textLow, marginTop: 8 }}>body sent: {result.sent?.body || '(none)'}</div>
       </div>}
     </div>}
   </div>
 }
 
-export const WebhookEditor = ({ draft, update, customFields, onCreateCustomField }) => {
+export const WebhookEditor = ({ draft, update, customFields, onCreateCustomField, tiers = [] }) => {
   const urlRef = useRef(null)
   const bodyRef = useRef(null)
   const headerValueRefs = useRef({})
@@ -323,7 +353,19 @@ export const WebhookEditor = ({ draft, update, customFields, onCreateCustomField
       </div>
     </div>
 
-    <WebhookTester method={method} url={draft.webhookUrl || ''} headers={headers} payload={draft.webhookPayload || ''} customFields={customFields} />
+    <WebhookTester
+      method={method}
+      url={draft.webhookUrl || ''}
+      headers={headers}
+      payload={draft.webhookPayload || ''}
+      customFields={customFields}
+      // The mappings and the quiz's own tiers travel with the test, so it can
+      // report what the FLOW would take from the answer rather than only what
+      // the provider said. A 200 that maps nothing is the failure that looks
+      // green.
+      responseMappings={responseMappings}
+      tiers={tiers}
+    />
   </div>
 }
 
@@ -769,7 +811,7 @@ export const NodeEditorModal = ({ node, quiz, customFields, onSave, onClose, onD
             </div>
           </div>}
 
-          {tab === 'webhook' && <WebhookEditor draft={draft} update={update} customFields={customFields} onCreateCustomField={onCreateCustomField} />}
+          {tab === 'webhook' && <WebhookEditor draft={draft} update={update} customFields={customFields} onCreateCustomField={onCreateCustomField} tiers={quiz?.tiers || []} />}
 
           {tab === 'redirect' && <RedirectEditor redirect={redirect} update={update} />}
 

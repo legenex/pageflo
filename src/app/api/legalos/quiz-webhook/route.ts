@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { safePost, type SafePostMethod } from '@/lib/net/ssrf'
+import { executeWebhookNode, EXECUTABLE_NODE_TYPES, type WebhookNode } from '@/lib/quiz-webhook/execute'
 import { resolveSiteByHost } from '@/lib/site-resolver'
 
 export const dynamic = 'force-dynamic'
@@ -76,81 +76,6 @@ const rateLimited = (key: string): boolean => {
   return cur.count > RATE_LIMIT_MAX
 }
 
-/** A visitor's answer, flattened to the scalar a template can carry. */
-const scalar = (v: unknown): string => {
-  if (v == null) return ''
-  if (Array.isArray(v)) return v.map(scalar).join(',')
-  if (typeof v === 'object') return ''
-  return String(v)
-}
-
-/** Substitute {{key}} from the visitor's answers, trimmed and length-capped. */
-const interpolate = (template: string, values: Record<string, unknown>): string =>
-  template.replace(/\{\{(\w+)\}\}/g, (_, key: string) => scalar(values[key]).slice(0, 500))
-
-/**
- * Substitute into a JSON template WITHOUT letting a visitor's answer end the
- * string it is being placed in.
- *
- * The payload template is JSON the author wrote (`{"mobile": "{{mobile}}"}`),
- * and the values are typed by the visitor. Plain textual substitution lets an
- * answer of `x","tier":"1` close the string and forge sibling fields, so the
- * buyer receives invented data attributed to the brand. Each value is therefore
- * JSON-encoded and the surrounding quotes the author already wrote are removed,
- * which leaves the template's shape intact and the value inert.
- */
-const interpolateJson = (template: string, values: Record<string, unknown>): string =>
-  // The author's own quotes around a slot are consumed, because JSON.stringify
-  // supplies its own. A bare {{x}} in a numeric position also becomes a quoted
-  // string, which is the honest reading of an answer that is always text.
-  template.replace(/"?\{\{(\w+)\}\}"?/g, (_match, key: string) =>
-    JSON.stringify(scalar(values[key]).slice(0, 500)),
-  )
-
-/**
- * Header values get the same substitution, then have anything that could start
- * a second header stripped. A newline in a header value is request splitting;
- * refusing to carry one costs nothing legitimate.
- */
-const headerValue = (template: string, values: Record<string, unknown>): string =>
-  interpolate(template, values)
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\r\n\x00-\x1f\x7f]/g, '')
-    .slice(0, 1000)
-
-/**
- * Read `a.b[0].c` out of a parsed JSON body.
- *
- * Returns undefined for anything missing rather than throwing, because a buyer
- * changing their response shape must degrade to "no tier" and not to a 500.
- */
-const readJsonPath = (root: unknown, path: string): unknown => {
-  const trimmed = path.trim()
-  if (!trimmed) return undefined
-  const parts = trimmed
-    .replace(/\[(\d+)\]/g, '.$1')
-    .split('.')
-    .filter(Boolean)
-  let cur: unknown = root
-  for (const part of parts) {
-    if (cur == null || typeof cur !== 'object') return undefined
-    cur = (cur as Record<string, unknown>)[part]
-  }
-  return cur
-}
-
-type NodeShape = {
-  id?: unknown
-  type?: unknown
-  webhookUrl?: unknown
-  webhookMethod?: unknown
-  webhookPayload?: unknown
-  webhookHeaders?: Array<{ key?: unknown; value?: unknown }>
-  responseMappings?: Array<{ jsonPath?: unknown; fieldKey?: unknown }>
-}
-
-const EXECUTABLE_TYPES = new Set(['webhook', 'verification'])
-
 export async function POST(req: NextRequest) {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || 'unknown'
   if (rateLimited(ip)) {
@@ -216,78 +141,27 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'not found' }, { status: 404 })
   }
 
-  const nodes = Array.isArray(quiz.nodes) ? (quiz.nodes as NodeShape[]) : []
+  const nodes = Array.isArray(quiz.nodes) ? (quiz.nodes as WebhookNode[]) : []
   const node = nodes.find((n) => String(n.id) === node_id)
-  if (!node || !EXECUTABLE_TYPES.has(String(node.type))) {
+  if (!node || !EXECUTABLE_NODE_TYPES.has(String(node.type))) {
     return NextResponse.json({ ok: false, error: 'node is not a webhook or verification node' }, { status: 400 })
   }
 
-  const url = typeof node.webhookUrl === 'string' ? node.webhookUrl.trim() : ''
-  const mappings = (Array.isArray(node.responseMappings) ? node.responseMappings : [])
-    .map((m) => ({ jsonPath: String(m?.jsonPath ?? '').trim(), fieldKey: String(m?.fieldKey ?? '').trim() }))
-    .filter((m) => m.jsonPath && m.fieldKey)
+  // Everything that decides what a provider's answer MEANS lives in
+  // `lib/quiz-webhook/execute`, where it can be exercised against a timeout, an
+  // HTML response, a 500 and an unknown tier without a database or a network.
+  // This handler's job is the parts that need a request: who is asking, whose
+  // deployment it is, and how loudly to fail.
+  const outcome = await executeWebhookNode(node, values)
 
-  // Nothing to call, or nothing to do with the answer: not an error, just a
-  // node the flow can walk straight through.
-  if (!url || mappings.length === 0) {
-    return NextResponse.json({ ok: true, fields: {} })
-  }
-
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  for (const h of Array.isArray(node.webhookHeaders) ? node.webhookHeaders : []) {
-    const key = String(h?.key ?? '').trim()
-    if (!key || !/^[A-Za-z0-9!#$%&'*+.^_`|~-]+$/.test(key)) continue
-    headers[key] = headerValue(String(h?.value ?? ''), values)
-  }
-
-  // JSON-aware substitution. The template is JSON and the values are typed by
-  // a visitor, so plain text replacement would let an answer close the string
-  // it sits in and forge sibling fields in what the buyer receives.
-  const bodyText = interpolateJson(typeof node.webhookPayload === 'string' ? node.webhookPayload : '', values)
-
-  // The builder offers five verbs, so the author's choice is honoured rather
-  // than coerced. Forcing POST onto a GET verification node produced a 405 and
-  // a flow that then routed on nothing - the exact silent failure this endpoint
-  // exists to end.
-  const chosen = String(node.webhookMethod ?? 'POST').toUpperCase()
-  const method: SafePostMethod =
-    chosen === 'GET' || chosen === 'PUT' || chosen === 'PATCH' || chosen === 'DELETE' ? chosen : 'POST'
-
-  const res = await safePost(url, {
-    method,
-    headers,
-    body: bodyText,
-    // A visitor is on a spinner. A buyer's slow endpoint must not hold the
-    // funnel open longer than a person will wait.
-    timeoutMs: 6000,
-    maxBytes: 256 * 1024,
-  })
-
-  if (!res.ok) {
+  if (!outcome.ok) {
+    if (outcome.code === 'not_executable') {
+      return NextResponse.json({ ok: false, error: 'node is not a webhook or verification node' }, { status: 400 })
+    }
     // eslint-disable-next-line no-console
-    console.error(`[legalos] quiz-webhook ${node_id} failed: ${res.reason}`)
+    console.error(`[legalos] quiz-webhook ${node_id} ${outcome.code}: ${outcome.reason}`)
     return NextResponse.json({ ok: false, error: 'webhook unavailable' }, { status: 502 })
   }
-  if (res.status < 200 || res.status >= 300) {
-    // eslint-disable-next-line no-console
-    console.error(`[legalos] quiz-webhook ${node_id} answered ${res.status}`)
-    return NextResponse.json({ ok: false, error: 'webhook error' }, { status: 502 })
-  }
 
-  let body: unknown
-  try {
-    body = JSON.parse(res.body)
-  } catch {
-    return NextResponse.json({ ok: false, error: 'webhook did not return JSON' }, { status: 502 })
-  }
-
-  // ONLY the mapped fields. The response body never leaves this handler.
-  const fields: Record<string, string> = {}
-  for (const m of mappings) {
-    const value = readJsonPath(body, m.jsonPath)
-    if (value == null || typeof value === 'object') continue
-    fields[m.fieldKey] = String(value).slice(0, 500)
-  }
-
-  return NextResponse.json({ ok: true, fields })
+  return NextResponse.json({ ok: true, fields: outcome.fields })
 }
