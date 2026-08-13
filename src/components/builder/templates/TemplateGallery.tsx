@@ -23,8 +23,8 @@
  *
  *  2. EVERY PREVIEW IS A REAL RENDER, through the primitives the public page
  *     uses: `TemplatePreview` runs the actual progress and answer forms, and a
- *     landing page is `composeTemplate` + `resolveTokens` inside
- *     `portedTemplateDocument` — the exact call the public renderer makes.
+ *     landing page is mounted through `PortedTemplateView`, the same component the
+ *     public page and the builder's own centre pane render.
  *     A gallery backed by screenshots goes stale first for the templates nobody
  *     has looked at recently, which are precisely the ones somebody is browsing
  *     to find.
@@ -43,7 +43,7 @@
 import { useMemo, useState } from 'react'
 
 import { TemplatePreview } from '@/components/builder/quiz/TemplatePreview'
-import { portedTemplateDocument } from '@/components/builder/lp/PortedTemplate'
+import { PortedTemplateView } from '@/components/builder/lp/PortedTemplate'
 import { PREVIEW_BRAND_DEFAULT } from '@/components/builder/lp/render'
 import { resolveTemplate } from '@/lib/template-registry'
 import { T, Pill, Btn, Select, Label } from '@/components/builder/ui'
@@ -75,40 +75,30 @@ const brandFor = (brands, brandId) =>
 /**
  * A landing-page template, rendered small.
  *
- * An iframe, contained THREE ways rather than one. The history is why: four
- * earlier containment attempts (overflow on a sized box, absolute positioning,
- * clip-path, and an iframe with overflow alone) each measured correct and each
- * painted over the card underneath, so the gallery shipped with no picture.
+ * Mounted INLINE and scaled, not in an iframe. The iframe came first and was
+ * the obvious choice — isolation you cannot defeat with a stray selector — but
+ * it paints nothing. Measured, not guessed: an `<iframe srcdoc>` at 1280x1600
+ * scaled into a 327x190 box renders blank in this Chromium with and without
+ * `sandbox`, with and without `contain: paint`, and with `zoom` in place of
+ * `transform`. Its `contentDocument` reports 1172px of real content the whole
+ * time, so every measurement said it worked and every screenshot said it did
+ * not — which is the same trap `docs/production-readiness.md` records this
+ * gallery falling into once already, in a different disguise.
  *
- *  - `overflow: hidden` clips the box.
- *  - `contain: paint` makes it a containing block AND a paint containment
- *    boundary, so a descendant cannot escape even if it establishes its own
- *    stacking or positioning context. This is the one the earlier attempts
- *    missed: `overflow` alone does not stop a fixed or transformed descendant.
- *  - `isolation: isolate` gives it its own stacking context.
+ * `PortedTemplateView` is what the builder's own centre pane mounts and what
+ * the public page renders through, so this is the real composition path rather
+ * than a second one that could drift. Both untrusted inputs are already escaped
+ * at their source — `composeTemplate` for slot overrides, `resolveTokensForHtml`
+ * for brand values — which is what makes an inline mount safe here; see the
+ * doc comment on PortedTemplate.tsx.
  *
- * `sandbox` with no `allow-scripts`: the markup is a build asset, but a document
- * that cannot run script cannot reach out of the frame however it later changes.
+ * Containment is still three-deep, because the reason for that has not changed:
+ * `overflow` alone does not stop a positioned or transformed descendant, and
+ * four earlier attempts each measured correct while painting over the card.
  */
 const LpThumb = ({ slug, brand, overrides, height = 190, frameWidth = 1280 }) => {
-  const doc = useMemo(
-    () => portedTemplateDocument(slug, brand, overrides ?? {}),
-    [slug, brand, overrides],
-  )
-  // The references are drawn at desktop width. Rendering at that width and
-  // scaling down shows the template's real layout; letting the frame be
-  // card-width would show its MOBILE layout and call it a desktop preview.
-  const FRAME_H = Math.round(frameWidth * 1.25)
   const [w, setW] = useState(560)
   const scale = w / frameWidth
-
-  if (!doc) {
-    return (
-      <div style={{ ...thumbBox(height), display: 'grid', placeItems: 'center', color: T.textLow, fontSize: 11 }}>
-        no preview for this renderer
-      </div>
-    )
-  }
 
   return (
     <div
@@ -116,23 +106,20 @@ const LpThumb = ({ slug, brand, overrides, height = 190, frameWidth = 1280 }) =>
       aria-hidden="true"
       style={thumbBox(height)}
     >
-      <iframe
-        title=""
-        tabIndex={-1}
-        sandbox=""
-        srcDoc={doc}
+      <div
         style={{
           position: 'absolute',
           top: 0,
           left: 0,
           width: frameWidth,
-          height: FRAME_H,
-          border: 'none',
           transform: `scale(${scale})`,
           transformOrigin: '0 0',
           pointerEvents: 'none',
+          backgroundColor: '#fff',
         }}
-      />
+      >
+        <PortedTemplateView slug={slug} brand={brand} overrides={overrides ?? {}} />
+      </div>
     </div>
   )
 }
@@ -189,12 +176,23 @@ const PreviewModal = ({ template, kind, brand, onClose }) => {
         style={{ flex: 1, minHeight: 0, display: 'grid', placeItems: 'start center', overflow: 'auto' }}
       >
         {kind === 'lp' ? (
-          <iframe
-            title={`${template.name} preview`}
-            sandbox=""
-            srcDoc={portedTemplateDocument(template.templateId, brand, template.slotOverrides ?? {})}
-            style={{ width, height: '100%', minHeight: 640, border: `1px solid ${T.border}`, background: '#fff', borderRadius: 6 }}
-          />
+          // Inline for the same reason the thumbnail is: an iframe here paints
+          // nothing. Scaled to the chosen device width so a mobile preview is a
+          // real narrow render rather than a squeezed desktop one.
+          <div
+            style={{
+              width,
+              maxWidth: '100%',
+              border: `1px solid ${T.border}`,
+              background: '#fff',
+              borderRadius: 6,
+              overflow: 'hidden',
+              contain: 'paint',
+              isolation: 'isolate',
+            }}
+          >
+            <PortedTemplateView slug={template.templateId} brand={brand} overrides={template.slotOverrides ?? {}} />
+          </div>
         ) : (
           <div style={{ width, maxWidth: '100%', border: `1px solid ${T.border}`, borderRadius: 6, overflow: 'hidden' }}>
             <TemplatePreview spec={quizSpecFor(template)} brand={brand} height={640} />

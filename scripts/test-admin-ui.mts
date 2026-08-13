@@ -383,7 +383,26 @@ const run = async (browser: Browser): Promise<void> => {
   t(!/MVA Pain First/i.test(lpCardText), 'the LP gallery does NOT offer old Page records')
   t((await lpCards.first().getByRole('button', { name: /preview/i }).count()) > 0, 'each LP template card offers Preview')
   t((await lpCards.first().getByRole('button', { name: /select/i }).count()) > 0, 'each LP template card offers Select')
-  t(await lpCards.first().locator('iframe').count() > 0, 'each LP template card shows a real rendered preview')
+
+
+  /*
+   * The preview is checked by PIXELS, not by presence.
+   *
+   * The first version of this card mounted the template in an `<iframe srcdoc>`.
+   * The iframe existed, had the right box, and its `contentDocument` reported
+   * 1172px of content — so every structural assertion passed while the card
+   * painted solid black. `docs/production-readiness.md` records this gallery
+   * falling into the same trap once already. Counting distinct colours in a
+   * screenshot of the thumbnail is the only check that would have caught it.
+   */
+  const thumbColours = async (card: ReturnType<Page['locator']>): Promise<number> => {
+    const buf = await card.screenshot()
+    const seen = new Set<number>()
+    for (let i = 0; i < buf.length - 3; i += 997) seen.add((buf[i] << 16) | (buf[i + 1] << 8) | buf[i + 2])
+    return seen.size
+  }
+  const lpColours = await thumbColours(lpCards.first())
+  t(lpColours > 8, `an LP template card actually PAINTS its preview (${lpColours} distinct samples)`)
 
   await shot(page, 'landing-page-deployment-general')
 
