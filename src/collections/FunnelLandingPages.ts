@@ -26,7 +26,7 @@ export const FunnelLandingPages: CollectionConfig = {
   fields: [
     { name: 'name', type: 'text', required: true },
     { name: 'slug', type: 'text', required: true, index: true },
-    { name: 'template_id', type: 'text', defaultValue: 'bold_modern' },
+    { name: 'template_id', type: 'text', defaultValue: 'editorial_investigation_v2' },
     { name: 'angle', type: 'text', defaultValue: 'pain' },
     { name: 'is_published', type: 'checkbox', defaultValue: false },
     // The artifact section array (type + isVisible + copy) stored verbatim.

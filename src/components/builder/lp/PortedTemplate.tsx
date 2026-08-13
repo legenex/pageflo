@@ -22,13 +22,28 @@
  */
 
 import { useMemo } from 'react'
-import { PORTED_BY_SLUG, TEMPLATE_FONTS_HREF } from '@/lib/lp-templates'
+import { TEMPLATE_FONTS_HREF } from '@/lib/lp-templates'
 import { templateStyle } from '@/lib/lp-templates/tokens'
+import { resolveForRender, reportTemplateFallback } from '@/lib/template-registry'
 import { resolveLpPalette } from '@/lib/lp-nodes/palette'
 import { getLpIdentity } from '@/lib/lp-identities'
 
+/**
+ * The ported markup for a stored id, or null.
+ *
+ * Goes through the registry rather than indexing `PORTED_BY_SLUG`, so an alias
+ * such as `bold_modern` reaches its markup here exactly as it does everywhere
+ * else. `.template` is null for a legacy identity template, which has no ported
+ * markup to mount — returning null there is correct and the caller draws
+ * nothing rather than the wrong page.
+ */
+const portedFor = (slug, context) => {
+  const res = reportTemplateFallback(context, resolveForRender('lp', slug))
+  return res.template.kind === 'lp' ? res.template.template : null
+}
+
 export const PortedTemplateView = ({ slug, brand, className = '' }) => {
-  const template = PORTED_BY_SLUG[slug]
+  const template = useMemo(() => portedFor(slug, 'ported template view'), [slug])
 
   // The identity is only a fallback source of colour for a brand that has set
   // none; the ported markup supplies its own reference values regardless.
@@ -57,7 +72,7 @@ export const PortedTemplateView = ({ slug, brand, className = '' }) => {
  * reached by them, which is worth having regardless of the clipping.
  */
 export const portedTemplateDocument = (slug, brand) => {
-  const template = PORTED_BY_SLUG[slug]
+  const template = portedFor(slug, 'ported template thumbnail')
   if (!template) return ''
   const palette = resolveLpPalette(getLpIdentity('a'), brand)
   const vars = Object.entries(templateStyle(template, palette))

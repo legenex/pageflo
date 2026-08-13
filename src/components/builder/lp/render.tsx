@@ -26,7 +26,8 @@ import { isVisible, TONES } from '@/lib/lp-nodes/model'
 import { deriveSurface, groundFor, lookOf } from '@/lib/lp-nodes/surface'
 import { resolveLpPalette } from '@/lib/lp-nodes/palette'
 import { skeletonFor } from '@/lib/lp-skeletons'
-import { PORTED_TEMPLATES, PORTED_BY_SLUG, isPortedTemplate } from '@/lib/lp-templates'
+import { PORTED_TEMPLATES, isPortedTemplate } from '@/lib/lp-templates'
+import { resolveForRender, reportTemplateFallback } from '@/lib/template-registry'
 import { PortedTemplateView } from './PortedTemplate'
 import { SectionNode } from './nodes/SectionNode'
 import { T } from '../ui'
@@ -115,8 +116,24 @@ export const GALLERY_TEMPLATES = TEMPLATES.filter((t) => t.ported)
  */
 export const SKELETON_TEMPLATES = TEMPLATES.filter((t) => t.skeleton)
 
-export const templateFor = (templateId) =>
-  TEMPLATES.find((t) => t.id === templateId) || TEMPLATES[0]
+/**
+ * The builder's template record for a stored id.
+ *
+ * The lookup used to be `find(...) || TEMPLATES[0]`, which answered every id —
+ * including `'bold_modern'`, the stored default on every row, which names no
+ * template — with `editorial_investigation_v2` and no word about it. Resolution
+ * is now the registry's: it canonicalises aliases, and when it does fall back it
+ * says so in the server log rather than in how the page looks.
+ *
+ * `TEMPLATES` stays the builder's own enriched record (identity, skeleton,
+ * angle default). What it is no longer allowed to do is decide which id is
+ * valid, because the save path, the public renderer and this file disagreeing
+ * about that is the whole failure mode.
+ */
+export const templateFor = (templateId) => {
+  const res = reportTemplateFallback('lp builder', resolveForRender('lp', templateId))
+  return TEMPLATES.find((t) => t.id === res.template.id) || TEMPLATES[0]
+}
 
 /**
  * The colours a template produces UNDER A GIVEN BRAND, for gallery swatches.
@@ -186,14 +203,21 @@ export const LivePreview = ({
   selectedId?: string | null
   onSelectNode?: (nodeId: string) => void
 }) => {
-  const template = templateFor(landingPage.templateId)
-  const identity = template.identity || getLpIdentity(landingPage.templateId)
+  // One resolution for the whole render. The branch below used to test the RAW
+  // stored id with `isPortedTemplate`, so `'bold_modern'` — which is the stored
+  // default and resolves to a ported template — took the node branch instead,
+  // asked `getLpIdentity('bold_modern')` for an identity it does not have, and
+  // drew the wrong page under the right name.
+  const resolved = reportTemplateFallback('lp render', resolveForRender('lp', landingPage.templateId))
+  const templateId = resolved.template.id
+  const template = templateFor(templateId)
+  const identity = template.identity || getLpIdentity(templateId)
   const previewBrand = brand || PREVIEW_BRAND_DEFAULT
 
   // A ported template renders the handoff's own markup. Its copy is not yet
   // node-backed, so the element tree and the click-to-edit affordances are not
   // offered for one - showing them would advertise an edit that does nothing.
-  if (isPortedTemplate(landingPage.templateId)) {
+  if (isPortedTemplate(templateId)) {
     return (
       <div
         className={editable ? 'lp-preview-root' : 'lp-preview-root lp-public-root'}
@@ -201,7 +225,7 @@ export const LivePreview = ({
           ? { borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 32px -12px rgba(0,0,0,0.4)', border: `1px solid ${T.border}` }
           : { minHeight: '100vh' }}
       >
-        <PortedTemplateView slug={landingPage.templateId} brand={previewBrand} />
+        <PortedTemplateView slug={templateId} brand={previewBrand} />
       </div>
     )
   }

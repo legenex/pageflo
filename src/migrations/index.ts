@@ -20,6 +20,7 @@ import * as migration_20260729_230000_buildlog_comments from './20260729_230000_
 import * as migration_20260730_120000_funnel_advertorial_tables from './20260730_120000_funnel_advertorial_tables';
 import * as migration_20260803_120000_locked_documents_buildlog_comments_rel from './20260803_120000_locked_documents_buildlog_comments_rel';
 import * as migration_20260806_120000_quiz_deployment_progress_form from './20260806_120000_quiz_deployment_progress_form'
+import * as migration_20260813_090000_canonical_template_defaults from './20260813_090000_canonical_template_defaults'
 
 export const migrations = [
   {
@@ -131,5 +132,10 @@ export const migrations = [
     up: migration_20260806_120000_quiz_deployment_progress_form.up,
     down: migration_20260806_120000_quiz_deployment_progress_form.down,
     name: '20260806_120000_quiz_deployment_progress_form',
+  },
+  {
+    up: migration_20260813_090000_canonical_template_defaults.up,
+    down: migration_20260813_090000_canonical_template_defaults.down,
+    name: '20260813_090000_canonical_template_defaults',
   },
 ];

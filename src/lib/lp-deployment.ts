@@ -5,6 +5,7 @@ import { siteToBrand, type DomainLite } from './brand-map'
 import { normalizeDeploymentPath } from './quiz-deployment-path'
 import { isClaimedByAuthoredContent, pathVariantsFor } from './public-path-claims'
 import { resolveQuizDeploymentById, type ResolvedQuizDeployment } from './quiz-deployment'
+import { resolveForRender, reportTemplateFallback } from './template-registry'
 
 /**
  * Server-side resolution of a public funnel landing page.
@@ -24,7 +25,16 @@ export type PublicLandingPage = {
   id: string
   name: string
   slug: string
+  /** Canonical: aliases already resolved, never a raw stored value. */
   templateId: string
+  /**
+   * True when the stored id named no template and a stand-in was drawn. Carried
+   * on the resolved object rather than only logged, so a preflight can refuse to
+   * publish a page whose template does not exist and the builder can badge it.
+   */
+  templateFellBack: boolean
+  /** The id that was stored, when it differs from what rendered. */
+  requestedTemplateId: string
   angle: string
   sections: unknown[]
 }
@@ -154,6 +164,15 @@ const resolveLpDeploymentUncached = async (
     ? await resolveQuizDeploymentById(quizDeploymentId, siteId, includeUnpublished)
     : null
 
+  // Resolved here, once, rather than by whichever renderer reads the row. The
+  // template id travels canonical from this point, so the metadata pass, the
+  // render and any preflight all agree, and a stored id that names nothing is
+  // written to the log instead of quietly becoming template zero.
+  const templateRes = reportTemplateFallback(
+    `lp deployment ${doc.id}`,
+    resolveForRender('lp', lpDoc.template_id),
+  )
+
   return {
     deployment: {
       id: String(doc.id),
@@ -166,7 +185,9 @@ const resolveLpDeploymentUncached = async (
       id: String(lpDoc.id),
       name: String(lpDoc.name ?? ''),
       slug: String(lpDoc.slug ?? ''),
-      templateId: String(lpDoc.template_id ?? 'bold_modern'),
+      templateId: templateRes.template.id,
+      templateFellBack: templateRes.usedFallback,
+      requestedTemplateId: templateRes.requestedId,
       angle: String(lpDoc.angle ?? 'pain'),
       sections,
     },

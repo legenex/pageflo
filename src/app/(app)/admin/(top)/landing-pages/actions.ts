@@ -8,6 +8,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { invokeLLM } from '@/lib/ai/invoke'
+import { canonicalTemplateId } from '@/lib/template-registry'
+import { requireDeploymentSiteAdmin } from '@/lib/authz'
 
 const PATH = '/admin/landing-pages'
 
@@ -27,13 +29,20 @@ export async function createLP(args: { lp: LP }): Promise<{ ok: true; id: string
   if (!user) return { ok: false, error: 'unauthenticated' }
   const lp = args.lp || {}
   const payload = await getPayload({ config })
+
+  // `'bold_modern'` is the collection default and names no template. It is an
+  // explicit alias now, so it still resolves, and it is canonicalised on the way
+  // in so a page created today does not need the alias tomorrow.
+  const template = canonicalTemplateId('lp', (lp.templateId as string) || 'bold_modern')
+  if (!template.ok) return { ok: false, error: template.error }
+
   try {
     const created = (await payload.create({
       collection: 'funnel-landing-pages',
       data: {
         name: (lp.name as string) || 'Untitled LP',
         slug: (lp.slug as string) || `lp-${Date.now().toString(36)}`,
-        template_id: (lp.templateId as string) || 'bold_modern',
+        template_id: template.id,
         angle: (lp.angle as string) || 'pain',
         is_published: Boolean(lp.isPublished),
         sections: lp.sections ?? [],
@@ -52,8 +61,18 @@ export async function saveLP(args: { id: string; patch: Record<string, unknown> 
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: 'unauthenticated' }
   const payload = await getPayload({ config })
+
+  // A patch may or may not carry a template. When it does, it goes through the
+  // same gate a create does; a partial update is not a way around validation.
+  const patch = { ...(args.patch || {}) }
+  if ('template_id' in patch) {
+    const template = canonicalTemplateId('lp', patch.template_id)
+    if (!template.ok) return { ok: false, error: template.error }
+    patch.template_id = template.id
+  }
+
   try {
-    await payload.update({ collection: 'funnel-landing-pages', id: args.id, data: args.patch as never, user: user as never, overrideAccess: false })
+    await payload.update({ collection: 'funnel-landing-pages', id: args.id, data: patch as never, user: user as never, overrideAccess: false })
     revalidatePath(PATH)
     return { ok: true }
   } catch (err) {
@@ -68,12 +87,17 @@ export async function cloneLP(args: { id: string }): Promise<{ ok: true; id: str
   try {
     const src = (await payload.findByID({ collection: 'funnel-landing-pages', id: args.id, overrideAccess: true })) as Record<string, unknown>
     if (!src) return { ok: false, error: 'not found' }
+    // A clone is a new row, so it gets the canonical id rather than inheriting a
+    // legacy one. A source row whose template no longer resolves cannot be
+    // cloned into the same broken state: the clone is refused and names the id.
+    const template = canonicalTemplateId('lp', src.template_id)
+    if (!template.ok) return { ok: false, error: `cannot clone: ${template.error}` }
     const created = (await payload.create({
       collection: 'funnel-landing-pages',
       data: {
         name: `${src.name} (copy)`,
         slug: `${src.slug}-copy-${Date.now().toString(36).slice(-4)}`,
-        template_id: src.template_id,
+        template_id: template.id,
         angle: src.angle,
         is_published: false,
         sections: src.sections ?? [],
@@ -115,6 +139,30 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
   const dep = args.deployment || {}
   const payload = await getPayload({ config })
 
+  const siteId = numFromBrandId(dep.brandId)
+  const isExisting = typeof dep.id === 'string' && /^\d+$/.test(dep.id)
+
+  const gate = await requireDeploymentSiteAdmin(payload, user, {
+    collection: 'funnel-lp-deployments',
+    existingId: isExisting ? dep.id : undefined,
+    incomingSiteId: siteId,
+  })
+  if (!gate.ok) return gate
+
+  // The template lives on the brandless page, not on the deployment, so this is
+  // where a deployment learns its page's template does not resolve. Publishing
+  // that would put a page nobody chose on a real host; refusing at save is the
+  // earliest point the operator can be told which id is wrong.
+  const lpId = dep.landingPageId ? Number(dep.landingPageId) : null
+  if (lpId !== null && Number.isFinite(lpId)) {
+    const lpDoc = (await payload
+      .findByID({ collection: 'funnel-landing-pages', id: lpId, overrideAccess: true })
+      .catch(() => null)) as Record<string, unknown> | null
+    if (!lpDoc) return { ok: false, error: 'landing page not found' }
+    const template = canonicalTemplateId('lp', lpDoc.template_id)
+    if (!template.ok) return { ok: false, error: `landing page template: ${template.error}` }
+  }
+
   // Resolve the host string from the editor back to a domain record id.
   let domainId: number | null = null
   if (typeof dep.domain === 'string' && dep.domain) {
@@ -124,15 +172,14 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
 
   const data = {
     name: (dep.name as string) || '',
-    landing_page: dep.landingPageId ? Number(dep.landingPageId) : null,
-    site: numFromBrandId(dep.brandId),
+    landing_page: lpId,
+    site: gate.siteId,
     domain: domainId,
     path: (dep.path as string) || '',
     quiz_deployment_id: (dep.quizDeploymentId as string) || '',
     status: (dep.status as string) || 'draft',
   }
 
-  const isExisting = typeof dep.id === 'string' && /^\d+$/.test(dep.id)
   try {
     let id: string
     if (isExisting) {

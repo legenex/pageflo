@@ -8,6 +8,8 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { invokeLLM } from '@/lib/ai/invoke'
+import { canonicalTemplateId } from '@/lib/template-registry'
+import { requireDeploymentSiteAdmin } from '@/lib/authz'
 
 const PATH = '/admin/quizzes'
 
@@ -147,6 +149,26 @@ export async function saveQuizDeployment(args: { deployment: Record<string, unkn
   const dep = args.deployment || {}
   const payload = await getPayload({ config })
 
+  const siteId = numFromBrandId(dep.brandId)
+  const isExisting = typeof dep.id === 'string' && /^\d+$/.test(dep.id)
+
+  // The three funnel deployment collections are `isAuthenticated` on every verb,
+  // so `overrideAccess: false` alone lets any logged-in user write any tenant's
+  // deployment. Both the incoming Site and, on an update, the one already on the
+  // row must belong to the caller.
+  const gate = await requireDeploymentSiteAdmin(payload, user, {
+    collection: 'funnel-quiz-deployments',
+    existingId: isExisting ? dep.id : undefined,
+    incomingSiteId: siteId,
+  })
+  if (!gate.ok) return gate
+
+  // A template id that names nothing must stop the save. It used to default to
+  // `'default'` and resolve silently at render time, so a typo produced a page
+  // that looked wrong with nothing anywhere saying why.
+  const template = canonicalTemplateId('quiz', dep.templateId ?? 'default')
+  if (!template.ok) return { ok: false, error: template.error }
+
   let domainId = null
   if (typeof dep.domain === 'string' && dep.domain) {
     const dr = await payload.find({ collection: 'domains', where: { host: { equals: dep.domain } }, limit: 1, overrideAccess: true })
@@ -156,11 +178,13 @@ export async function saveQuizDeployment(args: { deployment: Record<string, unkn
   const data = {
     name: dep.name || '',
     quiz: dep.quizId ? Number(dep.quizId) : null,
-    site: numFromBrandId(dep.brandId),
+    site: gate.siteId,
     domain: domainId,
     path: dep.path || '',
     render_mode: dep.renderMode || 'standalone',
-    template_id: dep.templateId || 'default',
+    // Canonical, so the alias table is consulted once here rather than on every
+    // read for the rest of the row's life.
+    template_id: template.id,
     // Null rather than '' so "use the template's" is one value, not two.
     progress_form: (dep.progressForm as string) || null,
     status: dep.status || 'draft',
@@ -173,7 +197,6 @@ export async function saveQuizDeployment(args: { deployment: Record<string, unkn
     pixels: dep.pixels ?? {},
   }
 
-  const isExisting = typeof dep.id === 'string' && /^\d+$/.test(dep.id)
   try {
     let id
     if (isExisting) {

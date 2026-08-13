@@ -347,15 +347,20 @@ export const LEGACY_TEMPLATE_IDS: Record<string, string> = {
   compact: 'sq_sixty_second',
 }
 
-/** The template a stored id resolves to, old ids included. */
-export const resolveQuizTemplate = (id: unknown): QuizTemplate => {
-  const key = typeof id === 'string' ? id : ''
-  return (
-    QUIZ_TEMPLATE_BY_ID[key] ??
-    QUIZ_TEMPLATE_BY_ID[LEGACY_TEMPLATE_IDS[key] ?? ''] ??
-    QUIZ_TEMPLATE_BY_ID.sq_editorial_inline
-  )
-}
+/**
+ * `resolveQuizTemplate` used to live here and answered every id, including ones
+ * that named nothing, with `sq_editorial_inline` and no word about it.
+ *
+ * It has been removed rather than fixed. Resolution is `src/lib/template-registry.ts`
+ * and only that: `resolveTemplate` for anything that may refuse, `resolveForRender`
+ * for a path that must draw something and now reports when it guessed. A second
+ * resolver next to the data it resolves is how the first one survived — every
+ * caller had one within reach and none of them had to think about it.
+ *
+ * This module is the DATA. `QUIZ_TEMPLATES`, `QUIZ_TEMPLATE_BY_ID` and
+ * `LEGACY_TEMPLATE_IDS` are what the registry reads; nothing here decides.
+ * `scripts/test-template-registry.mts` fails if a second resolver reappears.
+ */
 
 /** Max width in px for a template, or null when it runs full bleed. */
 export const templateMaxWidth = (t: QuizTemplate): number | null => (t.width[1] === 0 ? null : t.width[1])

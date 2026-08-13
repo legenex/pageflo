@@ -33,6 +33,7 @@ import {
   type QuizTemplate,
 } from '@/lib/quiz-templates/model'
 import { PORTED_TEMPLATES, PORTED_BY_SLUG, type PortedTemplate } from '@/lib/lp-templates'
+import { LP_IDENTITIES } from '@/lib/lp-identities'
 
 export type TemplateKind = 'quiz' | 'lp'
 
@@ -80,13 +81,27 @@ export type RegisteredQuizTemplate = {
   template: QuizTemplate
 }
 
+/**
+ * Which code path draws a landing-page template.
+ *
+ * `ported` is the twelve: the handoff's own markup, mounted as-is with the
+ * brand supplied through CSS variables. `identity` is the four that predate
+ * them: a skeleton of nodes drawn by `SectionNode`, carrying an `LpIdentity`.
+ *
+ * They are genuinely different renderers, not two skins, which is why the four
+ * are registered rather than aliased onto a ported template. An alias would
+ * silently move every page built by the AI wizard onto markup it has no copy
+ * for, and the failure would look like an empty page rather than a bad mapping.
+ */
+export type LpRenderer = 'ported' | 'identity'
+
 export type RegisteredLpTemplate = {
   kind: 'lp'
   id: string
   code: string
   name: string
   blurb: string
-  family: PortedTemplate['family']
+  family: PortedTemplate['family'] | 'legacy'
   channels: string
   /** Where this template puts the quiz, in the library's own words. */
   quizPlacement: string
@@ -96,7 +111,18 @@ export type RegisteredLpTemplate = {
    * A recommendation, never a constraint — the operator may pick any of the 20.
    */
   recommendedQuizTemplateId: string
-  template: PortedTemplate
+  renderer: LpRenderer
+  /**
+   * True for the twelve the stock library offers. The four legacy identity
+   * templates resolve, render and keep their pages working, but they are not
+   * what the Templates tab is a catalogue of, and counting them there would
+   * make the library's own count a lie.
+   */
+  stock: boolean
+  /** The ported markup and token table. Null for an identity template. */
+  template: PortedTemplate | null
+  /** The identity id this template carries. Null for a ported template. */
+  identityId: string | null
 }
 
 export type RegisteredTemplate = RegisteredQuizTemplate | RegisteredLpTemplate
@@ -147,14 +173,61 @@ const lpEntry = (t: PortedTemplate): RegisteredLpTemplate => ({
   quizPlacement: t.quiz,
   ground: t.ground,
   recommendedQuizTemplateId: RECOMMENDED_QUIZ_BY_LP[t.slug] ?? NEUTRAL_QUIZ_TEMPLATE,
+  renderer: 'ported',
+  stock: true,
   template: t,
+  identityId: null,
+})
+
+/**
+ * The four identity templates, registered rather than aliased.
+ *
+ * They are stored on real rows and they are what the AI wizard builds into,
+ * because they are the only landing-page templates whose copy travels as nodes.
+ * Leaving them out of the registry would mean either that `resolveTemplate`
+ * rejects a page the product can still create, or that the save path has to keep
+ * a second list of "ids that are also fine" — which is precisely the hidden
+ * second registry this module exists to remove.
+ */
+const identityEntry = (identity: { id: string; name: string; position: string; tagline: string }): RegisteredLpTemplate => ({
+  kind: 'lp',
+  id: identity.id,
+  code: `LEG-${identity.id.toUpperCase()}`,
+  name: identity.name,
+  blurb: `${identity.position} - ${identity.tagline}`,
+  family: 'legacy',
+  channels: 'Legacy - kept resolvable for pages already built on it',
+  quizPlacement: 'Per skeleton',
+  ground: 'IDENTITY',
+  recommendedQuizTemplateId: NEUTRAL_QUIZ_TEMPLATE,
+  renderer: 'identity',
+  stock: false,
+  template: null,
+  identityId: identity.id,
 })
 
 /** Every quiz visual template, in library order. */
 export const listQuizTemplates = (): RegisteredQuizTemplate[] => QUIZ_TEMPLATES.map(quizEntry)
 
-/** Every landing-page visual template, in library order. */
+/**
+ * The stock landing-page library: the twelve, in library order.
+ *
+ * This is what a Templates tab is a catalogue of. `listAllLpTemplates` is what a
+ * resolver iterates.
+ */
 export const listLpTemplates = (): RegisteredLpTemplate[] => PORTED_TEMPLATES.map(lpEntry)
+
+/** The four legacy identity templates. Resolvable, never offered as stock. */
+export const listLegacyLpTemplates = (): RegisteredLpTemplate[] => LP_IDENTITIES.map(identityEntry)
+
+/** Every landing-page id that resolves: the twelve stock, then the four legacy. */
+export const listAllLpTemplates = (): RegisteredLpTemplate[] => [
+  ...listLpTemplates(),
+  ...listLegacyLpTemplates(),
+]
+
+const LP_BY_ID = (): Record<string, RegisteredLpTemplate> =>
+  Object.fromEntries(listAllLpTemplates().map((t) => [t.id, t]))
 
 export const listTemplates = (kind: TemplateKind): RegisteredTemplate[] =>
   kind === 'quiz' ? listQuizTemplates() : listLpTemplates()
@@ -178,18 +251,39 @@ export const resolveTemplate = (kind: TemplateKind, rawId: unknown): TemplateRes
   const alias = TEMPLATE_ALIASES[kind][requestedId]
   const id = alias ?? requestedId
 
-  const hit = kind === 'quiz' ? QUIZ_TEMPLATE_BY_ID[id] : PORTED_BY_SLUG[id]
-  if (!hit) {
+  if (kind === 'quiz') {
+    const hit = QUIZ_TEMPLATE_BY_ID[id]
     // Naming the id is the difference between a report somebody can act on and
     // one they can only escalate.
-    return { ok: false, error: `unknown ${kind} template id "${requestedId}"`, requestedId }
+    if (!hit) return { ok: false, error: `unknown quiz template id "${requestedId}"`, requestedId }
+    return { ok: true, template: quizEntry(hit), usedAlias: alias ? requestedId : null }
   }
 
-  return {
-    ok: true,
-    template: kind === 'quiz' ? quizEntry(hit as QuizTemplate) : lpEntry(hit as PortedTemplate),
-    usedAlias: alias ? requestedId : null,
-  }
+  const ported = PORTED_BY_SLUG[id]
+  if (ported) return { ok: true, template: lpEntry(ported), usedAlias: alias ? requestedId : null }
+
+  const legacy = LP_BY_ID()[id]
+  if (legacy) return { ok: true, template: legacy, usedAlias: alias ? requestedId : null }
+
+  return { ok: false, error: `unknown lp template id "${requestedId}"`, requestedId }
+}
+
+/**
+ * The id to STORE for a raw operator or import value.
+ *
+ * Aliases are resolved forward here, so a row saved today carries the id of the
+ * template it actually renders as. That is the difference between an alias table
+ * that shrinks and one that grows: the mapping stays for rows nobody touches,
+ * and every row somebody does touch stops needing it. `bold_modern` is the case
+ * that matters — it is the stored default on every landing page and names no
+ * template, so leaving it in place means the alias is load-bearing forever.
+ */
+export const canonicalTemplateId = (
+  kind: TemplateKind,
+  rawId: unknown,
+): { ok: true; id: string } | { ok: false; error: string } => {
+  const r = resolveTemplate(kind, rawId)
+  return r.ok ? { ok: true, id: r.template.id } : { ok: false, error: r.error }
 }
 
 export type RenderResolution = {
@@ -218,6 +312,28 @@ export const resolveForRender = (kind: TemplateKind, rawId: unknown): RenderReso
   const list = listTemplates(kind)
   const fallback = kind === 'quiz' ? (list.find((t) => t.id === NEUTRAL_QUIZ_TEMPLATE) ?? list[0]) : list[0]
   return { template: fallback, usedFallback: true, requestedId: strict.requestedId, error: strict.error }
+}
+
+/**
+ * Say out loud that a render fell back.
+ *
+ * `resolveForRender` returning `usedFallback` is only worth having if somebody
+ * reads it, and the render paths are the ones that cannot throw. One reporter,
+ * one grep-able prefix, so a page rendering as a template nobody chose leaves a
+ * trace in the server log instead of only in how the page looks.
+ *
+ * Returns the resolution so a caller can inline it:
+ *   const { template } = reportTemplateFallback('quiz deployment 12', resolveForRender(...))
+ */
+export const TEMPLATE_FALLBACK_LOG_PREFIX = '[template-registry] fallback'
+
+export const reportTemplateFallback = <R extends RenderResolution>(context: string, res: R): R => {
+  if (res.usedFallback) {
+    console.warn(
+      `${TEMPLATE_FALLBACK_LOG_PREFIX}: ${context} requested "${res.requestedId}" (${res.error}); rendered "${res.template.id}" instead`,
+    )
+  }
+  return res
 }
 
 /** The quiz skin to offer for a landing page, by LP id. Never throws. */
@@ -255,14 +371,31 @@ export const registryHealth = (): { ok: boolean; problems: string[] } => {
     }
   }
   dupe(quiz.map((t) => t.id), 'quiz')
-  dupe(lp.map((t) => t.id), 'landing-page')
+  // Across stock AND legacy: a legacy identity id colliding with a ported slug
+  // would make one of them unreachable, and which one wins is an ordering
+  // accident rather than a decision.
+  dupe(listAllLpTemplates().map((t) => t.id), 'landing-page')
 
   // An alias pointing at nothing is worse than a missing alias: it resolves to
   // the fallback while looking deliberate.
+  const lpById = LP_BY_ID()
   for (const kind of ['quiz', 'lp'] as TemplateKind[]) {
     for (const [from, to] of Object.entries(TEMPLATE_ALIASES[kind])) {
-      const target = kind === 'quiz' ? QUIZ_TEMPLATE_BY_ID[to] : PORTED_BY_SLUG[to]
+      const target = kind === 'quiz' ? QUIZ_TEMPLATE_BY_ID[to] : lpById[to]
       if (!target) problems.push(`${kind} alias "${from}" points at unknown template "${to}"`)
+      // An alias whose source is also a real id is unreachable by definition:
+      // the alias table is consulted first, so the real template it names can
+      // never be resolved under its own name again.
+      const shadowed = kind === 'quiz' ? QUIZ_TEMPLATE_BY_ID[from] : lpById[from]
+      if (shadowed) problems.push(`${kind} alias "${from}" shadows a real template of the same id`)
+    }
+  }
+
+  // Every legacy identity template must actually have an identity behind it, or
+  // the render path it names has nothing to draw with.
+  for (const t of listLegacyLpTemplates()) {
+    if (t.renderer !== 'identity' || !t.identityId) {
+      problems.push(`legacy landing-page template "${t.id}" names no identity`)
     }
   }
 

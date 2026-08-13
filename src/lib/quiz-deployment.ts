@@ -2,7 +2,7 @@ import { cache } from 'react'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { siteToBrand, type DomainLite } from './brand-map'
-import { resolveQuizTemplateId } from './quiz-theme'
+import { resolveForRender, reportTemplateFallback } from './template-registry'
 import { normalizeDeploymentPath } from './quiz-deployment-path'
 import { normalizeDestinations, type DestinationMap } from './quiz-destinations'
 import { isClaimedByAuthoredContent, pathVariantsFor } from './public-path-claims'
@@ -32,7 +32,16 @@ export type PublicQuizDeployment = {
   name: string
   path: string
   renderMode: 'standalone' | 'embed'
+  /** Canonical: aliases already resolved, never a raw stored value. */
   templateId: string
+  /**
+   * True when the stored id named no template and a stand-in was drawn. Carried
+   * on the resolved object rather than only logged, so the publish preflight can
+   * refuse it and the builder can badge it.
+   */
+  templateFellBack: boolean
+  /** The id that was stored, when it differs from what rendered. */
+  requestedTemplateId: string
   status: string
   embedPreviewBg: string
   headerConfig: Record<string, unknown> | null
@@ -194,12 +203,23 @@ const hydrateQuizDeployment = async (
     kind: typeof d.kind === 'string' ? d.kind : undefined,
   }))
 
+  // One resolution for the whole hydration, reported once. `resolveQuizTemplateId`
+  // below used to be the only thing that looked at this id, and it answered
+  // silently, so a deployment stored under a typo rendered as the neutral skin
+  // with nothing anywhere recording that a choice had been discarded.
+  const templateRes = reportTemplateFallback(
+    `quiz deployment ${doc.id}`,
+    resolveForRender('quiz', doc.template_id ?? 'default'),
+  )
+
   const deployment: PublicQuizDeployment = {
     id: String(doc.id),
     name: String(doc.name ?? ''),
     path: normalizeDeploymentPath(String(doc.path ?? '')),
     renderMode: doc.render_mode === 'embed' ? 'embed' : 'standalone',
-    templateId: String(doc.template_id ?? 'default'),
+    templateId: templateRes.template.id,
+    templateFellBack: templateRes.usedFallback,
+    requestedTemplateId: templateRes.requestedId,
     status: String(doc.status ?? 'draft'),
     embedPreviewBg: String(doc.embed_preview_bg ?? ''),
     headerConfig: (doc.header_config ?? null) as Record<string, unknown> | null,
@@ -215,7 +235,9 @@ const hydrateQuizDeployment = async (
   const baseBrand = siteToBrand(siteDoc as unknown as Record<string, unknown>, domainList)
 
   return {
-    deployment: { ...deployment, templateId: resolveQuizTemplateId(deployment) },
+    // `deployment.templateId` is already canonical — resolved once above — so
+    // there is no second resolution here to disagree with the first.
+    deployment,
     quiz: {
       id: String(quizDoc.id),
       name: String(quizDoc.name ?? ''),

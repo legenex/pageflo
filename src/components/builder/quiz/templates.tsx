@@ -25,12 +25,24 @@
 
 import { ShieldCheck } from 'lucide-react'
 import { onPrimaryText, auditColorPairs } from '@/lib/builder/color-system'
-import { QUIZ_TEMPLATES, resolveQuizTemplate, templateMaxWidth, cleanProgressForm, PROGRESS_FORM_LABELS } from '@/lib/quiz-templates/model'
+import { QUIZ_TEMPLATES, templateMaxWidth, cleanProgressForm, PROGRESS_FORM_LABELS } from '@/lib/quiz-templates/model'
+import { resolveForRender, reportTemplateFallback } from '@/lib/template-registry'
 import { quizTheme, QUIZ_FONTS } from '@/lib/quiz-templates/theme'
 import { QuizProgress } from '@/components/public/quiz/forms/progress'
 import { QuizAnswer, answerLayout } from '@/components/public/quiz/forms/answers'
 
-export { QUIZ_TEMPLATES, resolveQuizTemplate, answerLayout, PROGRESS_FORM_LABELS }
+/**
+ * The spec a stored id draws as.
+ *
+ * A thin wrapper over the registry rather than its own lookup: the builder must
+ * agree with the public renderer about what `'default'` means, and the only way
+ * to guarantee that is for both to ask the same module. The wrapper exists so
+ * the callers here keep taking a spec rather than a resolution object.
+ */
+export const resolveQuizTemplate = (id) =>
+  reportTemplateFallback(`quiz builder preview`, resolveForRender('quiz', id)).template.template
+
+export { QUIZ_TEMPLATES, answerLayout, PROGRESS_FORM_LABELS }
 
 /**
  * Everything a template needs, for one brand.

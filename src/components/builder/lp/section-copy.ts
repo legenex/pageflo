@@ -129,10 +129,18 @@ export const buildSeedSections = () =>
 
 // The artifact's sample landing pages (buildSeedLandingPages). Sections are
 // generated fresh per page at seed time.
+//
+// The three template ids carried over from the artifact — `bold_modern`,
+// `classic_authority`, `editorial_investigation` — named NO template in this
+// codebase. The old resolver answered all three with the first template in the
+// list, so every seeded sample was the same page under three names and nothing
+// said so. They are now three real, distinct templates chosen to match each
+// sample's angle; `scripts/test-template-registry.mts` asserts they resolve, so
+// a seed cannot go back to naming a template that does not exist.
 export const SAMPLE_LANDING_PAGES = [
-  { name: 'MVA Pain First', slug: 'mva-pain-first', template_id: 'bold_modern', angle: 'pain', is_published: true },
-  { name: 'Authority Build', slug: 'authority-build', template_id: 'classic_authority', angle: 'authority', is_published: false },
-  { name: 'Editorial Test', slug: 'editorial-test', template_id: 'editorial_investigation', angle: 'community', is_published: false },
+  { name: 'MVA Pain First', slug: 'mva-pain-first', template_id: 'human_recovery_story', angle: 'pain', is_published: true },
+  { name: 'Authority Build', slug: 'authority-build', template_id: 'authority_network', angle: 'authority', is_published: false },
+  { name: 'Editorial Test', slug: 'editorial-test', template_id: 'editorial_investigation_v2', angle: 'community', is_published: false },
 ]
 
 // The artifact's sample deployments (buildSeedLPDeployments), mapped to whichever

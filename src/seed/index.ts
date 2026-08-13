@@ -326,7 +326,7 @@ const upsertFunnelQuizDeployment = async (
     collection: 'funnel-quiz-deployments',
     data: {
       name: 'MVA Tiered Quiz', quiz: quizId, site: siteId, domain: domainId, path: '/s/mva',
-      render_mode: 'standalone', template_id: 'default', status: 'live',
+      render_mode: 'standalone', template_id: 'sq_quiz_first', status: 'live',
       header_config: { logoEnabled: true, ctaButton: { enabled: true, text: 'CLICK HERE TO CALL', url: 'tel:', fontSize: 11 } },
       footer_config: { logoEnabled: true, logoSize: 32, showCopyright: true, fontSize: 12 },
       body_section_overrides: null, embed_preview_bg: '#0a1a3a', utm: {}, pixels: {},
