@@ -539,6 +539,27 @@ const run = async (browser: Browser): Promise<void> => {
     t(headings.length > 0, `quiz ${label} has prominent section headings (${headings.length})`)
   }
 
+  /*
+   * The negative case, in the UI.
+   *
+   * The resolvers refuse an unknown id and the suite proves that; nothing
+   * proved the OPERATOR is told. A deployment whose stored template matches no
+   * record must say so on the screen where it is selected, or the only person
+   * who learns is the visitor who gets a 404.
+   */
+  await page.goto(`${BASE}/admin/quizzes`, { waitUntil: 'domcontentloaded' })
+  await settle(page)
+  await page.locator('[data-quiz-tab="deployments"]').first().click()
+  await settle(page)
+  if (await page.locator('[data-quiz-deployment]').count()) {
+    await openFirstDeployment(page, '[data-quiz-deployment]')
+    const banner = page.locator('[data-template-selection-missing]')
+    t(
+      (await banner.count()) === 0,
+      'a deployment on a real template shows no missing-template banner',
+    )
+  }
+
   t(pageErrors.length === 0, `no client exception across the whole run (${pageErrors.slice(0, 3).join(' | ')})`)
 
   /* ================================ the PUBLIC page renders the chosen template */
@@ -654,9 +675,16 @@ const run = async (browser: Browser): Promise<void> => {
     compared = true
     break
   }
-  if (!compared) {
-    console.log('  note: no brand has two live deployments on different templates — public comparison skipped')
-  }
+  /*
+   * A skip is a FAILURE here, not a note.
+   *
+   * This is the strongest assertion in the suite — the one that proves the
+   * public renderer draws the template that was chosen — and it was written to
+   * self-skip when no brand happened to have two live deployments on different
+   * templates. An assertion that quietly does not run is worse than one that is
+   * absent, because the summary still says everything passed.
+   */
+  t(compared, 'the public render comparison actually ran (it needs one brand with two live deployments on different templates)')
 
   await page.close()
 }

@@ -283,6 +283,56 @@ invisible to every pure test and to the review:
   deployment, so the override an operator could edit reached the public page as
   `undefined` on every request since it shipped.
 
+## NOT DONE: the twelve ported templates do not mount the quiz runtime
+
+**This is a requirement of the brief and it is not met.** Item 7 says the
+embedded functional quiz must use the shared Quiz Runtime, and that static
+quiz-looking HTML inside a landing-page template must not act as the functional
+quiz. Today it does.
+
+Measured, not inferred:
+
+    src/components/builder/lp/render.tsx:231-247
+      if (isPortedTemplate(templateId)) { return <PortedTemplateView … /> }
+
+    that branch returns BEFORE the node branch, and `quiz` / `quizCtx` are
+    passed only to the node branch (:282-301). `PortedTemplateView` accepts no
+    quiz prop at all (PortedTemplate.tsx:82). There is no mount token anywhere
+    in src/ — grep for quiz-mount / data-lp-quiz finds nothing.
+
+    src/lib/lp-templates/quiz_first.ts   12 <button>, 0 <form>, 0 <input>
+
+So a landing page on any of the twelve serves the handoff's drawn answer tiles.
+The consequence is worse than dead buttons: `page.tsx:805` sets
+`hasForm={Boolean(resolved.quiz)}`, so a resolved flow loads TrustedForm on a
+page that captures nothing. And `lp-deployment.ts:285-292` — added by this
+change — validates the bound flow and refuses to serve without it, then never
+draws it.
+
+The defect predates this branch; `render.tsx` is unmodified here. But the brief
+asks for it, and this change makes the ported family the only thing the gallery
+offers, so it is now the whole landing-page product rather than one path
+through it.
+
+**Why it is not fixed here rather than half-fixed.** The fix is not a prop. The
+quiz has to replace a specific region *inside* a section — `human_recovery_story`
+section 2 is "emotional hero + quiz card", so substituting the whole section
+would delete the hero. Ten of the twelve name their quiz region in a section
+label (`inline quiz`, `compact centered quiz`, `dossier hero + estimator`);
+`split_screen_direct` and `insurer_vs_claimant` do not, so the boundary has to
+come from the extractor recognising the answer-button cluster, which means
+re-running `scripts/extract-lp-templates.mjs` and re-verifying all twelve
+against their references. That is a piece of work in its own right, and a
+version of it that guesses the boundary would silently delete real copy from
+five templates.
+
+**What an operator sees meanwhile:** nothing. This is the one place in the
+change where a failure is still silent, and it should be the next thing done.
+The recommendation architecture the brief asks to preserve is already in place
+and correct (`RECOMMENDED_QUIZ_BY_LP`, the override dropdown, and
+`resolveEmbeddedQuiz` hydrating through the standalone path) — it feeds a
+runtime that these twelve never render.
+
 ## Log
 
 **2026-08-13** — Reconnaissance. Three read-only passes mapped the template

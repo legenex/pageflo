@@ -43,7 +43,7 @@
 import { useMemo, useState } from 'react'
 
 import { TemplatePreview } from '@/components/builder/quiz/TemplatePreview'
-import { PortedTemplateView } from '@/components/builder/lp/PortedTemplate'
+import { LivePreview } from '@/components/builder/lp/render'
 import { PREVIEW_BRAND_DEFAULT } from '@/components/builder/lp/render'
 import { resolveTemplate } from '@/lib/template-registry'
 import { T, Pill, Btn, Select, Label } from '@/components/builder/ui'
@@ -85,18 +85,21 @@ const brandFor = (brands, brandId) =>
  * not — which is the same trap `docs/production-readiness.md` records this
  * gallery falling into once already, in a different disguise.
  *
- * `PortedTemplateView` is what the builder's own centre pane mounts and what
- * the public page renders through, so this is the real composition path rather
- * than a second one that could drift. Both untrusted inputs are already escaped
- * at their source — `composeTemplate` for slot overrides, `resolveTokensForHtml`
- * for brand values — which is what makes an inline mount safe here; see the
- * doc comment on PortedTemplate.tsx.
+ * `LivePreview` is what the builder's own centre pane mounts and what the public
+ * page renders through, so this is the real composition path rather than a
+ * second one that could drift. It is used in place of `PortedTemplateView`
+ * because that component draws only the twelve PORTED templates and returns
+ * null for the four node-backed identity ones — and "New template with Claude"
+ * creates exactly those, so an AI-authored template was selectable in the
+ * deployment gallery with a blank thumbnail and a blank Preview. One preview
+ * implementation that covers every renderer, rather than two that cover
+ * different halves of one library.
  *
  * Containment is still three-deep, because the reason for that has not changed:
  * `overflow` alone does not stop a positioned or transformed descendant, and
  * four earlier attempts each measured correct while painting over the card.
  */
-const LpThumb = ({ slug, brand, overrides, height = 190, frameWidth = 1280 }) => {
+const LpThumb = ({ slug, brand, overrides, sections = [], height = 190, frameWidth = 1280 }) => {
   const [w, setW] = useState(560)
   const scale = w / frameWidth
 
@@ -118,7 +121,12 @@ const LpThumb = ({ slug, brand, overrides, height = 190, frameWidth = 1280 }) =>
           backgroundColor: '#fff',
         }}
       >
-        <PortedTemplateView slug={slug} brand={brand} overrides={overrides ?? {}} />
+        <LivePreview
+          landingPage={{ templateId: slug, sections }}
+          brand={brand}
+          slotOverrides={overrides ?? {}}
+          editable={false}
+        />
       </div>
     </div>
   )
@@ -204,7 +212,12 @@ const PreviewModal = ({ template, kind, brand, onClose }) => {
               isolation: 'isolate',
             }}
           >
-            <PortedTemplateView slug={template.templateId} brand={brand} overrides={template.slotOverrides ?? {}} />
+            <LivePreview
+              landingPage={{ templateId: template.templateId, sections: template.sections ?? [] }}
+              brand={brand}
+              slotOverrides={template.slotOverrides ?? {}}
+              editable={false}
+            />
           </div>
         ) : (
           <div style={{ width, maxWidth: '100%', border: `1px solid ${T.border}`, borderRadius: 6, overflow: 'hidden' }}>
@@ -259,7 +272,12 @@ const Card = ({ template, kind, brand, isSelected, onSelect, onPreview }) => {
           <TemplatePreview spec={spec} brand={brand} height={190} />
         </div>
       ) : (
-        <LpThumb slug={template.templateId} brand={brand} overrides={template.slotOverrides} />
+        <LpThumb
+          slug={template.templateId}
+          brand={brand}
+          overrides={template.slotOverrides}
+          sections={template.sections}
+        />
       )}
 
       <div style={{ padding: 13, display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
