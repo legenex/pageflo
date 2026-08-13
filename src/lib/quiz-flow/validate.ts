@@ -838,22 +838,32 @@ const checkDeterminism = (
   // Driving the flow from the answer ids alone is the real property: the
   // outcome has to be a function of what the visitor chose. Comparing two runs
   // of the enumerator alone would only prove the enumerator is stable.
+  // The input to a qualification decision is what the visitor chose AND what
+  // any lookup node returned. Keying on the answers alone was right only while
+  // webhook nodes were skipped; now that they execute, it would report every
+  // flow with a tier lookup as ambiguous, which is the wrong answer loudly.
+  // Keying on both keeps the real defect - one input, two outcomes - detectable.
   const bySequence = new Map<string, PathRow>()
   let replayed = 0
   for (const row of walk.rows) {
     if (row.terminalKind === 'depth_limit') continue
-    const key = row.answerIds.join('>')
+    const answerKey = row.answerIds.join('>')
+    const lookupKey = row.lookupOutcomeIds.join('>')
+    const key = `${answerKey}|${lookupKey}`
     const previous = bySequence.get(key)
     if (previous) {
+      const inputs = lookupKey
+        ? `${answerKey || '(no answers)'} with lookups ${lookupKey}`
+        : answerKey || '(no answers)'
       c.error({
         code: 'ambiguous_answer_sequence',
-        message: `Two different paths take the same answers (${key || '(no answers)'}) and end differently: ${previous.terminalNodeId ?? previous.terminalKind} vs ${row.terminalNodeId ?? row.terminalKind}.`,
+        message: `Two different paths take the same answers (${inputs}) and end differently: ${previous.terminalNodeId ?? previous.terminalKind} vs ${row.terminalNodeId ?? row.terminalKind}.`,
       })
       continue
     }
     bySequence.set(key, row)
 
-    const replay = replayAnswerIds(quiz, row.answerIds, options)
+    const replay = replayAnswerIds(quiz, row.answerIds, { ...options, lookupOutcomeIds: row.lookupOutcomeIds })
     if (!replay.ok) {
       c.error({
         code: 'replay_failed',

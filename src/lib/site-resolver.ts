@@ -12,17 +12,33 @@ import { domainEligibility, type DomainLike } from './domain-eligibility'
  * like a live one.
  *
  * Enforcing it is the correct behaviour and it is what this switch turns on.
- * It defaults to OFF, and that is a rollout decision rather than an unfinished
- * one: turning it on changes which hosts a live system answers for, the
- * production `domains` rows cannot be read from this checkout, and
- * `docs/production-readiness.md` records that at least one live host's
- * `ssl_status` was set without anything verifying it. Flipping a switch that
- * 404s real traffic on the strength of a row nobody has looked at is the kind
- * of confident change this codebase has been bitten by.
+ * It defaults to OFF because turning it on changes which hosts a live system
+ * answers for, and doing that on the strength of a row nobody has looked at is
+ * the kind of confident change this codebase has been bitten by.
  *
- * Off, every refusal is still LOGGED with its reason, so the list of what would
- * change is available before anybody decides. Set
- * `LEGALOS_ENFORCE_DOMAIN_ELIGIBILITY=true` once that list has been read.
+ * THAT LIST HAS NOW BEEN READ. On 2026-08-13 every production domain row was
+ * checked against real DNS, a real TLS handshake, the certificate the host
+ * actually presents, and `/api/legalos/self-check`:
+ *
+ *   64/65/69  *.preview.legenex.com   DNS correct, app returns the right site,
+ *                                     NO certificate has ever been issued.
+ *                                     Eligible on `status` alone while
+ *                                     PREVIEW_REQUIRES_SSL is false, so
+ *                                     enforcement does not change them.
+ *   67        getwhatyoureowed.co     Claimed status=active AND ssl_status=
+ *                                     active. Both false: no Plesk vhost, no
+ *                                     certificate, and DNS split between this
+ *                                     server and a third party. Row corrected
+ *                                     to error/error, so enforcement now
+ *                                     refuses it - which is right, because a
+ *                                     browser refuses it too.
+ *
+ * So exactly one host changes behaviour under enforcement, and it is the one
+ * that provably cannot serve valid HTTPS. Set
+ * `LEGALOS_ENFORCE_DOMAIN_ELIGIBILITY=true` (it is set in production).
+ *
+ * Off, every refusal is still LOGGED with its reason, so the same list can be
+ * re-derived from the journal after any future domain change.
  */
 const ENFORCE_DOMAIN_ELIGIBILITY = process.env.LEGALOS_ENFORCE_DOMAIN_ELIGIBILITY === 'true'
 

@@ -105,6 +105,19 @@ export const NON_VISITOR_NODE_TYPES: readonly string[] = [
 
 const NON_VISITOR = new Set<string>(NON_VISITOR_NODE_TYPES)
 
+/**
+ * The node types that call an outside service and map its answer back into the
+ * value bag.
+ *
+ * Mirrors `WEBHOOK_NODE_TYPES` in `src/components/public/quiz/QuizRuntime.tsx`,
+ * and `scripts/test-quiz-flow.mts` reads the runtime's source to fail when the
+ * two stop agreeing - the same guard the non-visitor list already has, for the
+ * same reason.
+ */
+export const WEBHOOK_NODE_TYPES_LIST: readonly string[] = ['webhook', 'verification']
+
+const WEBHOOK_NODE_TYPES = new Set<string>(WEBHOOK_NODE_TYPES_LIST)
+
 /** The operators `QuizRuntime.advance()` understands. Anything else is false. */
 export const CONDITION_OPERATORS: readonly string[] = [
   'eq',
@@ -177,6 +190,12 @@ export type NodeSituation =
   | { kind: 'dead_end'; node: QuizNode }
   /** Executes and advances itself. */
   | { kind: 'auto'; node: QuizNode; answer: Answer }
+  /**
+   * Executes, advances itself, and can land in more than one state because an
+   * outside service decided something. The visitor still chose nothing, so this
+   * never contributes to a path's answer sequence.
+   */
+  | { kind: 'auto_branch'; node: QuizNode; answers: readonly Answer[] }
   | { kind: 'choose'; node: QuizNode; answers: readonly Answer[] }
 
 /**
@@ -194,11 +213,126 @@ export type NodeSituation =
  * far more common case (a button question with its answers deleted) where there
  * is genuinely no way forward.
  */
+/**
+ * The id recorded for the branch where the lookup told the flow nothing.
+ *
+ * Shared with `AUTO_ANSWER` so the no-response branch of a webhook node and a
+ * plain auto-advanced node read identically in a replay.
+ */
+export const LOOKUP_NO_RESPONSE_ID = AUTO_ANSWER_ID
+
+/**
+ * A stable, readable id for one outcome of one lookup node.
+ *
+ * It names the node as well as the value because two lookups can both write
+ * `tier`, and a replay has to be able to tell which one it is replaying.
+ */
+export const lookupOutcomeId = (node: QuizNode, key: string, value: string): string =>
+  `__lookup:${node.id}:${key}=${value}__`
+
+/** The field keys a node's response mappings write, in author order. */
+const responseMappingKeys = (node: QuizNode): string[] => {
+  const raw = node.responseMappings
+  if (!Array.isArray(raw)) return []
+  const keys: string[] = []
+  for (const mapping of raw) {
+    if (!mapping || typeof mapping !== 'object') continue
+    const key = (mapping as Record<string, unknown>).fieldKey
+    if (typeof key === 'string' && key && !keys.includes(key)) keys.push(key)
+  }
+  return keys
+}
+
+/** Every value the flow's own conditions compare `field` against. */
+const conditionValuesFor = (quiz: Quiz, field: string): string[] => {
+  const out: string[] = []
+  for (const node of quiz.nodes) {
+    for (const cond of node.conditions ?? []) {
+      if (cond.field !== field) continue
+      const value = typeof cond.value === 'string' ? cond.value : ''
+      if (value && !out.includes(value)) out.push(value)
+    }
+  }
+  return out
+}
+
+/**
+ * What a webhook or verification node can leave behind.
+ *
+ * The runtime CALLS these nodes and merges the mapped fields into the value bag
+ * (`QuizRuntime.advance`), so their outcome steers everything downstream. What
+ * the outcome IS lives on a buyer's endpoint, not in this quiz, and this module
+ * refuses to invent it. So the branch enumerates the outcomes the flow itself
+ * distinguishes:
+ *
+ *   - the endpoint failing, timing out, or omitting the key. This is FIRST and
+ *     is always present, because a lookup that does not answer is the one case
+ *     guaranteed to happen eventually, and the flow still has to work.
+ *   - a mapping onto `tier`: one branch per tier the quiz DECLARES. The runtime
+ *     ignores a returned tier it does not declare, so branching over anything
+ *     else would model a state the runtime cannot enter.
+ *   - a mapping onto any other field: one branch per value the author's own
+ *     conditions test for. A value nothing routes on cannot change a path.
+ *
+ * KNOWN APPROXIMATION, stated rather than hidden: fields branch INDEPENDENTLY
+ * rather than as a cross-product. A node mapping two fields that are each
+ * routed on will not enumerate every combination of the two. That is sound for
+ * the reachability questions this feeds (each branch is a state the runtime can
+ * really be in) and unsound for "is this combination possible", which nothing
+ * asks yet. The cross-product is exponential in mapped fields and would trade a
+ * real limit for a path explosion.
+ */
+const webhookOutcomes = (quiz: Quiz, node: QuizNode): readonly Answer[] | null => {
+  if (!WEBHOOK_NODE_TYPES.has(node.type)) return null
+  if (typeof node.webhookUrl !== 'string' || !node.webhookUrl) return null
+  const keys = responseMappingKeys(node)
+  if (keys.length === 0) return null
+
+  // The no-answer branch. Identical to AUTO_ANSWER on purpose: it is exactly
+  // what the runtime advances with when the call fails.
+  const outcomes: Answer[] = [AUTO_ANSWER]
+
+  for (const key of keys) {
+    if (key === 'tier') {
+      for (const tier of quiz.tiers) {
+        if (!tier?.id) continue
+        outcomes.push(
+          Object.freeze({
+            id: lookupOutcomeId(node, 'tier', tier.id),
+            label: '',
+            nextStepKey: '',
+            setTier: tier.id,
+          }) as Answer,
+        )
+      }
+      continue
+    }
+    for (const value of conditionValuesFor(quiz, key)) {
+      outcomes.push(
+        Object.freeze({
+          id: lookupOutcomeId(node, key, value),
+          label: '',
+          nextStepKey: '',
+          fieldMappings: [{ key, value }],
+        }) as Answer,
+      )
+    }
+  }
+
+  // Only the no-answer branch survived: nothing downstream reads what this node
+  // writes, so it advances like any other invisible node.
+  return outcomes.length > 1 ? outcomes : null
+}
+
 export const situationAt = (quiz: Quiz, state: FlowState): NodeSituation => {
   const step = quiz.steps[state.stepIndex]
   const node = step ? resolveNodeForStep(quiz, step.key, state.tier) : null
   if (!node) return { kind: 'missing', node: null }
-  if (isAutoAdvanceNode(node)) return { kind: 'auto', node, answer: AUTO_ANSWER }
+  if (isAutoAdvanceNode(node)) {
+    const outcomes = webhookOutcomes(quiz, node)
+    if (outcomes) return { kind: 'auto_branch', node, answers: outcomes }
+    return { kind: 'auto', node, answer: AUTO_ANSWER }
+  }
   if (node.type === 'endpoint') return { kind: 'terminal', node }
   const answers = node.answers ?? []
   if (answers.length === 0) return { kind: 'dead_end', node }
@@ -343,6 +477,15 @@ export type TerminalKind =
 export type PathRow = {
   /** The answers the visitor chose, in order. Auto-advanced hops are not choices. */
   answerIds: string[]
+  /**
+   * What each lookup node returned along this path, in order.
+   *
+   * The visitor did not choose these, so they are kept out of `answerIds` - but
+   * they DO decide the outcome, so an outcome is a function of the two lists
+   * together rather than of the answers alone. That is what keeps the
+   * determinism check meaningful now that webhook nodes really execute.
+   */
+  lookupOutcomeIds: string[]
   /** Every node entered, in order, including the ones the visitor never saw. */
   nodeIds: string[]
   /** Form nodes passed through. Consent is rendered on these. */
@@ -415,6 +558,7 @@ export const enumeratePaths = (quiz: Quiz, options: EnumerationOptions = {}): Pa
   const activeTiers = new Set<string>()
 
   const answerIds: string[] = []
+  const lookupOutcomeIds: string[] = []
   const nodeIds: string[] = []
   const formNodeIds: string[] = []
   const onPath = new Set<string>()
@@ -445,6 +589,7 @@ export const enumeratePaths = (quiz: Quiz, options: EnumerationOptions = {}): Pa
     if (rows.length >= overflowAt) return
     rows.push({
       answerIds: [...answerIds],
+      lookupOutcomeIds: [...lookupOutcomeIds],
       nodeIds: [...nodeIds],
       formNodeIds: [...formNodeIds],
       tier,
@@ -503,10 +648,13 @@ export const enumeratePaths = (quiz: Quiz, options: EnumerationOptions = {}): Pa
       const choices = situation.kind === 'auto' ? [situation.answer] : situation.answers
       for (const answer of choices) {
         const chosen = situation.kind === 'choose'
+        const lookedUp = situation.kind === 'auto_branch'
         if (chosen) answerIds.push(answer.id)
+        if (lookedUp) lookupOutcomeIds.push(answer.id)
         const result = advanceFrom(quiz, state, node, answer)
         if (result.kind === 'end') emit('out_of_steps', node, state.stepIndex, result.values, result.tier)
         else walk(result.state, depth + 1)
+        if (lookedUp) lookupOutcomeIds.pop()
         if (chosen) answerIds.pop()
         if (rows.length >= overflowAt) break
       }
@@ -556,10 +704,19 @@ export type ReplayResult = { ok: true; row: PathRow } | { ok: false; error: stri
  * answer sequence proves the OUTCOME is a function of the visitor's choices,
  * which is the property that has to hold for a qualification decision.
  */
+export type ReplayOptions = EnumerationOptions & {
+  /**
+   * What each lookup node returned, in the order the path met them. Defaults to
+   * "the lookup said nothing" at every hop, which is the outcome a replay from
+   * answer ids alone can assume.
+   */
+  lookupOutcomeIds?: readonly string[]
+}
+
 export const replayAnswerIds = (
   quiz: Quiz,
   ids: readonly string[],
-  options: EnumerationOptions = {},
+  options: ReplayOptions = {},
 ): ReplayResult => {
   const maxDepth = options.maxDepth ?? MAX_DEPTH
   const start = entryStepIndex(quiz, null)
@@ -570,6 +727,8 @@ export const replayAnswerIds = (
   const formNodeIds: string[] = []
   const seen = new Set<string>()
   let cursor = 0
+  const lookupIds = options.lookupOutcomeIds ?? []
+  let lookupCursor = 0
 
   const row = (
     kind: TerminalKind,
@@ -632,6 +791,22 @@ export const replayAnswerIds = (
     let answer: Answer
     if (situation.kind === 'auto') {
       answer = situation.answer
+    } else if (situation.kind === 'auto_branch') {
+      // The visitor did not choose what a lookup returned, so it is replayed
+      // from the recorded outcome rather than from the answer ids. With no
+      // outcome supplied the replay takes the no-response branch, which is what
+      // a replay driven by answers alone can honestly assume.
+      const wanted = lookupIds[lookupCursor]
+      lookupCursor += 1
+      if (wanted === undefined || wanted === LOOKUP_NO_RESPONSE_ID) {
+        answer = situation.answers[0] ?? AUTO_ANSWER
+      } else {
+        const found = situation.answers.find((a) => a.id === wanted)
+        if (!found) {
+          return { ok: false, error: `lookup outcome "${wanted}" is not possible at node "${node.id}"` }
+        }
+        answer = found
+      }
     } else {
       const wanted = ids[cursor]
       if (wanted === undefined) {
