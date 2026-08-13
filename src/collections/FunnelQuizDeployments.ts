@@ -1,6 +1,14 @@
 import type { CollectionConfig } from 'payload'
 import { isAuthenticated } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
+import { resolveTemplate } from '../lib/template-registry'
+
+/** See FunnelLandingPages: the server actions are not the only writer. */
+const validateQuizTemplateId = (value: unknown): true | string => {
+  if (value == null || value === '') return true
+  const r = resolveTemplate('quiz', value)
+  return r.ok ? true : r.error
+}
 
 // A quiz deployment binds a brandless FunnelQuiz to a brand (Site) + domain +
 // path, plus render/template/chrome/tracking config. Mirrors the artifact.
@@ -29,7 +37,7 @@ export const FunnelQuizDeployments: CollectionConfig = {
     { name: 'domain', type: 'relationship', relationTo: 'domains' },
     { name: 'path', type: 'text' },
     { name: 'render_mode', type: 'text', defaultValue: 'standalone' },
-    { name: 'template_id', type: 'text', defaultValue: 'sq_quiz_first' },
+    { name: 'template_id', type: 'text', defaultValue: 'sq_quiz_first', validate: validateQuizTemplateId },
     // Null means "use whatever the template chose". A deployment only stores a
     // value here once someone has deliberately picked a different one.
     { name: 'progress_form', type: 'text' },

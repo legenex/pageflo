@@ -4,7 +4,7 @@
     "file": "LP01-Editorial-Investigation.html",
     "tokens": 20,
     "bytes": 35181,
-    "slots": 108,
+    "slots": 92,
     "loopsExpanded": 0,
     "valid": true,
     "problems": []
@@ -14,7 +14,7 @@
     "file": "LP02-Human-Recovery-Story.html",
     "tokens": 28,
     "bytes": 36534,
-    "slots": 109,
+    "slots": 97,
     "loopsExpanded": 0,
     "valid": true,
     "problems": []
@@ -24,7 +24,7 @@
     "file": "LP03-Authority-Network.html",
     "tokens": 33,
     "bytes": 47632,
-    "slots": 164,
+    "slots": 148,
     "loopsExpanded": 0,
     "valid": true,
     "problems": []
@@ -34,7 +34,7 @@
     "file": "LP04-Case-Value-Dossier.html",
     "tokens": 29,
     "bytes": 48852,
-    "slots": 152,
+    "slots": 145,
     "loopsExpanded": 0,
     "valid": true,
     "problems": []
@@ -44,7 +44,7 @@
     "file": "LP05-Split-Screen-Direct.html",
     "tokens": 19,
     "bytes": 23321,
-    "slots": 70,
+    "slots": 61,
     "loopsExpanded": 0,
     "valid": true,
     "problems": []
@@ -54,7 +54,7 @@
     "file": "LP06-Quiz-First.html",
     "tokens": 21,
     "bytes": 16312,
-    "slots": 47,
+    "slots": 43,
     "loopsExpanded": 0,
     "valid": true,
     "problems": []
@@ -64,7 +64,7 @@
     "file": "LP07-Deadline-Signal.html",
     "tokens": 25,
     "bytes": 23520,
-    "slots": 65,
+    "slots": 63,
     "loopsExpanded": 0,
     "valid": true,
     "problems": []
@@ -74,7 +74,7 @@
     "file": "LP08-Insurer-vs-Claimant.html",
     "tokens": 22,
     "bytes": 23589,
-    "slots": 71,
+    "slots": 68,
     "loopsExpanded": 0,
     "valid": true,
     "problems": []
@@ -84,7 +84,7 @@
     "file": "LP09-60-Second-Check.html",
     "tokens": 22,
     "bytes": 11910,
-    "slots": 33,
+    "slots": 26,
     "loopsExpanded": 0,
     "valid": true,
     "problems": []
@@ -94,7 +94,7 @@
     "file": "LP10-Answer-First.html",
     "tokens": 19,
     "bytes": 13914,
-    "slots": 37,
+    "slots": 33,
     "loopsExpanded": 0,
     "valid": true,
     "problems": []
@@ -114,7 +114,7 @@
     "file": "LP12-Network-Authority.html",
     "tokens": 43,
     "bytes": 26967,
-    "slots": 86,
+    "slots": 79,
     "loopsExpanded": 0,
     "valid": true,
     "problems": []

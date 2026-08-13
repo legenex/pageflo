@@ -1,6 +1,33 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
 
+import { domainEligibility, type DomainLike } from './domain-eligibility'
+
+/**
+ * Whether an ineligible host is REFUSED or merely reported.
+ *
+ * `domain-eligibility.ts` is the one contract for "may this domain serve", and
+ * the resolver was the last of its four callers still not consulting it — so a
+ * domain in `pending`, `provisioning` or `error` resolved and served exactly
+ * like a live one.
+ *
+ * Enforcing it is the correct behaviour and it is what this switch turns on.
+ * It defaults to OFF, and that is a rollout decision rather than an unfinished
+ * one: turning it on changes which hosts a live system answers for, the
+ * production `domains` rows cannot be read from this checkout, and
+ * `docs/production-readiness.md` records that at least one live host's
+ * `ssl_status` was set without anything verifying it. Flipping a switch that
+ * 404s real traffic on the strength of a row nobody has looked at is the kind
+ * of confident change this codebase has been bitten by.
+ *
+ * Off, every refusal is still LOGGED with its reason, so the list of what would
+ * change is available before anybody decides. Set
+ * `LEGALOS_ENFORCE_DOMAIN_ELIGIBILITY=true` once that list has been read.
+ */
+const ENFORCE_DOMAIN_ELIGIBILITY = process.env.LEGALOS_ENFORCE_DOMAIN_ELIGIBILITY === 'true'
+
+export const RESOLVER_ELIGIBILITY_LOG_PREFIX = '[site-resolver] ineligible host'
+
 type CacheEntry = { siteId: string | number; primaryHost: string | null; redirectTo: string | null; expiresAt: number }
 const HOST_CACHE = new Map<string, CacheEntry>()
 const CACHE_TTL_MS = 60 * 1000

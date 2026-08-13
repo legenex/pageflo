@@ -200,8 +200,18 @@ t(
 
 t(canonicalTemplateId('lp', 'bold_modern').ok, "the stored default 'bold_modern' canonicalises")
 {
+  // NOT `editorial_investigation_v2`, which is what `templateFor` returned and
+  // therefore what the builder LABELLED it. The RENDER branched separately on
+  // the raw id: `isPortedTemplate('bold_modern')` was false, so the page took
+  // the node path and drew the operator's own authored sections under identity
+  // `a`. Aliasing to a ported template would have replaced every such page's
+  // real copy with stock reference copy - including a seeded page that is
+  // published and deployed live. An adversarial pass caught this.
   const c = canonicalTemplateId('lp', 'bold_modern')
-  t(c.ok && c.id === 'editorial_investigation_v2', 'and it canonicalises to the template it was already rendering')
+  t(c.ok && c.id === 'a', "'bold_modern' canonicalises to the LEGACY IDENTITY template, which is what it actually rendered as")
+  const r = resolveTemplate('lp', 'bold_modern')
+  t(r.ok && r.template.kind === 'lp' && r.template.renderer === 'identity', 'and so it keeps the node render path, not the ported one')
+  t(r.ok && r.template.kind === 'lp' && r.template.stock === false, 'and is not offered as a stock template')
 }
 {
   const c = canonicalTemplateId('quiz', 'default')

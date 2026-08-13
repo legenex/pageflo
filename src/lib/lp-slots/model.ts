@@ -396,14 +396,39 @@ export const validateTemplateSlots = (template: LpSlottedTemplate): SlotValidati
     if (!roles.has(r)) add('missing_required_role', `no slot has the required role "${r}"`)
   }
 
-  // A placeholder nothing resolves reaches the visitor as literal braces.
+  /*
+   * A placeholder nothing resolves reaches the visitor as literal braces.
+   *
+   * The pattern here must be LOOSER than the resolver's, and it used to be
+   * tighter in exactly the ways that mattered. The resolver matches
+   * `\{\{([\w.]+)\}\}` — no inner whitespace, word characters and dots only —
+   * while this scanned `\{\{\s*([\w.]+)\s*\}\}` and then asked whether the
+   * trimmed key was resolvable. Three forms slipped through:
+   *
+   *   {{ brand.displayName }}   trimmed to a real key, so declared fine; the
+   *                             resolver never matches it and it ships as braces
+   *   {{brand-name}}            hyphen, so neither matches; not scanned either
+   *   {<U+200B>{brand.x}<U+200B>}  the zero-width-space form this whole gate
+   *                             exists to kill, and it passed
+   *
+   * So the scan is now anything BRACE-SHAPED, and a hit counts as resolved only
+   * if the resolver itself would have matched it — same literal pattern, not a
+   * description of it.
+   */
   const html = defaultHtml(template)
   const unresolved = new Set<string>()
-  for (const m of html.matchAll(/\{\{\s*([\w.]+)\s*\}\}/g)) {
-    const key = m[1]
-    if (isResolvedToken(key)) continue
-    if (ANNOTATION_NAMESPACES.test(key)) continue
-    unresolved.add(key)
+  for (const m of html.matchAll(/\{[\s​﻿]*\{([^{}]{1,80})\}[\s​﻿]*\}/g)) {
+    const raw = m[1]
+    const exact = /^([\w.]+)$/.exec(raw)
+    // Only the exact form can resolve; everything else is literal braces on a
+    // page however plausible it looks.
+    if (exact && !/[​﻿]/.test(m[0]) && m[0].startsWith('{{') && m[0].endsWith('}}')) {
+      if (isResolvedToken(exact[1])) continue
+      if (ANNOTATION_NAMESPACES.test(exact[1])) continue
+      unresolved.add(exact[1])
+      continue
+    }
+    unresolved.add(raw.trim() || m[0])
   }
   for (const key of unresolved) {
     add('unresolved_placeholder', `"{{${key}}}" is in the markup and nothing resolves it`)

@@ -17,6 +17,7 @@ import {
 import {
   resolveNodeForStep, nextSequentialStepIndex, explicitStepIndex, entryStepIndex,
 } from '@/lib/quiz-graph'
+import { resolveForRender, reportTemplateFallback } from '@/lib/template-registry'
 import { getTemplateConfig, renderAnswerButton, renderProgressIndicator, renderHeader } from './templates'
 import { resolveRedirectUrl } from '@/lib/quiz-destinations'
 import { onPrimaryText, getSafeTextColor, getSafeMutedColor, deriveBrandSurface } from '@/lib/builder/color-system'
@@ -458,11 +459,21 @@ export const QuizPreviewView = ({ quiz, brand, deployment, onBackToBuilder, bran
   const C = effectiveBrand.colors
   const fontFamily = `"${effectiveBrand.typography.headlineFont}", sans-serif`
   const totalVisible = quiz.steps.filter((s, i) => i <= stepIdx).length
-  const tc = getTemplateConfig(effectiveDeployment?.templateId || 'minimal', effectiveDeployment?.progressForm)
+  // ONE resolution, through the registry. There used to be three defaults in
+  // this component and two named DIFFERENT templates - `'minimal'` resolves to
+  // sq_editorial_inline and `'default'` to sq_quiz_first - so a quiz with no
+  // deployment yet (every newly created one) painted its page chrome from one
+  // template and its question card from another. Both were valid aliases, so
+  // the registry set no fallback flag and nothing was logged.
+  const previewTemplateId = reportTemplateFallback(
+    'quiz builder preview',
+    resolveForRender('quiz', effectiveDeployment?.templateId),
+  ).template.id
+  const tc = getTemplateConfig(previewTemplateId, effectiveDeployment?.progressForm)
   // Page-level palette for standalone chrome + body sections (verified
   // against the actual page bg, so the editorial cream page / any light brand
   // never renders white-on-white text below the card).
-  const pagePal = resolvePagePalette(effectiveBrand, effectiveDeployment?.templateId || 'minimal')
+  const pagePal = resolvePagePalette(effectiveBrand, previewTemplateId)
   const pageBg = renderMode === 'embed' ? (effectiveDeployment?.embedPreviewBg || '#1a1a1a') : tc.pageBg(effectiveBrand)
   const pageOverlay = renderMode === 'embed' ? 'none' : tc.pageOverlay(effectiveBrand)
   const pagePattern = renderMode === 'embed' ? 'none' : tc.pagePattern(effectiveBrand)
@@ -505,7 +516,7 @@ export const QuizPreviewView = ({ quiz, brand, deployment, onBackToBuilder, bran
           <div style={{ height: 4, backgroundColor: `${C.primary}22`, borderRadius: 999, marginBottom: 24, overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${(totalVisible / quiz.steps.length) * 100}%`, backgroundColor: C.primary, transition: 'width 0.3s' }} />
           </div>
-          {currentNode && isNodeVisible(currentNode) ? <PreviewQuestionCard node={currentNode} brand={effectiveBrand} customFields={customFields} onAnswer={handleAnswer} fieldValues={fieldValues} templateId={effectiveDeployment?.templateId || 'default'} stepIdx={stepIdx} totalSteps={quiz.steps.length} onBack={goBack} canGoBack={history.length > 0} destinationCtx={{ deployment: effectiveDeployment?.destinationOverrides, brand: effectiveBrand?.urls }} previewMode /> :
+          {currentNode && isNodeVisible(currentNode) ? <PreviewQuestionCard node={currentNode} brand={effectiveBrand} customFields={customFields} onAnswer={handleAnswer} fieldValues={fieldValues} templateId={previewTemplateId} stepIdx={stepIdx} totalSteps={quiz.steps.length} onBack={goBack} canGoBack={history.length > 0} destinationCtx={{ deployment: effectiveDeployment?.destinationOverrides, brand: effectiveBrand?.urls }} previewMode /> :
             currentNode ? <div style={{ minHeight: 200 }} /> :
             <div style={{ padding: 40, textAlign: 'center', color: pagePal.muted }}>End of quiz</div>}
         </div>

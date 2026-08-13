@@ -330,13 +330,42 @@ export const extractSlots = (slug: string, html: string, opts: ExtractOptions = 
   const containsImageBox = (n: ScannedNode): boolean =>
     imageBoxes.some(({ box }) => box.start >= n.contentStart && box.end <= n.contentEnd)
 
+  /**
+   * A decorative glyph is not a line of copy.
+   *
+   * The deepest-candidate rule alone strands real text. The references draw a
+   * benefit row as `<span>✓</span>No fee unless you receive a settlement`, and a
+   * drop cap as `<span>T</span>he phone call usually comes...`. The span is the
+   * deepest candidate, so it became the slot — leaving the operator able to edit
+   * the checkmark and NOT the fee claim beside it. 120 of 950 slots were glyphs
+   * like this, and ten of the twelve templates carried visible copy in a literal
+   * part as a result.
+   *
+   * A glyph is short and carries no word: a tick, a bullet, an arrow, a single
+   * capital. Requiring BOTH conditions is what keeps a genuinely short label
+   * ("New", "$0") a slot of its own.
+   */
+  const isDecorativeGlyph = (n: ScannedNode): boolean => {
+    const text = textOf(html, n)
+    if (text.length > 2) return false
+    return !/[a-z]/i.test(text) || text.length === 1
+  }
+
   const slotNodes: ScannedNode[] = []
   walk(roots, (n) => {
     if (!candidates.has(n)) return
     if (containsImageBox(n)) return
     let hasCandidateDescendant = false
-    walk(n.children, (d) => { if (candidates.has(d)) hasCandidateDescendant = true })
-    if (!hasCandidateDescendant) slotNodes.push(n)
+    walk(n.children, (d) => {
+      // A glyph child does not block its parent from being the slot: the parent
+      // is where the sentence is.
+      if (candidates.has(d) && !isDecorativeGlyph(d)) hasCandidateDescendant = true
+    })
+    if (hasCandidateDescendant) return
+    // ...and the glyph itself is then not a slot, because its parent now covers
+    // the whole region and two overlapping cuts would corrupt the stream.
+    if (isDecorativeGlyph(n) && n.parent && candidates.has(n.parent)) return
+    slotNodes.push(n)
   })
 
   /* --- pass 2: images ----------------------------------------------------- */

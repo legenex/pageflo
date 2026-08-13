@@ -176,12 +176,37 @@ export const requirePoolDomain = async (
 export const requireDeploymentSiteAdmin = async (
   payload: Payload,
   user: AuthedUser | null,
-  args: { collection: string; existingId?: unknown; incomingSiteId: unknown },
+  args: { collection: string; existingId?: unknown; incomingSiteId?: unknown },
 ): Promise<SiteAuthz | AuthzFailure> => {
+  const existingId = relationId(args.existingId)
+
+  /*
+   * DELETE has no incoming Site.
+   *
+   * `deleteQuizDeployment` and `deleteDeployment` had no gate at all - any
+   * logged-in user could delete any tenant's deployment - and they cannot supply
+   * an incoming Site because a delete does not carry one. So when only an
+   * existing id is given, the record's OWN Site is the subject, which is the
+   * rule this module is built on: derive, never accept.
+   */
+  if (args.incomingSiteId === undefined) {
+    if (!user) return { ok: false, error: 'unauthenticated' }
+    if (existingId === null) return { ok: false, error: 'deployment not found' }
+    let row: Record<string, unknown> | null = null
+    try {
+      row = (await payload.findByID({ collection: args.collection as never, id: existingId, overrideAccess: true })) as Record<string, unknown> | null
+    } catch {
+      row = null
+    }
+    if (!row) return { ok: false, error: 'deployment not found' }
+    const owner = relationId(row.site)
+    if (owner === null || !isBoundToSite(user, owner)) return { ok: false, error: 'deployment not found' }
+    return { ok: true, siteId: owner }
+  }
+
   const incoming = requireSiteAdmin(user, args.incomingSiteId)
   if (!incoming.ok) return incoming
 
-  const existingId = relationId(args.existingId)
   if (existingId === null) return incoming
 
   let existing: Record<string, unknown> | null = null
@@ -197,8 +222,10 @@ export const requireDeploymentSiteAdmin = async (
   if (!existing) return { ok: false, error: 'deployment not found' }
 
   const currentSiteId = relationId(existing.site)
-  if (currentSiteId !== null && !isBoundToSite(user, currentSiteId)) {
-    return { ok: false, error: 'deployment not found' }
-  }
+  // An ORPHAN row - one whose site is null - used to pass here, so anybody bound
+  // to any Site could claim it. There is no legitimate way for a deployment to
+  // have no Site, and "unowned" must not mean "anyone's".
+  if (currentSiteId === null) return { ok: false, error: 'deployment not found' }
+  if (!isBoundToSite(user, currentSiteId)) return { ok: false, error: 'deployment not found' }
   return incoming
 }

@@ -52,7 +52,9 @@ export default async function QuizzesPage() {
       domain: domId ? domainHostById.get(domId) ?? '' : '',
       path: r.path ?? '',
       renderMode: r.render_mode ?? 'standalone',
-      templateId: r.template_id ?? 'default',
+      // The raw stored value. Substituting a default here would be a fourth
+    // opinion about what an absent id means; the registry has the only one.
+    templateId: r.template_id ?? '',
       progressForm: r.progress_form ?? null,
       status: r.status ?? 'draft',
       embedPreviewBg: r.embed_preview_bg ?? '',

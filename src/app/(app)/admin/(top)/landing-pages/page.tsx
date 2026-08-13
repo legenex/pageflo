@@ -33,7 +33,9 @@ export default async function LandingPagesPage() {
     id: String(r.id),
     name: r.name,
     slug: r.slug,
-    templateId: r.template_id ?? 'bold_modern',
+    // The raw stored value. Substituting a default here would be a fourth
+    // opinion about what an absent id means; the registry has the only one.
+    templateId: r.template_id ?? '',
     angle: r.angle ?? 'pain',
     isPublished: Boolean(r.is_published),
     sections: Array.isArray(r.sections) ? r.sections : [],

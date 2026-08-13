@@ -9,7 +9,7 @@ import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { invokeLLM } from '@/lib/ai/invoke'
 import { canonicalTemplateId } from '@/lib/template-registry'
-import { requireDeploymentSiteAdmin } from '@/lib/authz'
+import { relationId, requireDeploymentSiteAdmin } from '@/lib/authz'
 
 const PATH = '/admin/quizzes'
 
@@ -169,10 +169,18 @@ export async function saveQuizDeployment(args: { deployment: Record<string, unkn
   const template = canonicalTemplateId('quiz', dep.templateId ?? 'default')
   if (!template.ok) return { ok: false, error: template.error }
 
+  // The host is resolved with `overrideAccess: true`, so the row it finds may
+  // belong to ANY tenant. Binding a deployment to another brand's domain wrote a
+  // cross-tenant reference that the resolver happens to ignore today; a check
+  // here is cheaper than relying on that staying true.
   let domainId = null
   if (typeof dep.domain === 'string' && dep.domain) {
     const dr = await payload.find({ collection: 'domains', where: { host: { equals: dep.domain } }, limit: 1, overrideAccess: true })
-    domainId = dr.docs[0] ? Number(dr.docs[0].id) : null
+    const found = dr.docs[0]
+    if (found) {
+      if (relationId(found.site) !== gate.siteId) return { ok: false, error: 'that domain belongs to a different brand' }
+      domainId = Number(found.id)
+    }
   }
 
   const data = {
@@ -217,6 +225,12 @@ export async function deleteQuizDeployment(args: { id: string }) {
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: 'unauthenticated' }
   const payload = await getPayload({ config })
+
+  // No gate at all before this: the collections are `isAuthenticated` on every
+  // verb, so any logged-in user could delete any tenant's deployment. A delete
+  // carries no incoming Site, so the record's own is the subject.
+  const gate = await requireDeploymentSiteAdmin(payload, user, { collection: 'funnel-quiz-deployments', existingId: args.id })
+  if (!gate.ok) return gate
   try {
     await payload.delete({ collection: 'funnel-quiz-deployments', id: args.id, user, overrideAccess: false })
     revalidatePath(PATH)

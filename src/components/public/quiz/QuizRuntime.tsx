@@ -29,6 +29,7 @@
  *    frame, so the same deployment can be a standalone page or an iframe.
  */
 
+import { resolveForRender, reportTemplateFallback } from '@/lib/template-registry'
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Loader2 } from 'lucide-react'
 import {
@@ -84,7 +85,11 @@ export function QuizRuntime({
   previewMode = false,
 }) {
   const customFields = quiz.customFields?.length ? quiz.customFields : SEED_CUSTOM_FIELDS
-  const templateId = deployment?.templateId || 'minimal'
+  // The deployment resolver already canonicalises this, so on a real page it is
+  // a pass-through. The registry call is what covers the embed and preview paths
+  // that construct a deployment object by hand - a private `|| 'minimal'` here
+  // silently disagreed with the resolver's own answer.
+  const templateId = reportTemplateFallback('quiz runtime', resolveForRender('quiz', deployment?.templateId)).template.id
   // The deployment may override the template's progress treatment; everything
   // else about the template is unchanged by it.
   const tc = getTemplateConfig(templateId, deployment?.progressForm)

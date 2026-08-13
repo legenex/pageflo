@@ -62,11 +62,29 @@ export const EXPECTED_LP_TEMPLATE_COUNT = 12
 export const TEMPLATE_ALIASES: Record<TemplateKind, Record<string, string>> = {
   quiz: { ...LEGACY_TEMPLATE_IDS },
   lp: {
-    // The collection default since the funnel port. It never named a real
-    // template, so every page carrying it has been rendering TEMPLATES[0] —
-    // `editorial_investigation_v2` — by accident. Mapping it there makes the
-    // accident explicit and keeps every existing page rendering as it does now.
-    bold_modern: 'editorial_investigation_v2',
+    /*
+     * The collection default since the funnel port. It named no template.
+     *
+     * The obvious mapping is `editorial_investigation_v2`, because
+     * `templateFor('bold_modern')` returned `TEMPLATES[0]` and that is what it
+     * is. That mapping is WRONG, and an adversarial pass caught it before it
+     * reached a live page.
+     *
+     * `templateFor` decided the builder's LABEL. The RENDER branched separately,
+     * on the raw id, through `isPortedTemplate('bold_modern')` — which was false,
+     * because it is not a ported slug. So the page took the node path and drew
+     * the operator's own authored sections, under identity `a`'s look (the
+     * fallback `getLpIdentity` returns for an unknown id).
+     *
+     * Aliasing to a ported template would therefore have replaced every such
+     * page's real copy with the stock Editorial Investigation reference copy.
+     * The seeded `mva-pain-first` page is published and deployed live at
+     * `/c/pain`, so that was a live page silently losing its content.
+     *
+     * `'a'` is the legacy identity template: node-rendered, identity `a`. It is
+     * what these pages have always been, and now they say so.
+     */
+    bold_modern: 'a',
   },
 }
 

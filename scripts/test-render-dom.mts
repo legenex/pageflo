@@ -24,7 +24,7 @@ import { chromium, type Browser, type Page } from 'playwright'
 
 import { PORTED_TEMPLATES, asSlotted, TEMPLATE_FONTS_HREF } from '../src/lib/lp-templates/index.ts'
 import { composeTemplate } from '../src/lib/lp-slots/model.ts'
-import { resolveTokens } from '../src/components/builder/lp/tokens.ts'
+import { resolveTokensForHtml } from '../src/components/builder/lp/tokens.ts'
 import { templateVars } from '../src/lib/lp-templates/tokens.ts'
 import { resolveLpPalette } from '../src/lib/lp-nodes/palette.ts'
 import { getLpIdentity } from '../src/lib/lp-identities/index.ts'
@@ -83,13 +83,22 @@ const BRANDS = [
 
 type TestBrand = (typeof BRANDS)[number]
 
-/** The exact document the public renderer mounts, for one template + brand. */
+/**
+ * The exact document the public renderer mounts, for one template + brand.
+ *
+ * Must stay line-for-line what `portedTemplateDocument` does, and the token pass
+ * must be `resolveTokensForHtml`. This harness originally used `resolveTokens`,
+ * which is the NODE-path resolver and does not escape — so it was measuring a
+ * pipeline the product does not have, and it reported a hostile brand executing
+ * when the real renderer had already been fixed. A test double of a sanitiser is
+ * the one thing that must never be a double.
+ */
 const documentFor = (slug: string, brand: TestBrand, overrides: Record<string, string> = {}): string => {
   const tpl = PORTED_TEMPLATES.find((x) => x.slug === slug)!
   const palette = resolveLpPalette(getLpIdentity('a'), brand)
   const vars = Object.entries(templateVars(tpl, palette)).map(([k, v]) => `${k}:${v}`).join(';')
   const composed = composeTemplate(asSlotted(tpl), overrides)
-  const html = resolveTokens(composed.html, { brand }) as string
+  const html = resolveTokensForHtml(composed.html, { brand })
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="${TEMPLATE_FONTS_HREF}">
@@ -249,7 +258,7 @@ const run = async (browser: Browser): Promise<void> => {
       // No variables at all: every colour falls back to the reference's own,
       // which is the property the token format was designed to give us.
       const composed = composeTemplate(asSlotted(tpl), {})
-      const html = resolveTokens(composed.html, { brand: BRANDS[0] }) as string
+      const html = resolveTokensForHtml(composed.html, { brand: BRANDS[0] })
       await load(page, `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${TEMPLATE_FONTS_HREF}"><style>*,*::before,*::after{box-sizing:border-box}html,body{margin:0}</style></head><body>${html}</body></html>`, 1280, 900)
       baseline.set(tpl.slug, (await readContrastFailures(page)).length)
     }
@@ -334,6 +343,49 @@ const run = async (browser: Browser): Promise<void> => {
     t(result.injectedScripts === 0, 'and injects no script')
     t(result.jsHrefs === 0, 'and no javascript: URL survives')
     t(result.shows, 'and the operator still sees the text they typed')
+  }
+
+  /* ---- a hostile BRAND cannot execute ------------------------------------ */
+  //
+  // The other untrusted string reaching `dangerouslySetInnerHTML`, and the one
+  // that was missed: brand values are tenant free text, and `resolveTokens`
+  // splices them into the markup with no escaping. Overrides were escaped from
+  // the start; brand values were not, and the same component renders in /admin
+  // UNSANDBOXED — so a Site admin's display name executing as script would run
+  // in a super-admin's origin. Found by an adversarial pass, not by us.
+
+  {
+    const tpl = PORTED_TEMPLATES.find((x) => x.slug === 'editorial_investigation_v2')!
+    const headline = tpl.slots.find((s) => s.role === 'headline')!
+    const hostileBrand = {
+      id: 'evil',
+      name: '<script>window.__pwned=2</script>',
+      displayName: '<img src=x onerror="window.__pwned=1">',
+      shortName: 'EV',
+      colors: { primary: '#BF2E1A', accent: '#7E8C99', ink: '#17191D', surface: '#F4F2EE' },
+      contact: { callNumber: '"><svg onload="window.__pwned=3">' },
+      legal: { defaultDisclaimer: '<b>bold</b>', tcpaText: 'x', privacyUrl: 'javascript:alert(1)', termsUrl: '/t' },
+      typography: { headlineFont: 'Inter', bodyFont: 'Inter', baseSize: 'md' },
+    } as unknown as TestBrand
+
+    for (const [label, overrides] of [
+      ['with no override at all', {}],
+      // An override is the delivery vehicle: it can put a token into a slot that
+      // had none, widening the sink. So the hostile brand is tried both ways.
+      ['with a token planted in an override', { [headline.id]: 'Call {{brand.callNumber}} now, {{brand.displayName}}' }],
+    ] as const) {
+      await load(page, documentFor(tpl.slug, hostileBrand, overrides as Record<string, string>))
+      const r = await page.evaluate(`({
+        pwned: window.__pwned === undefined ? null : window.__pwned,
+        imgs: document.querySelectorAll('img[src="x"]').length,
+        scripts: document.querySelectorAll('script').length,
+        js: document.querySelectorAll('[href^="javascript:"],[src^="javascript:"]').length,
+        svgOnload: document.querySelectorAll('svg[onload]').length,
+      })`) as { pwned: unknown; imgs: number; scripts: number; js: number; svgOnload: number }
+      t(r.pwned === null, `a hostile brand executes nothing ${label}`)
+      t(r.imgs === 0 && r.scripts === 0 && r.svgOnload === 0, `and injects no element ${label}`)
+      t(r.js === 0, `and no javascript: URL survives ${label}`)
+    }
   }
 
   /* ---- gallery containment, proven with PIXELS --------------------------- */

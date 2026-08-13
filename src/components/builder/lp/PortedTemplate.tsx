@@ -13,19 +13,28 @@
  * what makes pixel parity checkable rather than asserted - and it also means a
  * brand that supplies nothing degrades to the design rather than to nothing.
  *
- * The markup is a fixed asset of this build, not user input: it is generated
- * from the handoff by a committed script and cannot be edited from the admin,
- * so there is no untrusted string reaching dangerouslySetInnerHTML here. That
- * stops being true the moment any part of it becomes operator-editable, which
- * is the next piece of work and will need the copy to travel as nodes rather
- * than as HTML.
+ * TWO UNTRUSTED STRINGS REACH THIS SINK, and both are handled at their source
+ * rather than here. The markup itself is a build asset — generated from the
+ * handoff by a committed script, not editable from the admin — but since the
+ * slot contract landed, two tenant-controlled values are spliced into it:
+ *
+ *  - a DEPLOYMENT OVERRIDE, escaped by `composeTemplate`, which is why an
+ *    override can put text on the page and not an element; and
+ *  - a BRAND VALUE, escaped by `resolveTokensForHtml`. That one was missed at
+ *    first and it was the more dangerous of the two: this component also
+ *    renders in `/admin` unsandboxed, so a Site admin's display name executing
+ *    as script would run in a super-admin's origin.
+ *
+ * Neither escape lives in this file on purpose. A sink that trusts its inputs
+ * and a caller that sanitises is a pair that drifts; escaping where the value
+ * enters means a new caller cannot forget.
  */
 
 import { useEffect, useMemo } from 'react'
 import { TEMPLATE_FONTS_HREF, asSlotted } from '@/lib/lp-templates'
 import { templateStyle } from '@/lib/lp-templates/tokens'
 import { composeTemplate } from '@/lib/lp-slots/model'
-import { resolveTokens } from './tokens'
+import { resolveTokensForHtml } from './tokens'
 import { resolveForRender, reportTemplateFallback } from '@/lib/template-registry'
 import { resolveLpPalette } from '@/lib/lp-nodes/palette'
 import { getLpIdentity } from '@/lib/lp-identities'
@@ -67,7 +76,7 @@ const useComposed = (template, brand, overrides) =>
   useMemo(() => {
     if (!template) return { html: '', refused: [], unknownOverrides: [] }
     const composed = composeTemplate(asSlotted(template), overrides ?? {})
-    return { ...composed, html: resolveTokens(composed.html, { brand }) as string }
+    return { ...composed, html: resolveTokensForHtml(composed.html, { brand }) }
   }, [template, brand, overrides])
 
 export const PortedTemplateView = ({ slug, brand, overrides = null, className = '', onDiagnostics = null }) => {
@@ -120,7 +129,7 @@ export const portedTemplateDocument = (slug, brand, overrides = null) => {
   // that composed differently from the page would be a preview of a page that
   // does not exist, which is the whole reason there is one composition path.
   const composed = composeTemplate(asSlotted(template), overrides ?? {})
-  const html = resolveTokens(composed.html, { brand })
+  const html = resolveTokensForHtml(composed.html, { brand })
   return `<!doctype html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="${TEMPLATE_FONTS_HREF}">
 <style>*,*::before,*::after{box-sizing:border-box}html,body{margin:0}body{${vars}}</style>
