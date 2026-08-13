@@ -107,11 +107,19 @@ const applied: string[] = []
 if (apply) {
   for (const r of rows) {
     if (!r.migration) continue
+    // A flow id that is not a number would be written as NaN, which postgres
+    // takes as null - silently UNBINDING the page this migration exists to
+    // keep working. Refused rather than written.
+    const quizId = Number(r.migration.quiz)
+    if (!Number.isInteger(quizId) || quizId <= 0) {
+      console.log(`  ${r.id}  SKIPPED: "${r.migration.quiz}" is not a flow id`)
+      continue
+    }
     await payload.update({
       collection: 'funnel-lp-deployments',
       id: r.id,
       data: {
-        quiz: Number(r.migration.quiz),
+        quiz: quizId,
         embedded_quiz_template_id: r.migration.embedded_quiz_template_id,
         embedded_progress_form: r.migration.embedded_progress_form,
         // Cleared last and only here. While it is a row's only binding it is

@@ -47,7 +47,9 @@ const t = (cond: unknown, label: string): void => {
 }
 
 const RUN = `e2e${Date.now()}`
-const PORT = Number(process.env.LEGALOS_E2E_PORT ?? 3123)
+// Varies per run, because a killed run can leave `next start` holding a fixed
+// port and the next run then reports "the production build boots" as a failure.
+const PORT = Number(process.env.LEGALOS_E2E_PORT ?? 3200 + (process.pid % 500))
 const ORIGIN = `http://127.0.0.1:${PORT}`
 const HOST = '127.0.0.1'
 
@@ -178,6 +180,19 @@ try {
     overrideAccess: true,
   }))
 
+  /*
+   * The host is a unique key, and a run that is killed mid-way leaves its row
+   * behind - so the NEXT run fails to create a fixture and reports it as a
+   * product failure. Cleared first. `127.0.0.1` is not a host any real tenant
+   * can hold, so this cannot remove somebody's data.
+   */
+  const stale = await payload.find({
+    collection: 'domains', where: { host: { equals: HOST } }, limit: 10, depth: 0, overrideAccess: true,
+  })
+  for (const row of stale.docs) {
+    await payload.delete({ collection: 'domains', id: row.id, overrideAccess: true }).catch(() => null)
+  }
+
   track('domains', await payload.create({
     collection: 'domains',
     data: { site: site.id, host: HOST, primary: true, kind: 'custom', status: 'active', ssl_status: 'active' } as never,
@@ -245,6 +260,21 @@ try {
   /** Drive one URL end to end and report what happened. */
   const runFunnel = async (path: string, label: string) => {
     const page = await context.newPage()
+
+    /*
+     * The templates load their faces from Google Fonts. This environment's
+     * network policy refuses outbound hosts, so that request hangs rather than
+     * failing, `networkidle` never arrives, and the run becomes a coin flip
+     * between "passed" and "timed out" - which is worse than a red suite,
+     * because a flaky proof gets re-run until it agrees with you.
+     *
+     * Aborted outright, and the test waits on the RUNTIME being present instead
+     * of on the network going quiet. The subject here is behaviour; typography
+     * is `pnpm test:dom`'s job and it renders without a network at all.
+     */
+    await page.route('**://fonts.googleapis.com/**', (route) => route.abort())
+    await page.route('**://fonts.gstatic.com/**', (route) => route.abort())
+
     const leadPosts: string[] = []
     page.on('request', (req) => {
       if (req.method() === 'POST' && req.url().includes('/api/leads')) leadPosts.push(req.url())
@@ -252,7 +282,11 @@ try {
     const consoleErrors: string[] = []
     page.on('pageerror', (err) => consoleErrors.push(String(err)))
 
-    await page.goto(`${ORIGIN}${path}`, { waitUntil: 'networkidle' })
+    await page.goto(`${ORIGIN}${path}`, { waitUntil: 'domcontentloaded' })
+    // The quiz is portalled in after hydration on a landing page, so the wait is
+    // for the RUNTIME rather than for a document event.
+    await page.waitForSelector('[data-quiz-root]', { timeout: 20_000 })
+    await page.waitForSelector('[data-quiz-answer]', { timeout: 20_000 })
 
     // The quiz is present AS A RUNTIME, not as a picture of one. `data-quiz-root`
     // is set by QuizRuntime itself; the static card never had it.
@@ -273,7 +307,10 @@ try {
 
     // CLICK. This is the assertion the production defect failed.
     await optionsOne.first().click()
-    await page.waitForTimeout(500)
+    await page.waitForFunction(
+      `document.querySelector('[data-quiz-question]')?.textContent?.trim() !== ${JSON.stringify(questionOne.trim())}`,
+      { timeout: 15_000 },
+    ).catch(() => null)
     const questionTwo = (await page.locator('[data-quiz-question]').first().textContent()) ?? ''
     t(questionTwo.trim() !== questionOne.trim(), `${label}: clicking an answer ADVANCES the quiz`)
     // ALPHA is the THIRD step; the sequential next is BRAVO. So this fails if the
@@ -286,18 +323,24 @@ try {
     // Back, then the OTHER answer, to the OTHER destination. One flow, two
     // routes, which is what makes it conditional rather than linear.
     await page.locator('[data-quiz-back]').first().click()
-    await page.waitForTimeout(400)
+    await page.waitForFunction(
+      `document.querySelector('[data-quiz-question]')?.textContent?.trim() === ${JSON.stringify(questionOne.trim())}`,
+      { timeout: 15_000 },
+    ).catch(() => null)
     t(
       ((await page.locator('[data-quiz-question]').first().textContent()) ?? '').trim() === questionOne.trim(),
       `${label}: Back returns to the question that was asked`,
     )
     await page.locator('[data-quiz-answer]').nth(1).click()
-    await page.waitForTimeout(500)
+    await page.waitForFunction(
+      `document.querySelector('[data-quiz-question]')?.textContent?.trim() !== ${JSON.stringify(questionOne.trim())}`,
+      { timeout: 15_000 },
+    ).catch(() => null)
     const questionAlt = (await page.locator('[data-quiz-question]').first().textContent()) ?? ''
     t(/BRAVO/.test(questionAlt), `${label}: the other answer reaches the other step (${questionAlt.trim()})`)
 
     await page.locator('[data-quiz-answer]').first().click()
-    await page.waitForTimeout(500)
+    await page.waitForSelector('[data-quiz-form]', { timeout: 15_000 }).catch(() => null)
 
     // The lead form.
     const form = page.locator('[data-quiz-form]')

@@ -802,3 +802,207 @@ The other three numbers are unchanged from the pre-existing baseline.
   traffic on the strength of production rows that cannot be read from here.
 * **Advertorials are a fourth template id space** (`ADV_TEMPLATES`) outside the
   registry. Out of scope for these gates, and now the only one left.
+
+---
+
+# Third session — the cloud run, gates A through J
+
+Started 2026-08-13, continuing from `3b4748d` on branch
+`claude/legalos-release-work-ea1y9i`. Same rule as the two sessions above: every
+claim was measured here and the command that measured it is given.
+
+## What this environment can do that the codespace could not
+
+| Capability | State | Evidence |
+|---|---|---|
+| `pnpm build` | **works** | exit 0, ~90s, on a 16 GB / 4-core box. It OOMed in the codespace at three heap sizes. |
+| `pnpm start` + drive it with Chromium | **works** | `pnpm test:e2e` boots the production build and walks two funnels |
+| PostgreSQL 16 | native cluster | `pg_ctlcluster 16 main start` |
+| Headless Chromium | works, build 1194 | pinned `playwright` wants 1234, so `LEGALOS_CHROMIUM_PATH` exists — see below |
+| SSH to production | **NO** | this environment holds no production key, by design |
+| Outbound HTTP to arbitrary hosts | **NO** | the network policy refuses `CONNECT`; `api.legenex.com` could not be re-measured from here |
+
+`scripts/lib/browser.ts` exists because playwright resolves its browser by BUILD
+NUMBER, so an image shipping 1194 fails with "Executable doesn't exist" against
+a pin of 1234 — which reads as a missing dependency and is a version pin. Unset,
+`launchChromium()` is exactly `chromium.launch()`.
+
+## Gate A — the landing-page quiz is the real quiz (`364d6e5`)
+
+The twelve ported templates each DRAW a quiz. Ported verbatim, that drawing
+shipped: seven clicks on a live landing page, zero lead posts.
+
+`src/lib/lp-slots/quiz-mount.ts` locates the card from the reference's own
+structure — an answer group with a step indicator or a nav control above it —
+and records it in PART-STREAM coordinates, so the cut survives a deployment's
+overrides. `case_type_router` is the discriminating case: eight case-type cards
+that are page presentation, four answer buttons that are the quiz, and the rule
+that separates them is the one that keeps the runtime out of the router.
+
+**Zero matches and two matches both REFUSE**, and the extractor then declines to
+write the module. A live quiz mounted in the wrong place is worse than a build
+that fails.
+
+**One innerHTML, not two.** The card is nested several elements deep, so
+splitting the string at it and setting each half on a separate node would have
+the parser repair each half into a different tree. The page is mounted whole and
+the runtime is portalled into the marked box. The trade, stated rather than
+hidden: the quiz's first question is not in the server-rendered HTML the way it
+is on a standalone quiz page. It costs nothing a visitor can use — a quiz with
+no JavaScript is a picture either way.
+
+Second defect on the same path: the LP deployment editor bound a STANDALONE QUIZ
+DEPLOYMENT and its data mapping never carried `quiz` at all, so **every save
+through the editor wiped the flow binding the resolver prefers**. Gate 10's
+feature had been unreachable from the UI since it landed.
+
+## Gate B — what a landing page runs, and whether it still runs it (`364d6e5`)
+
+`quiz_deployment_id` is a migration fallback now: never read from the request,
+not written on create, cleared on update once a flow is named. The comment above
+that write already said so while the line below it wrote the client's value
+straight through, which is how three of four live rows came to point at deleted
+deployments.
+
+`src/lib/lp-quiz-binding.ts` is one judgement with six verdicts, shared by the
+admin list, the preflight and `pnpm reconcile:lp-quiz`. `--apply` migrates only
+what is lossless and refuses any row whose standalone deployment carries
+destination overrides — a landing page cannot hold those, so migrating would
+silently redeliver its leads.
+
+## Gate C — `[LOGO SLOT]` was on a live public page (`419ee07`)
+
+The image slot was the LABEL, so a supplied logo rendered inside the reference's
+dashed placeholder frame and an unsupplied one rendered the words. The slot is
+the WHOLE WELL now, and it resolves: the deployment's URL, then the brand's mark,
+then the brand's NAME for a logo well, then nothing. Light or dark mark is
+derived from the opaque ground the well sits on.
+
+Two more of the same shape were in every template: `[LEGAL DISCLOSURE]`, which
+cleans to the brand tokens it was labelling, and `[CASE RESULT PLACEHOLDER]`,
+which has no honest default and now blocks publish through `mustSupply`.
+
+The cleaned text is `liveDefault`, not a rewrite of `default`, and that
+distinction is load-bearing twice: the image-well detector keys on `[LOGO SLOT]`
+to FIND a well, and the slots have to stay re-derivable from the shipped markup.
+
+## Gate D — the tier lookup decides who qualifies (`a2b1e91`)
+
+`src/lib/quiz-webhook/execute.ts` and `tier.ts` were inline — one inside a route
+handler that needs a database and a host header to reach, the other inside a
+client component. `pnpm test:webhook` is 133 assertions over every way a provider
+can behave, including nine SSRF targets through the REAL guard rather than a
+double.
+
+The builder's "Run Test" fetched from the ADMIN'S BROWSER and interpolated the
+URL, which the server does not. That is why nobody saw the 405. It runs through
+the same executor now and reports what the FLOW would take rather than what the
+provider said.
+
+**The tier rule itself is not in this repository, in any migration, in any seed,
+or in the Base44 account** (the Lead Gateway app has `processLead`, `testHlr`,
+`testLeadByte` and no tier lookup). EB-1 in `docs/external-blockers.md`.
+
+## Gate E — `/_next/image` fetched any host on earth (`b1d46fe`)
+
+`hostname: '**'` made it an unauthenticated server-side fetch of an
+attacker-chosen host on every public tenant domain. Nothing remote is admitted
+now; brand artwork renders as a plain `<img>` the VISITOR's browser fetches, so
+this server never fetches a remote image at all.
+
+The narrow rule lives in a dependency-free `.mjs` because Next's config loader
+runs before the app exists. That makes it a second spelling of `ssrf.ts`, so the
+suite asserts it is never more permissive for 28 hostile spellings — and that
+caught `127.1` being waved through by a dotted-quad test.
+
+Two more found on the product path: `isSafeImageUrl` tested relative paths first
+with `^\.{0,2}\/`, which matches anything starting with a slash, so
+`//evil.example/x.png` was admitted as "a relative path"; and an absolute image
+URL was never checked for its host at all.
+
+## Gates F and G — a fresh database, and the order (`097768a`)
+
+Three documents disagreed about F001. `pnpm test:bootstrap` settles it by asking
+the database, and it failed on the first run, twice, on drift nobody had listed:
+
+* `payload_locked_documents_rels` was missing six `funnel_*_id` columns. Payload
+  clears a document's locks as part of DELETING it, and that query names every
+  collection's column in one WHERE clause, so a delete of ANY document in ANY
+  collection failed app-wide. **Third time this exact omission has shipped.**
+* `integration_config` was missing two markers, so reading the global threw —
+  and it is read by the admin shell and on every builder page load.
+
+`scripts/release.sh` migrates while the service is DOWN and runs
+`pnpm verify:schema` before starting it. `pnpm test:release` builds a scratch
+database at the PREVIOUS release's schema and asserts the new code fails there,
+passes after migrating, and that one `migrate:down` reverses the batch.
+
+Two things that were false: `20260518_134859_site_status_draft.down` had never
+worked (42804: it set a column to `text` while its DEFAULT was still an enum
+value), and `CLAUDE.md` had the migration discovery backwards — Payload reads the
+DIRECTORY and skips `index.ts`.
+
+## Gate H — nothing was collecting the errors (`db897f4`)
+
+Seventeen `console.error` calls, each worded differently, none naming the brand
+or the route, and no error boundary anywhere. One reporter now, one stable event
+shape, redaction proven against nine leak shapes with a control that the useful
+part survives. The destination is a decision, not code: EB-3.
+
+## Gate I — one lead from each funnel, in a browser (`827b116`)
+
+`pnpm test:e2e` boots the production build against a real database and walks both
+funnels: clicking advances, the answer's ROUTE is followed rather than the step
+order, Back returns, progress moves, the form renders, the consent line is on it,
+the destination renders, and there is EXACTLY ONE POST to `/api/leads` and
+exactly one row per path with distinct event ids.
+
+The fixture's step order is deliberately not its answer order, because routing
+that agrees with document order proves nothing — and an earlier draft proved
+exactly that, using a seed helper's shorthand the node shape does not have.
+
+## Gate J — the adversarial pass
+
+Run against this session's own work. What it broke:
+
+* **An out-of-range mount coordinate threw during a render.** Nothing produces
+  one today, but the failure mode was the whole page after the bad index
+  disappearing silently. It composes WHOLE now, with nowhere to mount.
+* **A live landing page whose flow had been unpublished served an EMPTY CARD.**
+  The publish preflight refuses to publish one, but an already-live deployment
+  degrades the moment somebody archives its quiz. It 404s now, with the reason
+  logged: an empty card converts at zero either way and a 404 is the version
+  somebody notices.
+* **`reconcile:lp-quiz --apply` would have written `NaN`** for a non-numeric flow
+  id, which postgres takes as null — silently unbinding the page the migration
+  exists to keep working.
+
+What it could not break, and what it tried: forging a second mount marker through
+a deployment override and through a brand value (both escaped); reaching the live
+page with copy aimed inside the card; a cross-tenant legacy pointer passing
+preflight; an archived or unpublished flow publishing; an embedded skin naming no
+template; fifteen hostile image URLs as both an override and a brand logo.
+
+## Final measured state
+
+    pnpm typecheck            exit 0
+    pnpm build                exit 0
+    pnpm test                 2458 assertions across 10 suites, 0 failed
+      brand 37 · authz 69 · registry 115 · slots 906 · publish 173 · ai 58
+      flow 202 · webhook 133 · observability 44 · brand-identity 721
+    pnpm test:dom             357 in Chromium, 0 failed
+    pnpm test:isolation       12 against a real database and a real login
+    pnpm test:bootstrap       54 against a migration-only schema
+    pnpm test:release         26 against a scratch database at the previous schema
+    pnpm test:e2e             34 in Chromium against the production build
+    pnpm sweep:templates      200 / 25 / 24 / 0 — unchanged from baseline
+
+## Not done, and why
+
+* **Namecheap.** EB-2. Nothing in this session touched DNS or TLS and nothing in
+  it should be read as progress on them.
+* **The MVA tier rule.** EB-1. The execution layer is complete and proven; the
+  business rule is not in any authoritative source this session could reach.
+* **An error-tracking destination.** EB-3. A decision with a bill attached.
+* **`fetch-bundle.ts` SSRF** — wired in the previous session; unchanged here.
+* **Advertorials are still a fourth template id space** outside the registry.

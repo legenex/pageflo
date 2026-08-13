@@ -637,8 +637,33 @@ export const composeTemplateWithQuizMount = (
   overrides: LpSlotOverrides = {},
   opts: ComposeOptions = {},
 ): ComposeWithMountResult => {
-  const mount = template.quizMount
+  const rawMount = template.quizMount
   const base = composeTemplate(template, overrides, opts)
+
+  /*
+   * A mount whose coordinates do not address this part stream is treated as no
+   * mount at all.
+   *
+   * They cannot drift today - the extractor writes both in one pass and refuses
+   * to write a template it could not locate - but the failure mode if they ever
+   * did is the whole page after the bad index disappearing, silently, on a live
+   * landing page. Composing WHOLE is the honest degradation: the visitor gets
+   * the page, and the caller sees there is nowhere to put a quiz.
+   */
+  const addressable =
+    rawMount != null &&
+    Number.isInteger(rawMount.startPart) &&
+    Number.isInteger(rawMount.endPart) &&
+    rawMount.startPart >= 0 &&
+    rawMount.startPart <= rawMount.endPart &&
+    rawMount.endPart < template.parts.length &&
+    rawMount.startOffset >= 0 &&
+    rawMount.startOffset <= template.parts[rawMount.startPart].length &&
+    rawMount.endOffset >= 0 &&
+    rawMount.endOffset <= template.parts[rawMount.endPart].length &&
+    (rawMount.startPart !== rawMount.endPart || rawMount.startOffset <= rawMount.endOffset)
+
+  const mount = addressable ? rawMount : null
   if (!mount) {
     return {
       ...base,

@@ -24,7 +24,7 @@ import { type Browser, type Page } from 'playwright'
 import { launchChromium, browserProvenance } from './lib/browser.ts'
 
 import { PORTED_TEMPLATES, asSlotted, TEMPLATE_FONTS_HREF } from '../src/lib/lp-templates/index.ts'
-import { composeTemplate } from '../src/lib/lp-slots/model.ts'
+import { composeTemplate, composeTemplateWithQuizMount, QUIZ_MOUNT_ATTR } from '../src/lib/lp-slots/model.ts'
 import { resolveTokensForHtml } from '../src/components/builder/lp/tokens.ts'
 import { templateVars } from '../src/lib/lp-templates/tokens.ts'
 import { resolveLpPalette } from '../src/lib/lp-nodes/palette.ts'
@@ -94,12 +94,28 @@ type TestBrand = (typeof BRANDS)[number]
  * when the real renderer had already been fixed. A test double of a sanitiser is
  * the one thing that must never be a double.
  */
-const documentFor = (slug: string, brand: TestBrand, overrides: Record<string, string> = {}): string => {
+const documentFor = (
+  slug: string,
+  brand: TestBrand,
+  overrides: Record<string, string> = {},
+  opts: { live?: boolean } = {},
+): string => {
   const tpl = PORTED_TEMPLATES.find((x) => x.slug === slug)!
   const palette = resolveLpPalette(getLpIdentity('a'), brand)
   const vars = Object.entries(templateVars(tpl, palette)).map(([k, v]) => `${k}:${v}`).join(';')
-  const composed = composeTemplate(asSlotted(tpl), overrides)
-  const html = resolveTokensForHtml(composed.html, { brand })
+  /*
+   * `live` is what a VISITOR is served: the quiz card replaced by the empty box
+   * the runtime portals into, and the image wells resolved against the brand
+   * rather than drawn as the handoff's dashed placeholders. Without it this is
+   * the reference asset, which is the right subject for a parity claim and the
+   * wrong one for "what does a visitor see".
+   */
+  const source = opts.live
+    ? composeTemplateWithQuizMount(asSlotted(tpl), overrides, {
+        assets: { logoUrl: '', logoUrlDark: '', wordmark: brand.displayName ?? brand.name ?? 'Brand', vars: templateVars(tpl, palette) },
+      }).htmlWithMount
+    : composeTemplate(asSlotted(tpl), overrides, { keepReferencePlaceholders: true }).html
+  const html = resolveTokensForHtml(source, { brand })
   return `<!doctype html><html><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="${TEMPLATE_FONTS_HREF}">
@@ -258,7 +274,7 @@ const run = async (browser: Browser): Promise<void> => {
     for (const tpl of PORTED_TEMPLATES) {
       // No variables at all: every colour falls back to the reference's own,
       // which is the property the token format was designed to give us.
-      const composed = composeTemplate(asSlotted(tpl), {})
+      const composed = composeTemplate(asSlotted(tpl), {}, { keepReferencePlaceholders: true })
       const html = resolveTokensForHtml(composed.html, { brand: BRANDS[0] })
       await load(page, `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="${TEMPLATE_FONTS_HREF}"><style>*,*::before,*::after{box-sizing:border-box}html,body{margin:0}</style></head><body>${html}</body></html>`, 1280, 900)
       baseline.set(tpl.slug, (await readContrastFailures(page)).length)
@@ -508,11 +524,67 @@ const run = async (browser: Browser): Promise<void> => {
   await page.close()
 }
 
+/* ------------------------------------------- the page a visitor is served */
+//
+// Everything above measures the reference ASSET. This measures what actually
+// goes down the wire: the quiz card replaced by the box the runtime mounts into,
+// and the image wells resolved against a brand. Both are things that can only be
+// wrong in a browser - a mount box with no height is a hole in the page, and a
+// removed image well can collapse a layout that depended on it.
+
+const liveRender = async (browser: Browser): Promise<void> => {
+  const page = await browser.newPage()
+  const brand = BRANDS[0]
+
+  for (const tpl of PORTED_TEMPLATES) {
+    await load(page, documentFor(tpl.slug, brand, {}, { live: true }))
+
+    const probe = await page.evaluate(`(() => {
+      const mount = document.querySelector('[${QUIZ_MOUNT_ATTR}]')
+      const box = mount ? mount.getBoundingClientRect() : null
+      return {
+        mounts: document.querySelectorAll('[${QUIZ_MOUNT_ATTR}]').length,
+        width: box ? Math.round(box.width) : 0,
+        height: box ? Math.round(box.height) : 0,
+        visible: box ? box.width > 0 : false,
+        overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+        placeholders: (document.body.innerText.match(/\\[[A-Z0-9 ·/_-]{3,}\\]/g) || []).length,
+        buttons: document.querySelectorAll('button').length,
+        text: document.body.innerText.trim().length,
+      }
+    })()`) as {
+      mounts: number; width: number; height: number; visible: boolean
+      overflow: number; placeholders: number; buttons: number; text: number
+    }
+
+    t(probe.mounts === 1, `${tpl.slug}: the live page has exactly one quiz mount (${probe.mounts})`)
+    t(probe.visible, `${tpl.slug}: the mount box has a real width (${probe.width}px)`)
+    // The runtime fills the height; what matters here is that the box is IN the
+    // layout at the width the design gave the card, not that it is tall while
+    // empty.
+    t(probe.width >= 200, `${tpl.slug}: and it is the width of a card rather than a sliver (${probe.width}px)`)
+    t(probe.placeholders === 0, `${tpl.slug}: and no bracketed placeholder label is visible`)
+    t(probe.overflow === 0, `${tpl.slug}: and the page does not scroll sideways with the card removed (${probe.overflow}px)`)
+    t(probe.text > 500, `${tpl.slug}: and the page still has its own copy (${probe.text} chars)`)
+  }
+
+  // Narrow, because a card removed from a flex row is exactly where a mobile
+  // layout collapses and nothing else would notice.
+  for (const tpl of PORTED_TEMPLATES) {
+    await load(page, documentFor(tpl.slug, brand, {}, { live: true }), 390, 844)
+    const overflow = await page.evaluate('Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth)')
+    t(Number(overflow) <= 1, `${tpl.slug}: no sideways scroll at 390px either (${overflow}px)`)
+  }
+
+  await page.close()
+}
+
 /* --------------------------------------------------------------------- boot */
 
 const browser = await launchChromium()
 try {
   await run(browser)
+  await liveRender(browser)
 } finally {
   await browser.close()
 }

@@ -627,6 +627,60 @@ const BOUND_LP_DEP = { ...GOOD_LP_DEP, quiz: 70 }
 
 /* ------------------------------------------------------------------ report */
 
+/* ------------------------------------------- adversarial: the quiz binding */
+
+{
+  const FLOW = { ...GOOD_QUIZ, id: 70, is_published: true, is_archived: false }
+  const LP_DEP = { id: 40, site: 1, landing_page: 30, domain: null, path: '/c/lp', status: 'draft', content_overrides: {}, quiz_deployment_id: '' }
+
+  {
+    // A row that names a flow AND carries a stale cross-tenant pointer beside it
+    // publishes: the resolver reads the flow and never looks at the pointer, so
+    // refusing here would block a page that works.
+    const r = await lpDeploymentPreflight(CTX(), {
+      deployment: { ...LP_DEP, quiz: 70, quiz_deployment_id: '55' },
+      landingPage: GOOD_LP, site: SITE, domain: null,
+      quizDeployment: { id: 55, site: 999, quiz: 70 }, quiz: FLOW,
+    })
+    t(r.ok, `a flow binding beside a stale cross-tenant pointer still publishes${r.ok ? '' : ' — ' + r.blocking.map((c) => c.id).join(',')}`)
+  }
+  {
+    // With NO flow, that same pointer is the binding, and it belongs to somebody
+    // else. This is one brand's page delivering leads to another brand's
+    // destinations.
+    const r = await lpDeploymentPreflight(CTX(), {
+      deployment: { ...LP_DEP, quiz_deployment_id: '55' },
+      landingPage: GOOD_LP, site: SITE, domain: null,
+      quizDeployment: { id: 55, site: 999, quiz: 70, template_id: 'sq_editorial_inline' }, quiz: FLOW,
+    })
+    t(!r.ok && r.blocking.some((c) => c.id === 'embedded-quiz-tenant'), "a cross-tenant legacy pointer is refused as the binding")
+  }
+  {
+    const r = await lpDeploymentPreflight(CTX(), {
+      deployment: { ...LP_DEP, quiz: 70 }, landingPage: GOOD_LP, site: SITE, domain: null,
+      quizDeployment: null, quiz: { ...FLOW, is_archived: true },
+    })
+    t(!r.ok && r.blocking.some((c) => c.id === 'embedded-flow-published'), 'an ARCHIVED flow cannot be published behind a landing page')
+  }
+  {
+    const r = await lpDeploymentPreflight(CTX(), {
+      deployment: { ...LP_DEP, quiz: 70 }, landingPage: GOOD_LP, site: SITE, domain: null,
+      quizDeployment: null, quiz: { ...FLOW, is_published: false },
+    })
+    t(!r.ok && r.blocking.some((c) => c.id === 'embedded-flow-published'), 'and neither can an unpublished one')
+  }
+  {
+    // An embedded skin that names no template must not reach a live page: the
+    // registry would fall back and the operator would never know which skin
+    // they got.
+    const r = await lpDeploymentPreflight(CTX(), {
+      deployment: { ...LP_DEP, quiz: 70, embedded_quiz_template_id: 'sq_not_a_template' },
+      landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: FLOW,
+    })
+    t(!r.ok && r.blocking.some((c) => c.id === 'embedded-quiz-template'), 'an embedded skin that names no template is refused')
+  }
+}
+
 console.log(`\n${passed} passed, ${failed} failed`)
 if (failed > 0) process.exit(1)
 if (passed === 0) { console.log('no assertions ran'); process.exit(2) }

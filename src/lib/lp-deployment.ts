@@ -228,6 +228,32 @@ const resolveLpDeploymentUncached = async (
     resolveForRender('lp', lpDoc.template_id),
   )
 
+  /*
+   * A LANDING PAGE WHOSE FUNNEL IS GONE IS NOT A LANDING PAGE.
+   *
+   * The twelve ported templates all have a quiz mount, and the live render puts
+   * the real runtime in it. With nothing to mount, the visitor gets the card's
+   * EMPTY BOX where the funnel goes — which is what an already-live deployment
+   * degrades to the moment somebody unpublishes or archives its flow, long after
+   * the publish preflight had its say.
+   *
+   * A 404 is the loud version of a failure that is otherwise silent: an empty
+   * card converts at zero either way, and this one shows up in analytics, in the
+   * logs, and to whoever is buying the traffic. Admin preview is exempt —
+   * `includeUnpublished` means somebody is deliberately looking at unpublished
+   * work and should see the page they are building.
+   */
+  const portedTemplate = templateRes.template.kind === 'lp' ? templateRes.template.template : null
+  if (!includeUnpublished && portedTemplate?.quizMount && !quiz) {
+    // eslint-disable-next-line no-console
+    console.error(
+      `[legalos] lp deployment ${doc.id} (${normalized}) is live and has no quiz to mount: ` +
+        `${ownQuizId ? `flow ${ownQuizId} did not resolve` : quizDeploymentId ? `legacy pointer "${quizDeploymentId}" did not resolve` : 'no flow is bound'}. ` +
+        'Serving 404 rather than an empty card. See pnpm reconcile:lp-quiz.',
+    )
+    return null
+  }
+
   return {
     deployment: {
       id: String(doc.id),
