@@ -3,6 +3,14 @@
 //
 // Every colour carries the reference's own value as its CSS fallback, so with
 // no variables supplied this renders exactly as the handoff drew it.
+//
+// `parts` and `slotIds` are the same markup with its editable regions cut out:
+// joining the parts with each slot's default reproduces `html` byte for byte,
+// which is asserted by scripts/test-lp-slots.mts and by this script before it
+// writes. A deployment stores OVERRIDES against these ids and never a copy of
+// the template, so a corrected template reaches every deployment at once.
+
+import type { LpSlot, LpUnsupportedRegion } from '@/lib/lp-slots/model'
 
 export const slug = "case_type_router"
 export const source = "LP11-Case-Type-Router.html"
@@ -51,4 +59,762 @@ export const tokens: Record<string, string> = {
   "--lp-n956": "#fafafa"
 }
 
-export const html = "<header style=\"background:var(--lp-n956, #fafafa);border-bottom:1px solid var(--lp-n831, #ebebeb);padding:0 24px;font-family:'Archivo',sans-serif\">\n  <div style=\"max-width:1120px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap\">\n    <div style=\"display:flex;align-items:center;gap:10px\">\n      <div style=\"width:132px;height:32px;border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n880, #f1f1f1);border-radius:6px;display:flex;align-items:center;justify-content:center\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n067, #494949);letter-spacing:.1em\">[LOGO SLOT]</span></div>\n      <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n855, #eeeeee);color:var(--lp-n041, #393939);border:1px solid var(--lp-n723, #dddddd);border-radius:4px;padding:1px 6px\">{​{brand.logo}​}</code>\n    </div>\n    <div style=\"display:flex;align-items:center;gap:12px;flex-wrap:wrap\">\n      <span style=\"font-size:11px;color:var(--lp-n159, #6f6f6f);letter-spacing:.08em;font-family:'JetBrains Mono',monospace\">A FREE MATCHING SERVICE · NOT A LAW FIRM</span>\n      <a href=\"#\" style=\"display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--lp-n023, #2a2a2a);text-decoration:none;border:1px solid var(--lp-n680, #d7d7d7);border-radius:6px;padding:9px 15px;min-height:44px\" style-hover=\"border-color:var(--lp-n034, #343434)\">Call <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n855, #eeeeee);color:var(--lp-n041, #393939);border:1px solid var(--lp-n723, #dddddd);border-radius:4px;padding:0 5px\">{​{brand.callNumber}​}</code></a>\n    </div>\n  </div>\n</header>\n\n<!-- ===== router hero ===== -->\n\n<section data-tight=\"\" style=\"background:var(--lp-n956, #fafafa);padding:48px 24px 30px\">\n  <div style=\"max-width:820px;margin:0 auto;text-align:center\">\n    <h1 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(30px,4.2vw,44px);line-height:1.16;letter-spacing:-0.01em;color:var(--lp-n018, #242424);margin:0 0 12px;text-wrap:pretty\">Every case type has its own playbook. Start with the one that happened.</h1>\n    <p style=\"font-family:'Archivo',sans-serif;font-size:15.5px;line-height:1.6;color:var(--lp-n107, #5c5c5c);margin:0 auto;max-width:560px\">Choosing repaints this page for that case type and pre-fills the first quiz answer. The choice is yours to change — nothing else about your check is affected.</p>\n  </div>\n</section>\n<section style=\"background:var(--lp-n956, #fafafa);padding:0 24px 8px\">\n  <div style=\"max-width:1080px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px\">\n    <sc-for list=\"{{caseTypes}}\" as=\"ct\" hint-placeholder-count=\"8\">\n      <button sc-camel-on-click=\"{{ct.select}}\" aria-pressed=\"{{ct.pressed}}\" style=\"text-align:left;background:{{ct.bg}};border:{{ct.border}};border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:{{ct.iconBg}};color:{{ct.iconInk}};display:inline-flex;align-items:center;justify-content:center\">{{ct.iconEl}}</span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:{{ct.tagInk}}\">{{ct.tag}}</span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:{{ct.ink}};line-height:1.3\">{{ct.name}}</span><span style=\"font-size:11.5px;color:{{ct.subInk}};line-height:1.45\">{{ct.sub}}</span></span>\n      </button>\n    </sc-for>\n  </div>\n</section>\n\n<!-- ===== dynamic playbook + quiz ===== -->\n\n<section style=\"background:var(--lp-n956, #fafafa);padding:22px 24px 52px\">\n  <div style=\"max-width:1080px;margin:0 auto;display:flex;gap:clamp(18px,3vw,28px);flex-wrap:wrap;align-items:stretch\">\n    <div style=\"flex:1.25 1 420px;min-width:min(100%,400px);background:var(--lp-n887, #f2f2f0);border:1px solid var(--lp-n789, #e6e6e2);border-radius:12px;padding:clamp(20px,3.5vw,30px)\">\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:23px;color:var(--lp-n018, #242424);margin:0 0 20px\">{{playTitle}}</h2>\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--lp-n197, #7b7b76);margin:0 0 6px\">WHO IS ON THE OTHER SIDE</div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;line-height:1.65;color:var(--lp-n045, #3c3c3c);margin:0 0 18px\">{{playWho}}</p>\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--lp-n197, #7b7b76);margin:0 0 6px\">WHAT MATTERS EARLY</div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;line-height:1.65;color:var(--lp-n045, #3c3c3c);margin:0 0 18px\">{{playEarly}}</p>\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--lp-n197, #7b7b76);margin:0 0 6px\">WHO HANDLES IT IN THE NETWORK</div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;line-height:1.65;color:var(--lp-n045, #3c3c3c);margin:0\">{{playAttorney}}</p>\n    </div>\n    <div style=\"flex:1 1 340px;min-width:min(100%,330px);background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:12px;padding:22px clamp(16px,3vw,26px);box-shadow:0 14px 32px -18px rgba(40,40,40,.28);display:flex;flex-direction:column\">\n      <div style=\"display:flex;align-items:center;justify-content:space-between;gap:10px;font-family:'Archivo',sans-serif;margin-bottom:4px\">\n        <span style=\"font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--lp-n018, #242424)\">CHECK THIS CASE TYPE</span>\n        <span style=\"font-size:11px;color:var(--lp-n258, #8b8b8b)\">Free · no obligation</span>\n      </div>\n      <div style=\"display:inline-flex;align-items:center;gap:6px;background:var(--lp-n903, #f4f4f2);border:1px dashed var(--lp-n581, #c9c9c2);border-radius:5px;padding:4px 9px;margin:6px 0 12px;align-self:flex-start\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--lp-n154, #6e6e66)\">FIRST ANSWER PRE-FILLED:</span><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.08em;color:var(--lp-n028, #2f2f2f)\">{{prefillTag}}</span></div>\n      <div style=\"display:flex;align-items:center;justify-content:space-between;font-family:'Archivo',sans-serif;margin-bottom:6px\"><span style=\"font-size:10.5px;color:var(--lp-n258, #8b8b8b);letter-spacing:.06em\">QUESTION 1 OF 6</span></div>\n      <div style=\"height:5px;background:var(--lp-n839, #ececec);border-radius:999px;margin-bottom:14px\"><div style=\"width:17%;height:5px;background:var(--lp-n034, #343434);border-radius:999px\"></div></div>\n      <h3 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:19px;color:var(--lp-n018, #242424);margin:0 0 4px\">How Were You Injured?</h3>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:12.5px;color:var(--lp-n258, #8b8b8b);margin:0 0 12px\">Select the type of accident you were involved in:</p>\n      <div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:'Archivo',sans-serif;margin-bottom:14px\">\n        <sc-for list=\"{{quizOptions}}\" as=\"q\" hint-placeholder-count=\"4\">\n          <button sc-camel-on-click=\"{{q.select}}\" aria-pressed=\"{{q.pressed}}\" style=\"text-align:center;background:{{q.bg}};border:{{q.border}};color:{{q.ink}};border-radius:8px;padding:10px 8px;font-size:12px;font-weight:600;line-height:1.35;cursor:pointer;min-height:52px;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n034, #343434)\">{{q.label}}</button>\n        </sc-for>\n      </div>\n      <button style=\"width:100%;background:var(--lp-n024, #2b2b2b);color:var(--lp-n1000, #ffffff);border:none;border-radius:8px;padding:14px 22px;font-family:'Archivo',sans-serif;font-size:14.5px;font-weight:700;cursor:pointer;min-height:48px\" style-hover=\"background:var(--lp-n016, #222222)\">Continue →</button>\n      <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-family:'Archivo',sans-serif\"><span style=\"font-size:11px;color:var(--lp-n258, #8b8b8b)\">Free · confidential · no obligation</span><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n432, #b0b0aa)\">{​{quiz.estimatedDuration}​}</span></div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:10.5px;line-height:1.6;color:var(--lp-n321, #9a9a94);margin:12px 0 0;border-top:1px solid var(--lp-n861, #efefec);padding-top:10px\">By continuing, you agree that <code style=\"font-family:'JetBrains Mono',monospace;font-size:9px;background:var(--lp-n903, #f4f4f2);color:var(--lp-n154, #6e6e66);border:1px solid var(--lp-n757, #e2e2dc);border-radius:3px;padding:0 4px\">{​{brand.displayName}​}</code> and participating attorneys may contact you about this request. <code style=\"font-family:'JetBrains Mono',monospace;font-size:9px;background:var(--lp-n903, #f4f4f2);color:var(--lp-n154, #6e6e66);border:1px solid var(--lp-n757, #e2e2dc);border-radius:3px;padding:0 4px\">{​{brand.tcpaText}​}</code></p>\n    </div>\n  </div>\n</section>\n\n<!-- ===== disclosure / reassurance block ===== -->\n\n<section style=\"background:var(--lp-n887, #f2f2f0);border-top:1px solid var(--lp-n789, #e6e6e2);border-bottom:1px solid var(--lp-n789, #e6e6e2);padding:26px 24px\">\n  <div style=\"max-width:1080px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:18px;font-family:'Archivo',sans-serif\">\n    <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:28px;height:28px;border-radius:6px;background:var(--lp-n789, #e6e6e2);color:var(--lp-n068, #4a4a44);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0\"><svg width=\"15\" height=\"15\" sc-camel-view-box=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"></circle><path d=\"M12 8v4\"></path><path d=\"M12 16h.01\"></path></svg></span><p style=\"font-size:12.5px;line-height:1.6;color:var(--lp-n068, #4a4a4a);margin:0\"><code style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;background:var(--lp-n812, #e9e9e4);color:var(--lp-n106, #5c5c54);border:1px solid var(--lp-n712, #dcdcd4);border-radius:3px;padding:0 4px\">{​{brand.displayName}​}</code> is a matching / referral service — not a law firm, unless the deployed brand configuration explicitly states otherwise.</p></div>\n    <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:28px;height:28px;border-radius:6px;background:var(--lp-n789, #e6e6e2);color:var(--lp-n068, #4a4a44);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0\"><svg width=\"15\" height=\"15\" sc-camel-view-box=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h9\"></path><path d=\"M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z\"></path></svg></span><p style=\"font-size:12.5px;line-height:1.6;color:var(--lp-n068, #4a4a4a);margin:0\">Selecting a card pre-fills the first quiz response. It never locks or permanently alters what you submit — you can change it at any step.</p></div>\n    <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:28px;height:28px;border-radius:6px;background:var(--lp-n789, #e6e6e2);color:var(--lp-n068, #4a4a44);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0\"><svg width=\"15\" height=\"15\" sc-camel-view-box=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z\"></path><path d=\"M14 2v6h6\"></path><path d=\"M9 15l2 2 4-4\"></path></svg></span><p style=\"font-size:12.5px;line-height:1.6;color:var(--lp-n068, #4a4a4a);margin:0\">No legal representation begins without a separate written agreement between you and an attorney.</p></div>\n  </div>\n</section>\n\n<!-- ===== FAQ ===== -->\n\n<section style=\"background:var(--lp-n956, #fafafa);padding:48px 24px\">\n  <div style=\"max-width:720px;margin:0 auto\">\n    <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:26px;color:var(--lp-n018, #242424);margin:0 0 18px;text-align:center\">Before you choose a card</h2>\n    <div style=\"display:flex;flex-direction:column;gap:9px;font-family:'Archivo',sans-serif\">\n      <details open=\"\" style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer;list-style-position:outside\">What if more than one accident type applies?</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">Select the closest one. Many crashes fit more than one card — a rideshare trip that involved a commercial truck, for example. The quiz and any later attorney review are where the full circumstances get clarified; the card just sets a starting point.</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">What if I’m not sure which accident type to choose?</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">“Not sure” is a real option, not a dead end. The quiz collects the detail in plain language — you never have to classify the legal issues yourself.</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">Does choosing an accident type determine whether I qualify?</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">No. The card only tailors what this page explains and pre-fills one answer. Eligibility depends on the complete circumstances of what happened — never on which card you tapped.</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">What information should I have before starting?</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">Approximate dates, the location, what injuries you had, any medical treatment, and whatever insurance details you have handy all help. But you don’t need every document to begin — start with what you remember.</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">Can I still complete the check if several parties may be responsible?</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">Yes. Crashes involving employers, rideshare platforms, commercial vehicles, or multiple drivers can involve more than one responsible party. Describe what happened — deciding liability is the attorney’s job, not yours.</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">What happens after I complete the check?</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">Your information may be reviewed for a possible match with a network attorney. A match isn’t guaranteed — and nothing proceeds unless you choose to continue after hearing from them.</p></details>\n    </div>\n  </div>\n</section>\n\n<!-- ===== final CTA ===== -->\n<section style=\"background:var(--lp-n887, #f2f2f0);border-top:1px solid var(--lp-n789, #e6e6e2);padding:48px 24px\">\n  <div style=\"max-width:560px;margin:0 auto;text-align:center\">\n    <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3.6vw,30px);line-height:1.2;color:var(--lp-n018, #242424);margin:0 0 10px;text-wrap:pretty\">Pick the card that fits. We’ll take it from there.</h2>\n    <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;color:var(--lp-n107, #5c5c5c);margin:0 0 22px\">About two minutes. Nothing is filed, and nobody is hired, without your say-so.</p>\n    <div style=\"display:flex;gap:12px;justify-content:center;flex-wrap:wrap\">\n      <button style=\"background:var(--lp-n024, #2b2b2b);color:var(--lp-n1000, #ffffff);border:none;border-radius:8px;padding:14px 30px;font-family:'Archivo',sans-serif;font-size:14.5px;font-weight:700;cursor:pointer;min-height:48px\" style-hover=\"background:var(--lp-n016, #222222)\">Start the case check</button>\n      <a href=\"#\" style=\"display:inline-flex;align-items:center;gap:8px;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n680, #d7d7d7);border-radius:8px;padding:13px 24px;font-family:'Archivo',sans-serif;font-size:13.5px;font-weight:600;color:var(--lp-n023, #2a2a2a);text-decoration:none;min-height:48px\" style-hover=\"border-color:var(--lp-n034, #343434)\">Call <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n855, #eeeeee);color:var(--lp-n041, #393939);border:1px solid var(--lp-n723, #dddddd);border-radius:4px;padding:0 5px\">{​{brand.callNumber}​}</code></a>\n    </div>\n  </div>\n</section>\n\n<!-- ===== legal footer ===== -->\n<footer style=\"background:var(--lp-n838, #ececea);border-top:1px solid var(--lp-n743, #e0e0dc);padding:32px 24px 26px;font-family:'Archivo',sans-serif\">\n  <div style=\"max-width:1080px;margin:0 auto\">\n    <div style=\"display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:16px\">\n      <div style=\"display:flex;align-items:center;gap:10px\">\n        <div style=\"width:110px;height:26px;border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n929, #f7f7f5);border-radius:6px;display:flex;align-items:center;justify-content:center\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--lp-n067, #494949);letter-spacing:.1em\">[LOGO SLOT]</span></div>\n        <span style=\"font-size:12px;color:var(--lp-n068, #4a4a4a)\">An attorney-matching service. Not a law firm.</span>\n      </div>\n      <div style=\"display:flex;gap:16px;flex-wrap:wrap\">\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c3c)\">Privacy Policy</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c3c)\">Terms of Service</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c3c)\">Do Not Sell My Info</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c3c)\">TCPA Disclosure</a>\n      </div>\n    </div>\n    <div style=\"border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n929, #f7f7f5);border-radius:8px;padding:12px 14px;margin-bottom:12px\">\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n067, #494949);letter-spacing:.12em;margin-bottom:6px\">[LEGAL DISCLOSURE] · {​{brand.disclaimer}​} + {​{brand.tcpaText}​}</div>\n      <p style=\"font-size:11px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:0\">By submitting your information you agree to be contacted by phone, email, or text by participating attorneys and partner law firms for the purpose of evaluating your case. Message and data rates may apply. This site is attorney advertising paid for by participating law firms. {​{brand.displayName}​} is not a law firm and does not provide legal advice. Prior results do not guarantee a similar outcome.</p>\n    </div>\n    <div style=\"font-size:11px;color:var(--lp-n107, #5c5c5c)\">© {​{site.currentYear}​} {​{brand.displayName}​} · {​{brand.copyright}​}</div>\n  </div>\n</footer>\n\n<script type=\"text/x-dc\" data-dc-script=\"\" data-props=\"{&quot;annotations&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Engineering handoff&quot;}}\">\nclass Component extends DCLogic {\n  state = { anno: false, selected: 'auto', quizChoice: 'auto_moto' };\n  renderVals() {\n    const on = (this.props.annotations ?? false) || this.state.anno;\n    const sel = this.state.selected;\n    const S = (k, next) => this.setState(next ? { selected: k, quizChoice: MAP[k] } : { selected: k });\n    const icon = (paths) => React.createElement('svg', { width: 18, height: 18, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': true }, ...paths.map((d, i) => React.createElement(d.c || 'path', Object.assign({ key: i }, d.a))));\n    const P = (d) => ({ a: { d } });\n    const ICONS = {\n      auto: [P('M19 17h2v-4l-2-5H5l-2 5v4h2'), { c: 'circle', a: { cx: 7.5, cy: 17.5, r: 1.6 } }, { c: 'circle', a: { cx: 16.5, cy: 17.5, r: 1.6 } }, P('M9.1 17.5h5.8'), P('M3 12h18')],\n      truck: [P('M1 7h13v10H1z'), P('M14 10h4l3 3v4h-7'), { c: 'circle', a: { cx: 5.5, cy: 17.5, r: 1.6 } }, { c: 'circle', a: { cx: 17.5, cy: 17.5, r: 1.6 } }],\n      rideshare: [{ c: 'rect', a: { x: 7, y: 2, width: 10, height: 20, rx: 2.5 } }, P('M11 18h2'), { c: 'circle', a: { cx: 12, cy: 10, r: 2.2 } }, P('M9 14c.6-1.3 1.7-2 3-2s2.4.7 3 2')],\n      pedestrian: [{ c: 'circle', a: { cx: 12, cy: 5, r: 2 } }, P('M12 7.5v5'), P('M12 12.5 9 20'), P('M12 12.5 15 20'), P('M8.5 10.5 12 9l3.5 1.5')],\n      bicycle: [{ c: 'circle', a: { cx: 6, cy: 16.5, r: 3.4 } }, { c: 'circle', a: { cx: 18, cy: 16.5, r: 3.4 } }, P('M6 16.5 9.5 9h5'), P('M12 16.5 9.5 9'), P('M14.5 9 18 16.5'), P('M13 6h2.5')],\n      multi: [P('M15 15h2v-3l-1.5-3.5H8L6.5 12v3h2'), P('M10 15h4'), P('M20 9h1.5v-2.5L20.5 4H12l-.6 1.4'), { c: 'circle', a: { cx: 8, cy: 15.5, r: 1.4 } }, { c: 'circle', a: { cx: 16, cy: 15.5, r: 1.4 } }, P('M3 19h18')],\n      work: [{ c: 'rect', a: { x: 3, y: 8, width: 18, height: 12, rx: 2 } }, P('M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2'), P('M3 13h18')],\n      unsure: [{ c: 'circle', a: { cx: 12, cy: 12, r: 9 } }, P('M9.5 9.2a2.6 2.6 0 0 1 5 .8c0 1.6-2.3 2-2.3 3.4'), P('M12 17h.01')],\n    };\n    const MAP = { auto: 'auto_moto', truck: 'commercial', rideshare: 'passenger', work: 'work_other', pedestrian: 'passenger', bicycle: 'passenger', multi: 'auto_moto', unsure: null };\n    const TYPES = [\n      { k: 'auto', name: 'Car or motorcycle', sub: 'Two or more passenger vehicles' },\n      { k: 'truck', name: 'Commercial truck', sub: 'Semi, delivery, company vehicle' },\n      { k: 'rideshare', name: 'Rideshare', sub: 'Driver or passenger during a trip' },\n      { k: 'pedestrian', name: 'Pedestrian', sub: 'Struck while walking or crossing' },\n      { k: 'bicycle', name: 'Bicycle or e-bike', sub: 'Riding when a vehicle was involved' },\n      { k: 'multi', name: 'Multi-vehicle incident', sub: 'Pile-up or chain-reaction crash' },\n      { k: 'work', name: 'Workplace or other', sub: 'On the job, or something else' },\n      { k: 'unsure', name: 'Not sure', sub: 'Describe it in the quiz instead' },\n    ];\n    const PLAY = {\n      auto: { t: 'The auto-claim playbook', who: 'Usually the other driver\\u2019s insurance carrier. An adjuster is assigned within days and starts building the company\\u2019s file immediately.', early: 'The police report, photos, and not signing releases while things are unsettled. Recorded statements can wait until after advice.', att: 'Attorneys who work passenger-vehicle claims in the relevant state, matched by case type rather than by advertising budget.' },\n      truck: { t: 'The commercial-truck playbook', who: 'A motor carrier, its insurer, and often a rapid-response team that reaches the scene before the police report is finished.', early: 'Preserving the driver\\u2019s logs, the truck\\u2019s electronic data, and maintenance records before they cycle out. Federal rules may apply alongside state law.', att: 'Attorneys with commercial-carrier caseloads \\u2014 the discovery and the defendants differ from an ordinary car crash.' },\n      rideshare: { t: 'The rideshare playbook', who: 'It depends on the trip phase: the platform\\u2019s coverage, the driver\\u2019s personal policy, or another driver\\u2019s insurer \\u2014 sometimes more than one.', early: 'Screenshots of the trip, the ride receipt, and in-app incident reports. Which policy applies turns on whether a ride was accepted or in progress.', att: 'Attorneys who handle platform-coverage disputes and know how rideshare insurance tiers interact.' },\n      pedestrian: { t: 'The pedestrian playbook', who: 'The driver\\u2019s insurer \\u2014 and sometimes your own auto policy, even though you were on foot.', early: 'Crosswalk and signal details, camera footage nearby, and prompt medical documentation. Injuries in pedestrian cases are often more serious than they first feel.', att: 'Attorneys experienced with vulnerable-road-user claims and the comparative-fault arguments insurers raise against people on foot.' },\n      bicycle: { t: 'The bicycle and e-bike playbook', who: 'Typically the driver\\u2019s insurer. E-bike cases can also raise questions about equipment and local vehicle classifications.', early: 'The bike\\u2019s condition (keep it unrepaired if possible), helmet and gear, route details, and any camera footage.', att: 'Attorneys who handle cyclist injury claims and know the road-sharing rules that decide fault in the relevant state.' },\n      multi: { t: 'The multi-vehicle playbook', who: 'Several insurers at once, each trying to move fault onto someone else\\u2019s policyholder. Fault is rarely settled quickly.', early: 'Your own account written down early, the order of impacts as you remember it, and every driver\\u2019s insurance details from the report.', att: 'Attorneys used to multi-party liability \\u2014 apportioning fault across several policies is its own discipline.' },\n      work: { t: 'The workplace-and-other playbook', who: 'Possibly an employer\\u2019s workers\\u2019-compensation carrier, a third party\\u2019s insurer, or both \\u2014 the two systems interact.', early: 'Reporting the incident to the employer in writing and getting treatment documented. Deadlines in work-related claims can be short.', att: 'Attorneys who handle both workers\\u2019-compensation and third-party injury claims, so nothing falls between the two.' },\n      unsure: { t: 'The not-sure playbook', who: 'That\\u2019s genuinely fine \\u2014 many situations involve more than one possible party, and sorting that out is the review\\u2019s job, not yours.', early: 'Just what you remember: roughly when it happened, where, what hurt, and whether you saw a doctor. Plain language is enough.', att: 'The quiz routes your description the same way regardless of this page \\u2014 an attorney match is based on the full circumstances.' },\n    };\n    const QOPTS = [\n      { k: 'auto_moto', label: 'Auto / Motorcycle Accident' },\n      { k: 'commercial', label: 'Commercial / Semi Accident' },\n      { k: 'passenger', label: 'Passenger / Rideshare / Pedestrian' },\n      { k: 'work_other', label: 'At Work / Other / I Wasn\\u2019t Injured' },\n    ];\n    const TAGNAMES = { auto_moto: 'AUTO', commercial: 'COMMERCIAL', passenger: 'PASSENGER', work_other: 'WORK/OTHER' };\n    const p = PLAY[sel];\n    return {\n      anno: on ? 'flex' : 'none',\n      annoLabel: on ? 'ANNOTATIONS: ON' : 'ANNOTATIONS: OFF',\n      toggleAnno: () => this.setState((s) => ({ anno: !s.anno })),\n      caseTypes: TYPES.map((t) => {\n        const is = t.k === sel;\n        return {\n          name: t.name, sub: t.sub,\n          iconEl: icon(ICONS[t.k]),\n          bg: is ? 'var(--lp-n024, #2b2b2b)' : 'var(--lp-n1000, #ffffff)',\n          border: is ? '2px solid var(--lp-n024, #2b2b2b)' : '1px solid var(--lp-n761, #e2e2e2)',\n          ink: is ? 'var(--lp-n1000, #ffffff)' : 'var(--lp-n018, #242424)',\n          subInk: is ? 'rgba(255,255,255,.72)' : 'var(--lp-n258, #8b8b8b)',\n          iconBg: is ? 'rgba(255,255,255,.14)' : 'var(--lp-n887, #f2f2f0)',\n          iconInk: is ? 'var(--lp-n1000, #ffffff)' : 'var(--lp-n045, #3c3c3c)',\n          tag: is ? 'SELECTED' : '',\n          tagInk: is ? 'var(--lp-n687, #d8d8d8)' : 'transparent',\n          pressed: is,\n          select: () => this.setState({ selected: t.k, quizChoice: MAP[t.k] }),\n        };\n      }),\n      playTitle: p.t, playWho: p.who, playEarly: p.early, playAttorney: p.att,\n      prefillTag: this.state.quizChoice ? TAGNAMES[this.state.quizChoice] : 'NONE \\u00b7 CHOOSE BELOW',\n      quizOptions: QOPTS.map((q) => {\n        const is = q.k === this.state.quizChoice;\n        return {\n          label: q.label,\n          bg: is ? 'var(--lp-n024, #2b2b2b)' : 'var(--lp-n1000, #ffffff)',\n          border: is ? '2px solid var(--lp-n024, #2b2b2b)' : '1px solid var(--lp-n680, #d7d7d7)',\n          ink: is ? 'var(--lp-n1000, #ffffff)' : 'var(--lp-n045, #3c3c3c)',\n          pressed: is,\n          select: () => this.setState({ quizChoice: q.k }),\n        };\n      }),\n    };\n  }\n}\n</script>"
+/** The template as the reference draws it, with nothing overridden. */
+export const html = "<header style=\"background:var(--lp-n956, #fafafa);border-bottom:1px solid var(--lp-n831, #ebebeb);padding:0 24px;font-family:'Archivo',sans-serif\">\n  <div style=\"max-width:1120px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap\">\n    <div style=\"display:flex;align-items:center;gap:10px\">\n      <div style=\"width:132px;height:32px;border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n880, #f1f1f1);border-radius:6px;display:flex;align-items:center;justify-content:center\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n067, #494949);letter-spacing:.1em\">[LOGO SLOT]</span></div>\n      <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n855, #eeeeee);color:var(--lp-n041, #393939);border:1px solid var(--lp-n723, #dddddd);border-radius:4px;padding:1px 6px\">{{brand.logo}}</code>\n    </div>\n    <div style=\"display:flex;align-items:center;gap:12px;flex-wrap:wrap\">\n      <span style=\"font-size:11px;color:var(--lp-n159, #6f6f6f);letter-spacing:.08em;font-family:'JetBrains Mono',monospace\">A FREE MATCHING SERVICE · NOT A LAW FIRM</span>\n      <a href=\"#\" style=\"display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--lp-n023, #2a2a2a);text-decoration:none;border:1px solid var(--lp-n680, #d7d7d7);border-radius:6px;padding:9px 15px;min-height:44px\" style-hover=\"border-color:var(--lp-n034, #343434)\">Call <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n855, #eeeeee);color:var(--lp-n041, #393939);border:1px solid var(--lp-n723, #dddddd);border-radius:4px;padding:0 5px\">{{brand.callNumber}}</code></a>\n    </div>\n  </div>\n</header>\n\n<!-- ===== router hero ===== -->\n\n<section data-tight=\"\" style=\"background:var(--lp-n956, #fafafa);padding:48px 24px 30px\">\n  <div style=\"max-width:820px;margin:0 auto;text-align:center\">\n    <h1 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(30px,4.2vw,44px);line-height:1.16;letter-spacing:-0.01em;color:var(--lp-n018, #242424);margin:0 0 12px;text-wrap:pretty\">Every case type has its own playbook. Start with the one that happened.</h1>\n    <p style=\"font-family:'Archivo',sans-serif;font-size:15.5px;line-height:1.6;color:var(--lp-n107, #5c5c5c);margin:0 auto;max-width:560px\">Choosing repaints this page for that case type and pre-fills the first quiz answer. The choice is yours to change — nothing else about your check is affected.</p>\n  </div>\n</section>\n<section style=\"background:var(--lp-n956, #fafafa);padding:0 24px 8px\">\n  <div style=\"max-width:1080px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px\">\n    \n      <button aria-pressed=\"true\" style=\"text-align:left;background:var(--lp-n024, #2b2b2b);border:2px solid var(--lp-n024, #2b2b2b);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.14);color:var(--lp-n1000, #ffffff);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><path d=\"M19 17h2v-4l-2-5H5l-2 5v4h2\" /><circle cx=\"7.5\" cy=\"17.5\" r=\"1.6\" /><circle cx=\"16.5\" cy=\"17.5\" r=\"1.6\" /><path d=\"M9.1 17.5h5.8\" /><path d=\"M3 12h18\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:var(--lp-n687, #d8d8d8)\">SELECTED</span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n1000, #ffffff);line-height:1.3\">Car or motorcycle</span><span style=\"font-size:11.5px;color:rgba(255,255,255,.72);line-height:1.45\">Two or more passenger vehicles</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><path d=\"M1 7h13v10H1z\" /><path d=\"M14 10h4l3 3v4h-7\" /><circle cx=\"5.5\" cy=\"17.5\" r=\"1.6\" /><circle cx=\"17.5\" cy=\"17.5\" r=\"1.6\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">Commercial truck</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">Semi, delivery, company vehicle</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><rect x=\"7\" y=\"2\" width=\"10\" height=\"20\" rx=\"2.5\" /><path d=\"M11 18h2\" /><circle cx=\"12\" cy=\"10\" r=\"2.2\" /><path d=\"M9 14c.6-1.3 1.7-2 3-2s2.4.7 3 2\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">Rideshare</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">Driver or passenger during a trip</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><circle cx=\"12\" cy=\"5\" r=\"2\" /><path d=\"M12 7.5v5\" /><path d=\"M12 12.5 9 20\" /><path d=\"M12 12.5 15 20\" /><path d=\"M8.5 10.5 12 9l3.5 1.5\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">Pedestrian</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">Struck while walking or crossing</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><circle cx=\"6\" cy=\"16.5\" r=\"3.4\" /><circle cx=\"18\" cy=\"16.5\" r=\"3.4\" /><path d=\"M6 16.5 9.5 9h5\" /><path d=\"M12 16.5 9.5 9\" /><path d=\"M14.5 9 18 16.5\" /><path d=\"M13 6h2.5\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">Bicycle or e-bike</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">Riding when a vehicle was involved</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><path d=\"M15 15h2v-3l-1.5-3.5H8L6.5 12v3h2\" /><path d=\"M10 15h4\" /><path d=\"M20 9h1.5v-2.5L20.5 4H12l-.6 1.4\" /><circle cx=\"8\" cy=\"15.5\" r=\"1.4\" /><circle cx=\"16\" cy=\"15.5\" r=\"1.4\" /><path d=\"M3 19h18\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">Multi-vehicle incident</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">Pile-up or chain-reaction crash</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><rect x=\"3\" y=\"8\" width=\"18\" height=\"12\" rx=\"2\" /><path d=\"M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2\" /><path d=\"M3 13h18\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">Workplace or other</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">On the job, or something else</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><circle cx=\"12\" cy=\"12\" r=\"9\" /><path d=\"M9.5 9.2a2.6 2.6 0 0 1 5 .8c0 1.6-2.3 2-2.3 3.4\" /><path d=\"M12 17h.01\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">Not sure</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">Describe it in the quiz instead</span></span>\n      </button>\n    \n  </div>\n</section>\n\n<!-- ===== dynamic playbook + quiz ===== -->\n\n<section style=\"background:var(--lp-n956, #fafafa);padding:22px 24px 52px\">\n  <div style=\"max-width:1080px;margin:0 auto;display:flex;gap:clamp(18px,3vw,28px);flex-wrap:wrap;align-items:stretch\">\n    <div style=\"flex:1.25 1 420px;min-width:min(100%,400px);background:var(--lp-n887, #f2f2f0);border:1px solid var(--lp-n789, #e6e6e2);border-radius:12px;padding:clamp(20px,3.5vw,30px)\">\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:23px;color:var(--lp-n018, #242424);margin:0 0 20px\">The auto-claim playbook</h2>\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--lp-n197, #7b7b76);margin:0 0 6px\">WHO IS ON THE OTHER SIDE</div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;line-height:1.65;color:var(--lp-n045, #3c3c3c);margin:0 0 18px\">Usually the other driver’s insurance carrier. An adjuster is assigned within days and starts building the company’s file immediately.</p>\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--lp-n197, #7b7b76);margin:0 0 6px\">WHAT MATTERS EARLY</div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;line-height:1.65;color:var(--lp-n045, #3c3c3c);margin:0 0 18px\">The police report, photos, and not signing releases while things are unsettled. Recorded statements can wait until after advice.</p>\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--lp-n197, #7b7b76);margin:0 0 6px\">WHO HANDLES IT IN THE NETWORK</div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;line-height:1.65;color:var(--lp-n045, #3c3c3c);margin:0\">Attorneys who work passenger-vehicle claims in the relevant state, matched by case type rather than by advertising budget.</p>\n    </div>\n    <div style=\"flex:1 1 340px;min-width:min(100%,330px);background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:12px;padding:22px clamp(16px,3vw,26px);box-shadow:0 14px 32px -18px rgba(40,40,40,.28);display:flex;flex-direction:column\">\n      <div style=\"display:flex;align-items:center;justify-content:space-between;gap:10px;font-family:'Archivo',sans-serif;margin-bottom:4px\">\n        <span style=\"font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--lp-n018, #242424)\">CHECK THIS CASE TYPE</span>\n        <span style=\"font-size:11px;color:var(--lp-n258, #8b8b8b)\">Free · no obligation</span>\n      </div>\n      <div style=\"display:inline-flex;align-items:center;gap:6px;background:var(--lp-n903, #f4f4f2);border:1px dashed var(--lp-n581, #c9c9c2);border-radius:5px;padding:4px 9px;margin:6px 0 12px;align-self:flex-start\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--lp-n154, #6e6e66)\">FIRST ANSWER PRE-FILLED:</span><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.08em;color:var(--lp-n028, #2f2f2f)\">AUTO</span></div>\n      <div style=\"display:flex;align-items:center;justify-content:space-between;font-family:'Archivo',sans-serif;margin-bottom:6px\"><span style=\"font-size:10.5px;color:var(--lp-n258, #8b8b8b);letter-spacing:.06em\">QUESTION 1 OF 6</span></div>\n      <div style=\"height:5px;background:var(--lp-n839, #ececec);border-radius:999px;margin-bottom:14px\"><div style=\"width:17%;height:5px;background:var(--lp-n034, #343434);border-radius:999px\"></div></div>\n      <h3 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:19px;color:var(--lp-n018, #242424);margin:0 0 4px\">How Were You Injured?</h3>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:12.5px;color:var(--lp-n258, #8b8b8b);margin:0 0 12px\">Select the type of accident you were involved in:</p>\n      <div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:'Archivo',sans-serif;margin-bottom:14px\">\n        \n          <button aria-pressed=\"true\" style=\"text-align:center;background:var(--lp-n024, #2b2b2b);border:2px solid var(--lp-n024, #2b2b2b);color:var(--lp-n1000, #ffffff);border-radius:8px;padding:10px 8px;font-size:12px;font-weight:600;line-height:1.35;cursor:pointer;min-height:52px;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n034, #343434)\">Auto / Motorcycle Accident</button>\n        \n          <button aria-pressed=\"false\" style=\"text-align:center;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n680, #d7d7d7);color:var(--lp-n045, #3c3c3c);border-radius:8px;padding:10px 8px;font-size:12px;font-weight:600;line-height:1.35;cursor:pointer;min-height:52px;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n034, #343434)\">Commercial / Semi Accident</button>\n        \n          <button aria-pressed=\"false\" style=\"text-align:center;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n680, #d7d7d7);color:var(--lp-n045, #3c3c3c);border-radius:8px;padding:10px 8px;font-size:12px;font-weight:600;line-height:1.35;cursor:pointer;min-height:52px;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n034, #343434)\">Passenger / Rideshare / Pedestrian</button>\n        \n          <button aria-pressed=\"false\" style=\"text-align:center;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n680, #d7d7d7);color:var(--lp-n045, #3c3c3c);border-radius:8px;padding:10px 8px;font-size:12px;font-weight:600;line-height:1.35;cursor:pointer;min-height:52px;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n034, #343434)\">At Work / Other / I Wasn’t Injured</button>\n        \n      </div>\n      <button style=\"width:100%;background:var(--lp-n024, #2b2b2b);color:var(--lp-n1000, #ffffff);border:none;border-radius:8px;padding:14px 22px;font-family:'Archivo',sans-serif;font-size:14.5px;font-weight:700;cursor:pointer;min-height:48px\" style-hover=\"background:var(--lp-n016, #222222)\">Continue →</button>\n      <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-family:'Archivo',sans-serif\"><span style=\"font-size:11px;color:var(--lp-n258, #8b8b8b)\">Free · confidential · no obligation</span><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n432, #b0b0aa)\">{{quiz.estimatedDuration}}</span></div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:10.5px;line-height:1.6;color:var(--lp-n321, #9a9a94);margin:12px 0 0;border-top:1px solid var(--lp-n861, #efefec);padding-top:10px\">By continuing, you agree that <code style=\"font-family:'JetBrains Mono',monospace;font-size:9px;background:var(--lp-n903, #f4f4f2);color:var(--lp-n154, #6e6e66);border:1px solid var(--lp-n757, #e2e2dc);border-radius:3px;padding:0 4px\">{{brand.displayName}}</code> and participating attorneys may contact you about this request. <code style=\"font-family:'JetBrains Mono',monospace;font-size:9px;background:var(--lp-n903, #f4f4f2);color:var(--lp-n154, #6e6e66);border:1px solid var(--lp-n757, #e2e2dc);border-radius:3px;padding:0 4px\">{{brand.tcpaText}}</code></p>\n    </div>\n  </div>\n</section>\n\n<!-- ===== disclosure / reassurance block ===== -->\n\n<section style=\"background:var(--lp-n887, #f2f2f0);border-top:1px solid var(--lp-n789, #e6e6e2);border-bottom:1px solid var(--lp-n789, #e6e6e2);padding:26px 24px\">\n  <div style=\"max-width:1080px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:18px;font-family:'Archivo',sans-serif\">\n    <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:28px;height:28px;border-radius:6px;background:var(--lp-n789, #e6e6e2);color:var(--lp-n068, #4a4a44);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0\"><svg width=\"15\" height=\"15\" sc-camel-view-box=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"></circle><path d=\"M12 8v4\"></path><path d=\"M12 16h.01\"></path></svg></span><p style=\"font-size:12.5px;line-height:1.6;color:var(--lp-n068, #4a4a4a);margin:0\"><code style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;background:var(--lp-n812, #e9e9e4);color:var(--lp-n106, #5c5c54);border:1px solid var(--lp-n712, #dcdcd4);border-radius:3px;padding:0 4px\">{{brand.displayName}}</code> is a matching / referral service — not a law firm, unless the deployed brand configuration explicitly states otherwise.</p></div>\n    <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:28px;height:28px;border-radius:6px;background:var(--lp-n789, #e6e6e2);color:var(--lp-n068, #4a4a44);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0\"><svg width=\"15\" height=\"15\" sc-camel-view-box=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h9\"></path><path d=\"M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z\"></path></svg></span><p style=\"font-size:12.5px;line-height:1.6;color:var(--lp-n068, #4a4a4a);margin:0\">Selecting a card pre-fills the first quiz response. It never locks or permanently alters what you submit — you can change it at any step.</p></div>\n    <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:28px;height:28px;border-radius:6px;background:var(--lp-n789, #e6e6e2);color:var(--lp-n068, #4a4a44);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0\"><svg width=\"15\" height=\"15\" sc-camel-view-box=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z\"></path><path d=\"M14 2v6h6\"></path><path d=\"M9 15l2 2 4-4\"></path></svg></span><p style=\"font-size:12.5px;line-height:1.6;color:var(--lp-n068, #4a4a4a);margin:0\">No legal representation begins without a separate written agreement between you and an attorney.</p></div>\n  </div>\n</section>\n\n<!-- ===== FAQ ===== -->\n\n<section style=\"background:var(--lp-n956, #fafafa);padding:48px 24px\">\n  <div style=\"max-width:720px;margin:0 auto\">\n    <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:26px;color:var(--lp-n018, #242424);margin:0 0 18px;text-align:center\">Before you choose a card</h2>\n    <div style=\"display:flex;flex-direction:column;gap:9px;font-family:'Archivo',sans-serif\">\n      <details open=\"\" style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer;list-style-position:outside\">What if more than one accident type applies?</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">Select the closest one. Many crashes fit more than one card — a rideshare trip that involved a commercial truck, for example. The quiz and any later attorney review are where the full circumstances get clarified; the card just sets a starting point.</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">What if I’m not sure which accident type to choose?</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">“Not sure” is a real option, not a dead end. The quiz collects the detail in plain language — you never have to classify the legal issues yourself.</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">Does choosing an accident type determine whether I qualify?</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">No. The card only tailors what this page explains and pre-fills one answer. Eligibility depends on the complete circumstances of what happened — never on which card you tapped.</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">What information should I have before starting?</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">Approximate dates, the location, what injuries you had, any medical treatment, and whatever insurance details you have handy all help. But you don’t need every document to begin — start with what you remember.</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">Can I still complete the check if several parties may be responsible?</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">Yes. Crashes involving employers, rideshare platforms, commercial vehicles, or multiple drivers can involve more than one responsible party. Describe what happened — deciding liability is the attorney’s job, not yours.</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">What happens after I complete the check?</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">Your information may be reviewed for a possible match with a network attorney. A match isn’t guaranteed — and nothing proceeds unless you choose to continue after hearing from them.</p></details>\n    </div>\n  </div>\n</section>\n\n<!-- ===== final CTA ===== -->\n<section style=\"background:var(--lp-n887, #f2f2f0);border-top:1px solid var(--lp-n789, #e6e6e2);padding:48px 24px\">\n  <div style=\"max-width:560px;margin:0 auto;text-align:center\">\n    <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3.6vw,30px);line-height:1.2;color:var(--lp-n018, #242424);margin:0 0 10px;text-wrap:pretty\">Pick the card that fits. We’ll take it from there.</h2>\n    <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;color:var(--lp-n107, #5c5c5c);margin:0 0 22px\">About two minutes. Nothing is filed, and nobody is hired, without your say-so.</p>\n    <div style=\"display:flex;gap:12px;justify-content:center;flex-wrap:wrap\">\n      <button style=\"background:var(--lp-n024, #2b2b2b);color:var(--lp-n1000, #ffffff);border:none;border-radius:8px;padding:14px 30px;font-family:'Archivo',sans-serif;font-size:14.5px;font-weight:700;cursor:pointer;min-height:48px\" style-hover=\"background:var(--lp-n016, #222222)\">Start the case check</button>\n      <a href=\"#\" style=\"display:inline-flex;align-items:center;gap:8px;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n680, #d7d7d7);border-radius:8px;padding:13px 24px;font-family:'Archivo',sans-serif;font-size:13.5px;font-weight:600;color:var(--lp-n023, #2a2a2a);text-decoration:none;min-height:48px\" style-hover=\"border-color:var(--lp-n034, #343434)\">Call <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n855, #eeeeee);color:var(--lp-n041, #393939);border:1px solid var(--lp-n723, #dddddd);border-radius:4px;padding:0 5px\">{{brand.callNumber}}</code></a>\n    </div>\n  </div>\n</section>\n\n<!-- ===== legal footer ===== -->\n<footer style=\"background:var(--lp-n838, #ececea);border-top:1px solid var(--lp-n743, #e0e0dc);padding:32px 24px 26px;font-family:'Archivo',sans-serif\">\n  <div style=\"max-width:1080px;margin:0 auto\">\n    <div style=\"display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:16px\">\n      <div style=\"display:flex;align-items:center;gap:10px\">\n        <div style=\"width:110px;height:26px;border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n929, #f7f7f5);border-radius:6px;display:flex;align-items:center;justify-content:center\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--lp-n067, #494949);letter-spacing:.1em\">[LOGO SLOT]</span></div>\n        <span style=\"font-size:12px;color:var(--lp-n068, #4a4a4a)\">An attorney-matching service. Not a law firm.</span>\n      </div>\n      <div style=\"display:flex;gap:16px;flex-wrap:wrap\">\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c3c)\">Privacy Policy</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c3c)\">Terms of Service</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c3c)\">Do Not Sell My Info</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c3c)\">TCPA Disclosure</a>\n      </div>\n    </div>\n    <div style=\"border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n929, #f7f7f5);border-radius:8px;padding:12px 14px;margin-bottom:12px\">\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n067, #494949);letter-spacing:.12em;margin-bottom:6px\">[LEGAL DISCLOSURE] · {{brand.disclaimer}} + {{brand.tcpaText}}</div>\n      <p style=\"font-size:11px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:0\">By submitting your information you agree to be contacted by phone, email, or text by participating attorneys and partner law firms for the purpose of evaluating your case. Message and data rates may apply. This site is attorney advertising paid for by participating law firms. {{brand.displayName}} is not a law firm and does not provide legal advice. Prior results do not guarantee a similar outcome.</p>\n    </div>\n    <div style=\"font-size:11px;color:var(--lp-n107, #5c5c5c)\">© {{site.currentYear}} {{brand.displayName}} · {{brand.copyright}}</div>\n  </div>\n</footer>"
+
+/** Literal markup between the slots. Always `slotIds.length + 1` entries. */
+export const parts: string[] = ["<header style=\"background:var(--lp-n956, #fafafa);border-bottom:1px solid var(--lp-n831, #ebebeb);padding:0 24px;font-family:'Archivo',sans-serif\">\n  <div style=\"max-width:1120px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap\">\n    <div style=\"display:flex;align-items:center;gap:10px\">\n      <div style=\"width:132px;height:32px;border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n880, #f1f1f1);border-radius:6px;display:flex;align-items:center;justify-content:center\">","</div>\n      <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n855, #eeeeee);color:var(--lp-n041, #393939);border:1px solid var(--lp-n723, #dddddd);border-radius:4px;padding:1px 6px\">{{brand.logo}}</code>\n    </div>\n    <div style=\"display:flex;align-items:center;gap:12px;flex-wrap:wrap\">\n      <span style=\"font-size:11px;color:var(--lp-n159, #6f6f6f);letter-spacing:.08em;font-family:'JetBrains Mono',monospace\">","</span>\n      <a href=\"#\" style=\"display:inline-flex;align-items:center;gap:7px;font-size:13px;font-weight:600;color:var(--lp-n023, #2a2a2a);text-decoration:none;border:1px solid var(--lp-n680, #d7d7d7);border-radius:6px;padding:9px 15px;min-height:44px\" style-hover=\"border-color:var(--lp-n034, #343434)\">","</a>\n    </div>\n  </div>\n</header>\n\n<!-- ===== router hero ===== -->\n\n<section data-tight=\"\" style=\"background:var(--lp-n956, #fafafa);padding:48px 24px 30px\">\n  <div style=\"max-width:820px;margin:0 auto;text-align:center\">\n    <h1 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(30px,4.2vw,44px);line-height:1.16;letter-spacing:-0.01em;color:var(--lp-n018, #242424);margin:0 0 12px;text-wrap:pretty\">","</h1>\n    <p style=\"font-family:'Archivo',sans-serif;font-size:15.5px;line-height:1.6;color:var(--lp-n107, #5c5c5c);margin:0 auto;max-width:560px\">","</p>\n  </div>\n</section>\n<section style=\"background:var(--lp-n956, #fafafa);padding:0 24px 8px\">\n  <div style=\"max-width:1080px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px\">\n    \n      <button aria-pressed=\"true\" style=\"text-align:left;background:var(--lp-n024, #2b2b2b);border:2px solid var(--lp-n024, #2b2b2b);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.14);color:var(--lp-n1000, #ffffff);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><path d=\"M19 17h2v-4l-2-5H5l-2 5v4h2\" /><circle cx=\"7.5\" cy=\"17.5\" r=\"1.6\" /><circle cx=\"16.5\" cy=\"17.5\" r=\"1.6\" /><path d=\"M9.1 17.5h5.8\" /><path d=\"M3 12h18\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:var(--lp-n687, #d8d8d8)\">","</span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n1000, #ffffff);line-height:1.3\">","</span><span style=\"font-size:11.5px;color:rgba(255,255,255,.72);line-height:1.45\">","</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><path d=\"M1 7h13v10H1z\" /><path d=\"M14 10h4l3 3v4h-7\" /><circle cx=\"5.5\" cy=\"17.5\" r=\"1.6\" /><circle cx=\"17.5\" cy=\"17.5\" r=\"1.6\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">","</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">","</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><rect x=\"7\" y=\"2\" width=\"10\" height=\"20\" rx=\"2.5\" /><path d=\"M11 18h2\" /><circle cx=\"12\" cy=\"10\" r=\"2.2\" /><path d=\"M9 14c.6-1.3 1.7-2 3-2s2.4.7 3 2\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">","</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">","</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><circle cx=\"12\" cy=\"5\" r=\"2\" /><path d=\"M12 7.5v5\" /><path d=\"M12 12.5 9 20\" /><path d=\"M12 12.5 15 20\" /><path d=\"M8.5 10.5 12 9l3.5 1.5\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">","</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">","</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><circle cx=\"6\" cy=\"16.5\" r=\"3.4\" /><circle cx=\"18\" cy=\"16.5\" r=\"3.4\" /><path d=\"M6 16.5 9.5 9h5\" /><path d=\"M12 16.5 9.5 9\" /><path d=\"M14.5 9 18 16.5\" /><path d=\"M13 6h2.5\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">","</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">","</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><path d=\"M15 15h2v-3l-1.5-3.5H8L6.5 12v3h2\" /><path d=\"M10 15h4\" /><path d=\"M20 9h1.5v-2.5L20.5 4H12l-.6 1.4\" /><circle cx=\"8\" cy=\"15.5\" r=\"1.4\" /><circle cx=\"16\" cy=\"15.5\" r=\"1.4\" /><path d=\"M3 19h18\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">","</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">","</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><rect x=\"3\" y=\"8\" width=\"18\" height=\"12\" rx=\"2\" /><path d=\"M9 8V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2\" /><path d=\"M3 13h18\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">","</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">","</span></span>\n      </button>\n    \n      <button aria-pressed=\"false\" style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:16px 16px 14px;display:flex;flex-direction:column;gap:9px;cursor:pointer;min-height:104px;font-family:'Archivo',sans-serif;transition:border-color .15s\" style-hover=\"border-color:var(--lp-n034, #343434)\">\n        <span style=\"display:flex;align-items:center;justify-content:space-between;width:100%\"><span style=\"width:34px;height:34px;border-radius:8px;background:var(--lp-n887, #f2f2f0);color:var(--lp-n045, #3c3c3c);display:inline-flex;align-items:center;justify-content:center\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden><circle cx=\"12\" cy=\"12\" r=\"9\" /><path d=\"M9.5 9.2a2.6 2.6 0 0 1 5 .8c0 1.6-2.3 2-2.3 3.4\" /><path d=\"M12 17h.01\" /></svg></span><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;font-weight:600;letter-spacing:.1em;color:transparent\"></span></span>\n        <span style=\"display:flex;flex-direction:column;gap:2px\"><span style=\"font-size:14.5px;font-weight:700;color:var(--lp-n018, #242424);line-height:1.3\">","</span><span style=\"font-size:11.5px;color:var(--lp-n258, #8b8b8b);line-height:1.45\">","</span></span>\n      </button>\n    \n  </div>\n</section>\n\n<!-- ===== dynamic playbook + quiz ===== -->\n\n<section style=\"background:var(--lp-n956, #fafafa);padding:22px 24px 52px\">\n  <div style=\"max-width:1080px;margin:0 auto;display:flex;gap:clamp(18px,3vw,28px);flex-wrap:wrap;align-items:stretch\">\n    <div style=\"flex:1.25 1 420px;min-width:min(100%,400px);background:var(--lp-n887, #f2f2f0);border:1px solid var(--lp-n789, #e6e6e2);border-radius:12px;padding:clamp(20px,3.5vw,30px)\">\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:23px;color:var(--lp-n018, #242424);margin:0 0 20px\">","</h2>\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--lp-n197, #7b7b76);margin:0 0 6px\">","</div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;line-height:1.65;color:var(--lp-n045, #3c3c3c);margin:0 0 18px\">","</p>\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--lp-n197, #7b7b76);margin:0 0 6px\">","</div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;line-height:1.65;color:var(--lp-n045, #3c3c3c);margin:0 0 18px\">","</p>\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.14em;color:var(--lp-n197, #7b7b76);margin:0 0 6px\">","</div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;line-height:1.65;color:var(--lp-n045, #3c3c3c);margin:0\">","</p>\n    </div>\n    <div style=\"flex:1 1 340px;min-width:min(100%,330px);background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:12px;padding:22px clamp(16px,3vw,26px);box-shadow:0 14px 32px -18px rgba(40,40,40,.28);display:flex;flex-direction:column\">\n      <div style=\"display:flex;align-items:center;justify-content:space-between;gap:10px;font-family:'Archivo',sans-serif;margin-bottom:4px\">\n        <span style=\"font-size:11px;font-weight:700;letter-spacing:.12em;color:var(--lp-n018, #242424)\">","</span>\n        <span style=\"font-size:11px;color:var(--lp-n258, #8b8b8b)\">","</span>\n      </div>\n      <div style=\"display:inline-flex;align-items:center;gap:6px;background:var(--lp-n903, #f4f4f2);border:1px dashed var(--lp-n581, #c9c9c2);border-radius:5px;padding:4px 9px;margin:6px 0 12px;align-self:flex-start\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--lp-n154, #6e6e66)\">","</span><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;font-weight:600;letter-spacing:.08em;color:var(--lp-n028, #2f2f2f)\">","</span></div>\n      <div style=\"display:flex;align-items:center;justify-content:space-between;font-family:'Archivo',sans-serif;margin-bottom:6px\"><span style=\"font-size:10.5px;color:var(--lp-n258, #8b8b8b);letter-spacing:.06em\">","</span></div>\n      <div style=\"height:5px;background:var(--lp-n839, #ececec);border-radius:999px;margin-bottom:14px\"><div style=\"width:17%;height:5px;background:var(--lp-n034, #343434);border-radius:999px\"></div></div>\n      <h3 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:19px;color:var(--lp-n018, #242424);margin:0 0 4px\">","</h3>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:12.5px;color:var(--lp-n258, #8b8b8b);margin:0 0 12px\">","</p>\n      <div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:'Archivo',sans-serif;margin-bottom:14px\">\n        \n          <button aria-pressed=\"true\" style=\"text-align:center;background:var(--lp-n024, #2b2b2b);border:2px solid var(--lp-n024, #2b2b2b);color:var(--lp-n1000, #ffffff);border-radius:8px;padding:10px 8px;font-size:12px;font-weight:600;line-height:1.35;cursor:pointer;min-height:52px;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n034, #343434)\">","</button>\n        \n          <button aria-pressed=\"false\" style=\"text-align:center;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n680, #d7d7d7);color:var(--lp-n045, #3c3c3c);border-radius:8px;padding:10px 8px;font-size:12px;font-weight:600;line-height:1.35;cursor:pointer;min-height:52px;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n034, #343434)\">","</button>\n        \n          <button aria-pressed=\"false\" style=\"text-align:center;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n680, #d7d7d7);color:var(--lp-n045, #3c3c3c);border-radius:8px;padding:10px 8px;font-size:12px;font-weight:600;line-height:1.35;cursor:pointer;min-height:52px;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n034, #343434)\">","</button>\n        \n          <button aria-pressed=\"false\" style=\"text-align:center;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n680, #d7d7d7);color:var(--lp-n045, #3c3c3c);border-radius:8px;padding:10px 8px;font-size:12px;font-weight:600;line-height:1.35;cursor:pointer;min-height:52px;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n034, #343434)\">","</button>\n        \n      </div>\n      <button style=\"width:100%;background:var(--lp-n024, #2b2b2b);color:var(--lp-n1000, #ffffff);border:none;border-radius:8px;padding:14px 22px;font-family:'Archivo',sans-serif;font-size:14.5px;font-weight:700;cursor:pointer;min-height:48px\" style-hover=\"background:var(--lp-n016, #222222)\">","</button>\n      <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-family:'Archivo',sans-serif\"><span style=\"font-size:11px;color:var(--lp-n258, #8b8b8b)\">","</span><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n432, #b0b0aa)\">{{quiz.estimatedDuration}}</span></div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:10.5px;line-height:1.6;color:var(--lp-n321, #9a9a94);margin:12px 0 0;border-top:1px solid var(--lp-n861, #efefec);padding-top:10px\">","</p>\n    </div>\n  </div>\n</section>\n\n<!-- ===== disclosure / reassurance block ===== -->\n\n<section style=\"background:var(--lp-n887, #f2f2f0);border-top:1px solid var(--lp-n789, #e6e6e2);border-bottom:1px solid var(--lp-n789, #e6e6e2);padding:26px 24px\">\n  <div style=\"max-width:1080px;margin:0 auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:18px;font-family:'Archivo',sans-serif\">\n    <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:28px;height:28px;border-radius:6px;background:var(--lp-n789, #e6e6e2);color:var(--lp-n068, #4a4a44);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0\"><svg width=\"15\" height=\"15\" sc-camel-view-box=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"9\"></circle><path d=\"M12 8v4\"></path><path d=\"M12 16h.01\"></path></svg></span><p style=\"font-size:12.5px;line-height:1.6;color:var(--lp-n068, #4a4a4a);margin:0\">","</p></div>\n    <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:28px;height:28px;border-radius:6px;background:var(--lp-n789, #e6e6e2);color:var(--lp-n068, #4a4a44);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0\"><svg width=\"15\" height=\"15\" sc-camel-view-box=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M12 20h9\"></path><path d=\"M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z\"></path></svg></span><p style=\"font-size:12.5px;line-height:1.6;color:var(--lp-n068, #4a4a4a);margin:0\">","</p></div>\n    <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:28px;height:28px;border-radius:6px;background:var(--lp-n789, #e6e6e2);color:var(--lp-n068, #4a4a44);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0\"><svg width=\"15\" height=\"15\" sc-camel-view-box=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z\"></path><path d=\"M14 2v6h6\"></path><path d=\"M9 15l2 2 4-4\"></path></svg></span><p style=\"font-size:12.5px;line-height:1.6;color:var(--lp-n068, #4a4a4a);margin:0\">","</p></div>\n  </div>\n</section>\n\n<!-- ===== FAQ ===== -->\n\n<section style=\"background:var(--lp-n956, #fafafa);padding:48px 24px\">\n  <div style=\"max-width:720px;margin:0 auto\">\n    <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:26px;color:var(--lp-n018, #242424);margin:0 0 18px;text-align:center\">","</h2>\n    <div style=\"display:flex;flex-direction:column;gap:9px;font-family:'Archivo',sans-serif\">\n      <details open=\"\" style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer;list-style-position:outside\">","</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">","</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">","</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">","</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">","</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">","</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">","</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">","</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">","</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">","</p></details>\n      <details style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n761, #e2e2e2);border-radius:10px;padding:14px 18px\"><summary style=\"font-size:14.5px;font-weight:600;color:var(--lp-n018, #242424);cursor:pointer\">","</summary><p style=\"font-size:13.5px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:10px 0 0\">","</p></details>\n    </div>\n  </div>\n</section>\n\n<!-- ===== final CTA ===== -->\n<section style=\"background:var(--lp-n887, #f2f2f0);border-top:1px solid var(--lp-n789, #e6e6e2);padding:48px 24px\">\n  <div style=\"max-width:560px;margin:0 auto;text-align:center\">\n    <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3.6vw,30px);line-height:1.2;color:var(--lp-n018, #242424);margin:0 0 10px;text-wrap:pretty\">","</h2>\n    <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;color:var(--lp-n107, #5c5c5c);margin:0 0 22px\">","</p>\n    <div style=\"display:flex;gap:12px;justify-content:center;flex-wrap:wrap\">\n      <button style=\"background:var(--lp-n024, #2b2b2b);color:var(--lp-n1000, #ffffff);border:none;border-radius:8px;padding:14px 30px;font-family:'Archivo',sans-serif;font-size:14.5px;font-weight:700;cursor:pointer;min-height:48px\" style-hover=\"background:var(--lp-n016, #222222)\">","</button>\n      <a href=\"#\" style=\"display:inline-flex;align-items:center;gap:8px;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n680, #d7d7d7);border-radius:8px;padding:13px 24px;font-family:'Archivo',sans-serif;font-size:13.5px;font-weight:600;color:var(--lp-n023, #2a2a2a);text-decoration:none;min-height:48px\" style-hover=\"border-color:var(--lp-n034, #343434)\">","</a>\n    </div>\n  </div>\n</section>\n\n<!-- ===== legal footer ===== -->\n<footer style=\"background:var(--lp-n838, #ececea);border-top:1px solid var(--lp-n743, #e0e0dc);padding:32px 24px 26px;font-family:'Archivo',sans-serif\">\n  <div style=\"max-width:1080px;margin:0 auto\">\n    <div style=\"display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:16px\">\n      <div style=\"display:flex;align-items:center;gap:10px\">\n        <div style=\"width:110px;height:26px;border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n929, #f7f7f5);border-radius:6px;display:flex;align-items:center;justify-content:center\">","</div>\n        <span style=\"font-size:12px;color:var(--lp-n068, #4a4a4a)\">","</span>\n      </div>\n      <div style=\"display:flex;gap:16px;flex-wrap:wrap\">\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c3c)\">","</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c3c)\">","</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c3c)\">","</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c3c)\">","</a>\n      </div>\n    </div>\n    <div style=\"border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n929, #f7f7f5);border-radius:8px;padding:12px 14px;margin-bottom:12px\">\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n067, #494949);letter-spacing:.12em;margin-bottom:6px\">","</div>\n      <p style=\"font-size:11px;line-height:1.65;color:var(--lp-n068, #4a4a4a);margin:0\">","</p>\n    </div>\n    <div style=\"font-size:11px;color:var(--lp-n107, #5c5c5c)\">","</div>\n  </div>\n</footer>"]
+
+/** The slot that fills each gap between the parts, in document order. */
+export const slotIds: string[] = ["s01_image_src_1","s01_eyebrow_1","s01_cta_label_1","s02_headline_1","s02_subheadline_1","s03_eyebrow_1","s03_card_title_1","s03_card_body_1","s03_card_title_2","s03_card_body_2","s03_card_title_3","s03_card_body_3","s03_card_title_4","s03_card_body_4","s03_card_title_5","s03_card_body_5","s03_card_title_6","s03_card_body_6","s03_card_title_7","s03_card_body_7","s03_card_title_8","s03_card_body_8","s04_section_headline_1","s04_eyebrow_1","s04_card_body_1","s04_eyebrow_2","s04_card_body_2","s04_eyebrow_3","s04_card_body_3","s04_eyebrow_4","s04_trust_line_1","s04_eyebrow_5","s04_eyebrow_6","s04_eyebrow_7","s04_faq_question_1","s04_faq_answer_1","s04_cta_label_1","s04_cta_label_2","s04_cta_label_3","s04_cta_label_4","s04_cta_label_5","s04_trust_line_2","s04_disclaimer_1","s05_disclaimer_1","s05_card_body_1","s05_card_body_2","s06_section_headline_1","s06_faq_question_1","s06_faq_answer_1","s06_faq_question_2","s06_faq_answer_2","s06_faq_question_3","s06_faq_answer_3","s06_faq_question_4","s06_faq_answer_4","s06_faq_question_5","s06_faq_answer_5","s06_faq_question_6","s06_faq_answer_6","s07_section_headline_1","s07_section_body_1","s07_cta_label_1","s07_cta_label_2","s08_image_src_1","s08_disclaimer_1","s08_disclaimer_2","s08_disclaimer_3","s08_disclaimer_4","s08_disclaimer_5","s08_disclaimer_6","s08_disclaimer_7","s08_disclaimer_8"]
+
+/** Every editable region, with the reference's own copy as its default. */
+export const slots: LpSlot[] = [
+  {
+    "id": "s01_image_src_1",
+    "role": "image_src",
+    "escaping": "image",
+    "section": 1,
+    "sectionLabel": "header",
+    "default": "<span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n067, #494949);letter-spacing:.1em\">[LOGO SLOT]</span>",
+    "required": false,
+    "maxChars": 40,
+    "pairedWith": "s01_image_src_1__alt"
+  },
+  {
+    "id": "s01_image_src_1__alt",
+    "role": "image_alt",
+    "escaping": "meta",
+    "section": 1,
+    "sectionLabel": "header",
+    "default": "Logo",
+    "required": false,
+    "maxChars": 160,
+    "pairedWith": "s01_image_src_1"
+  },
+  {
+    "id": "s01_eyebrow_1",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 1,
+    "sectionLabel": "header",
+    "default": "A FREE MATCHING SERVICE · NOT A LAW FIRM",
+    "required": false,
+    "maxChars": 64
+  },
+  {
+    "id": "s01_cta_label_1",
+    "role": "cta_label",
+    "escaping": "text",
+    "section": 1,
+    "sectionLabel": "header",
+    "default": "Call <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n855, #eeeeee);color:var(--lp-n041, #393939);border:1px solid var(--lp-n723, #dddddd);border-radius:4px;padding:0 5px\">{{brand.callNumber}}</code>",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s02_headline_1",
+    "role": "headline",
+    "escaping": "text",
+    "section": 2,
+    "sectionLabel": "router hero",
+    "default": "Every case type has its own playbook. Start with the one that happened.",
+    "required": true,
+    "maxChars": 114
+  },
+  {
+    "id": "s02_subheadline_1",
+    "role": "subheadline",
+    "escaping": "text",
+    "section": 2,
+    "sectionLabel": "router hero",
+    "default": "Choosing repaints this page for that case type and pre-fills the first quiz answer. The choice is yours to change — nothing else about your check is affected.",
+    "required": false,
+    "maxChars": 253
+  },
+  {
+    "id": "s03_eyebrow_1",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "SELECTED",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_title_1",
+    "role": "card_title",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Car or motorcycle",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_1",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Two or more passenger vehicles",
+    "required": false,
+    "maxChars": 48
+  },
+  {
+    "id": "s03_card_title_2",
+    "role": "card_title",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Commercial truck",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_2",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Semi, delivery, company vehicle",
+    "required": false,
+    "maxChars": 50
+  },
+  {
+    "id": "s03_card_title_3",
+    "role": "card_title",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Rideshare",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_3",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Driver or passenger during a trip",
+    "required": false,
+    "maxChars": 53
+  },
+  {
+    "id": "s03_card_title_4",
+    "role": "card_title",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Pedestrian",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_4",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Struck while walking or crossing",
+    "required": false,
+    "maxChars": 52
+  },
+  {
+    "id": "s03_card_title_5",
+    "role": "card_title",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Bicycle or e-bike",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_5",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Riding when a vehicle was involved",
+    "required": false,
+    "maxChars": 55
+  },
+  {
+    "id": "s03_card_title_6",
+    "role": "card_title",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Multi-vehicle incident",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_6",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Pile-up or chain-reaction crash",
+    "required": false,
+    "maxChars": 50
+  },
+  {
+    "id": "s03_card_title_7",
+    "role": "card_title",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Workplace or other",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_7",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "On the job, or something else",
+    "required": false,
+    "maxChars": 47
+  },
+  {
+    "id": "s03_card_title_8",
+    "role": "card_title",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Not sure",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_8",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "section",
+    "default": "Describe it in the quiz instead",
+    "required": false,
+    "maxChars": 50
+  },
+  {
+    "id": "s04_section_headline_1",
+    "role": "section_headline",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "The auto-claim playbook",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_eyebrow_1",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "WHO IS ON THE OTHER SIDE",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_card_body_1",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "Usually the other driver’s insurance carrier. An adjuster is assigned within days and starts building the company’s file immediately.",
+    "required": false,
+    "maxChars": 213
+  },
+  {
+    "id": "s04_eyebrow_2",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "WHAT MATTERS EARLY",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_card_body_2",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "The police report, photos, and not signing releases while things are unsettled. Recorded statements can wait until after advice.",
+    "required": false,
+    "maxChars": 205
+  },
+  {
+    "id": "s04_eyebrow_3",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "WHO HANDLES IT IN THE NETWORK",
+    "required": false,
+    "maxChars": 47
+  },
+  {
+    "id": "s04_card_body_3",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "Attorneys who work passenger-vehicle claims in the relevant state, matched by case type rather than by advertising budget.",
+    "required": false,
+    "maxChars": 196
+  },
+  {
+    "id": "s04_eyebrow_4",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "CHECK THIS CASE TYPE",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_trust_line_1",
+    "role": "trust_line",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "Free · no obligation",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_eyebrow_5",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "FIRST ANSWER PRE-FILLED:",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_eyebrow_6",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "AUTO",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_eyebrow_7",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "QUESTION 1 OF 6",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_faq_question_1",
+    "role": "faq_question",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "How Were You Injured?",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_faq_answer_1",
+    "role": "faq_answer",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "Select the type of accident you were involved in:",
+    "required": false,
+    "maxChars": 79
+  },
+  {
+    "id": "s04_cta_label_1",
+    "role": "cta_label",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "Auto / Motorcycle Accident",
+    "required": false,
+    "maxChars": 42
+  },
+  {
+    "id": "s04_cta_label_2",
+    "role": "cta_label",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "Commercial / Semi Accident",
+    "required": false,
+    "maxChars": 42
+  },
+  {
+    "id": "s04_cta_label_3",
+    "role": "cta_label",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "Passenger / Rideshare / Pedestrian",
+    "required": false,
+    "maxChars": 55
+  },
+  {
+    "id": "s04_cta_label_4",
+    "role": "cta_label",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "At Work / Other / I Wasn’t Injured",
+    "required": false,
+    "maxChars": 55
+  },
+  {
+    "id": "s04_cta_label_5",
+    "role": "cta_label",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "Continue →",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_trust_line_2",
+    "role": "trust_line",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "Free · confidential · no obligation",
+    "required": false,
+    "maxChars": 56
+  },
+  {
+    "id": "s04_disclaimer_1",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "dynamic playbook + quiz",
+    "default": "By continuing, you agree that <code style=\"font-family:'JetBrains Mono',monospace;font-size:9px;background:var(--lp-n903, #f4f4f2);color:var(--lp-n154, #6e6e66);border:1px solid var(--lp-n757, #e2e2dc);border-radius:3px;padding:0 4px\">{{brand.displayName}}</code> and participating attorneys may contact you about this request. <code style=\"font-family:'JetBrains Mono',monospace;font-size:9px;background:var(--lp-n903, #f4f4f2);color:var(--lp-n154, #6e6e66);border:1px solid var(--lp-n757, #e2e2dc);border-radius:3px;padding:0 4px\">{{brand.tcpaText}}</code>",
+    "required": true,
+    "maxChars": 215
+  },
+  {
+    "id": "s05_disclaimer_1",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 5,
+    "sectionLabel": "disclosure / reassurance block",
+    "default": "<code style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;background:var(--lp-n812, #e9e9e4);color:var(--lp-n106, #5c5c54);border:1px solid var(--lp-n712, #dcdcd4);border-radius:3px;padding:0 4px\">{{brand.displayName}}</code> is a matching / referral service — not a law firm, unless the deployed brand configuration explicitly states otherwise.",
+    "required": true,
+    "maxChars": 226
+  },
+  {
+    "id": "s05_card_body_1",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 5,
+    "sectionLabel": "disclosure / reassurance block",
+    "default": "Selecting a card pre-fills the first quiz response. It never locks or permanently alters what you submit — you can change it at any step.",
+    "required": false,
+    "maxChars": 220
+  },
+  {
+    "id": "s05_card_body_2",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 5,
+    "sectionLabel": "disclosure / reassurance block",
+    "default": "No legal representation begins without a separate written agreement between you and an attorney.",
+    "required": false,
+    "maxChars": 154
+  },
+  {
+    "id": "s06_section_headline_1",
+    "role": "section_headline",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "FAQ",
+    "default": "Before you choose a card",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s06_faq_question_1",
+    "role": "faq_question",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "FAQ",
+    "default": "What if more than one accident type applies?",
+    "required": false,
+    "maxChars": 71
+  },
+  {
+    "id": "s06_faq_answer_1",
+    "role": "faq_answer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "FAQ",
+    "default": "Select the closest one. Many crashes fit more than one card — a rideshare trip that involved a commercial truck, for example. The quiz and any later attorney review are where the full circumstances get clarified; the card just sets a starting point.",
+    "required": false,
+    "maxChars": 399
+  },
+  {
+    "id": "s06_faq_question_2",
+    "role": "faq_question",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "FAQ",
+    "default": "What if I’m not sure which accident type to choose?",
+    "required": false,
+    "maxChars": 82
+  },
+  {
+    "id": "s06_faq_answer_2",
+    "role": "faq_answer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "FAQ",
+    "default": "“Not sure” is a real option, not a dead end. The quiz collects the detail in plain language — you never have to classify the legal issues yourself.",
+    "required": false,
+    "maxChars": 236
+  },
+  {
+    "id": "s06_faq_question_3",
+    "role": "faq_question",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "FAQ",
+    "default": "Does choosing an accident type determine whether I qualify?",
+    "required": false,
+    "maxChars": 95
+  },
+  {
+    "id": "s06_faq_answer_3",
+    "role": "faq_answer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "FAQ",
+    "default": "No. The card only tailors what this page explains and pre-fills one answer. Eligibility depends on the complete circumstances of what happened — never on which card you tapped.",
+    "required": false,
+    "maxChars": 282
+  },
+  {
+    "id": "s06_faq_question_4",
+    "role": "faq_question",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "FAQ",
+    "default": "What information should I have before starting?",
+    "required": false,
+    "maxChars": 76
+  },
+  {
+    "id": "s06_faq_answer_4",
+    "role": "faq_answer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "FAQ",
+    "default": "Approximate dates, the location, what injuries you had, any medical treatment, and whatever insurance details you have handy all help. But you don’t need every document to begin — start with what you remember.",
+    "required": false,
+    "maxChars": 335
+  },
+  {
+    "id": "s06_faq_question_5",
+    "role": "faq_question",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "FAQ",
+    "default": "Can I still complete the check if several parties may be responsible?",
+    "required": false,
+    "maxChars": 111
+  },
+  {
+    "id": "s06_faq_answer_5",
+    "role": "faq_answer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "FAQ",
+    "default": "Yes. Crashes involving employers, rideshare platforms, commercial vehicles, or multiple drivers can involve more than one responsible party. Describe what happened — deciding liability is the attorney’s job, not yours.",
+    "required": false,
+    "maxChars": 349
+  },
+  {
+    "id": "s06_faq_question_6",
+    "role": "faq_question",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "FAQ",
+    "default": "What happens after I complete the check?",
+    "required": false,
+    "maxChars": 64
+  },
+  {
+    "id": "s06_faq_answer_6",
+    "role": "faq_answer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "FAQ",
+    "default": "Your information may be reviewed for a possible match with a network attorney. A match isn’t guaranteed — and nothing proceeds unless you choose to continue after hearing from them.",
+    "required": false,
+    "maxChars": 290
+  },
+  {
+    "id": "s07_section_headline_1",
+    "role": "section_headline",
+    "escaping": "text",
+    "section": 7,
+    "sectionLabel": "final CTA",
+    "default": "Pick the card that fits. We’ll take it from there.",
+    "required": false,
+    "maxChars": 80
+  },
+  {
+    "id": "s07_section_body_1",
+    "role": "section_body",
+    "escaping": "text",
+    "section": 7,
+    "sectionLabel": "final CTA",
+    "default": "About two minutes. Nothing is filed, and nobody is hired, without your say-so.",
+    "required": false,
+    "maxChars": 125
+  },
+  {
+    "id": "s07_cta_label_1",
+    "role": "cta_label",
+    "escaping": "text",
+    "section": 7,
+    "sectionLabel": "final CTA",
+    "default": "Start the case check",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s07_cta_label_2",
+    "role": "cta_label",
+    "escaping": "text",
+    "section": 7,
+    "sectionLabel": "final CTA",
+    "default": "Call <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n855, #eeeeee);color:var(--lp-n041, #393939);border:1px solid var(--lp-n723, #dddddd);border-radius:4px;padding:0 5px\">{{brand.callNumber}}</code>",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s08_image_src_1",
+    "role": "image_src",
+    "escaping": "image",
+    "section": 8,
+    "sectionLabel": "legal footer",
+    "default": "<span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--lp-n067, #494949);letter-spacing:.1em\">[LOGO SLOT]</span>",
+    "required": false,
+    "maxChars": 40,
+    "pairedWith": "s08_image_src_1__alt"
+  },
+  {
+    "id": "s08_image_src_1__alt",
+    "role": "image_alt",
+    "escaping": "meta",
+    "section": 8,
+    "sectionLabel": "legal footer",
+    "default": "Logo",
+    "required": false,
+    "maxChars": 160,
+    "pairedWith": "s08_image_src_1"
+  },
+  {
+    "id": "s08_disclaimer_1",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 8,
+    "sectionLabel": "legal footer",
+    "default": "An attorney-matching service. Not a law firm.",
+    "required": false,
+    "maxChars": 72
+  },
+  {
+    "id": "s08_disclaimer_2",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 8,
+    "sectionLabel": "legal footer",
+    "default": "Privacy Policy",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s08_disclaimer_3",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 8,
+    "sectionLabel": "legal footer",
+    "default": "Terms of Service",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s08_disclaimer_4",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 8,
+    "sectionLabel": "legal footer",
+    "default": "Do Not Sell My Info",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s08_disclaimer_5",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 8,
+    "sectionLabel": "legal footer",
+    "default": "TCPA Disclosure",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s08_disclaimer_6",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 8,
+    "sectionLabel": "legal footer",
+    "default": "[LEGAL DISCLOSURE] · {{brand.disclaimer}} + {{brand.tcpaText}}",
+    "required": false,
+    "maxChars": 100
+  },
+  {
+    "id": "s08_disclaimer_7",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 8,
+    "sectionLabel": "legal footer",
+    "default": "By submitting your information you agree to be contacted by phone, email, or text by participating attorneys and partner law firms for the purpose of evaluating your case. Message and data rates may apply. This site is attorney advertising paid for by participating law firms. {{brand.displayName}} is not a law firm and does not provide legal advice. Prior results do not guarantee a similar outcome.",
+    "required": true,
+    "maxChars": 642
+  },
+  {
+    "id": "s08_disclaimer_8",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 8,
+    "sectionLabel": "legal footer",
+    "default": "© {{site.currentYear}} {{brand.displayName}} · {{brand.copyright}}",
+    "required": false,
+    "maxChars": 106
+  }
+]
+
+/** Regions the markup alone cannot carry. Empty means the template is complete. */
+export const unsupported: LpUnsupportedRegion[] = []

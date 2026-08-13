@@ -3,6 +3,14 @@
 //
 // Every colour carries the reference's own value as its CSS fallback, so with
 // no variables supplied this renders exactly as the handoff drew it.
+//
+// `parts` and `slotIds` are the same markup with its editable regions cut out:
+// joining the parts with each slot's default reproduces `html` byte for byte,
+// which is asserted by scripts/test-lp-slots.mts and by this script before it
+// writes. A deployment stores OVERRIDES against these ids and never a copy of
+// the template, so a corrected template reaches every deployment at once.
+
+import type { LpSlot, LpUnsupportedRegion } from '@/lib/lp-slots/model'
 
 export const slug = "network_authority"
 export const source = "LP12-Network-Authority.html"
@@ -54,4 +62,882 @@ export const tokens: Record<string, string> = {
   "--lp-n964": "#fbfbfa"
 }
 
-export const html = "<header style=\"background:var(--lp-n964, #fbfbfa);border-bottom:1px solid var(--lp-n829, #ebebe8);padding:0 24px;font-family:'Archivo',sans-serif\">\n  <div style=\"max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap\">\n    <div style=\"display:flex;align-items:center;gap:10px\">\n      <div style=\"width:132px;height:32px;border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n886, #f2f2ef);border-radius:6px;display:flex;align-items:center;justify-content:center\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n067, #494949);letter-spacing:.1em\">[LOGO SLOT]</span></div>\n      <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n861, #efefec);color:var(--lp-n041, #393939);border:1px solid var(--lp-n735, #dfdfda);border-radius:4px;padding:1px 6px\">{​{brand.logo}​}</code>\n    </div>\n    <div style=\"text-align:right\">\n      <div style=\"font-size:10px;color:var(--lp-n256, #8b8b85);letter-spacing:.1em;font-family:'JetBrains Mono',monospace\">QUESTIONS, CALL</div>\n      <a href=\"#\" style=\"font-weight:700;font-size:15px;color:var(--lp-n012, #1d1d1d);text-decoration:none\"><code style=\"font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--lp-n861, #efefec);color:var(--lp-n041, #393939);border:1px solid var(--lp-n735, #dfdfda);border-radius:4px;padding:1px 6px\">{​{brand.callNumber}​}</code></a>\n    </div>\n  </div>\n</header>\n\n<!-- ===== network-map hero ===== -->\n\n<section data-tight=\"\" style=\"background:var(--lp-n964, #fbfbfa);position:relative;overflow:hidden;padding:64px 24px 58px;border-bottom:1px solid var(--lp-n829, #ebebe8)\">\n  <svg aria-hidden=\"true\" style=\"position:absolute;inset:0;width:100%;height:100%;opacity:.55\" sc-camel-view-box=\"0 0 1200 420\" sc-camel-preserve-aspect-ratio=\"xMidYMid slice\" fill=\"none\">\n    <path d=\"M-40 340 220 160 480 300 760 120 1020 280 1260 140\" stroke=\"var(--lp-n765, #e3e3de)\" stroke-width=\"1.4\"></path>\n    <path d=\"M-40 80 260 240 560 60 860 260 1160 100\" stroke=\"var(--lp-n812, #e9e9e4)\" stroke-width=\"1.2\"></path>\n    <path d=\"M220 160 260 240M480 300 560 60M760 120 860 260M1020 280 1160 100\" stroke=\"var(--lp-n765, #e3e3de)\" stroke-width=\"1.2\"></path>\n    <circle cx=\"220\" cy=\"160\" r=\"7\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n581, #c9c9c2)\" stroke-width=\"1.6\"></circle><circle cx=\"220\" cy=\"160\" r=\"2.4\" fill=\"var(--lp-n273, #8f8f88)\"></circle>\n    <circle cx=\"480\" cy=\"300\" r=\"7\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n581, #c9c9c2)\" stroke-width=\"1.6\"></circle><circle cx=\"480\" cy=\"300\" r=\"2.4\" fill=\"var(--lp-n273, #8f8f88)\"></circle>\n    <circle cx=\"760\" cy=\"120\" r=\"7\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n581, #c9c9c2)\" stroke-width=\"1.6\"></circle><circle cx=\"760\" cy=\"120\" r=\"2.4\" fill=\"var(--lp-n273, #8f8f88)\"></circle>\n    <circle cx=\"260\" cy=\"240\" r=\"5.5\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n669, #d6d6d0)\" stroke-width=\"1.4\"></circle>\n    <circle cx=\"560\" cy=\"60\" r=\"5.5\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n669, #d6d6d0)\" stroke-width=\"1.4\"></circle>\n    <circle cx=\"860\" cy=\"260\" r=\"5.5\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n669, #d6d6d0)\" stroke-width=\"1.4\"></circle>\n    <circle cx=\"1020\" cy=\"280\" r=\"7\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n581, #c9c9c2)\" stroke-width=\"1.6\"></circle><circle cx=\"1020\" cy=\"280\" r=\"2.4\" fill=\"var(--lp-n273, #8f8f88)\"></circle>\n  </svg>\n  <div style=\"position:relative;max-width:760px;margin:0 auto;text-align:center\">\n    <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;color:var(--lp-n256, #8b8b85);margin-bottom:16px\">OPERATED BY <code style=\"background:var(--lp-n861, #efefec);color:var(--lp-n106, #5c5c56);border:1px solid var(--lp-n735, #dfdfda);border-radius:3px;padding:1px 6px\">{​{brand.displayName}​}</code></div>\n    <h1 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(32px,4.6vw,48px);line-height:1.14;letter-spacing:-0.01em;color:var(--lp-n014, #1f1f1f);margin:0 0 14px;text-wrap:pretty\">Matching is only as good as the network behind it.</h1>\n    <p style=\"font-family:'Archivo',sans-serif;font-size:15.5px;line-height:1.65;color:var(--lp-n106, #5c5c58);margin:0 auto;max-width:540px\">This page explains how the attorney network is assembled, what vetting actually checks, and how matching differs from selling a name to the highest bidder.</p>\n  </div>\n</section>\n\n<!-- ===== vetting + rail quiz ===== -->\n\n<section style=\"background:var(--lp-n964, #fbfbfa);padding:52px 24px 60px\">\n  <div style=\"max-width:1100px;margin:0 auto;display:flex;gap:clamp(24px,4vw,56px);flex-wrap:wrap;align-items:flex-start\">\n    <div style=\"flex:1.4 1 460px;min-width:min(100%,440px)\">\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin-bottom:10px\">I</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3vw,30px);color:var(--lp-n014, #1f1f1f);margin:0 0 12px;border-bottom:1px solid var(--lp-n789, #e6e6e1);padding-bottom:12px\">What vetting means here</h2>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:15px;line-height:1.7;color:var(--lp-n049, #3f3f3b);margin:0 0 22px;max-width:560px\">Every attorney in the network passes the same review before receiving a single match — and the review repeats on a schedule, not once at signup.</p>\n      <div style=\"display:flex;flex-direction:column\">\n        <div style=\"display:flex;gap:18px;padding:14px 0;border-bottom:1px solid #ececе7;border-bottom:1px solid var(--lp-n836, #ecece7)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);width:86px;flex-shrink:0;padding-top:2px\">LICENSURE</span><p style=\"font-family:'Archivo',sans-serif;font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b);margin:0\">Active bar admission verified in every state where the attorney receives matches.</p></div>\n        <div style=\"display:flex;gap:18px;padding:14px 0;border-bottom:1px solid var(--lp-n836, #ecece7)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);width:86px;flex-shrink:0;padding-top:2px\">STANDING</span><p style=\"font-family:'Archivo',sans-serif;font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b);margin:0\">Public disciplinary history reviewed at intake and on renewal.</p></div>\n        <div style=\"display:flex;gap:18px;padding:14px 0;border-bottom:1px solid var(--lp-n836, #ecece7)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);width:86px;flex-shrink:0;padding-top:2px\">PRACTICE</span><p style=\"font-family:'Archivo',sans-serif;font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b);margin:0\">The attorney must actually handle the case types they are matched to — confirmed by practice review rather than self-description.</p></div>\n        <div style=\"display:flex;gap:18px;padding:14px 0\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);width:86px;flex-shrink:0;padding-top:2px\">CONDUCT</span><p style=\"font-family:'Archivo',sans-serif;font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b);margin:0\">Response standards for how quickly and how respectfully matched drivers are contacted.</p></div>\n      </div>\n\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin:44px 0 10px\">II</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3vw,30px);color:var(--lp-n014, #1f1f1f);margin:0 0 12px;border-bottom:1px solid var(--lp-n789, #e6e6e1);padding-bottom:12px\">Licensing is the floor, not the standard</h2>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:15px;line-height:1.7;color:var(--lp-n049, #3f3f3b);margin:0 0 18px;max-width:560px\">A bar card proves someone may practice law in a state. It doesn’t say whether they handle injury claims, return calls, or take cases to trial when the offer is short. The network review starts where licensing stops.</p>\n      <div style=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px;margin-bottom:8px\">\n        <div style=\"border:1px solid var(--lp-n789, #e6e6e1);border-radius:8px;padding:16px 18px;background:var(--lp-n920, #f6f6f3)\"><div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);margin-bottom:8px\">STATE LICENSURE · THE MINIMUM</div><ul style=\"font-family:'Archivo',sans-serif;font-size:13px;line-height:1.7;color:var(--lp-n090, #55554f);margin:0;padding-left:16px\"><li>Admitted to the state bar</li><li>No suspension in force</li><li>Says nothing about case type or conduct</li></ul></div>\n        <div style=\"border:1px solid var(--lp-n621, #cfcfc8);border-radius:8px;padding:16px 18px;background:var(--lp-n1000, #ffffff)\"><div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--lp-n090, #55554f);margin-bottom:8px\">NETWORK REVIEW · THE STANDARD</div><ul style=\"font-family:'Archivo',sans-serif;font-size:13px;line-height:1.7;color:var(--lp-n028, #2f2f2b);margin:0;padding-left:16px\"><li>Motor-vehicle injury caseload, verified</li><li>Contingency representation offered</li><li>Response and conduct standards, renewed</li></ul></div>\n      </div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:13px;line-height:1.65;color:var(--lp-n256, #8b8b85);margin:0\">Licensing status is public record in every state; the deeper review is the network’s own and repeats annually.</p>\n\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin:44px 0 10px\">III</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3vw,30px);color:var(--lp-n014, #1f1f1f);margin:0 0 12px;border-bottom:1px solid var(--lp-n789, #e6e6e1);padding-bottom:12px\">Matching is not an auction</h2>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:15px;line-height:1.7;color:var(--lp-n049, #3f3f3b);margin:0 0 14px;max-width:560px\">Some services sell each inquiry to whichever firm pays most that week. Here, matching works from the case: the accident type, the state, and the attorney’s verified practice decide who is proposed — not a bid.</p>\n      <div style=\"display:flex;flex-direction:column;gap:8px;max-width:560px\">\n        <div style=\"display:flex;gap:12px;align-items:flex-start;background:var(--lp-n920, #f6f6f3);border:1px solid var(--lp-n789, #e6e6e1);border-radius:8px;padding:12px 16px\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0;padding-top:3px\">MATCHED BY</span><span style=\"font-family:'Archivo',sans-serif;font-size:13.5px;line-height:1.6;color:var(--lp-n028, #2f2f2b)\">Case type, state relevance, verified practice, current capacity.</span></div>\n        <div style=\"display:flex;gap:12px;align-items:flex-start;background:var(--lp-n920, #f6f6f3);border:1px solid var(--lp-n789, #e6e6e1);border-radius:8px;padding:12px 16px\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0;padding-top:3px\">NEVER BY</span><span style=\"font-family:'Archivo',sans-serif;font-size:13.5px;line-height:1.6;color:var(--lp-n028, #2f2f2b)\">Advertising spend, bidding, or who paid most for the inquiry.</span></div>\n      </div>\n\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin:44px 0 10px\">IV</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3vw,30px);color:var(--lp-n014, #1f1f1f);margin:0 0 12px;border-bottom:1px solid var(--lp-n789, #e6e6e1);padding-bottom:12px\">What you control, start to finish</h2>\n      <div style=\"display:flex;flex-direction:column;gap:10px;max-width:560px;font-family:'Archivo',sans-serif\">\n        <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:22px;height:22px;border-radius:50%;border:1.5px solid var(--lp-n482, #b9b9b2);color:var(--lp-n090, #55554f);display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px\">✓</span><span style=\"font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b)\">The check is free, and completing it starts nothing. There is no charge for the check or the conversation, and nothing proceeds without a written agreement the driver chooses to sign.</span></div>\n        <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:22px;height:22px;border-radius:50%;border:1.5px solid var(--lp-n482, #b9b9b2);color:var(--lp-n090, #55554f);display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px\">✓</span><span style=\"font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b)\">You can decline a proposed match, ask for another, or simply stop responding — nothing is filed on your behalf.</span></div>\n        <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:22px;height:22px;border-radius:50%;border:1.5px solid var(--lp-n482, #b9b9b2);color:var(--lp-n090, #55554f);display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px\">✓</span><span style=\"font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b)\">Your information goes to the matched attorney for review — it is not circulated across the network or sold onward.</span></div>\n      </div>\n    </div>\n\n    <div data-msticky=\"\" style=\"flex:1 1 320px;min-width:min(100%,310px);max-width:400px;position:sticky;top:24px\">\n      <div style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n728, #dededa);border-radius:10px;padding:22px clamp(16px,3vw,24px);box-shadow:0 10px 28px -16px rgba(31,31,31,.22)\">\n        <div style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:19px;color:var(--lp-n014, #1f1f1f);margin:0 0 4px\">Check the case type against the network</div>\n        <div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--lp-n321, #9a9a93);margin-bottom:14px\">FREE · ABOUT TWO MINUTES · NO OBLIGATION TO PROCEED</div>\n        <div style=\"display:flex;align-items:center;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.08em;color:var(--lp-n256, #8b8b85);margin-bottom:6px\"><span>QUESTION 1 OF 6</span><span>—</span></div>\n        <div style=\"height:3px;background:var(--lp-n836, #ecece7);border-radius:999px;margin-bottom:16px\"><div style=\"width:17%;height:3px;background:var(--lp-n042, #3a3a36);border-radius:999px\"></div></div>\n        <div style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:17px;color:var(--lp-n014, #1f1f1f);margin-bottom:4px\">How Were You Injured?</div>\n        <p style=\"font-family:'Archivo',sans-serif;font-size:12px;color:var(--lp-n256, #8b8b85);margin:0 0 12px\">Select the type of accident you were involved in:</p>\n        <div style=\"display:flex;flex-direction:column;gap:7px;font-family:'Archivo',sans-serif;margin-bottom:14px\">\n          <button style=\"text-align:left;background:var(--lp-n920, #f6f6f3);border:1.5px solid var(--lp-n042, #3a3a36);border-radius:7px;padding:11px 13px;display:flex;align-items:center;gap:11px;min-height:46px;cursor:pointer;font-family:'Archivo',sans-serif\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n090, #55554f);width:18px;flex-shrink:0\">i</span><span style=\"font-size:13px;font-weight:600;color:var(--lp-n014, #1f1f1f);flex:1;line-height:1.4\">Auto / Motorcycle Accident</span><span style=\"width:16px;height:16px;border-radius:50%;border:1.5px solid var(--lp-n042, #3a3a36);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0\"><span style=\"width:8px;height:8px;border-radius:50%;background:var(--lp-n042, #3a3a36)\"></span></span></button>\n          <button style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n728, #dededa);border-radius:7px;padding:11px 13px;display:flex;align-items:center;gap:11px;min-height:46px;cursor:pointer;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n042, #3a3a36)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n321, #9a9a93);width:18px;flex-shrink:0\">ii</span><span style=\"font-size:13px;font-weight:500;color:var(--lp-n049, #3f3f3b);flex:1;line-height:1.4\">Commercial / Semi Accident</span><span style=\"width:16px;height:16px;border-radius:50%;border:1.5px solid var(--lp-n581, #c9c9c2);flex-shrink:0\"></span></button>\n          <button style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n728, #dededa);border-radius:7px;padding:11px 13px;display:flex;align-items:center;gap:11px;min-height:46px;cursor:pointer;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n042, #3a3a36)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n321, #9a9a93);width:18px;flex-shrink:0\">iii</span><span style=\"font-size:13px;font-weight:500;color:var(--lp-n049, #3f3f3b);flex:1;line-height:1.4\">Passenger / Rideshare / Pedestrian Accident</span><span style=\"width:16px;height:16px;border-radius:50%;border:1.5px solid var(--lp-n581, #c9c9c2);flex-shrink:0\"></span></button>\n          <button style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n728, #dededa);border-radius:7px;padding:11px 13px;display:flex;align-items:center;gap:11px;min-height:46px;cursor:pointer;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n042, #3a3a36)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n321, #9a9a93);width:18px;flex-shrink:0\">iv</span><span style=\"font-size:13px;font-weight:500;color:var(--lp-n049, #3f3f3b);flex:1;line-height:1.4\">At Work / Other / I Wasn’t Injured</span><span style=\"width:16px;height:16px;border-radius:50%;border:1.5px solid var(--lp-n581, #c9c9c2);flex-shrink:0\"></span></button>\n        </div>\n        <button style=\"width:100%;background:var(--lp-n042, #3a3a36);color:var(--lp-n1000, #ffffff);border:none;border-radius:7px;padding:13px 22px;font-family:'Archivo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;min-height:46px\" style-hover=\"background:var(--lp-n026, #2d2d2a)\">Continue →</button>\n        <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-family:'Archivo',sans-serif\"><button style=\"background:none;border:none;color:var(--lp-n321, #9a9a93);font-size:12px;cursor:pointer;padding:6px 2px;font-family:'Archivo',sans-serif\">← Back</button><span style=\"font-size:10.5px;color:var(--lp-n321, #9a9a93)\">Free · no obligation</span></div>\n        <p style=\"font-family:'Archivo',sans-serif;font-size:10px;line-height:1.6;color:var(--lp-n374, #a5a59e);margin:10px 0 0;border-top:1px solid var(--lp-n861, #efefeb);padding-top:9px\">By continuing, you agree that <code style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;background:var(--lp-n886, #f2f2ef);color:var(--lp-n154, #6e6e66);border:1px solid var(--lp-n757, #e2e2dc);border-radius:3px;padding:0 3px\">{​{brand.displayName}​}</code> and participating attorneys may contact you about this request. <code style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;background:var(--lp-n886, #f2f2ef);color:var(--lp-n154, #6e6e66);border:1px solid var(--lp-n757, #e2e2dc);border-radius:3px;padding:0 3px\">{​{brand.tcpaText}​}</code></p>\n      </div>\n      <div style=\"margin-top:10px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--lp-n431, #b0b0a9)\">MATCHED BY CASE · NEVER AUCTIONED</div>\n    </div>\n  </div>\n</section>\n\n<!-- ===== state relevance ===== -->\n\n<section style=\"background:var(--lp-n903, #f4f4f1);border-top:1px solid var(--lp-n789, #e6e6e1);border-bottom:1px solid var(--lp-n789, #e6e6e1);padding:44px 24px\">\n  <div style=\"max-width:1100px;margin:0 auto;display:flex;gap:clamp(24px,4vw,56px);flex-wrap:wrap;align-items:flex-start\">\n    <div style=\"flex:1 1 320px;min-width:min(100%,300px)\">\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin-bottom:10px\">V</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(22px,2.8vw,28px);color:var(--lp-n014, #1f1f1f);margin:0 0 10px\">Why the state matters more than the billboard</h2>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;line-height:1.7;color:var(--lp-n049, #3f3f3b);margin:0\">Injury law is state law: filing deadlines, fault rules, and damage limits all change at the border. A match is only proposed from attorneys licensed and practicing where your claim actually lives — coverage per state is <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n836, #ecece8);color:var(--lp-n106, #5c5c56);border:1px solid var(--lp-n735, #dfdfda);border-radius:3px;padding:0 4px\">{​{page.network.states}​}</code>, resolved per brand.</p>\n    </div>\n    <div style=\"flex:1 1 320px;min-width:min(100%,300px);display:flex;flex-direction:column;gap:9px;font-family:'Archivo',sans-serif\">\n      <div style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n758, #e2e2dd);border-radius:8px;padding:13px 16px;display:flex;gap:12px;align-items:baseline\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0\">DEADLINES</span><span style=\"font-size:13px;line-height:1.55;color:var(--lp-n049, #3f3f3b)\">Statutes of limitation range from one to several years depending on the state.</span></div>\n      <div style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n758, #e2e2dd);border-radius:8px;padding:13px 16px;display:flex;gap:12px;align-items:baseline\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0\">FAULT RULES</span><span style=\"font-size:13px;line-height:1.55;color:var(--lp-n049, #3f3f3b)\">Some states reduce recovery by your share of fault; a few bar it entirely.</span></div>\n      <div style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n758, #e2e2dd);border-radius:8px;padding:13px 16px;display:flex;gap:12px;align-items:baseline\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0\">PROCEDURE</span><span style=\"font-size:13px;line-height:1.55;color:var(--lp-n049, #3f3f3b)\">Where and how a claim is filed — and against whom — is a state-level question.</span></div>\n    </div>\n  </div>\n</section>\n\n<!-- ===== final CTA ===== -->\n<section style=\"background:var(--lp-n964, #fbfbfa);padding:52px 24px\">\n  <div style=\"max-width:560px;margin:0 auto;text-align:center\">\n    <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3.6vw,30px);line-height:1.2;color:var(--lp-n014, #1f1f1f);margin:0 0 10px;text-wrap:pretty\">Now you know how the network works. See if it covers your case.</h2>\n    <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;color:var(--lp-n106, #5c5c58);margin:0 0 22px\">Two minutes, free, and nothing proceeds without your written say-so.</p>\n    <div style=\"display:flex;gap:12px;justify-content:center;flex-wrap:wrap\">\n      <button style=\"background:var(--lp-n042, #3a3a36);color:var(--lp-n1000, #ffffff);border:none;border-radius:7px;padding:14px 30px;font-family:'Archivo',sans-serif;font-size:14.5px;font-weight:700;cursor:pointer;min-height:48px\" style-hover=\"background:var(--lp-n026, #2d2d2a)\">Check the case type</button>\n      <a href=\"#\" style=\"display:inline-flex;align-items:center;gap:8px;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n677, #d7d7d2);border-radius:7px;padding:13px 24px;font-family:'Archivo',sans-serif;font-size:13.5px;font-weight:600;color:var(--lp-n023, #2a2a2a);text-decoration:none;min-height:48px\" style-hover=\"border-color:var(--lp-n042, #3a3a36)\">Call <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n861, #efefec);color:var(--lp-n041, #393939);border:1px solid var(--lp-n735, #dfdfda);border-radius:4px;padding:0 5px\">{​{brand.callNumber}​}</code></a>\n    </div>\n  </div>\n</section>\n\n<!-- ===== legal footer ===== -->\n<footer style=\"background:var(--lp-n837, #ecece9);border-top:1px solid var(--lp-n743, #e0e0db);padding:32px 24px 26px;font-family:'Archivo',sans-serif\">\n  <div style=\"max-width:1100px;margin:0 auto\">\n    <div style=\"display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:16px\">\n      <div style=\"display:flex;align-items:center;gap:10px\">\n        <div style=\"width:110px;height:26px;border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n928, #f7f7f4);border-radius:6px;display:flex;align-items:center;justify-content:center\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--lp-n067, #494949);letter-spacing:.1em\">[LOGO SLOT]</span></div>\n        <span style=\"font-size:12px;color:var(--lp-n068, #4a4a46)\">An attorney-matching service. Not a law firm.</span>\n      </div>\n      <div style=\"display:flex;gap:16px;flex-wrap:wrap\">\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c38)\">Privacy Policy</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c38)\">Terms of Service</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c38)\">Do Not Sell My Info</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c38)\">TCPA Disclosure</a>\n      </div>\n    </div>\n    <div style=\"border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n928, #f7f7f4);border-radius:8px;padding:12px 14px;margin-bottom:12px\">\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n067, #494949);letter-spacing:.12em;margin-bottom:6px\">[LEGAL DISCLOSURE] · {​{brand.disclaimer}​} + {​{brand.tcpaText}​}</div>\n      <p style=\"font-size:11px;line-height:1.65;color:var(--lp-n068, #4a4a46);margin:0\">By submitting your information you agree to be contacted by phone, email, or text by participating attorneys and partner law firms for the purpose of evaluating your case. Message and data rates may apply. This site is attorney advertising paid for by participating law firms. {​{brand.displayName}​} is not a law firm and does not provide legal advice. Prior results do not guarantee a similar outcome.</p>\n    </div>\n    <div style=\"font-size:11px;color:var(--lp-n106, #5c5c58)\">© {​{site.currentYear}​} {​{brand.displayName}​} · {​{brand.copyright}​}</div>\n  </div>\n</footer>\n\n<script type=\"text/x-dc\" data-dc-script=\"\" data-props=\"{&quot;annotations&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Engineering handoff&quot;}}\">\nclass Component extends DCLogic {\n  state = { anno: false };\n  renderVals() {\n    const on = (this.props.annotations ?? false) || this.state.anno;\n    return {\n      anno: on ? 'flex' : 'none',\n      annoLabel: on ? 'ANNOTATIONS: ON' : 'ANNOTATIONS: OFF',\n      toggleAnno: () => this.setState((s) => ({ anno: !s.anno })),\n    };\n  }\n}\n</script>"
+/** The template as the reference draws it, with nothing overridden. */
+export const html = "<header style=\"background:var(--lp-n964, #fbfbfa);border-bottom:1px solid var(--lp-n829, #ebebe8);padding:0 24px;font-family:'Archivo',sans-serif\">\n  <div style=\"max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap\">\n    <div style=\"display:flex;align-items:center;gap:10px\">\n      <div style=\"width:132px;height:32px;border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n886, #f2f2ef);border-radius:6px;display:flex;align-items:center;justify-content:center\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n067, #494949);letter-spacing:.1em\">[LOGO SLOT]</span></div>\n      <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n861, #efefec);color:var(--lp-n041, #393939);border:1px solid var(--lp-n735, #dfdfda);border-radius:4px;padding:1px 6px\">{{brand.logo}}</code>\n    </div>\n    <div style=\"text-align:right\">\n      <div style=\"font-size:10px;color:var(--lp-n256, #8b8b85);letter-spacing:.1em;font-family:'JetBrains Mono',monospace\">QUESTIONS, CALL</div>\n      <a href=\"#\" style=\"font-weight:700;font-size:15px;color:var(--lp-n012, #1d1d1d);text-decoration:none\"><code style=\"font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--lp-n861, #efefec);color:var(--lp-n041, #393939);border:1px solid var(--lp-n735, #dfdfda);border-radius:4px;padding:1px 6px\">{{brand.callNumber}}</code></a>\n    </div>\n  </div>\n</header>\n\n<!-- ===== network-map hero ===== -->\n\n<section data-tight=\"\" style=\"background:var(--lp-n964, #fbfbfa);position:relative;overflow:hidden;padding:64px 24px 58px;border-bottom:1px solid var(--lp-n829, #ebebe8)\">\n  <svg aria-hidden=\"true\" style=\"position:absolute;inset:0;width:100%;height:100%;opacity:.55\" sc-camel-view-box=\"0 0 1200 420\" sc-camel-preserve-aspect-ratio=\"xMidYMid slice\" fill=\"none\">\n    <path d=\"M-40 340 220 160 480 300 760 120 1020 280 1260 140\" stroke=\"var(--lp-n765, #e3e3de)\" stroke-width=\"1.4\"></path>\n    <path d=\"M-40 80 260 240 560 60 860 260 1160 100\" stroke=\"var(--lp-n812, #e9e9e4)\" stroke-width=\"1.2\"></path>\n    <path d=\"M220 160 260 240M480 300 560 60M760 120 860 260M1020 280 1160 100\" stroke=\"var(--lp-n765, #e3e3de)\" stroke-width=\"1.2\"></path>\n    <circle cx=\"220\" cy=\"160\" r=\"7\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n581, #c9c9c2)\" stroke-width=\"1.6\"></circle><circle cx=\"220\" cy=\"160\" r=\"2.4\" fill=\"var(--lp-n273, #8f8f88)\"></circle>\n    <circle cx=\"480\" cy=\"300\" r=\"7\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n581, #c9c9c2)\" stroke-width=\"1.6\"></circle><circle cx=\"480\" cy=\"300\" r=\"2.4\" fill=\"var(--lp-n273, #8f8f88)\"></circle>\n    <circle cx=\"760\" cy=\"120\" r=\"7\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n581, #c9c9c2)\" stroke-width=\"1.6\"></circle><circle cx=\"760\" cy=\"120\" r=\"2.4\" fill=\"var(--lp-n273, #8f8f88)\"></circle>\n    <circle cx=\"260\" cy=\"240\" r=\"5.5\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n669, #d6d6d0)\" stroke-width=\"1.4\"></circle>\n    <circle cx=\"560\" cy=\"60\" r=\"5.5\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n669, #d6d6d0)\" stroke-width=\"1.4\"></circle>\n    <circle cx=\"860\" cy=\"260\" r=\"5.5\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n669, #d6d6d0)\" stroke-width=\"1.4\"></circle>\n    <circle cx=\"1020\" cy=\"280\" r=\"7\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n581, #c9c9c2)\" stroke-width=\"1.6\"></circle><circle cx=\"1020\" cy=\"280\" r=\"2.4\" fill=\"var(--lp-n273, #8f8f88)\"></circle>\n  </svg>\n  <div style=\"position:relative;max-width:760px;margin:0 auto;text-align:center\">\n    <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;color:var(--lp-n256, #8b8b85);margin-bottom:16px\">OPERATED BY <code style=\"background:var(--lp-n861, #efefec);color:var(--lp-n106, #5c5c56);border:1px solid var(--lp-n735, #dfdfda);border-radius:3px;padding:1px 6px\">{{brand.displayName}}</code></div>\n    <h1 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(32px,4.6vw,48px);line-height:1.14;letter-spacing:-0.01em;color:var(--lp-n014, #1f1f1f);margin:0 0 14px;text-wrap:pretty\">Matching is only as good as the network behind it.</h1>\n    <p style=\"font-family:'Archivo',sans-serif;font-size:15.5px;line-height:1.65;color:var(--lp-n106, #5c5c58);margin:0 auto;max-width:540px\">This page explains how the attorney network is assembled, what vetting actually checks, and how matching differs from selling a name to the highest bidder.</p>\n  </div>\n</section>\n\n<!-- ===== vetting + rail quiz ===== -->\n\n<section style=\"background:var(--lp-n964, #fbfbfa);padding:52px 24px 60px\">\n  <div style=\"max-width:1100px;margin:0 auto;display:flex;gap:clamp(24px,4vw,56px);flex-wrap:wrap;align-items:flex-start\">\n    <div style=\"flex:1.4 1 460px;min-width:min(100%,440px)\">\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin-bottom:10px\">I</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3vw,30px);color:var(--lp-n014, #1f1f1f);margin:0 0 12px;border-bottom:1px solid var(--lp-n789, #e6e6e1);padding-bottom:12px\">What vetting means here</h2>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:15px;line-height:1.7;color:var(--lp-n049, #3f3f3b);margin:0 0 22px;max-width:560px\">Every attorney in the network passes the same review before receiving a single match — and the review repeats on a schedule, not once at signup.</p>\n      <div style=\"display:flex;flex-direction:column\">\n        <div style=\"display:flex;gap:18px;padding:14px 0;border-bottom:1px solid #ececе7;border-bottom:1px solid var(--lp-n836, #ecece7)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);width:86px;flex-shrink:0;padding-top:2px\">LICENSURE</span><p style=\"font-family:'Archivo',sans-serif;font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b);margin:0\">Active bar admission verified in every state where the attorney receives matches.</p></div>\n        <div style=\"display:flex;gap:18px;padding:14px 0;border-bottom:1px solid var(--lp-n836, #ecece7)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);width:86px;flex-shrink:0;padding-top:2px\">STANDING</span><p style=\"font-family:'Archivo',sans-serif;font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b);margin:0\">Public disciplinary history reviewed at intake and on renewal.</p></div>\n        <div style=\"display:flex;gap:18px;padding:14px 0;border-bottom:1px solid var(--lp-n836, #ecece7)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);width:86px;flex-shrink:0;padding-top:2px\">PRACTICE</span><p style=\"font-family:'Archivo',sans-serif;font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b);margin:0\">The attorney must actually handle the case types they are matched to — confirmed by practice review rather than self-description.</p></div>\n        <div style=\"display:flex;gap:18px;padding:14px 0\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);width:86px;flex-shrink:0;padding-top:2px\">CONDUCT</span><p style=\"font-family:'Archivo',sans-serif;font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b);margin:0\">Response standards for how quickly and how respectfully matched drivers are contacted.</p></div>\n      </div>\n\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin:44px 0 10px\">II</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3vw,30px);color:var(--lp-n014, #1f1f1f);margin:0 0 12px;border-bottom:1px solid var(--lp-n789, #e6e6e1);padding-bottom:12px\">Licensing is the floor, not the standard</h2>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:15px;line-height:1.7;color:var(--lp-n049, #3f3f3b);margin:0 0 18px;max-width:560px\">A bar card proves someone may practice law in a state. It doesn’t say whether they handle injury claims, return calls, or take cases to trial when the offer is short. The network review starts where licensing stops.</p>\n      <div style=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px;margin-bottom:8px\">\n        <div style=\"border:1px solid var(--lp-n789, #e6e6e1);border-radius:8px;padding:16px 18px;background:var(--lp-n920, #f6f6f3)\"><div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);margin-bottom:8px\">STATE LICENSURE · THE MINIMUM</div><ul style=\"font-family:'Archivo',sans-serif;font-size:13px;line-height:1.7;color:var(--lp-n090, #55554f);margin:0;padding-left:16px\"><li>Admitted to the state bar</li><li>No suspension in force</li><li>Says nothing about case type or conduct</li></ul></div>\n        <div style=\"border:1px solid var(--lp-n621, #cfcfc8);border-radius:8px;padding:16px 18px;background:var(--lp-n1000, #ffffff)\"><div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--lp-n090, #55554f);margin-bottom:8px\">NETWORK REVIEW · THE STANDARD</div><ul style=\"font-family:'Archivo',sans-serif;font-size:13px;line-height:1.7;color:var(--lp-n028, #2f2f2b);margin:0;padding-left:16px\"><li>Motor-vehicle injury caseload, verified</li><li>Contingency representation offered</li><li>Response and conduct standards, renewed</li></ul></div>\n      </div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:13px;line-height:1.65;color:var(--lp-n256, #8b8b85);margin:0\">Licensing status is public record in every state; the deeper review is the network’s own and repeats annually.</p>\n\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin:44px 0 10px\">III</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3vw,30px);color:var(--lp-n014, #1f1f1f);margin:0 0 12px;border-bottom:1px solid var(--lp-n789, #e6e6e1);padding-bottom:12px\">Matching is not an auction</h2>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:15px;line-height:1.7;color:var(--lp-n049, #3f3f3b);margin:0 0 14px;max-width:560px\">Some services sell each inquiry to whichever firm pays most that week. Here, matching works from the case: the accident type, the state, and the attorney’s verified practice decide who is proposed — not a bid.</p>\n      <div style=\"display:flex;flex-direction:column;gap:8px;max-width:560px\">\n        <div style=\"display:flex;gap:12px;align-items:flex-start;background:var(--lp-n920, #f6f6f3);border:1px solid var(--lp-n789, #e6e6e1);border-radius:8px;padding:12px 16px\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0;padding-top:3px\">MATCHED BY</span><span style=\"font-family:'Archivo',sans-serif;font-size:13.5px;line-height:1.6;color:var(--lp-n028, #2f2f2b)\">Case type, state relevance, verified practice, current capacity.</span></div>\n        <div style=\"display:flex;gap:12px;align-items:flex-start;background:var(--lp-n920, #f6f6f3);border:1px solid var(--lp-n789, #e6e6e1);border-radius:8px;padding:12px 16px\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0;padding-top:3px\">NEVER BY</span><span style=\"font-family:'Archivo',sans-serif;font-size:13.5px;line-height:1.6;color:var(--lp-n028, #2f2f2b)\">Advertising spend, bidding, or who paid most for the inquiry.</span></div>\n      </div>\n\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin:44px 0 10px\">IV</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3vw,30px);color:var(--lp-n014, #1f1f1f);margin:0 0 12px;border-bottom:1px solid var(--lp-n789, #e6e6e1);padding-bottom:12px\">What you control, start to finish</h2>\n      <div style=\"display:flex;flex-direction:column;gap:10px;max-width:560px;font-family:'Archivo',sans-serif\">\n        <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:22px;height:22px;border-radius:50%;border:1.5px solid var(--lp-n482, #b9b9b2);color:var(--lp-n090, #55554f);display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px\">✓</span><span style=\"font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b)\">The check is free, and completing it starts nothing. There is no charge for the check or the conversation, and nothing proceeds without a written agreement the driver chooses to sign.</span></div>\n        <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:22px;height:22px;border-radius:50%;border:1.5px solid var(--lp-n482, #b9b9b2);color:var(--lp-n090, #55554f);display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px\">✓</span><span style=\"font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b)\">You can decline a proposed match, ask for another, or simply stop responding — nothing is filed on your behalf.</span></div>\n        <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:22px;height:22px;border-radius:50%;border:1.5px solid var(--lp-n482, #b9b9b2);color:var(--lp-n090, #55554f);display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px\">✓</span><span style=\"font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b)\">Your information goes to the matched attorney for review — it is not circulated across the network or sold onward.</span></div>\n      </div>\n    </div>\n\n    <div data-msticky=\"\" style=\"flex:1 1 320px;min-width:min(100%,310px);max-width:400px;position:sticky;top:24px\">\n      <div style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n728, #dededa);border-radius:10px;padding:22px clamp(16px,3vw,24px);box-shadow:0 10px 28px -16px rgba(31,31,31,.22)\">\n        <div style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:19px;color:var(--lp-n014, #1f1f1f);margin:0 0 4px\">Check the case type against the network</div>\n        <div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--lp-n321, #9a9a93);margin-bottom:14px\">FREE · ABOUT TWO MINUTES · NO OBLIGATION TO PROCEED</div>\n        <div style=\"display:flex;align-items:center;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.08em;color:var(--lp-n256, #8b8b85);margin-bottom:6px\"><span>QUESTION 1 OF 6</span><span>—</span></div>\n        <div style=\"height:3px;background:var(--lp-n836, #ecece7);border-radius:999px;margin-bottom:16px\"><div style=\"width:17%;height:3px;background:var(--lp-n042, #3a3a36);border-radius:999px\"></div></div>\n        <div style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:17px;color:var(--lp-n014, #1f1f1f);margin-bottom:4px\">How Were You Injured?</div>\n        <p style=\"font-family:'Archivo',sans-serif;font-size:12px;color:var(--lp-n256, #8b8b85);margin:0 0 12px\">Select the type of accident you were involved in:</p>\n        <div style=\"display:flex;flex-direction:column;gap:7px;font-family:'Archivo',sans-serif;margin-bottom:14px\">\n          <button style=\"text-align:left;background:var(--lp-n920, #f6f6f3);border:1.5px solid var(--lp-n042, #3a3a36);border-radius:7px;padding:11px 13px;display:flex;align-items:center;gap:11px;min-height:46px;cursor:pointer;font-family:'Archivo',sans-serif\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n090, #55554f);width:18px;flex-shrink:0\">i</span><span style=\"font-size:13px;font-weight:600;color:var(--lp-n014, #1f1f1f);flex:1;line-height:1.4\">Auto / Motorcycle Accident</span><span style=\"width:16px;height:16px;border-radius:50%;border:1.5px solid var(--lp-n042, #3a3a36);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0\"><span style=\"width:8px;height:8px;border-radius:50%;background:var(--lp-n042, #3a3a36)\"></span></span></button>\n          <button style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n728, #dededa);border-radius:7px;padding:11px 13px;display:flex;align-items:center;gap:11px;min-height:46px;cursor:pointer;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n042, #3a3a36)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n321, #9a9a93);width:18px;flex-shrink:0\">ii</span><span style=\"font-size:13px;font-weight:500;color:var(--lp-n049, #3f3f3b);flex:1;line-height:1.4\">Commercial / Semi Accident</span><span style=\"width:16px;height:16px;border-radius:50%;border:1.5px solid var(--lp-n581, #c9c9c2);flex-shrink:0\"></span></button>\n          <button style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n728, #dededa);border-radius:7px;padding:11px 13px;display:flex;align-items:center;gap:11px;min-height:46px;cursor:pointer;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n042, #3a3a36)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n321, #9a9a93);width:18px;flex-shrink:0\">iii</span><span style=\"font-size:13px;font-weight:500;color:var(--lp-n049, #3f3f3b);flex:1;line-height:1.4\">Passenger / Rideshare / Pedestrian Accident</span><span style=\"width:16px;height:16px;border-radius:50%;border:1.5px solid var(--lp-n581, #c9c9c2);flex-shrink:0\"></span></button>\n          <button style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n728, #dededa);border-radius:7px;padding:11px 13px;display:flex;align-items:center;gap:11px;min-height:46px;cursor:pointer;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n042, #3a3a36)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n321, #9a9a93);width:18px;flex-shrink:0\">iv</span><span style=\"font-size:13px;font-weight:500;color:var(--lp-n049, #3f3f3b);flex:1;line-height:1.4\">At Work / Other / I Wasn’t Injured</span><span style=\"width:16px;height:16px;border-radius:50%;border:1.5px solid var(--lp-n581, #c9c9c2);flex-shrink:0\"></span></button>\n        </div>\n        <button style=\"width:100%;background:var(--lp-n042, #3a3a36);color:var(--lp-n1000, #ffffff);border:none;border-radius:7px;padding:13px 22px;font-family:'Archivo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;min-height:46px\" style-hover=\"background:var(--lp-n026, #2d2d2a)\">Continue →</button>\n        <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-family:'Archivo',sans-serif\"><button style=\"background:none;border:none;color:var(--lp-n321, #9a9a93);font-size:12px;cursor:pointer;padding:6px 2px;font-family:'Archivo',sans-serif\">← Back</button><span style=\"font-size:10.5px;color:var(--lp-n321, #9a9a93)\">Free · no obligation</span></div>\n        <p style=\"font-family:'Archivo',sans-serif;font-size:10px;line-height:1.6;color:var(--lp-n374, #a5a59e);margin:10px 0 0;border-top:1px solid var(--lp-n861, #efefeb);padding-top:9px\">By continuing, you agree that <code style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;background:var(--lp-n886, #f2f2ef);color:var(--lp-n154, #6e6e66);border:1px solid var(--lp-n757, #e2e2dc);border-radius:3px;padding:0 3px\">{{brand.displayName}}</code> and participating attorneys may contact you about this request. <code style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;background:var(--lp-n886, #f2f2ef);color:var(--lp-n154, #6e6e66);border:1px solid var(--lp-n757, #e2e2dc);border-radius:3px;padding:0 3px\">{{brand.tcpaText}}</code></p>\n      </div>\n      <div style=\"margin-top:10px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--lp-n431, #b0b0a9)\">MATCHED BY CASE · NEVER AUCTIONED</div>\n    </div>\n  </div>\n</section>\n\n<!-- ===== state relevance ===== -->\n\n<section style=\"background:var(--lp-n903, #f4f4f1);border-top:1px solid var(--lp-n789, #e6e6e1);border-bottom:1px solid var(--lp-n789, #e6e6e1);padding:44px 24px\">\n  <div style=\"max-width:1100px;margin:0 auto;display:flex;gap:clamp(24px,4vw,56px);flex-wrap:wrap;align-items:flex-start\">\n    <div style=\"flex:1 1 320px;min-width:min(100%,300px)\">\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin-bottom:10px\">V</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(22px,2.8vw,28px);color:var(--lp-n014, #1f1f1f);margin:0 0 10px\">Why the state matters more than the billboard</h2>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;line-height:1.7;color:var(--lp-n049, #3f3f3b);margin:0\">Injury law is state law: filing deadlines, fault rules, and damage limits all change at the border. A match is only proposed from attorneys licensed and practicing where your claim actually lives — coverage per state is <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n836, #ecece8);color:var(--lp-n106, #5c5c56);border:1px solid var(--lp-n735, #dfdfda);border-radius:3px;padding:0 4px\">{{page.network.states}}</code>, resolved per brand.</p>\n    </div>\n    <div style=\"flex:1 1 320px;min-width:min(100%,300px);display:flex;flex-direction:column;gap:9px;font-family:'Archivo',sans-serif\">\n      <div style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n758, #e2e2dd);border-radius:8px;padding:13px 16px;display:flex;gap:12px;align-items:baseline\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0\">DEADLINES</span><span style=\"font-size:13px;line-height:1.55;color:var(--lp-n049, #3f3f3b)\">Statutes of limitation range from one to several years depending on the state.</span></div>\n      <div style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n758, #e2e2dd);border-radius:8px;padding:13px 16px;display:flex;gap:12px;align-items:baseline\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0\">FAULT RULES</span><span style=\"font-size:13px;line-height:1.55;color:var(--lp-n049, #3f3f3b)\">Some states reduce recovery by your share of fault; a few bar it entirely.</span></div>\n      <div style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n758, #e2e2dd);border-radius:8px;padding:13px 16px;display:flex;gap:12px;align-items:baseline\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0\">PROCEDURE</span><span style=\"font-size:13px;line-height:1.55;color:var(--lp-n049, #3f3f3b)\">Where and how a claim is filed — and against whom — is a state-level question.</span></div>\n    </div>\n  </div>\n</section>\n\n<!-- ===== final CTA ===== -->\n<section style=\"background:var(--lp-n964, #fbfbfa);padding:52px 24px\">\n  <div style=\"max-width:560px;margin:0 auto;text-align:center\">\n    <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3.6vw,30px);line-height:1.2;color:var(--lp-n014, #1f1f1f);margin:0 0 10px;text-wrap:pretty\">Now you know how the network works. See if it covers your case.</h2>\n    <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;color:var(--lp-n106, #5c5c58);margin:0 0 22px\">Two minutes, free, and nothing proceeds without your written say-so.</p>\n    <div style=\"display:flex;gap:12px;justify-content:center;flex-wrap:wrap\">\n      <button style=\"background:var(--lp-n042, #3a3a36);color:var(--lp-n1000, #ffffff);border:none;border-radius:7px;padding:14px 30px;font-family:'Archivo',sans-serif;font-size:14.5px;font-weight:700;cursor:pointer;min-height:48px\" style-hover=\"background:var(--lp-n026, #2d2d2a)\">Check the case type</button>\n      <a href=\"#\" style=\"display:inline-flex;align-items:center;gap:8px;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n677, #d7d7d2);border-radius:7px;padding:13px 24px;font-family:'Archivo',sans-serif;font-size:13.5px;font-weight:600;color:var(--lp-n023, #2a2a2a);text-decoration:none;min-height:48px\" style-hover=\"border-color:var(--lp-n042, #3a3a36)\">Call <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n861, #efefec);color:var(--lp-n041, #393939);border:1px solid var(--lp-n735, #dfdfda);border-radius:4px;padding:0 5px\">{{brand.callNumber}}</code></a>\n    </div>\n  </div>\n</section>\n\n<!-- ===== legal footer ===== -->\n<footer style=\"background:var(--lp-n837, #ecece9);border-top:1px solid var(--lp-n743, #e0e0db);padding:32px 24px 26px;font-family:'Archivo',sans-serif\">\n  <div style=\"max-width:1100px;margin:0 auto\">\n    <div style=\"display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:16px\">\n      <div style=\"display:flex;align-items:center;gap:10px\">\n        <div style=\"width:110px;height:26px;border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n928, #f7f7f4);border-radius:6px;display:flex;align-items:center;justify-content:center\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--lp-n067, #494949);letter-spacing:.1em\">[LOGO SLOT]</span></div>\n        <span style=\"font-size:12px;color:var(--lp-n068, #4a4a46)\">An attorney-matching service. Not a law firm.</span>\n      </div>\n      <div style=\"display:flex;gap:16px;flex-wrap:wrap\">\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c38)\">Privacy Policy</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c38)\">Terms of Service</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c38)\">Do Not Sell My Info</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c38)\">TCPA Disclosure</a>\n      </div>\n    </div>\n    <div style=\"border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n928, #f7f7f4);border-radius:8px;padding:12px 14px;margin-bottom:12px\">\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n067, #494949);letter-spacing:.12em;margin-bottom:6px\">[LEGAL DISCLOSURE] · {{brand.disclaimer}} + {{brand.tcpaText}}</div>\n      <p style=\"font-size:11px;line-height:1.65;color:var(--lp-n068, #4a4a46);margin:0\">By submitting your information you agree to be contacted by phone, email, or text by participating attorneys and partner law firms for the purpose of evaluating your case. Message and data rates may apply. This site is attorney advertising paid for by participating law firms. {{brand.displayName}} is not a law firm and does not provide legal advice. Prior results do not guarantee a similar outcome.</p>\n    </div>\n    <div style=\"font-size:11px;color:var(--lp-n106, #5c5c58)\">© {{site.currentYear}} {{brand.displayName}} · {{brand.copyright}}</div>\n  </div>\n</footer>"
+
+/** Literal markup between the slots. Always `slotIds.length + 1` entries. */
+export const parts: string[] = ["<header style=\"background:var(--lp-n964, #fbfbfa);border-bottom:1px solid var(--lp-n829, #ebebe8);padding:0 24px;font-family:'Archivo',sans-serif\">\n  <div style=\"max-width:1100px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;flex-wrap:wrap\">\n    <div style=\"display:flex;align-items:center;gap:10px\">\n      <div style=\"width:132px;height:32px;border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n886, #f2f2ef);border-radius:6px;display:flex;align-items:center;justify-content:center\">","</div>\n      <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n861, #efefec);color:var(--lp-n041, #393939);border:1px solid var(--lp-n735, #dfdfda);border-radius:4px;padding:1px 6px\">{{brand.logo}}</code>\n    </div>\n    <div style=\"text-align:right\">\n      <div style=\"font-size:10px;color:var(--lp-n256, #8b8b85);letter-spacing:.1em;font-family:'JetBrains Mono',monospace\">","</div>\n      <a href=\"#\" style=\"font-weight:700;font-size:15px;color:var(--lp-n012, #1d1d1d);text-decoration:none\"><code style=\"font-family:'JetBrains Mono',monospace;font-size:11px;background:var(--lp-n861, #efefec);color:var(--lp-n041, #393939);border:1px solid var(--lp-n735, #dfdfda);border-radius:4px;padding:1px 6px\">{{brand.callNumber}}</code></a>\n    </div>\n  </div>\n</header>\n\n<!-- ===== network-map hero ===== -->\n\n<section data-tight=\"\" style=\"background:var(--lp-n964, #fbfbfa);position:relative;overflow:hidden;padding:64px 24px 58px;border-bottom:1px solid var(--lp-n829, #ebebe8)\">\n  <svg aria-hidden=\"true\" style=\"position:absolute;inset:0;width:100%;height:100%;opacity:.55\" sc-camel-view-box=\"0 0 1200 420\" sc-camel-preserve-aspect-ratio=\"xMidYMid slice\" fill=\"none\">\n    <path d=\"M-40 340 220 160 480 300 760 120 1020 280 1260 140\" stroke=\"var(--lp-n765, #e3e3de)\" stroke-width=\"1.4\"></path>\n    <path d=\"M-40 80 260 240 560 60 860 260 1160 100\" stroke=\"var(--lp-n812, #e9e9e4)\" stroke-width=\"1.2\"></path>\n    <path d=\"M220 160 260 240M480 300 560 60M760 120 860 260M1020 280 1160 100\" stroke=\"var(--lp-n765, #e3e3de)\" stroke-width=\"1.2\"></path>\n    <circle cx=\"220\" cy=\"160\" r=\"7\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n581, #c9c9c2)\" stroke-width=\"1.6\"></circle><circle cx=\"220\" cy=\"160\" r=\"2.4\" fill=\"var(--lp-n273, #8f8f88)\"></circle>\n    <circle cx=\"480\" cy=\"300\" r=\"7\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n581, #c9c9c2)\" stroke-width=\"1.6\"></circle><circle cx=\"480\" cy=\"300\" r=\"2.4\" fill=\"var(--lp-n273, #8f8f88)\"></circle>\n    <circle cx=\"760\" cy=\"120\" r=\"7\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n581, #c9c9c2)\" stroke-width=\"1.6\"></circle><circle cx=\"760\" cy=\"120\" r=\"2.4\" fill=\"var(--lp-n273, #8f8f88)\"></circle>\n    <circle cx=\"260\" cy=\"240\" r=\"5.5\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n669, #d6d6d0)\" stroke-width=\"1.4\"></circle>\n    <circle cx=\"560\" cy=\"60\" r=\"5.5\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n669, #d6d6d0)\" stroke-width=\"1.4\"></circle>\n    <circle cx=\"860\" cy=\"260\" r=\"5.5\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n669, #d6d6d0)\" stroke-width=\"1.4\"></circle>\n    <circle cx=\"1020\" cy=\"280\" r=\"7\" fill=\"var(--lp-n964, #fbfbfa)\" stroke=\"var(--lp-n581, #c9c9c2)\" stroke-width=\"1.6\"></circle><circle cx=\"1020\" cy=\"280\" r=\"2.4\" fill=\"var(--lp-n273, #8f8f88)\"></circle>\n  </svg>\n  <div style=\"position:relative;max-width:760px;margin:0 auto;text-align:center\">\n    <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.16em;color:var(--lp-n256, #8b8b85);margin-bottom:16px\">","</div>\n    <h1 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(32px,4.6vw,48px);line-height:1.14;letter-spacing:-0.01em;color:var(--lp-n014, #1f1f1f);margin:0 0 14px;text-wrap:pretty\">","</h1>\n    <p style=\"font-family:'Archivo',sans-serif;font-size:15.5px;line-height:1.65;color:var(--lp-n106, #5c5c58);margin:0 auto;max-width:540px\">","</p>\n  </div>\n</section>\n\n<!-- ===== vetting + rail quiz ===== -->\n\n<section style=\"background:var(--lp-n964, #fbfbfa);padding:52px 24px 60px\">\n  <div style=\"max-width:1100px;margin:0 auto;display:flex;gap:clamp(24px,4vw,56px);flex-wrap:wrap;align-items:flex-start\">\n    <div style=\"flex:1.4 1 460px;min-width:min(100%,440px)\">\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin-bottom:10px\">","</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3vw,30px);color:var(--lp-n014, #1f1f1f);margin:0 0 12px;border-bottom:1px solid var(--lp-n789, #e6e6e1);padding-bottom:12px\">","</h2>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:15px;line-height:1.7;color:var(--lp-n049, #3f3f3b);margin:0 0 22px;max-width:560px\">","</p>\n      <div style=\"display:flex;flex-direction:column\">\n        <div style=\"display:flex;gap:18px;padding:14px 0;border-bottom:1px solid #ececе7;border-bottom:1px solid var(--lp-n836, #ecece7)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);width:86px;flex-shrink:0;padding-top:2px\">","</span><p style=\"font-family:'Archivo',sans-serif;font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b);margin:0\">","</p></div>\n        <div style=\"display:flex;gap:18px;padding:14px 0;border-bottom:1px solid var(--lp-n836, #ecece7)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);width:86px;flex-shrink:0;padding-top:2px\">","</span><p style=\"font-family:'Archivo',sans-serif;font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b);margin:0\">","</p></div>\n        <div style=\"display:flex;gap:18px;padding:14px 0;border-bottom:1px solid var(--lp-n836, #ecece7)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);width:86px;flex-shrink:0;padding-top:2px\">","</span><p style=\"font-family:'Archivo',sans-serif;font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b);margin:0\">","</p></div>\n        <div style=\"display:flex;gap:18px;padding:14px 0\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);width:86px;flex-shrink:0;padding-top:2px\">","</span><p style=\"font-family:'Archivo',sans-serif;font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b);margin:0\">","</p></div>\n      </div>\n\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin:44px 0 10px\">","</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3vw,30px);color:var(--lp-n014, #1f1f1f);margin:0 0 12px;border-bottom:1px solid var(--lp-n789, #e6e6e1);padding-bottom:12px\">","</h2>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:15px;line-height:1.7;color:var(--lp-n049, #3f3f3b);margin:0 0 18px;max-width:560px\">","</p>\n      <div style=\"display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px;margin-bottom:8px\">\n        <div style=\"border:1px solid var(--lp-n789, #e6e6e1);border-radius:8px;padding:16px 18px;background:var(--lp-n920, #f6f6f3)\"><div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--lp-n321, #9a9a93);margin-bottom:8px\">","</div><ul style=\"font-family:'Archivo',sans-serif;font-size:13px;line-height:1.7;color:var(--lp-n090, #55554f);margin:0;padding-left:16px\"><li>","</li><li>","</li><li>","</li></ul></div>\n        <div style=\"border:1px solid var(--lp-n621, #cfcfc8);border-radius:8px;padding:16px 18px;background:var(--lp-n1000, #ffffff)\"><div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.12em;color:var(--lp-n090, #55554f);margin-bottom:8px\">","</div><ul style=\"font-family:'Archivo',sans-serif;font-size:13px;line-height:1.7;color:var(--lp-n028, #2f2f2b);margin:0;padding-left:16px\"><li>","</li><li>","</li><li>","</li></ul></div>\n      </div>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:13px;line-height:1.65;color:var(--lp-n256, #8b8b85);margin:0\">","</p>\n\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin:44px 0 10px\">","</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3vw,30px);color:var(--lp-n014, #1f1f1f);margin:0 0 12px;border-bottom:1px solid var(--lp-n789, #e6e6e1);padding-bottom:12px\">","</h2>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:15px;line-height:1.7;color:var(--lp-n049, #3f3f3b);margin:0 0 14px;max-width:560px\">","</p>\n      <div style=\"display:flex;flex-direction:column;gap:8px;max-width:560px\">\n        <div style=\"display:flex;gap:12px;align-items:flex-start;background:var(--lp-n920, #f6f6f3);border:1px solid var(--lp-n789, #e6e6e1);border-radius:8px;padding:12px 16px\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0;padding-top:3px\">","</span><span style=\"font-family:'Archivo',sans-serif;font-size:13.5px;line-height:1.6;color:var(--lp-n028, #2f2f2b)\">","</span></div>\n        <div style=\"display:flex;gap:12px;align-items:flex-start;background:var(--lp-n920, #f6f6f3);border:1px solid var(--lp-n789, #e6e6e1);border-radius:8px;padding:12px 16px\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0;padding-top:3px\">","</span><span style=\"font-family:'Archivo',sans-serif;font-size:13.5px;line-height:1.6;color:var(--lp-n028, #2f2f2b)\">","</span></div>\n      </div>\n\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin:44px 0 10px\">","</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3vw,30px);color:var(--lp-n014, #1f1f1f);margin:0 0 12px;border-bottom:1px solid var(--lp-n789, #e6e6e1);padding-bottom:12px\">","</h2>\n      <div style=\"display:flex;flex-direction:column;gap:10px;max-width:560px;font-family:'Archivo',sans-serif\">\n        <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:22px;height:22px;border-radius:50%;border:1.5px solid var(--lp-n482, #b9b9b2);color:var(--lp-n090, #55554f);display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px\">","</span><span style=\"font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b)\">","</span></div>\n        <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:22px;height:22px;border-radius:50%;border:1.5px solid var(--lp-n482, #b9b9b2);color:var(--lp-n090, #55554f);display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px\">","</span><span style=\"font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b)\">","</span></div>\n        <div style=\"display:flex;gap:11px;align-items:flex-start\"><span style=\"width:22px;height:22px;border-radius:50%;border:1.5px solid var(--lp-n482, #b9b9b2);color:var(--lp-n090, #55554f);display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px\">","</span><span style=\"font-size:14px;line-height:1.65;color:var(--lp-n049, #3f3f3b)\">","</span></div>\n      </div>\n    </div>\n\n    <div data-msticky=\"\" style=\"flex:1 1 320px;min-width:min(100%,310px);max-width:400px;position:sticky;top:24px\">\n      <div style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n728, #dededa);border-radius:10px;padding:22px clamp(16px,3vw,24px);box-shadow:0 10px 28px -16px rgba(31,31,31,.22)\">\n        <div style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:19px;color:var(--lp-n014, #1f1f1f);margin:0 0 4px\">","</div>\n        <div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--lp-n321, #9a9a93);margin-bottom:14px\">","</div>\n        <div style=\"display:flex;align-items:center;justify-content:space-between;font-family:'JetBrains Mono',monospace;font-size:9.5px;letter-spacing:.08em;color:var(--lp-n256, #8b8b85);margin-bottom:6px\"><span>","</span><span>","</span></div>\n        <div style=\"height:3px;background:var(--lp-n836, #ecece7);border-radius:999px;margin-bottom:16px\"><div style=\"width:17%;height:3px;background:var(--lp-n042, #3a3a36);border-radius:999px\"></div></div>\n        <div style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:17px;color:var(--lp-n014, #1f1f1f);margin-bottom:4px\">","</div>\n        <p style=\"font-family:'Archivo',sans-serif;font-size:12px;color:var(--lp-n256, #8b8b85);margin:0 0 12px\">","</p>\n        <div style=\"display:flex;flex-direction:column;gap:7px;font-family:'Archivo',sans-serif;margin-bottom:14px\">\n          <button style=\"text-align:left;background:var(--lp-n920, #f6f6f3);border:1.5px solid var(--lp-n042, #3a3a36);border-radius:7px;padding:11px 13px;display:flex;align-items:center;gap:11px;min-height:46px;cursor:pointer;font-family:'Archivo',sans-serif\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n090, #55554f);width:18px;flex-shrink:0\">","</span><span style=\"font-size:13px;font-weight:600;color:var(--lp-n014, #1f1f1f);flex:1;line-height:1.4\">","</span><span style=\"width:16px;height:16px;border-radius:50%;border:1.5px solid var(--lp-n042, #3a3a36);display:inline-flex;align-items:center;justify-content:center;flex-shrink:0\"><span style=\"width:8px;height:8px;border-radius:50%;background:var(--lp-n042, #3a3a36)\"></span></span></button>\n          <button style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n728, #dededa);border-radius:7px;padding:11px 13px;display:flex;align-items:center;gap:11px;min-height:46px;cursor:pointer;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n042, #3a3a36)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n321, #9a9a93);width:18px;flex-shrink:0\">","</span><span style=\"font-size:13px;font-weight:500;color:var(--lp-n049, #3f3f3b);flex:1;line-height:1.4\">","</span><span style=\"width:16px;height:16px;border-radius:50%;border:1.5px solid var(--lp-n581, #c9c9c2);flex-shrink:0\"></span></button>\n          <button style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n728, #dededa);border-radius:7px;padding:11px 13px;display:flex;align-items:center;gap:11px;min-height:46px;cursor:pointer;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n042, #3a3a36)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n321, #9a9a93);width:18px;flex-shrink:0\">","</span><span style=\"font-size:13px;font-weight:500;color:var(--lp-n049, #3f3f3b);flex:1;line-height:1.4\">","</span><span style=\"width:16px;height:16px;border-radius:50%;border:1.5px solid var(--lp-n581, #c9c9c2);flex-shrink:0\"></span></button>\n          <button style=\"text-align:left;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n728, #dededa);border-radius:7px;padding:11px 13px;display:flex;align-items:center;gap:11px;min-height:46px;cursor:pointer;font-family:'Archivo',sans-serif\" style-hover=\"border-color:var(--lp-n042, #3a3a36)\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n321, #9a9a93);width:18px;flex-shrink:0\">","</span><span style=\"font-size:13px;font-weight:500;color:var(--lp-n049, #3f3f3b);flex:1;line-height:1.4\">","</span><span style=\"width:16px;height:16px;border-radius:50%;border:1.5px solid var(--lp-n581, #c9c9c2);flex-shrink:0\"></span></button>\n        </div>\n        <button style=\"width:100%;background:var(--lp-n042, #3a3a36);color:var(--lp-n1000, #ffffff);border:none;border-radius:7px;padding:13px 22px;font-family:'Archivo',sans-serif;font-size:14px;font-weight:700;cursor:pointer;min-height:46px\" style-hover=\"background:var(--lp-n026, #2d2d2a)\">","</button>\n        <div style=\"display:flex;justify-content:space-between;align-items:center;margin-top:10px;font-family:'Archivo',sans-serif\"><button style=\"background:none;border:none;color:var(--lp-n321, #9a9a93);font-size:12px;cursor:pointer;padding:6px 2px;font-family:'Archivo',sans-serif\">","</button><span style=\"font-size:10.5px;color:var(--lp-n321, #9a9a93)\">","</span></div>\n        <p style=\"font-family:'Archivo',sans-serif;font-size:10px;line-height:1.6;color:var(--lp-n374, #a5a59e);margin:10px 0 0;border-top:1px solid var(--lp-n861, #efefeb);padding-top:9px\">","</p>\n      </div>\n      <div style=\"margin-top:10px;text-align:center;font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.08em;color:var(--lp-n431, #b0b0a9)\">","</div>\n    </div>\n  </div>\n</section>\n\n<!-- ===== state relevance ===== -->\n\n<section style=\"background:var(--lp-n903, #f4f4f1);border-top:1px solid var(--lp-n789, #e6e6e1);border-bottom:1px solid var(--lp-n789, #e6e6e1);padding:44px 24px\">\n  <div style=\"max-width:1100px;margin:0 auto;display:flex;gap:clamp(24px,4vw,56px);flex-wrap:wrap;align-items:flex-start\">\n    <div style=\"flex:1 1 320px;min-width:min(100%,300px)\">\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:.14em;color:var(--lp-n256, #8b8b85);margin-bottom:10px\">","</div>\n      <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(22px,2.8vw,28px);color:var(--lp-n014, #1f1f1f);margin:0 0 10px\">","</h2>\n      <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;line-height:1.7;color:var(--lp-n049, #3f3f3b);margin:0\">","</p>\n    </div>\n    <div style=\"flex:1 1 320px;min-width:min(100%,300px);display:flex;flex-direction:column;gap:9px;font-family:'Archivo',sans-serif\">\n      <div style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n758, #e2e2dd);border-radius:8px;padding:13px 16px;display:flex;gap:12px;align-items:baseline\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0\">","</span><span style=\"font-size:13px;line-height:1.55;color:var(--lp-n049, #3f3f3b)\">","</span></div>\n      <div style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n758, #e2e2dd);border-radius:8px;padding:13px 16px;display:flex;gap:12px;align-items:baseline\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0\">","</span><span style=\"font-size:13px;line-height:1.55;color:var(--lp-n049, #3f3f3b)\">","</span></div>\n      <div style=\"background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n758, #e2e2dd);border-radius:8px;padding:13px 16px;display:flex;gap:12px;align-items:baseline\"><span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;letter-spacing:.1em;color:var(--lp-n321, #9a9a93);flex-shrink:0\">","</span><span style=\"font-size:13px;line-height:1.55;color:var(--lp-n049, #3f3f3b)\">","</span></div>\n    </div>\n  </div>\n</section>\n\n<!-- ===== final CTA ===== -->\n<section style=\"background:var(--lp-n964, #fbfbfa);padding:52px 24px\">\n  <div style=\"max-width:560px;margin:0 auto;text-align:center\">\n    <h2 style=\"font-family:'Source Serif 4',Georgia,serif;font-weight:600;font-size:clamp(24px,3.6vw,30px);line-height:1.2;color:var(--lp-n014, #1f1f1f);margin:0 0 10px;text-wrap:pretty\">","</h2>\n    <p style=\"font-family:'Archivo',sans-serif;font-size:14.5px;color:var(--lp-n106, #5c5c58);margin:0 0 22px\">","</p>\n    <div style=\"display:flex;gap:12px;justify-content:center;flex-wrap:wrap\">\n      <button style=\"background:var(--lp-n042, #3a3a36);color:var(--lp-n1000, #ffffff);border:none;border-radius:7px;padding:14px 30px;font-family:'Archivo',sans-serif;font-size:14.5px;font-weight:700;cursor:pointer;min-height:48px\" style-hover=\"background:var(--lp-n026, #2d2d2a)\">","</button>\n      <a href=\"#\" style=\"display:inline-flex;align-items:center;gap:8px;background:var(--lp-n1000, #ffffff);border:1px solid var(--lp-n677, #d7d7d2);border-radius:7px;padding:13px 24px;font-family:'Archivo',sans-serif;font-size:13.5px;font-weight:600;color:var(--lp-n023, #2a2a2a);text-decoration:none;min-height:48px\" style-hover=\"border-color:var(--lp-n042, #3a3a36)\">","</a>\n    </div>\n  </div>\n</section>\n\n<!-- ===== legal footer ===== -->\n<footer style=\"background:var(--lp-n837, #ecece9);border-top:1px solid var(--lp-n743, #e0e0db);padding:32px 24px 26px;font-family:'Archivo',sans-serif\">\n  <div style=\"max-width:1100px;margin:0 auto\">\n    <div style=\"display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:center;margin-bottom:16px\">\n      <div style=\"display:flex;align-items:center;gap:10px\">\n        <div style=\"width:110px;height:26px;border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n928, #f7f7f4);border-radius:6px;display:flex;align-items:center;justify-content:center\">","</div>\n        <span style=\"font-size:12px;color:var(--lp-n068, #4a4a46)\">","</span>\n      </div>\n      <div style=\"display:flex;gap:16px;flex-wrap:wrap\">\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c38)\">","</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c38)\">","</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c38)\">","</a>\n        <a href=\"#\" style=\"font-size:12px;color:var(--lp-n045, #3c3c38)\">","</a>\n      </div>\n    </div>\n    <div style=\"border:1.5px dashed var(--lp-n509, #bdbdbd);background:var(--lp-n928, #f7f7f4);border-radius:8px;padding:12px 14px;margin-bottom:12px\">\n      <div style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n067, #494949);letter-spacing:.12em;margin-bottom:6px\">","</div>\n      <p style=\"font-size:11px;line-height:1.65;color:var(--lp-n068, #4a4a46);margin:0\">","</p>\n    </div>\n    <div style=\"font-size:11px;color:var(--lp-n106, #5c5c58)\">","</div>\n  </div>\n</footer>"]
+
+/** The slot that fills each gap between the parts, in document order. */
+export const slotIds: string[] = ["s01_image_src_1","s01_eyebrow_1","s02_text_1","s02_headline_1","s02_subheadline_1","s03_card_body_1","s03_section_headline_1","s03_card_body_2","s03_eyebrow_1","s03_card_body_3","s03_eyebrow_2","s03_card_body_4","s03_eyebrow_3","s03_card_body_5","s03_eyebrow_4","s03_card_body_6","s03_card_body_7","s03_section_headline_2","s03_card_body_8","s03_eyebrow_5","s03_card_body_9","s03_card_body_10","s03_card_body_11","s03_eyebrow_6","s03_card_body_12","s03_card_body_13","s03_card_body_14","s03_card_body_15","s03_eyebrow_7","s03_section_headline_3","s03_card_body_16","s03_eyebrow_8","s03_card_body_17","s03_eyebrow_9","s03_card_body_18","s03_card_body_19","s03_section_headline_4","s03_card_body_20","s03_card_body_21","s03_card_body_22","s03_card_body_23","s03_card_body_24","s03_card_body_25","s03_card_title_1","s03_eyebrow_10","s03_card_body_26","s03_card_body_27","s03_faq_question_1","s03_faq_answer_1","s03_card_body_28","s03_card_title_2","s03_card_body_29","s03_card_body_30","s03_card_body_31","s03_card_body_32","s03_card_body_33","s03_card_body_34","s03_cta_label_1","s03_cta_label_2","s03_trust_line_1","s03_disclaimer_1","s03_eyebrow_11","s04_card_body_1","s04_section_headline_1","s04_card_body_2","s04_eyebrow_1","s04_card_body_3","s04_eyebrow_2","s04_card_body_4","s04_eyebrow_3","s04_card_body_5","s05_section_headline_1","s05_trust_line_1","s05_cta_label_1","s05_cta_label_2","s06_image_src_1","s06_disclaimer_1","s06_disclaimer_2","s06_disclaimer_3","s06_disclaimer_4","s06_disclaimer_5","s06_disclaimer_6","s06_disclaimer_7","s06_disclaimer_8"]
+
+/** Every editable region, with the reference's own copy as its default. */
+export const slots: LpSlot[] = [
+  {
+    "id": "s01_image_src_1",
+    "role": "image_src",
+    "escaping": "image",
+    "section": 1,
+    "sectionLabel": "header",
+    "default": "<span style=\"font-family:'JetBrains Mono',monospace;font-size:9px;color:var(--lp-n067, #494949);letter-spacing:.1em\">[LOGO SLOT]</span>",
+    "required": false,
+    "maxChars": 40,
+    "pairedWith": "s01_image_src_1__alt"
+  },
+  {
+    "id": "s01_image_src_1__alt",
+    "role": "image_alt",
+    "escaping": "meta",
+    "section": 1,
+    "sectionLabel": "header",
+    "default": "Logo",
+    "required": false,
+    "maxChars": 160,
+    "pairedWith": "s01_image_src_1"
+  },
+  {
+    "id": "s01_eyebrow_1",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 1,
+    "sectionLabel": "header",
+    "default": "QUESTIONS, CALL",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s02_text_1",
+    "role": "text",
+    "escaping": "text",
+    "section": 2,
+    "sectionLabel": "network-map hero",
+    "default": "OPERATED BY <code style=\"background:var(--lp-n861, #efefec);color:var(--lp-n106, #5c5c56);border:1px solid var(--lp-n735, #dfdfda);border-radius:3px;padding:1px 6px\">{{brand.displayName}}</code>",
+    "required": false,
+    "maxChars": 53
+  },
+  {
+    "id": "s02_headline_1",
+    "role": "headline",
+    "escaping": "text",
+    "section": 2,
+    "sectionLabel": "network-map hero",
+    "default": "Matching is only as good as the network behind it.",
+    "required": true,
+    "maxChars": 80
+  },
+  {
+    "id": "s02_subheadline_1",
+    "role": "subheadline",
+    "escaping": "text",
+    "section": 2,
+    "sectionLabel": "network-map hero",
+    "default": "This page explains how the attorney network is assembled, what vetting actually checks, and how matching differs from selling a name to the highest bidder.",
+    "required": false,
+    "maxChars": 248
+  },
+  {
+    "id": "s03_card_body_1",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "I",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_section_headline_1",
+    "role": "section_headline",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "What vetting means here",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_2",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Every attorney in the network passes the same review before receiving a single match — and the review repeats on a schedule, not once at signup.",
+    "required": false,
+    "maxChars": 231
+  },
+  {
+    "id": "s03_eyebrow_1",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "LICENSURE",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_3",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Active bar admission verified in every state where the attorney receives matches.",
+    "required": false,
+    "maxChars": 130
+  },
+  {
+    "id": "s03_eyebrow_2",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "STANDING",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_4",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Public disciplinary history reviewed at intake and on renewal.",
+    "required": false,
+    "maxChars": 100
+  },
+  {
+    "id": "s03_eyebrow_3",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "PRACTICE",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_5",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "The attorney must actually handle the case types they are matched to — confirmed by practice review rather than self-description.",
+    "required": false,
+    "maxChars": 207
+  },
+  {
+    "id": "s03_eyebrow_4",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "CONDUCT",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_6",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Response standards for how quickly and how respectfully matched drivers are contacted.",
+    "required": false,
+    "maxChars": 138
+  },
+  {
+    "id": "s03_card_body_7",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "II",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_section_headline_2",
+    "role": "section_headline",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Licensing is the floor, not the standard",
+    "required": false,
+    "maxChars": 64
+  },
+  {
+    "id": "s03_card_body_8",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "A bar card proves someone may practice law in a state. It doesn’t say whether they handle injury claims, return calls, or take cases to trial when the offer is short. The network review starts where licensing stops.",
+    "required": false,
+    "maxChars": 344
+  },
+  {
+    "id": "s03_eyebrow_5",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "STATE LICENSURE · THE MINIMUM",
+    "required": false,
+    "maxChars": 47
+  },
+  {
+    "id": "s03_card_body_9",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Admitted to the state bar",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_10",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "No suspension in force",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_11",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Says nothing about case type or conduct",
+    "required": false,
+    "maxChars": 63
+  },
+  {
+    "id": "s03_eyebrow_6",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "NETWORK REVIEW · THE STANDARD",
+    "required": false,
+    "maxChars": 47
+  },
+  {
+    "id": "s03_card_body_12",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Motor-vehicle injury caseload, verified",
+    "required": false,
+    "maxChars": 63
+  },
+  {
+    "id": "s03_card_body_13",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Contingency representation offered",
+    "required": false,
+    "maxChars": 55
+  },
+  {
+    "id": "s03_card_body_14",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Response and conduct standards, renewed",
+    "required": false,
+    "maxChars": 63
+  },
+  {
+    "id": "s03_card_body_15",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Licensing status is public record in every state; the deeper review is the network’s own and repeats annually.",
+    "required": false,
+    "maxChars": 176
+  },
+  {
+    "id": "s03_eyebrow_7",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "III",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_section_headline_3",
+    "role": "section_headline",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Matching is not an auction",
+    "required": false,
+    "maxChars": 42
+  },
+  {
+    "id": "s03_card_body_16",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Some services sell each inquiry to whichever firm pays most that week. Here, matching works from the case: the accident type, the state, and the attorney’s verified practice decide who is proposed — not a bid.",
+    "required": false,
+    "maxChars": 335
+  },
+  {
+    "id": "s03_eyebrow_8",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "MATCHED BY",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_17",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Case type, state relevance, verified practice, current capacity.",
+    "required": false,
+    "maxChars": 103
+  },
+  {
+    "id": "s03_eyebrow_9",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "NEVER BY",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_18",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Advertising spend, bidding, or who paid most for the inquiry.",
+    "required": false,
+    "maxChars": 98
+  },
+  {
+    "id": "s03_card_body_19",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "IV",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_section_headline_4",
+    "role": "section_headline",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "What you control, start to finish",
+    "required": false,
+    "maxChars": 53
+  },
+  {
+    "id": "s03_card_body_20",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "✓",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_21",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "The check is free, and completing it starts nothing. There is no charge for the check or the conversation, and nothing proceeds without a written agreement the driver chooses to sign.",
+    "required": false,
+    "maxChars": 293
+  },
+  {
+    "id": "s03_card_body_22",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "✓",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_23",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "You can decline a proposed match, ask for another, or simply stop responding — nothing is filed on your behalf.",
+    "required": false,
+    "maxChars": 178
+  },
+  {
+    "id": "s03_card_body_24",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "✓",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_25",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Your information goes to the matched attorney for review — it is not circulated across the network or sold onward.",
+    "required": false,
+    "maxChars": 183
+  },
+  {
+    "id": "s03_card_title_1",
+    "role": "card_title",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Check the case type against the network",
+    "required": false,
+    "maxChars": 63
+  },
+  {
+    "id": "s03_eyebrow_10",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "FREE · ABOUT TWO MINUTES · NO OBLIGATION TO PROCEED",
+    "required": false,
+    "maxChars": 82
+  },
+  {
+    "id": "s03_card_body_26",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "QUESTION 1 OF 6",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_27",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "—",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_faq_question_1",
+    "role": "faq_question",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "How Were You Injured?",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_faq_answer_1",
+    "role": "faq_answer",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Select the type of accident you were involved in:",
+    "required": false,
+    "maxChars": 79
+  },
+  {
+    "id": "s03_card_body_28",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "i",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_title_2",
+    "role": "card_title",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Auto / Motorcycle Accident",
+    "required": false,
+    "maxChars": 42
+  },
+  {
+    "id": "s03_card_body_29",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "ii",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_30",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Commercial / Semi Accident",
+    "required": false,
+    "maxChars": 42
+  },
+  {
+    "id": "s03_card_body_31",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "iii",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_32",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Passenger / Rideshare / Pedestrian Accident",
+    "required": false,
+    "maxChars": 69
+  },
+  {
+    "id": "s03_card_body_33",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "iv",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_card_body_34",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "At Work / Other / I Wasn’t Injured",
+    "required": false,
+    "maxChars": 55
+  },
+  {
+    "id": "s03_cta_label_1",
+    "role": "cta_label",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Continue →",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_cta_label_2",
+    "role": "cta_label",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "← Back",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_trust_line_1",
+    "role": "trust_line",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "Free · no obligation",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s03_disclaimer_1",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "By continuing, you agree that <code style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;background:var(--lp-n886, #f2f2ef);color:var(--lp-n154, #6e6e66);border:1px solid var(--lp-n757, #e2e2dc);border-radius:3px;padding:0 3px\">{{brand.displayName}}</code> and participating attorneys may contact you about this request. <code style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;background:var(--lp-n886, #f2f2ef);color:var(--lp-n154, #6e6e66);border:1px solid var(--lp-n757, #e2e2dc);border-radius:3px;padding:0 3px\">{{brand.tcpaText}}</code>",
+    "required": true,
+    "maxChars": 215
+  },
+  {
+    "id": "s03_eyebrow_11",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 3,
+    "sectionLabel": "vetting + rail quiz",
+    "default": "MATCHED BY CASE · NEVER AUCTIONED",
+    "required": false,
+    "maxChars": 53
+  },
+  {
+    "id": "s04_card_body_1",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "state relevance",
+    "default": "V",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_section_headline_1",
+    "role": "section_headline",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "state relevance",
+    "default": "Why the state matters more than the billboard",
+    "required": false,
+    "maxChars": 72
+  },
+  {
+    "id": "s04_card_body_2",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "state relevance",
+    "default": "Injury law is state law: filing deadlines, fault rules, and damage limits all change at the border. A match is only proposed from attorneys licensed and practicing where your claim actually lives — coverage per state is <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n836, #ecece8);color:var(--lp-n106, #5c5c56);border:1px solid var(--lp-n735, #dfdfda);border-radius:3px;padding:0 4px\">{{page.network.states}}</code>, resolved per brand.",
+    "required": false,
+    "maxChars": 423
+  },
+  {
+    "id": "s04_eyebrow_1",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "state relevance",
+    "default": "DEADLINES",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_card_body_3",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "state relevance",
+    "default": "Statutes of limitation range from one to several years depending on the state.",
+    "required": false,
+    "maxChars": 125
+  },
+  {
+    "id": "s04_eyebrow_2",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "state relevance",
+    "default": "FAULT RULES",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_card_body_4",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "state relevance",
+    "default": "Some states reduce recovery by your share of fault; a few bar it entirely.",
+    "required": false,
+    "maxChars": 119
+  },
+  {
+    "id": "s04_eyebrow_3",
+    "role": "eyebrow",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "state relevance",
+    "default": "PROCEDURE",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s04_card_body_5",
+    "role": "card_body",
+    "escaping": "text",
+    "section": 4,
+    "sectionLabel": "state relevance",
+    "default": "Where and how a claim is filed — and against whom — is a state-level question.",
+    "required": false,
+    "maxChars": 125
+  },
+  {
+    "id": "s05_section_headline_1",
+    "role": "section_headline",
+    "escaping": "text",
+    "section": 5,
+    "sectionLabel": "final CTA",
+    "default": "Now you know how the network works. See if it covers your case.",
+    "required": false,
+    "maxChars": 101
+  },
+  {
+    "id": "s05_trust_line_1",
+    "role": "trust_line",
+    "escaping": "text",
+    "section": 5,
+    "sectionLabel": "final CTA",
+    "default": "Two minutes, free, and nothing proceeds without your written say-so.",
+    "required": false,
+    "maxChars": 109
+  },
+  {
+    "id": "s05_cta_label_1",
+    "role": "cta_label",
+    "escaping": "text",
+    "section": 5,
+    "sectionLabel": "final CTA",
+    "default": "Check the case type",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s05_cta_label_2",
+    "role": "cta_label",
+    "escaping": "text",
+    "section": 5,
+    "sectionLabel": "final CTA",
+    "default": "Call <code style=\"font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--lp-n861, #efefec);color:var(--lp-n041, #393939);border:1px solid var(--lp-n735, #dfdfda);border-radius:4px;padding:0 5px\">{{brand.callNumber}}</code>",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s06_image_src_1",
+    "role": "image_src",
+    "escaping": "image",
+    "section": 6,
+    "sectionLabel": "legal footer",
+    "default": "<span style=\"font-family:'JetBrains Mono',monospace;font-size:8.5px;color:var(--lp-n067, #494949);letter-spacing:.1em\">[LOGO SLOT]</span>",
+    "required": false,
+    "maxChars": 40,
+    "pairedWith": "s06_image_src_1__alt"
+  },
+  {
+    "id": "s06_image_src_1__alt",
+    "role": "image_alt",
+    "escaping": "meta",
+    "section": 6,
+    "sectionLabel": "legal footer",
+    "default": "Logo",
+    "required": false,
+    "maxChars": 160,
+    "pairedWith": "s06_image_src_1"
+  },
+  {
+    "id": "s06_disclaimer_1",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "legal footer",
+    "default": "An attorney-matching service. Not a law firm.",
+    "required": false,
+    "maxChars": 72
+  },
+  {
+    "id": "s06_disclaimer_2",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "legal footer",
+    "default": "Privacy Policy",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s06_disclaimer_3",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "legal footer",
+    "default": "Terms of Service",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s06_disclaimer_4",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "legal footer",
+    "default": "Do Not Sell My Info",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s06_disclaimer_5",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "legal footer",
+    "default": "TCPA Disclosure",
+    "required": false,
+    "maxChars": 40
+  },
+  {
+    "id": "s06_disclaimer_6",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "legal footer",
+    "default": "[LEGAL DISCLOSURE] · {{brand.disclaimer}} + {{brand.tcpaText}}",
+    "required": false,
+    "maxChars": 100
+  },
+  {
+    "id": "s06_disclaimer_7",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "legal footer",
+    "default": "By submitting your information you agree to be contacted by phone, email, or text by participating attorneys and partner law firms for the purpose of evaluating your case. Message and data rates may apply. This site is attorney advertising paid for by participating law firms. {{brand.displayName}} is not a law firm and does not provide legal advice. Prior results do not guarantee a similar outcome.",
+    "required": true,
+    "maxChars": 642
+  },
+  {
+    "id": "s06_disclaimer_8",
+    "role": "disclaimer",
+    "escaping": "text",
+    "section": 6,
+    "sectionLabel": "legal footer",
+    "default": "© {{site.currentYear}} {{brand.displayName}} · {{brand.copyright}}",
+    "required": false,
+    "maxChars": 106
+  }
+]
+
+/** Regions the markup alone cannot carry. Empty means the template is complete. */
+export const unsupported: LpUnsupportedRegion[] = []

@@ -3,72 +3,120 @@
     "slug": "editorial_investigation_v2",
     "file": "LP01-Editorial-Investigation.html",
     "tokens": 20,
-    "bytes": 36062
+    "bytes": 35445,
+    "slots": 108,
+    "loopsExpanded": 0,
+    "valid": true,
+    "problems": []
   },
   {
     "slug": "human_recovery_story",
     "file": "LP02-Human-Recovery-Story.html",
     "tokens": 28,
-    "bytes": 37243
+    "bytes": 36628,
+    "slots": 109,
+    "loopsExpanded": 0,
+    "valid": true,
+    "problems": []
   },
   {
     "slug": "authority_network",
     "file": "LP03-Authority-Network.html",
     "tokens": 33,
-    "bytes": 48881
+    "bytes": 48258,
+    "slots": 164,
+    "loopsExpanded": 0,
+    "valid": true,
+    "problems": []
   },
   {
     "slug": "case_value_dossier",
     "file": "LP04-Case-Value-Dossier.html",
     "tokens": 29,
-    "bytes": 49512
+    "bytes": 48901,
+    "slots": 152,
+    "loopsExpanded": 0,
+    "valid": true,
+    "problems": []
   },
   {
     "slug": "split_screen_direct",
     "file": "LP05-Split-Screen-Direct.html",
     "tokens": 19,
-    "bytes": 23924
+    "bytes": 23321,
+    "slots": 70,
+    "loopsExpanded": 0,
+    "valid": true,
+    "problems": []
   },
   {
     "slug": "quiz_first",
     "file": "LP06-Quiz-First.html",
     "tokens": 21,
-    "bytes": 16919
+    "bytes": 16312,
+    "slots": 47,
+    "loopsExpanded": 0,
+    "valid": true,
+    "problems": []
   },
   {
     "slug": "deadline_signal",
     "file": "LP07-Deadline-Signal.html",
     "tokens": 25,
-    "bytes": 24368
+    "bytes": 23761,
+    "slots": 65,
+    "loopsExpanded": 0,
+    "valid": true,
+    "problems": []
   },
   {
     "slug": "insurer_vs_claimant",
     "file": "LP08-Insurer-vs-Claimant.html",
     "tokens": 22,
-    "bytes": 24192
+    "bytes": 23589,
+    "slots": 71,
+    "loopsExpanded": 0,
+    "valid": true,
+    "problems": []
   },
   {
     "slug": "sixty_second_check",
     "file": "LP09-60-Second-Check.html",
     "tokens": 22,
-    "bytes": 12517
+    "bytes": 11910,
+    "slots": 33,
+    "loopsExpanded": 0,
+    "valid": true,
+    "problems": []
   },
   {
     "slug": "answer_first",
     "file": "LP10-Answer-First.html",
     "tokens": 19,
-    "bytes": 14527
+    "bytes": 13914,
+    "slots": 37,
+    "loopsExpanded": 0,
+    "valid": true,
+    "problems": []
   },
   {
     "slug": "case_type_router",
     "file": "LP11-Case-Type-Router.html",
     "tokens": 40,
-    "bytes": 29794
+    "bytes": 32443,
+    "slots": 74,
+    "loopsExpanded": 2,
+    "valid": true,
+    "problems": []
   },
   {
     "slug": "network_authority",
     "file": "LP12-Network-Authority.html",
     "tokens": 43,
-    "bytes": 27817
+    "bytes": 27203,
+    "slots": 86,
+    "loopsExpanded": 0,
+    "valid": true,
+    "problems": []
   }
 ]

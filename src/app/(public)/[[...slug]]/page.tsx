@@ -812,6 +812,11 @@ function RenderLpDeployment({
         // click handler is attached, no hover affordance is drawn, and unfilled
         // nodes are dropped rather than shown as placeholders.
         editable={false}
+        // This deployment's own copy. Overrides only: a slot with no entry here
+        // renders the stock template's wording, which is what lets one landing
+        // page run under three brands saying three different things without a
+        // copy of the markup existing per deployment.
+        slotOverrides={resolved.deployment.contentOverrides}
         // The landing-page renderer is a ported artifact carrying @ts-nocheck, so
         // its prop types are inferred from default values rather than declared:
         // `quizCtx = null` infers as `null`. The cast documents that the shape is

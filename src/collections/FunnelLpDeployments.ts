@@ -37,6 +37,14 @@ export const FunnelLpDeployments: CollectionConfig = {
     // Links to a quiz deployment once the Quiz builder exists (Phase 7). Text for now.
     { name: 'quiz_deployment_id', type: 'text' },
     {
+      name: 'content_overrides',
+      type: 'json',
+      admin: {
+        description:
+          'This deployment\'s own copy, keyed by the template\'s slot ids. Overrides ONLY: a slot with no entry renders the stock template\'s wording, so a corrected template reaches every deployment at once and no deployment holds a private copy of the markup.',
+      },
+    },
+    {
       name: 'status',
       type: 'select',
       defaultValue: 'draft',

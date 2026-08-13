@@ -192,6 +192,8 @@ export const LivePreview = ({
   quizCtx = null,
   selectedId = null,
   onSelectNode,
+  slotOverrides = null,
+  onSlotDiagnostics = null,
 }: {
   landingPage: { templateId?: string; sections?: unknown }
   brand?: unknown
@@ -202,6 +204,15 @@ export const LivePreview = ({
   quizCtx?: unknown
   selectedId?: string | null
   onSelectNode?: (nodeId: string) => void
+  /**
+   * The DEPLOYMENT's copy, keyed by slot id. A ported template renders the
+   * reference's own words where this has none, so a deployment that overrides
+   * nothing is the reference and one that overrides three lines is the
+   * reference with three lines changed. Never a per-deployment copy of the
+   * template: a correction to the template reaches every deployment at once.
+   */
+  slotOverrides?: Record<string, string> | null
+  onSlotDiagnostics?: ((d: { unknown: string[]; refused: Array<{ id: string; reason: string }> }) => void) | null
 }) => {
   // One resolution for the whole render. The branch below used to test the RAW
   // stored id with `isPortedTemplate`, so `'bold_modern'` — which is the stored
@@ -225,7 +236,12 @@ export const LivePreview = ({
           ? { borderRadius: 10, overflow: 'hidden', boxShadow: '0 8px 32px -12px rgba(0,0,0,0.4)', border: `1px solid ${T.border}` }
           : { minHeight: '100vh' }}
       >
-        <PortedTemplateView slug={templateId} brand={previewBrand} />
+        <PortedTemplateView
+          slug={templateId}
+          brand={previewBrand}
+          overrides={slotOverrides}
+          onDiagnostics={onSlotDiagnostics}
+        />
       </div>
     )
   }

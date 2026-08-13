@@ -45,6 +45,14 @@ export type PublicLpDeployment = {
   path: string
   status: string
   quizDeploymentId: string
+  /**
+   * This deployment's own copy, keyed by the template's slot ids.
+   *
+   * Overrides only. A slot with no entry renders the stock template's wording,
+   * so one landing page under three brands can say three different things
+   * without three copies of the markup existing anywhere.
+   */
+  contentOverrides: Record<string, string>
 }
 
 export type ResolvedLpDeployment = {
@@ -59,6 +67,23 @@ export type ResolvedLpDeployment = {
 
 const relId = (v: unknown): string =>
   v == null ? '' : typeof v === 'object' ? String((v as { id: unknown }).id ?? '') : String(v)
+
+/**
+ * Coerce a stored jsonb override bag into the string map the composer takes.
+ *
+ * Non-string values are DROPPED rather than stringified. A number that reached
+ * this column is a bug upstream, and `String(123)` on a page is that bug going
+ * unnoticed; `composeTemplate` then falls back to the template's own copy, which
+ * is the safe reading of "we do not have a value for this".
+ */
+const normalizeOverrides = (v: unknown): Record<string, string> => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
+  const out: Record<string, string> = {}
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof val === 'string') out[k] = val
+  }
+  return out
+}
 
 const resolveLpDeploymentUncached = async (
   siteId: number,
@@ -180,6 +205,7 @@ const resolveLpDeploymentUncached = async (
       path: normalizeDeploymentPath(String(doc.path ?? '')),
       status: String(doc.status ?? 'draft'),
       quizDeploymentId,
+      contentOverrides: normalizeOverrides(doc.content_overrides),
     },
     landingPage: {
       id: String(lpDoc.id),

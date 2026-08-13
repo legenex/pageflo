@@ -8,8 +8,10 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { invokeLLM } from '@/lib/ai/invoke'
-import { canonicalTemplateId } from '@/lib/template-registry'
+import { canonicalTemplateId, resolveTemplate } from '@/lib/template-registry'
 import { requireDeploymentSiteAdmin } from '@/lib/authz'
+import { asSlotted } from '@/lib/lp-templates'
+import { validateOverrides } from '@/lib/lp-slots/model'
 
 const PATH = '/admin/landing-pages'
 
@@ -154,6 +156,7 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
   // that would put a page nobody chose on a real host; refusing at save is the
   // earliest point the operator can be told which id is wrong.
   const lpId = dep.landingPageId ? Number(dep.landingPageId) : null
+  let overrides: Record<string, string> = {}
   if (lpId !== null && Number.isFinite(lpId)) {
     const lpDoc = (await payload
       .findByID({ collection: 'funnel-landing-pages', id: lpId, overrideAccess: true })
@@ -161,6 +164,31 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
     if (!lpDoc) return { ok: false, error: 'landing page not found' }
     const template = canonicalTemplateId('lp', lpDoc.template_id)
     if (!template.ok) return { ok: false, error: `landing page template: ${template.error}` }
+
+    // Deployment copy is validated against the template it deploys, here, at the
+    // point the operator can still fix it. An override naming a slot that does
+    // not exist is copy that will never appear on the page; accepting it
+    // silently is how a deployment ends up saying something nobody can find in
+    // the editor.
+    const raw = (dep.contentOverrides ?? {}) as Record<string, unknown>
+    for (const [k, v] of Object.entries(raw)) {
+      if (typeof v === 'string') overrides[k] = v
+      else return { ok: false, error: `content override "${k}" is not text` }
+    }
+    // Through the registry, not by indexing the library's own map. The map is a
+    // second lookup with a second idea of which ids exist, which is what the
+    // registry exists to remove - and `pnpm test:registry` fails on any module
+    // outside it that reaches for one.
+    const entry = resolveTemplate('lp', template.id)
+    const ported = entry.ok && entry.template.kind === 'lp' ? entry.template.template : null
+    if (ported) {
+      const v = validateOverrides(asSlotted(ported), overrides)
+      if (!v.ok) return { ok: false, error: v.problems.map((p) => p.detail).join('; ') }
+    } else if (Object.keys(overrides).length > 0) {
+      // A legacy identity template has no slots: its copy travels as nodes on
+      // the page itself. Overrides would silently do nothing.
+      return { ok: false, error: `template "${template.id}" has no content slots to override` }
+    }
   }
 
   // Resolve the host string from the editor back to a domain record id.
@@ -177,6 +205,7 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
     domain: domainId,
     path: (dep.path as string) || '',
     quiz_deployment_id: (dep.quizDeploymentId as string) || '',
+    content_overrides: overrides,
     status: (dep.status as string) || 'draft',
   }
 

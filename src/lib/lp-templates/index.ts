@@ -27,6 +27,8 @@ import * as case_type_router from './case_type_router'
 import * as sixty_second_check from './sixty_second_check'
 import * as answer_first from './answer_first'
 
+import type { LpSlot, LpSlottedTemplate, LpUnsupportedRegion } from '@/lib/lp-slots/model'
+
 export type PortedTemplate = {
   slug: string
   code: string
@@ -41,7 +43,22 @@ export type PortedTemplate = {
   /** The ground the reference is drawn on, per the library's badge. */
   ground: string
   tokens: Record<string, string>
+  /**
+   * The template with nothing overridden — what the reference draws.
+   *
+   * Kept as the parity target and as the cheap path for a preview that has no
+   * overrides. A page with overrides is built from `parts`/`slots` instead; see
+   * `composeTemplate` in `@/lib/lp-slots/model`.
+   */
   html: string
+  /** Literal markup between slots. Always `slotIds.length + 1` entries. */
+  parts: string[]
+  /** The slot filling each gap between parts, in document order. */
+  slotIds: string[]
+  /** Every editable region, with the reference's own copy as its default. */
+  slots: LpSlot[]
+  /** Regions the markup alone cannot carry. Empty means complete. */
+  unsupported: LpUnsupportedRegion[]
 }
 
 const meta = [
@@ -83,13 +100,38 @@ const meta = [
    'Email / warm / objection-heavy', 'Conversational card, opening', answer_first],
 ] as const
 
+type GeneratedModule = {
+  tokens: Record<string, string>
+  html: string
+  parts: string[]
+  slotIds: string[]
+  slots: LpSlot[]
+  unsupported: LpUnsupportedRegion[]
+}
+
 export const PORTED_TEMPLATES: PortedTemplate[] = meta.map(
-  ([slug, code, name, family, ground, blurb, channels, quiz, mod]) => ({
-    slug, code, name, family: family as PortedTemplate['family'], ground, blurb, channels, quiz,
-    tokens: (mod as { tokens: Record<string, string> }).tokens,
-    html: (mod as { html: string }).html,
-  }),
+  ([slug, code, name, family, ground, blurb, channels, quiz, mod]) => {
+    const m = mod as unknown as GeneratedModule
+    return {
+      slug, code, name, family: family as PortedTemplate['family'], ground, blurb, channels, quiz,
+      tokens: m.tokens,
+      html: m.html,
+      parts: m.parts,
+      slotIds: m.slotIds,
+      slots: m.slots,
+      unsupported: m.unsupported,
+    }
+  },
 )
+
+/** A ported template in the shape the slot composer takes. */
+export const asSlotted = (t: PortedTemplate): LpSlottedTemplate => ({
+  slug: t.slug,
+  parts: t.parts,
+  slotIds: t.slotIds,
+  slots: t.slots,
+  unsupported: t.unsupported,
+})
 
 export const PORTED_BY_SLUG: Record<string, PortedTemplate> =
   Object.fromEntries(PORTED_TEMPLATES.map((t) => [t.slug, t]))
