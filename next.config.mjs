@@ -1,4 +1,9 @@
 import { withPayload } from '@payloadcms/next/withPayload'
+// Plain JavaScript with no imports of its own: this is evaluated by Next's
+// config loader before the app exists, and a config that fails to load takes
+// the build with it. Imported rather than inlined so the rule is unit-testable -
+// a config file is the one place in a codebase nothing can assert against.
+import { imageRemotePatterns, admitImageHosts } from './src/lib/net/image-hosts.mjs'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -29,10 +34,27 @@ const nextConfig = {
   // break the launch, so it stays external and is required from node_modules.
   serverExternalPackages: ['playwright'],
   images: {
-    remotePatterns: [
-      { protocol: 'https', hostname: '**' },
-    ],
+    // `hostname: '**'` was here, which makes /_next/image?url=https://<anything>
+    // an unauthenticated server-side fetch of an attacker-chosen host on every
+    // public tenant domain - the one fetch path in the product that never went
+    // through the admission control in lib/net/ssrf.
+    //
+    // Nothing remote is admitted now. Brand artwork does not need the optimiser:
+    // the templates emit a plain <img> at the URL the brand supplied, so the
+    // VISITOR's browser fetches it and this server never does, which is the only
+    // arrangement with no server-side fetch to exploit. `LEGALOS_IMAGE_HOSTS` is
+    // for an operator who deliberately wants a known CDN optimised, and every
+    // entry goes through the same shape admission every other outbound address
+    // does. Wildcards are refused, so this cannot regress to what it was.
+    remotePatterns: imageRemotePatterns(process.env.LEGALOS_IMAGE_HOSTS),
   },
+}
+
+for (const { entry, reason } of admitImageHosts(process.env.LEGALOS_IMAGE_HOSTS).refused) {
+  // A typo in an environment variable must cost the one host it names, not the
+  // build - but silently dropping it is how an operator concludes the allowlist
+  // does not work and reaches for the wildcard again.
+  console.warn(`[legalos] LEGALOS_IMAGE_HOSTS: refused "${entry}" - ${reason}`)
 }
 
 export default withPayload(nextConfig)

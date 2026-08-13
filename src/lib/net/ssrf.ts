@@ -216,14 +216,29 @@ export type AssertSafeUrlOptions = {
 }
 
 /**
- * Decide whether this server may fetch `raw`.
+ * Everything about a URL that can be judged WITHOUT a network.
  *
- * Never throws: a resolver that fails is a refusal with a reason, because a
- * thrown error here would be caught somewhere generic and turn into "extraction
- * failed" with nothing an operator can act on.
+ * Split out of `assertSafeUrl` because two callers cannot await DNS and still
+ * need this half: a Zod schema validating a brand's logo URL as it is saved,
+ * and `next.config.mjs` deciding which hosts `/_next/image` may fetch, which is
+ * evaluated at build time in a synchronous module.
+ *
+ * It is the SAME code, not a summary of it — `assertSafeUrl` calls this and then
+ * adds the resolver. A second, "simplified" spelling of these rules beside the
+ * real one is how a guard ends up admitting `http://127.1/` because the copy
+ * only knew about `127.0.0.1`.
+ *
+ * What it CANNOT decide is what a hostname resolves to. A caller that will
+ * fetch must still go through `assertSafeUrl` or `safeFetch`; a caller that is
+ * only storing or configuring a name gets the shape check, which is what stops
+ * a literal address, a credentialed URL, a non-http scheme, an odd port and an
+ * internal-only name.
  */
-export const assertSafeUrl = async (raw: string, options: AssertSafeUrlOptions = {}): Promise<UrlAdmission> => {
-  const resolver = options.resolver ?? nodeDnsResolver
+export type UrlShapeAdmission =
+  | { ok: true; url: URL; host: string; /** True when the host is a literal IP that passed classification. */ literal: boolean }
+  | { ok: false; code: UrlRejectionCode; reason: string }
+
+export const admitUrlShape = (raw: string, options: { allowedPorts?: readonly number[] } = {}): UrlShapeAdmission => {
   const allowedPorts = options.allowedPorts ?? DEFAULT_ALLOWED_PORTS
 
   const trimmed = (raw ?? '').trim()
@@ -289,7 +304,7 @@ export const assertSafeUrl = async (raw: string, options: AssertSafeUrlOptions =
     if (!verdict.allowed) {
       return { ok: false, code: 'blocked_address', reason: `${host} is in ${verdict.reason}.` }
     }
-    return { ok: true, url, addresses: [host] }
+    return { ok: true, url, host, literal: true }
   }
 
   if (BLOCKED_HOST_EXACT.has(host)) {
@@ -307,6 +322,26 @@ export const assertSafeUrl = async (raw: string, options: AssertSafeUrlOptions =
       reason: `"${host}" has no domain, so it can only resolve inside this network.`,
     }
   }
+
+  return { ok: true, url, host, literal: false }
+}
+
+/**
+ * Decide whether this server may fetch `raw`.
+ *
+ * Never throws: a resolver that fails is a refusal with a reason, because a
+ * thrown error here would be caught somewhere generic and turn into "extraction
+ * failed" with nothing an operator can act on.
+ */
+export const assertSafeUrl = async (raw: string, options: AssertSafeUrlOptions = {}): Promise<UrlAdmission> => {
+  const resolver = options.resolver ?? nodeDnsResolver
+
+  const shape = admitUrlShape(raw, { allowedPorts: options.allowedPorts })
+  if (!shape.ok) return shape
+  const { url, host } = shape
+
+  // A literal address has already been classified; there is nothing to resolve.
+  if (shape.literal) return { ok: true, url, addresses: [host] }
 
   let addresses: string[]
   try {

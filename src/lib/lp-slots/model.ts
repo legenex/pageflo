@@ -39,6 +39,7 @@
 import { RESOLVABLE_TOKEN_KEYS } from '@/components/builder/lp/tokens'
 import { relativeLuminance } from '@/lib/builder/page-lint'
 import { resolveCssColor } from '@/lib/lp-templates/resolve-css-color'
+import { isPublicImageHost } from '@/lib/net/image-hosts.mjs'
 import type { LpQuizMount } from './quiz-mount'
 
 /**
@@ -272,9 +273,40 @@ export const escapeHtmlText = (value: string): string =>
 export const isSafeImageUrl = (value: string): boolean => {
   const v = value.trim()
   if (v === '') return true
-  if (/^(https?:)?\/\//i.test(v)) return true
-  if (/^\/[^/]/.test(v) || /^\.{0,2}\//.test(v)) return true
-  if (/^data:image\/(png|jpe?g|gif|webp|avif|svg\+xml);base64,[a-z0-9+/=\s]+$/i.test(v)) return true
+
+  /*
+   * ABSOLUTE AND PROTOCOL-RELATIVE FIRST, and the order is the fix.
+   *
+   * The relative-path test used to run first and read `/^\.{0,2}\//`, which with
+   * zero dots matches ANY string beginning with a slash — so `//evil.example/x`
+   * was admitted as "a relative path" and never examined as the absolute URL it
+   * is. Two leading slashes is a scheme-relative URL to another host.
+   */
+  if (/^(https?:)?\/\//i.test(v)) {
+    try {
+      const url = new URL(v.startsWith('//') ? `https:${v}` : v)
+      // Credentials in an image URL are either a mistake or a way to make a
+      // browser send them somewhere.
+      if (url.username !== '' || url.password !== '') return false
+      const host = url.hostname.startsWith('[') && url.hostname.endsWith(']')
+        ? url.hostname.slice(1, -1)
+        : url.hostname
+      // A PUBLIC host. This server never fetches a brand's logo — the template
+      // emits a plain `<img>` and the visitor's browser does — but a tenant
+      // pointing every visitor at `http://169.254.169.254/` is an intranet probe
+      // running in somebody else's browser, and there is no legitimate brand
+      // asset at an address like that.
+      return isPublicImageHost(host)
+    } catch {
+      return false
+    }
+  }
+
+  // A path on this site: `/logo.png`, `./logo.png`, `../logo.png`.
+  if (/^\/[^/]/.test(v) || /^\.{1,2}\//.test(v)) return true
+
+  if (/^data:image\/(png|jpe?g|gif|webp|avif|svg\+xml);base64,[a-z0-9+\/=\s]+$/i.test(v)) return true
+
   return false
 }
 

@@ -82,6 +82,8 @@ import {
   type UrlAdmission,
 } from '../src/lib/brand-identity/index.ts'
 import { ALL_TOKENS } from '../src/lib/brand/tokens.ts'
+import { admitUrlShape } from '../src/lib/net/ssrf.ts'
+import { admitImageHosts, imageRemotePatterns } from '../src/lib/net/image-hosts.mjs'
 // Imported from the REAL extractor module, not re-exported through the service
 // barrel: these tests exist to prove the product's own fetchers are guarded.
 import { fetchTextSafe, headOk, fetchUrlBundle } from '../src/lib/builder/extract/fetch-bundle.ts'
@@ -1533,6 +1535,77 @@ t(brand.contact.callNumber === '', 'and the reduction deliberately leaves it beh
 }
 
 /* -------------------------------------------------------------------------- */
+
+/* ---------------------------------------------- /_next/image host allowlist */
+//
+// `next.config.mjs` carried `remotePatterns: [{ protocol: 'https', hostname: '**' }]`.
+// That makes `/_next/image?url=https://<anything>` an unauthenticated
+// server-side fetch of an attacker-chosen host, on every public tenant domain -
+// the one fetch path in the product that never went through this module.
+//
+// The rule now lives in a dependency-free `.mjs`, because Next's config loader
+// evaluates it before the app exists. That makes it a SECOND spelling of rules
+// this file already tests, which is exactly the drift this codebase has been
+// bitten by. So it is not left on trust: every host the narrow rule admits must
+// also be admitted by the real guard, and every family the real guard blocks
+// must be refused here too.
+
+{
+  t(admitImageHosts(undefined).hosts.length === 0, 'with the variable unset, /_next/image admits no remote host at all')
+  t(admitImageHosts('').hosts.length === 0, 'and an empty list admits none')
+  t(imageRemotePatterns(undefined).length === 0, 'so remotePatterns ships empty')
+
+  // The exact value that was there.
+  for (const wild of ['**', '*', '*.example.com', 'example.**', '**.com']) {
+    const r = admitImageHosts(wild)
+    t(r.hosts.length === 0, `a wildcard entry ${JSON.stringify(wild)} is refused`)
+    t(r.refused.length === 1, `and reported (${wild})`)
+  }
+
+  // Everything the real guard treats as private, link-local, loopback or
+  // metadata, in the spellings that get past a naive check.
+  const HOSTILE = [
+    '127.0.0.1', '127.1', '0.0.0.0', '10.0.0.1', '172.16.0.1', '192.168.1.1',
+    '169.254.169.254', '2130706433', '0x7f000001', '[::1]', '::1', 'fd00::1',
+    'localhost', 'ip6-localhost', 'metadata.google.internal', 'db.internal',
+    'printer.local', 'host.home.arpa', 'thing.lan', 'wiki.intranet',
+    'foo.example.com:8080', 'user@example.com', 'example.com/path', 'example.com?x=1',
+    'http://example.com', 'has space.com', '.example.com', 'example.com.',
+  ]
+  for (const host of HOSTILE) {
+    const r = admitImageHosts(host)
+    t(r.hosts.length === 0, `the image allowlist refuses ${JSON.stringify(host)}`)
+    t(r.refused[0]?.reason, `and says why (${host})`)
+  }
+
+  // A real CDN is admitted, and only in its normalised form.
+  {
+    const r = admitImageHosts('cdn.example.com, images.brand.co.uk , cdn.example.com')
+    t(r.hosts.join(',') === 'cdn.example.com,images.brand.co.uk', 'real hostnames are admitted, trimmed and de-duplicated')
+    t(imageRemotePatterns('cdn.example.com')[0].protocol === 'https', 'and are admitted over https only')
+  }
+  {
+    const r = admitImageHosts('CDN.Example.com')
+    t(r.hosts.length === 0 && /normalises/.test(r.refused[0].reason), 'a host that is not already normalised is refused rather than silently rewritten')
+  }
+
+  // THE SUBSET PROOF. Anything the narrow rule admits must pass the real guard's
+  // shape admission; anything the real guard refuses by shape must be refused
+  // here. This is what keeps the second spelling honest.
+  for (const host of ['cdn.example.com', 'images.brand.co.uk', 'a.b.c.example.org']) {
+    t(admitImageHosts(host).hosts.length === 1, `${host} is admitted by the image rule`)
+    const shape = admitUrlShape(`https://${host}`)
+    t(shape.ok, `and by the real guard's own shape admission (${host})`)
+  }
+  for (const host of HOSTILE) {
+    const shape = admitUrlShape(`https://${host}`)
+    const narrow = admitImageHosts(host).hosts.length === 0
+    // Either both refuse, or the real guard admits the shape and the narrow rule
+    // is stricter. What must never happen is the narrow rule admitting something
+    // the real guard refuses.
+    t(narrow || shape.ok, `the image rule is never more permissive than the guard for ${JSON.stringify(host)}`)
+  }
+}
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
