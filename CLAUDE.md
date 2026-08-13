@@ -78,13 +78,23 @@ After **any** `git push` you make that touches `src/`, `package.json`, `next.con
 cd /var/www/vhosts/legenex.com/os.legenex.com
 plesk ext git --fetch -domain os.legenex.com -name legalos.git
 plesk ext git --deploy -domain os.legenex.com -name legalos.git
-systemctl stop legalos-dev
-pnpm install
-pnpm generate:importmap
-pnpm build
-systemctl start legalos-dev
-systemctl status legalos-dev --no-pager
+scripts/release.sh
 ```
+
+`scripts/release.sh` does the rest **in the only order that works**: stop,
+install, importmap, build, **`pnpm payload migrate` while the service is down**,
+**`pnpm verify:schema`**, start, health-check. It takes a size-checked database
+backup first and prints the exact rollback for whichever step failed. The two
+`plesk` lines are above it because the script cannot bring in the code it is
+about to release; run it with no arguments after them. `--dry-run` prints the
+plan and touches nothing. See `docs/release-runbook.md`.
+
+**The old block started the service and left `pnpm payload migrate` as a
+separate step you had to remember.** That order cannot work: new code declares a
+column, the service boots before the migration creates it, and Payload's SELECT
+enumerates every declared column — so the process throws at boot rather than
+degrading. The last release hit that on `funnel_lp_deployments.quiz_id` and was
+recovered by hand-transcribing migration SQL into psql.
 
 **`git pull` does not work here and never did.** The app directory is a Plesk
 *deployment target*, not a clone - it has no `.git`, so `git pull` exits with
@@ -102,11 +112,7 @@ commands are the manual path when it has not fired yet or you need it now.
 What each step does (most are fast no-ops if nothing changed):
 - `plesk ext git --fetch` — pull GitHub into the bare repo.
 - `plesk ext git --deploy` — check the bare repo out into the app directory. Both are needed: `--deploy` on its own redeploys whatever was last fetched.
-- `pnpm install` — only runs if `package.json` changed; otherwise ~1s.
-- `pnpm generate:importmap` — regenerates the Payload admin import map (required before a prod build per CLAUDE.md).
-- `pnpm build` — production build (~60–90s, the slow step).
-- `systemctl start legalos-dev` — boots `next start` against the fresh `.next/`.
-- `systemctl status legalos-dev --no-pager` — confirms it came up; should end with **`active (running)`**.
+- `scripts/release.sh` — backup (size-checked: the system `pg_dump` is v15 against a v16 server and writes a 20-byte file with exit 0), stop, `pnpm install --frozen-lockfile`, `pnpm generate:importmap`, `pnpm build` (~60–90s, the slow step), **`pnpm payload migrate`**, **`pnpm verify:schema`**, start, and an HTTP health check. It ends with `active (running)` or it fails loudly and tells you how to roll back.
 
 Then have the user hard-refresh: **Ctrl+Shift+R** (Windows) / **Cmd+Shift+R** (Mac).
 
@@ -120,7 +126,7 @@ All `src/` changes require the rebuild + restart from "Standard operations" abov
 |---|---|
 | Added a package (`pnpm add ...`) | `pnpm install` before `pnpm build` |
 | Edited `.env` | `.env` is gitignored — edit it on the server (`ssh root@51.81.202.161 nano /var/www/vhosts/legenex.com/os.legenex.com/.env`) then rebuild + restart |
-| Created a Payload migration | `pnpm payload migrate` after `pnpm build`, before the restart |
+| Created a Payload migration | nothing extra — `scripts/release.sh` migrates between the build and the start, which is the only safe order |
 | Edited `next.config.mjs` | (covered by the standard rebuild + restart) |
 | Service stuck / weird state | `ssh root@51.81.202.161 systemctl restart legalos-dev` on its own |
 
@@ -281,9 +287,9 @@ This repo carries its own review harness. Use it instead of ad-hoc greps when au
 - **This codespace cannot build.** No `node_modules`, no `.env`, no database. Don't promise a local verification you can't perform — reason it through, then verify on the server after the deploy block.
 - **`src/payload-types.ts` is generated and gitignored — it does not exist in a fresh clone.** Ten modules import from `@/payload-types`, so `pnpm typecheck` fails until `pnpm generate:types` has run against a reachable DB. After editing collection fields, regenerate it (on the server, where the DB lives).
 - Schema changes: dev auto-pushes (Payload default outside production). For production, generate a migration with `pnpm payload migrate:create <name>`, commit and push it, then run `pnpm payload migrate` on the server (deploys don't auto-migrate).
-- **Migrations must be hand-registered, and are written idempotent by hand.** Every file in `src/migrations/` also needs an import + a `{ up, down, name }` entry in `src/migrations/index.ts` — that array is what runs, not the directory listing. Only the first three migrations have a companion `.json` drizzle snapshot; everything from `20260528_*` on is hand-written SQL, so `migrate:create` diffs against a **stale** snapshot and will re-emit changes later migrations already applied. Read its output before committing. House style is retry-safe DDL — `ADD COLUMN IF NOT EXISTS` / `DROP COLUMN IF EXISTS` / `CREATE TABLE IF NOT EXISTS` / `ALTER TYPE … ADD VALUE IF NOT EXISTS`, nullable columns so existing rows need no backfill, and a header comment saying *why*. `20260528_220000_pages_hidden_blocks.ts` is the canonical short example.
+- **A migration runs because its FILE is in `src/migrations/`.** Payload's `readMigrationFiles` reads the directory, sorts by filename, and explicitly skips `index.ts` — so a file dropped in runs whether or not it is registered, and deleting three lines from `index.ts` disables nothing. (An earlier version of this file said the opposite.) `index.ts` is still maintained as the one place the intended chain is written down in order, and `pnpm test:release` fails if it and the directory disagree. Migrations are written idempotent by hand. Only the first three migrations have a companion `.json` drizzle snapshot; everything from `20260528_*` on is hand-written SQL, so `migrate:create` diffs against a **stale** snapshot and will re-emit changes later migrations already applied. Read its output before committing. House style is retry-safe DDL — `ADD COLUMN IF NOT EXISTS` / `DROP COLUMN IF EXISTS` / `CREATE TABLE IF NOT EXISTS` / `ALTER TYPE … ADD VALUE IF NOT EXISTS`, nullable columns so existing rows need no backfill, and a header comment saying *why*. `20260528_220000_pages_hidden_blocks.ts` is the canonical short example.
 - **A missing column breaks startup, not just one query.** Payload's `SELECT` enumerates every column a collection declares, so one absent column throws before startup completes — which is why `20260529_060000_sites_global_blocks.ts` was reduced to a no-op `DROP COLUMN IF EXISTS` and the global nav/footer moved into the existing `brand_identity` jsonb. Never add a column to a collection without the migration in the same commit.
-- **⚠️ Known schema drift — F001, still open.** `src/collections/Sites.ts` declares columns that **no** committed migration creates: `brand_identity` (jsonb), `brand_display_name`, `brand_short_name`, `brand_logo_url_dark`, `brand_tagline_brand`, `legal_*` (copyright / tcpa_text / privacy_url / terms_url / default_disclaimer), `typography_*` (headline_font / body_font / base_size). All six `funnel_*` tables are likewise absent. Note that `20260529_060000_sites_global_blocks.ts`'s header **asserts `brand_identity` "has been on the table since the initial migration" — that is false**; grep the migrations and you'll find the name only in that comment. Don't trust migration prose over a grep. This is finding **F001** in `docs/audit-2026-06-04.md`; if you touch `Sites` fields or the funnel collections, fix the drift rather than adding to it.
+- **F001 is CLOSED, and `pnpm test:bootstrap` is what keeps it closed.** Every field below exists in the committed chain; the suite creates a Site with all of them against a migration-only database and reads them back. Three more columns were found missing by that suite and are fixed in `20260813_210000` and `20260813_213000` — six `funnel_*_id` columns on `payload_locked_documents_rels` (which also made DELETING ANY DOCUMENT in ANY collection fail) and two markers on `integration_config` (which made the admin 500). The historical text follows so the claim can be checked rather than believed. **⚠️ Was: Known schema drift — F001.** `src/collections/Sites.ts` declares columns that **no** committed migration creates: `brand_identity` (jsonb), `brand_display_name`, `brand_short_name`, `brand_logo_url_dark`, `brand_tagline_brand`, `legal_*` (copyright / tcpa_text / privacy_url / terms_url / default_disclaimer), `typography_*` (headline_font / body_font / base_size). All six `funnel_*` tables are likewise absent. Note that `20260529_060000_sites_global_blocks.ts`'s header **asserts `brand_identity` "has been on the table since the initial migration" — that is false**; grep the migrations and you'll find the name only in that comment. Don't trust migration prose over a grep. This is finding **F001** in `docs/audit-2026-06-04.md`; if you touch `Sites` fields or the funnel collections, fix the drift rather than adding to it.
 - `next.config.mjs` is minimal; `cors: '*'` and the `csrf` allowlist are set in `payload.config.ts` — don't add CORS handling at the route layer. **The CSRF allowlist is a live foot-gun:** server actions send an `Origin` header that must match an entry, or Payload's cookie auth returns `user = null` and the action fails as "unauthenticated" with no CSRF-shaped error. The list is `NEXT_PUBLIC_SERVER_URL` + localhost (non-production only) + comma-separated `LEGALOS_EXTRA_ORIGINS` — use that env var to add apex/`www` aliases rather than editing code.
 - `db: postgresAdapter` sets no explicit `push`, so Payload's default applies: schema auto-push when `NODE_ENV !== production`, migrations only in production. Anything that "works locally" may simply be riding a dev push that no migration reproduces.
 - The `(payload)` route group exists because Payload's `withPayload` Next plugin convention expects it; the `(public)`, `(app)`, `(auth)` groups exist so each can have its own root `layout.tsx`.

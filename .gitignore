@@ -45,3 +45,6 @@ docker-compose.override.yml
 .claude/*
 !.claude/commands/
 !.claude/agents/
+
+# Scratch migration sets built by scripts/test-release-ordering.mts.
+.migrations-scratch-*/

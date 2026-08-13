@@ -1,3 +1,19 @@
+/**
+ * The migration chain, as a list.
+ *
+ * PAYLOAD DOES NOT READ THIS FILE. `readMigrationFiles` reads the migration
+ * DIRECTORY, sorted by filename, and explicitly skips `index.ts` - so a file
+ * dropped into `src/migrations/` runs whether or not it appears below, and a
+ * file removed from below still runs. `CLAUDE.md` says the opposite ("that array
+ * is what runs, not the directory listing"), and following that would let
+ * somebody "disable" a migration by deleting three lines here and be wrong.
+ *
+ * It is kept, and it is not decoration: it is the one place the intended chain
+ * is written down in order, and `scripts/test-release-ordering.mts` asserts that
+ * it matches the directory exactly. A list that agrees with reality is a
+ * cross-check; a list that is merely believed to be authoritative is a trap.
+ */
+
 import * as migration_20260513_221103_init from './20260513_221103_init';
 import * as migration_20260518_134859_site_status_draft from './20260518_134859_site_status_draft';
 import * as migration_20260518_134900_site_status_draft_default from './20260518_134900_site_status_draft_default';
@@ -23,6 +39,8 @@ import * as migration_20260806_120000_quiz_deployment_progress_form from './2026
 import * as migration_20260813_090000_canonical_template_defaults from './20260813_090000_canonical_template_defaults'
 import * as migration_20260813_120000_lp_deployment_content_overrides from './20260813_120000_lp_deployment_content_overrides'
 import * as migration_20260813_180000_lp_deployment_embedded_quiz from './20260813_180000_lp_deployment_embedded_quiz'
+import * as migration_20260813_210000_locked_documents_funnel_rels from './20260813_210000_locked_documents_funnel_rels'
+import * as migration_20260813_213000_integration_config_sample_markers from './20260813_213000_integration_config_sample_markers'
 
 export const migrations = [
   {
@@ -149,5 +167,15 @@ export const migrations = [
     up: migration_20260813_180000_lp_deployment_embedded_quiz.up,
     down: migration_20260813_180000_lp_deployment_embedded_quiz.down,
     name: '20260813_180000_lp_deployment_embedded_quiz',
+  },
+  {
+    up: migration_20260813_210000_locked_documents_funnel_rels.up,
+    down: migration_20260813_210000_locked_documents_funnel_rels.down,
+    name: '20260813_210000_locked_documents_funnel_rels',
+  },
+  {
+    up: migration_20260813_213000_integration_config_sample_markers.up,
+    down: migration_20260813_213000_integration_config_sample_markers.down,
+    name: '20260813_213000_integration_config_sample_markers',
   },
 ];

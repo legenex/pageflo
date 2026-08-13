@@ -36,17 +36,37 @@ export async function up({ payload }: MigrateUpArgs): Promise<void> {
   }
 }
 
+/**
+ * Postgres has no DROP VALUE for an enum, so the type is rebuilt without
+ * 'draft'. Same pool-bypass reason as up().
+ *
+ * THIS DID NOT WORK, and a rollback is the worst time to discover that. It set
+ * the column to `text` while the DEFAULT was still `'active'::enum_sites_status`,
+ * and postgres refuses with 42804 - "default for column cannot be cast
+ * automatically". So `payload migrate:down` failed on this migration and took
+ * every rollback that reached it with it. Measured by running the real command
+ * against a scratch database built from the committed chain.
+ *
+ * The order below is the one postgres accepts: drop the default, widen to text,
+ * land the rows that hold a value the narrower type does not have, rebuild the
+ * type, cast back, restore the default.
+ *
+ * A DRAFT SITE BECOMES PAUSED, NOT ACTIVE. It has to become something - the
+ * narrower type cannot hold 'draft' and the cast fails otherwise - and 'active'
+ * would PUBLISH every unfinished brand on the way down. Paused serves nothing,
+ * which is what a draft was already doing, and an operator can move it back.
+ */
 export async function down({ payload }: MigrateDownArgs): Promise<void> {
-  // Postgres has no DROP VALUE for enums. Rebuild the type without 'draft'.
-  // Same pool-bypass reason as up().
   const pool = (payload.db as unknown as { pool: Pool }).pool
   const client = await pool.connect()
   try {
+    await client.query(`ALTER TABLE "sites" ALTER COLUMN "status" DROP DEFAULT;`)
     await client.query(`ALTER TABLE "sites" ALTER COLUMN "status" SET DATA TYPE text;`)
-    await client.query(`ALTER TABLE "sites" ALTER COLUMN "status" SET DEFAULT 'active';`)
+    await client.query(`UPDATE "sites" SET "status" = 'paused' WHERE "status" = 'draft';`)
     await client.query(`DROP TYPE "public"."enum_sites_status";`)
     await client.query(`CREATE TYPE "public"."enum_sites_status" AS ENUM('active', 'paused', 'archived');`)
     await client.query(`ALTER TABLE "sites" ALTER COLUMN "status" SET DATA TYPE "public"."enum_sites_status" USING "status"::"public"."enum_sites_status";`)
+    await client.query(`ALTER TABLE "sites" ALTER COLUMN "status" SET DEFAULT 'active';`)
   } finally {
     client.release()
   }

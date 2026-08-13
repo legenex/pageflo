@@ -78,10 +78,20 @@ export default buildConfig({
     pool: {
       connectionString: process.env.DATABASE_URI ?? 'postgres://legalos:legalos@localhost:5432/legalos',
     },
-    // Production uses real migration files in src/migrations/. They're applied by
-    // scripts/deploy.sh + scripts/first-time-setup.sh via `pnpm payload migrate`.
-    // Dev still auto-pushes the schema (Payload's default when NODE_ENV !== production).
-    // To regenerate after schema changes: pnpm payload migrate:create <name>
+    // Production uses the real migration files in src/migrations/, applied by
+    // `scripts/release.sh` via `pnpm payload migrate` WHILE THE SERVICE IS DOWN
+    // and verified with `pnpm verify:schema` before it starts. Dev still
+    // auto-pushes the schema (Payload's default when NODE_ENV !== production),
+    // which is what let three columns ship without migrations.
+    // To add one after a schema change: pnpm payload migrate:create <name>
+    //
+    // The directory is overridable so a release can be STAGED - applied as far
+    // as a known point rather than all at once - and so
+    // `scripts/test-release-ordering.mts` can build the schema the previous
+    // release produced, exactly, from this repository alone. Payload discovers
+    // migrations by reading this directory and sorting by filename; it does NOT
+    // read src/migrations/index.ts.
+    migrationDir: process.env.LEGALOS_MIGRATION_DIR || undefined,
   }),
   typescript: {
     outputFile: path.resolve(dirname, 'payload-types.ts'),
