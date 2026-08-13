@@ -236,11 +236,37 @@ export const resolveBrandTokens = (
     borderStrong = shiftLightness(bg, (mode === 'dark' ? 0.06 : -0.06) * step)
   }
 
-  const fontHeading = String(b.font_heading ?? 'Inter')
-  const fontBody = String(b.font_body ?? 'Inter')
-  const radiusBase = Number(b.radius ?? 8)
-  const radiusLg = Number(b.radius_lg ?? radiusBase * 2)
-  const shadow = String(b.shadow ?? '0 8px 24px -12px rgba(0,0,0,0.35)')
+  /*
+   * `??` DOES NOT CATCH AN EMPTY STRING, and `siteToBrand` normalises every
+   * absent token to `''`. So a brand that authored only the four required
+   * colours - which is most of them - reached here with `radius: ''`,
+   * `shadow: ''` and `font_heading: ''`, and shipped:
+   *
+   *   --site-radius: "0px"          Number('') is 0, not the default 8
+   *   --site-shadow: ""             every elevation flat
+   *   --site-font-heading: ",system-ui,sans-serif"
+   *
+   * That last one is the worst: a leading comma makes the whole `font-family`
+   * declaration invalid, so headings silently fall back to the UA font and the
+   * brand's typography never appears. Measured, not inferred.
+   *
+   * `pxNumber` additionally survives a UNIT: `radius: '8px'` gave `NaNpx`,
+   * which is a value an operator can plausibly type and which no schema stopped.
+   */
+  const orDefault = (v: unknown, fallback: string): string => {
+    const s = typeof v === 'string' ? v.trim() : v == null ? '' : String(v).trim()
+    return s === '' ? fallback : s
+  }
+  const pxNumber = (v: unknown, fallback: number): number => {
+    const n = parseFloat(orDefault(v, String(fallback)))
+    return Number.isFinite(n) ? n : fallback
+  }
+
+  const fontHeading = orDefault(b.font_heading, 'Inter')
+  const fontBody = orDefault(b.font_body, 'Inter')
+  const radiusBase = pxNumber(b.radius, 8)
+  const radiusLg = pxNumber(b.radius_lg, radiusBase * 2)
+  const shadow = orDefault(b.shadow, '0 8px 24px -12px rgba(0,0,0,0.35)')
   const scale = DENSITY_SCALE[density]
 
   const vars: Record<string, string> = {

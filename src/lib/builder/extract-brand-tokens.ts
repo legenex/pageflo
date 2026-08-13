@@ -6,7 +6,13 @@
 
 const HEX = /#([0-9a-fA-F]{3,8})\b/
 const ROOT_BLOCK = /:root\s*\{([\s\S]*?)\}/g
-const CSS_VAR_DECL = /--([a-zA-Z0-9-]+)\s*:\s*([^;]+);/g
+// The trailing semicolon is OPTIONAL on the last declaration in a block, and
+// requiring it dropped that declaration silently. Worse than missing: the
+// caller falls a missing `accent` back to `primary`, so
+// `:root{--primary:#0b3d91;--accent:#c8a24a}` reported accent as #0b3d91 - a
+// wrong answer rather than no answer. `extract-colors.ts:210` already had the
+// correct form and a comment explaining it; this copy did not.
+const CSS_VAR_DECL = /--([a-zA-Z0-9-]+)\s*:\s*([^;}]+)/g
 
 type Tokens = Record<string, string>
 
