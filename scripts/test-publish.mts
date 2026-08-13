@@ -388,6 +388,57 @@ const GOOD_LP_DEP = { id: 40, site: 1, landing_page: 30, domain: null, path: '/c
   t(!r.ok && r.blocking.some((c) => c.id === 'embedded-quiz-template'), 'an embedded quiz on a template that names nothing blocks publication')
 }
 
+/* --------------------------------- an LP embeds a FLOW, not a deployment --- */
+//
+// The composition the product is made of is LP template x brand x FLOW x quiz
+// skin. Until gate 10 the only way to express it was to point at a standalone
+// quiz DEPLOYMENT, so embedding a quiz first required publishing a separate
+// public quiz page at its own path, which then competed for a URL and had to be
+// kept in step with the page that borrowed it.
+
+{
+  const r = await lpDeploymentPreflight(CTX(), {
+    deployment: { ...GOOD_LP_DEP, quiz: 10, embedded_quiz_template_id: 'sq_quiz_first' },
+    landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: GOOD_QUIZ,
+  })
+  t(r.ok, `an LP that names a quiz FLOW directly publishes with no standalone deployment${r.ok ? '' : ' — ' + r.blocking.map((c) => c.id).join(',')}`)
+  t(r.checks.some((c) => c.id === 'embedded-flow'), 'and the flow is a named check')
+  t(r.checks.some((c) => c.id === 'embedded-quiz-template'), "and so is the skin it chose")
+  t(r.checks.some((c) => c.id === 'flow-valid_terminals'), "and the flow's own graph is validated")
+  t(!r.checks.some((c) => c.id === 'embedded-quiz'), 'and it is NOT asked for a standalone deployment it deliberately does not have')
+}
+{
+  const r = await lpDeploymentPreflight(CTX(), {
+    deployment: { ...GOOD_LP_DEP, quiz: 10, embedded_quiz_template_id: 'sq_ghost' },
+    landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: GOOD_QUIZ,
+  })
+  t(!r.ok && r.blocking.some((c) => c.id === 'embedded-quiz-template'), 'a skin that names nothing blocks publication')
+}
+{
+  const r = await lpDeploymentPreflight(CTX(), {
+    deployment: { ...GOOD_LP_DEP, quiz: 10 },
+    landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: { ...GOOD_QUIZ, is_published: false },
+  })
+  t(!r.ok && r.blocking.some((c) => c.id === 'embedded-flow-published'), 'an unpublished flow blocks the landing page that embeds it')
+}
+{
+  // No skin chosen is legitimate: the landing page's recommended one is used.
+  const r = await lpDeploymentPreflight(CTX(), {
+    deployment: { ...GOOD_LP_DEP, quiz: 10 },
+    landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: GOOD_QUIZ,
+  })
+  t(r.ok, "an LP with no explicit skin publishes, and takes the template's recommendation")
+}
+{
+  // The legacy binding still works, so no live row changes behaviour.
+  const own = { id: 77, site: 1, quiz: 10, template_id: 'sq_quiz_first', path: '/x', status: 'live' }
+  const r = await lpDeploymentPreflight(CTX(), {
+    deployment: { ...GOOD_LP_DEP, quiz_deployment_id: '77' },
+    landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: own, quiz: GOOD_QUIZ,
+  })
+  t(r.ok && r.checks.some((c) => c.id === 'embedded-quiz'), 'a row still on the legacy standalone binding is unaffected')
+}
+
 /* ------------------------------------------------------------------ report */
 
 console.log(`\n${passed} passed, ${failed} failed`)

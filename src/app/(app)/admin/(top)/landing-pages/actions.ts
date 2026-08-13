@@ -191,6 +191,23 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
     }
   }
 
+  // The embedded quiz's skin. Validated exactly as the standalone one is: a
+  // skin that names nothing would draw the embed in a template nobody chose.
+  let embeddedTemplateId = ''
+  if (dep.embeddedQuizTemplateId) {
+    const t = canonicalTemplateId('quiz', dep.embeddedQuizTemplateId)
+    if (!t.ok) return { ok: false, error: `embedded quiz template: ${t.error}` }
+    embeddedTemplateId = t.id
+  }
+
+  // A quiz flow this deployment names must belong to nobody in particular — the
+  // flows are brandless — but it must EXIST, or the page renders without the
+  // thing it is for.
+  if (dep.quizId) {
+    const q = await payload.findByID({ collection: 'funnel-quizzes', id: Number(dep.quizId), overrideAccess: true }).catch(() => null)
+    if (!q) return { ok: false, error: 'quiz flow not found' }
+  }
+
   // Resolve the host string from the editor back to a domain record id.
   // The host is resolved with `overrideAccess: true`, so the row it finds may
   // belong to ANY tenant. Binding a deployment to another brand's domain wrote a
@@ -212,6 +229,12 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
     site: gate.siteId,
     domain: domainId,
     path: (dep.path as string) || '',
+    // The flow this page runs. `quiz_deployment_id` is kept for rows that still
+    // carry it and is never written from here any more: embedding a quiz must
+    // not require publishing a separate standalone quiz page first.
+    quiz: dep.quizId ? Number(dep.quizId) : null,
+    embedded_quiz_template_id: embeddedTemplateId,
+    embedded_progress_form: (dep.embeddedProgressForm as string) || null,
     quiz_deployment_id: (dep.quizDeploymentId as string) || '',
     content_overrides: overrides,
     status: (dep.status as string) || 'draft',

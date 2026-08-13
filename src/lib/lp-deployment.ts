@@ -4,7 +4,8 @@ import config from '@payload-config'
 import { siteToBrand, type DomainLite } from './brand-map'
 import { normalizeDeploymentPath } from './quiz-deployment-path'
 import { isClaimedByAuthoredContent, pathVariantsFor } from './public-path-claims'
-import { resolveQuizDeploymentById, type ResolvedQuizDeployment } from './quiz-deployment'
+import { resolveEmbeddedQuiz, resolveQuizDeploymentById, type ResolvedQuizDeployment } from './quiz-deployment'
+import { recommendedQuizTemplateFor } from './template-registry'
 import { resolveForRender, reportTemplateFallback } from './template-registry'
 
 /**
@@ -45,6 +46,13 @@ export type PublicLpDeployment = {
   path: string
   status: string
   quizDeploymentId: string
+  /**
+   * The quiz FLOW this page runs, when it names one directly.
+   *
+   * Preferred over `quizDeploymentId`, which required a standalone quiz page to
+   * exist before a landing page could embed anything.
+   */
+  quizId: string
   /**
    * This deployment's own copy, keyed by the template's slot ids.
    *
@@ -184,10 +192,32 @@ const resolveLpDeploymentUncached = async (
     kind: typeof d.kind === 'string' ? d.kind : undefined,
   }))
 
+  /*
+   * The deployment's OWN quiz flow first; the legacy standalone-deployment
+   * pointer only when it has none.
+   *
+   * Order matters and is not arbitrary. A row that has been moved to the new
+   * binding may still carry the old `quiz_deployment_id`, and reading that first
+   * would keep serving the standalone deployment's template and destinations
+   * after somebody deliberately chose otherwise.
+   */
+  const ownQuizId = relId(doc.quiz)
   const quizDeploymentId = String(doc.quiz_deployment_id ?? '')
-  const quiz = quizDeploymentId
-    ? await resolveQuizDeploymentById(quizDeploymentId, siteId, includeUnpublished)
-    : null
+
+  const quiz = ownQuizId
+    ? await resolveEmbeddedQuiz({
+        lpDeploymentId: String(doc.id),
+        quizId: ownQuizId,
+        siteId,
+        // The landing page's recommended skin when the deployment has not
+        // chosen one, so an embed is never drawn in a template nobody picked.
+        templateId: String(doc.embedded_quiz_template_id || '') || recommendedQuizTemplateFor(lpDoc.template_id),
+        progressForm: typeof doc.embedded_progress_form === 'string' && doc.embedded_progress_form ? doc.embedded_progress_form : null,
+        includeUnpublished,
+      })
+    : quizDeploymentId
+      ? await resolveQuizDeploymentById(quizDeploymentId, siteId, includeUnpublished)
+      : null
 
   // Resolved here, once, rather than by whichever renderer reads the row. The
   // template id travels canonical from this point, so the metadata pass, the
@@ -205,6 +235,8 @@ const resolveLpDeploymentUncached = async (
       path: normalizeDeploymentPath(String(doc.path ?? '')),
       status: String(doc.status ?? 'draft'),
       quizDeploymentId,
+      /** The flow this page runs directly, when it has one. */
+      quizId: ownQuizId,
       contentOverrides: normalizeOverrides(doc.content_overrides),
     },
     landingPage: {

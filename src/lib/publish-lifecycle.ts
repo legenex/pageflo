@@ -320,8 +320,27 @@ export const lpDeploymentPreflight = async (
     }
   }
 
-  // An embedded quiz is optional. One that is NAMED and broken is not.
-  if (str(deployment.quiz_deployment_id)) {
+  // The deployment's OWN flow, when it names one. Checked on the flow and its
+  // chosen skin rather than on a standalone deployment it deliberately does not
+  // have — requiring one was the thing gate 10 removed.
+  if (relationId(deployment.quiz) !== null) {
+    checks.push(
+      quiz
+        ? pass('embedded-flow', 'The embedded quiz flow exists')
+        : fail('embedded-flow', 'The embedded quiz flow exists', 'the quiz flow this page names could not be loaded'),
+    )
+    checks.push(
+      quiz?.is_published && !quiz.is_archived
+        ? pass('embedded-flow-published', 'The embedded quiz flow is published')
+        : fail('embedded-flow-published', 'The embedded quiz flow is published', quiz?.is_archived ? 'it is archived' : 'it is not published'),
+    )
+    const skin = str(deployment.embedded_quiz_template_id)
+    if (skin) {
+      checks.push(checkTemplateResolves('quiz', skin, { id: 'embedded-quiz-template', label: 'Embedded quiz visual template resolves' }))
+    }
+    checks.push(...checkQuizGraph(quiz))
+    checks.push(checkConsent(quiz))
+  } else if (str(deployment.quiz_deployment_id)) {
     checks.push(
       quizDeployment
         ? pass('embedded-quiz', 'The embedded quiz deployment exists')

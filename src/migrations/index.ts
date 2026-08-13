@@ -22,6 +22,7 @@ import * as migration_20260803_120000_locked_documents_buildlog_comments_rel fro
 import * as migration_20260806_120000_quiz_deployment_progress_form from './20260806_120000_quiz_deployment_progress_form'
 import * as migration_20260813_090000_canonical_template_defaults from './20260813_090000_canonical_template_defaults'
 import * as migration_20260813_120000_lp_deployment_content_overrides from './20260813_120000_lp_deployment_content_overrides'
+import * as migration_20260813_180000_lp_deployment_embedded_quiz from './20260813_180000_lp_deployment_embedded_quiz'
 
 export const migrations = [
   {
@@ -143,5 +144,10 @@ export const migrations = [
     up: migration_20260813_120000_lp_deployment_content_overrides.up,
     down: migration_20260813_120000_lp_deployment_content_overrides.down,
     name: '20260813_120000_lp_deployment_content_overrides',
+  },
+  {
+    up: migration_20260813_180000_lp_deployment_embedded_quiz.up,
+    down: migration_20260813_180000_lp_deployment_embedded_quiz.down,
+    name: '20260813_180000_lp_deployment_embedded_quiz',
   },
 ];

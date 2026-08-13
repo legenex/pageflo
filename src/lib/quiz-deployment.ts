@@ -254,6 +254,63 @@ const hydrateQuizDeployment = async (
 }
 
 /**
+ * A quiz embedded in a landing page, built from the LANDING PAGE'S OWN binding.
+ *
+ * The composition the product is made of is LP template x brand x FLOW x quiz
+ * skin, and until now the only way to express it was to point at a standalone
+ * quiz DEPLOYMENT — so embedding a quiz first required publishing a separate
+ * public quiz page, at its own path, competing for a URL and needing to be kept
+ * in step with the page that borrowed it.
+ *
+ * This synthesises the same `ResolvedQuizDeployment` the standalone path
+ * produces, through the SAME `hydrateQuizDeployment`, so the embedded quiz is
+ * themed, routed and delivered identically. There is one hydration path and one
+ * composed object; a second one is how a quiz ends up behaving differently
+ * inside a landing page than on its own.
+ *
+ * The synthetic row carries no path and no domain because it has none: it is not
+ * separately reachable, which is the point.
+ */
+export const resolveEmbeddedQuiz = cache(async (
+  args: {
+    lpDeploymentId: string
+    quizId: string
+    siteId: number
+    templateId: string
+    progressForm: string | null
+    includeUnpublished: boolean
+  },
+): Promise<ResolvedQuizDeployment | null> => {
+  if (!args.quizId) return null
+  const payload = await getPayload({ config })
+  return hydrateQuizDeployment(
+    payload,
+    {
+      // Namespaced so it can never collide with a real deployment id in a log,
+      // a pixel payload or a lead row.
+      id: `lp:${args.lpDeploymentId}`,
+      name: '',
+      quiz: args.quizId,
+      site: args.siteId,
+      domain: null,
+      path: '',
+      render_mode: 'embed',
+      template_id: args.templateId,
+      progress_form: args.progressForm,
+      status: 'live',
+      destination_overrides: null,
+      header_config: {},
+      footer_config: {},
+      body_section_overrides: null,
+      utm: {},
+      pixels: {},
+    },
+    args.siteId,
+    args.includeUnpublished,
+  )
+})
+
+/**
  * Resolve a quiz deployment by its id, for a landing page that embeds one.
  *
  * The quiz deployment must belong to the SAME Site as the landing page. The
