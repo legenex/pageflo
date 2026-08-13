@@ -16,14 +16,20 @@
  * A rule with four implementations has no implementation. This module is the
  * rule.
  *
- * WIRED SO FAR: `mayBecomePrimary`, in the domain actions — promotion and the
- * fallback promotion on removal. The resolver and the three pickers still each
- * decide for themselves. Converting them is not a drop-in: the resolver's filter
- * decides what the live site serves, and every existing preview row would need
- * checking against real data first. Until that happens this header should say
- * what is true rather than what was intended, because a module that claims
- * callers it does not have is how the next reader concludes the problem is
- * solved.
+ * WIRED (2026-08-13): `mayBecomePrimary` in the domain actions; the publish
+ * lifecycle; and — after every production row was checked against real DNS, a
+ * real TLS handshake and self-check — the RESOLVER, on all three paths that can
+ * return a site: the direct host match, the `redirects_from` alias, and the
+ * canonical primary behind `redirectTo`. That last one is not optional: gating
+ * only the host in hand still let an eligible preview 307 every visitor onto a
+ * refused primary, which took a live brand off the air entirely.
+ *
+ * NOT WIRED: the three funnel builder pickers (quiz, landing page, advertorial)
+ * still list domains without asking, so an operator can still deploy onto a
+ * domain that cannot serve. `brand-map.ts` also picks a brand's link host with
+ * no eligibility test. Both are stated here rather than implied fixed, because
+ * a module that claims callers it does not have is how the next reader
+ * concludes the problem is solved.
  *
  * ── On preview domains ────────────────────────────────────────────────────────
  *

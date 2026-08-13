@@ -49,8 +49,10 @@ export const claimTrustedFormCert = async (args: TrustedFormClaimArgs): Promise<
   if (vendor) body.set('vendor', vendor)
   if (retainCert) body.set('retain', 'true')
 
-  // Parsed and host-checked BEFORE the credentials are assembled, so a hostile
-  // cert URL never reaches a code path that has the API key in scope.
+  // Parsed and host-checked BEFORE the credentials are assembled, so no request
+  // carrying the API key is ever issued to an address that failed the check.
+  // (The key is in lexical scope from the destructure above; what matters is
+  // that nothing sends it.)
   let parsed: URL
   try {
     parsed = new URL(certUrl)
