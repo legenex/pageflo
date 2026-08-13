@@ -270,7 +270,19 @@ export const PreviewQuestionCard = ({ node: rawNode, brand, customFields, onAnsw
     ...(tc.cardBackdrop ? { backdropFilter: tc.cardBackdrop, WebkitBackdropFilter: tc.cardBackdrop } : {}),
   }
 
-  return <div style={cardStyle} className="preview-card">
+  /*
+   * TEST HOOKS, and they are load-bearing rather than decorative.
+   *
+   * The landing-page quiz shipped as static markup that LOOKED exactly like this
+   * card. Measured in production: `button type=submit`, no React props, seven
+   * clicks and zero lead posts. Nothing in the DOM distinguished the real
+   * runtime from the picture of it, so nothing could assert the difference.
+   *
+   * These attributes are what `scripts/test-e2e-lead.mts` addresses, so "the
+   * quiz on this page is the real one" is a claim a browser can check on both
+   * pages rather than one a person checks by clicking.
+   */
+  return <div style={cardStyle} className="preview-card" data-quiz-root="" data-quiz-node-type={node.type}>
     {!isNodeVisible(node) && <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 14, padding: 8, backgroundColor: `${C.primary}11`, border: `1px dashed ${C.primary}44`, borderRadius: 6 }}>
       <Icon size={14} style={{ opacity: 0.7 }} /><span style={{ fontSize: 11, opacity: 0.7, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Hidden in live quiz · preview only</span>
     </div>}
@@ -279,8 +291,8 @@ export const PreviewQuestionCard = ({ node: rawNode, brand, customFields, onAnsw
 
     {(rawNode.dynamicContent || []).length > 0 && <div style={{ fontSize: 10, color: T.purple, opacity: 0.75, marginBottom: 8, fontFamily: '"JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '0.1em' }}>dynamic content active</div>}
     {node.tagline && <div style={{ fontSize: 'clamp(12px, 2.5vw, 13px)', color: pal.textMute, marginBottom: 10, fontWeight: 500, letterSpacing: '0.04em' }}>{interp(node.tagline)}</div>}
-    {node.headline && <div style={{ fontSize: tc.headlineSize, fontWeight: tc.headlineWeight, marginBottom: 8, letterSpacing: '-0.015em', lineHeight: 1.18, color: pal.text, fontFamily: tc.headlineFamily(brand) }}>{interp(node.headline)}</div>}
-    {node.question && node.question !== node.headline && <div style={{ fontSize: 'clamp(15px, 3vw, 18px)', fontWeight: 600, marginBottom: 8, color: pal.text }}>{interp(node.question)}</div>}
+    {node.headline && <div data-quiz-headline="" style={{ fontSize: tc.headlineSize, fontWeight: tc.headlineWeight, marginBottom: 8, letterSpacing: '-0.015em', lineHeight: 1.18, color: pal.text, fontFamily: tc.headlineFamily(brand) }}>{interp(node.headline)}</div>}
+    {node.question && node.question !== node.headline && <div data-quiz-question="" style={{ fontSize: 'clamp(15px, 3vw, 18px)', fontWeight: 600, marginBottom: 8, color: pal.text }}>{interp(node.question)}</div>}
     {node.subheadline && <div style={{ fontSize: 'clamp(13px, 2.7vw, 15px)', color: pal.textMute, marginBottom: 'clamp(16px, 3vw, 24px)', lineHeight: 1.5 }}>{interp(node.subheadline)}</div>}
 
     {(node.questionType === 'button_grid' || node.questionType === 'single_select') && <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols}, 1fr)`, gap: 'clamp(8px, 1.5vw, 12px)' }}>
@@ -304,10 +316,10 @@ export const PreviewQuestionCard = ({ node: rawNode, brand, customFields, onAnsw
 
     {node.questionType === 'textarea' && <textarea value={text} onChange={(e) => setText(e.target.value)} placeholder="Tell us..." rows={5} style={{ width: '100%', maxWidth: 560, margin: '0 auto', padding: '14px 18px', borderRadius: tc.buttonRadius, border: `2px solid ${C.primary}55`, backgroundColor: isDarkTemplate ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: pal.text, fontSize: 14, fontFamily: cardFont, resize: 'vertical', display: 'block' }} />}
 
-    {node.type === 'form' && <div style={{ position: 'relative', maxWidth: 480, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+    {node.type === 'form' && <div data-quiz-form="" style={{ position: 'relative', maxWidth: 480, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
       {(node.formFields || []).map((f) => f.type === 'textarea' ?
-        <textarea key={f.key} value={formValues[f.key] || ''} onChange={(e) => setFormValues({ ...formValues, [f.key]: e.target.value })} placeholder={f.placeholder} rows={3} style={{ padding: '12px 16px', borderRadius: tc.buttonRadius, border: `2px solid ${C.primary}55`, backgroundColor: isDarkTemplate ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: pal.text, fontSize: 14, fontFamily: cardFont }} /> :
-        <input key={f.key} type={f.type === 'tel' ? 'tel' : f.type === 'email' ? 'email' : 'text'} value={formValues[f.key] || ''} onChange={(e) => setFormValues({ ...formValues, [f.key]: e.target.value })} placeholder={f.placeholder} style={{ padding: '12px 16px', borderRadius: tc.buttonRadius, border: `2px solid ${C.primary}55`, backgroundColor: isDarkTemplate ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: pal.text, fontSize: 14, fontFamily: cardFont }} />,
+        <textarea key={f.key} name={f.key} value={formValues[f.key] || ''} onChange={(e) => setFormValues({ ...formValues, [f.key]: e.target.value })} placeholder={f.placeholder} rows={3} style={{ padding: '12px 16px', borderRadius: tc.buttonRadius, border: `2px solid ${C.primary}55`, backgroundColor: isDarkTemplate ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: pal.text, fontSize: 14, fontFamily: cardFont }} /> :
+        <input key={f.key} name={f.key} type={f.type === 'tel' ? 'tel' : f.type === 'email' ? 'email' : 'text'} value={formValues[f.key] || ''} onChange={(e) => setFormValues({ ...formValues, [f.key]: e.target.value })} placeholder={f.placeholder} style={{ padding: '12px 16px', borderRadius: tc.buttonRadius, border: `2px solid ${C.primary}55`, backgroundColor: isDarkTemplate ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)', color: pal.text, fontSize: 14, fontFamily: cardFont }} />,
       )}
       {node.honeypot && <input type="text" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} tabIndex={-1} autoComplete="off" name="hp_email_secondary" aria-hidden="true" style={{ position: 'absolute', left: -9999, opacity: 0, height: 0, width: 0, pointerEvents: 'none' }} />}
     </div>}
@@ -322,7 +334,7 @@ export const PreviewQuestionCard = ({ node: rawNode, brand, customFields, onAnsw
       <Loader2 size={32} color={C.primary} style={{ animation: 'spin 1s linear infinite', marginBottom: 14 }} />
     </div>}
 
-    {node.type === 'endpoint' && <div style={{ padding: 24, textAlign: 'center' }}>
+    {node.type === 'endpoint' && <div data-quiz-endpoint="" style={{ padding: 24, textAlign: 'center' }}>
       <div style={{ width: 60, height: 60, margin: '0 auto 16px', borderRadius: '50%', backgroundColor: `${C.primary}22`, color: C.primary, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><CheckCircle2 size={32} /></div>
       {node.redirect?.mode === 'immediate' && redirectUrl && <div style={{ fontSize: 13, color: pal.textMute }}>{previewMode ? 'Would redirect here' : 'Redirecting...'}</div>}
       {node.redirect?.mode === 'button' && redirectUrl && <a href={redirectUrl} rel="noreferrer" onClick={previewMode ? (e) => e.preventDefault() : undefined} style={{ display: 'inline-block', marginTop: 8, padding: '14px 32px', backgroundColor: C.primary, color: primaryBtnText, borderRadius: 999, fontSize: 15, fontWeight: 600, textDecoration: 'none', fontFamily: cardFont, cursor: previewMode ? 'default' : 'pointer' }}>{node.redirect.buttonText || 'Continue'}</a>}
@@ -331,8 +343,8 @@ export const PreviewQuestionCard = ({ node: rawNode, brand, customFields, onAnsw
     </div>}
 
     {(node.type === 'question' || node.type === 'form') && <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'clamp(18px, 3vw, 28px)', gap: 10 }}>
-      {showBack ? <button onClick={onBack} style={{ padding: '12px 20px', borderRadius: tc.buttonRadius, border: `1px solid ${C.primary}44`, backgroundColor: 'transparent', color: pal.textMute, cursor: 'pointer', fontSize: 14, fontWeight: 500, fontFamily: cardFont }}>{backText}</button> : <div />}
-      {(!autoAdvance || node.questionType === 'multi_select' || node.questionType === 'smart_date' || node.questionType === 'textarea' || node.questionType === 'text_input' || node.questionType === 'number_input' || node.type === 'form') && <button onClick={submitSelected} disabled={!canSubmit} style={{ padding: '14px 28px', borderRadius: tc.buttonRadius === 999 ? 999 : tc.buttonRadius + 4, border: 'none', backgroundColor: canSubmit ? C.primary : `${C.primary}55`, color: primaryBtnText, cursor: canSubmit ? 'pointer' : 'not-allowed', fontSize: 15, fontWeight: 700, fontFamily: cardFont, transition: 'all 0.15s', opacity: canSubmit ? 1 : 0.6 }}>{nextText}</button>}
+      {showBack ? <button data-quiz-back="" onClick={onBack} style={{ padding: '12px 20px', borderRadius: tc.buttonRadius, border: `1px solid ${C.primary}44`, backgroundColor: 'transparent', color: pal.textMute, cursor: 'pointer', fontSize: 14, fontWeight: 500, fontFamily: cardFont }}>{backText}</button> : <div />}
+      {(!autoAdvance || node.questionType === 'multi_select' || node.questionType === 'smart_date' || node.questionType === 'textarea' || node.questionType === 'text_input' || node.questionType === 'number_input' || node.type === 'form') && <button data-quiz-submit="" onClick={submitSelected} disabled={!canSubmit} style={{ padding: '14px 28px', borderRadius: tc.buttonRadius === 999 ? 999 : tc.buttonRadius + 4, border: 'none', backgroundColor: canSubmit ? C.primary : `${C.primary}55`, color: primaryBtnText, cursor: canSubmit ? 'pointer' : 'not-allowed', fontSize: 15, fontWeight: 700, fontFamily: cardFont, transition: 'all 0.15s', opacity: canSubmit ? 1 : 0.6 }}>{nextText}</button>}
     </div>}
 
     {node.type === 'form' && <div style={{ fontSize: 11, color: pal.textMute, marginTop: 12, lineHeight: 1.4, opacity: 0.7 }}>{interp(brand.legal.tcpaText)}</div>}

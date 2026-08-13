@@ -78,6 +78,12 @@ export const QuizAnswer = ({
       role={multi ? 'checkbox' : 'radio'}
       aria-checked={selected}
       onClick={onSelect}
+      // The one attribute that tells a live answer control apart from a picture
+      // of one. The landing-page quiz shipped as static markup that looked
+      // identical - `button type=submit`, no React props, seven clicks and zero
+      // lead posts - and nothing in the DOM distinguished them, so nothing could
+      // assert the difference. See scripts/test-e2e-lead.mts.
+      data-quiz-answer=""
       style={{ ...style, cursor: 'pointer' }}
     >
       {children}

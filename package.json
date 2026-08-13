@@ -26,6 +26,7 @@
     "test:isolation": "tsx scripts/test-tenant-isolation.mts",
     "test:bootstrap": "cross-env NODE_ENV=production tsx scripts/test-fresh-bootstrap.mts",
     "test:release": "tsx scripts/test-release-ordering.mts",
+    "test:e2e": "cross-env NODE_ENV=production tsx scripts/test-e2e-lead.mts",
     "verify:schema": "cross-env NODE_ENV=production tsx scripts/verify-schema.mts",
     "test": "pnpm test:brand && pnpm test:authz && pnpm test:registry && pnpm test:slots && pnpm test:publish && pnpm test:ai && pnpm test:flow && pnpm test:webhook && pnpm test:observability && pnpm test:brand-identity",
     "test:all": "pnpm test && pnpm test:isolation && pnpm test:bootstrap",

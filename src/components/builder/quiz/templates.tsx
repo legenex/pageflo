@@ -150,7 +150,13 @@ export const renderAnswerButton = (a, idx, isSelected, onClick, tc, brand) => (
 )
 
 export const renderProgressIndicator = (stepIdx, totalSteps, tc, brand) => (
-  <div style={{ marginBottom: 'clamp(16px, 3vw, 24px)' }}>
+  // The percentage is carried as an attribute as well as drawn, because a
+  // progress bar is twenty different shapes across the library and "did it
+  // move" should not depend on which one a deployment chose.
+  <div
+    data-quiz-progress={String(totalSteps > 1 ? Math.round((stepIdx / (totalSteps - 1)) * 100) : 0)}
+    style={{ marginBottom: 'clamp(16px, 3vw, 24px)' }}
+  >
     <QuizProgress form={tc.spec.progress} theme={tc.theme(brand)} index={stepIdx} total={totalSteps} />
   </div>
 )
