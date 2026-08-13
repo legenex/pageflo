@@ -24,7 +24,7 @@
  * that works, offered purely so the two editors look alike.
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Eye, Save, Trash2 } from 'lucide-react'
 
 import { T, Btn, Input, Select, Label, Pill, TopBar, genId } from '../ui'
@@ -168,6 +168,7 @@ export const LPDeploymentEditor = ({
   brands,
   quizzes,
   quizTemplates,
+  onBrandSaved,
   onSave,
   onDelete,
   onCancel,
@@ -337,7 +338,10 @@ export const LPDeploymentEditor = ({
                             }).map((o) => <option key={o.id} value={o.id} disabled={o.disabled}>{o.label}{o.archived ? ' - ARCHIVED' : ''}</option>)}
                           </Select>
                         </div>
-                        <BrandQuickEdit brand={brand} align="right" />
+                        {/* Beside the picker, because the moment you notice a
+                            colour is wrong is the moment you are looking at
+                            which brand is set. */}
+                        <BrandQuickEdit brand={brand} onSaved={onBrandSaved} align="right" />
                       </div>
                     </div>
                   </div>

@@ -12,10 +12,9 @@ import { canonicalTemplateId, resolveTemplate } from '@/lib/template-registry'
 import { relationId, requireDeploymentSiteAdmin } from '@/lib/authz'
 import { asSlotted } from '@/lib/lp-templates'
 import { validateOverrides } from '@/lib/lp-slots/model'
+import { DESTINATION_KEYS, DESTINATION_LABELS, isSafeDestinationUrl, type DestinationKey } from '@/lib/quiz-destinations'
 
 const PATH = '/admin/landing-pages'
-
-type LP = Record<string, unknown>
 
 const numFromBrandId = (brandId: unknown): number | null => {
   if (typeof brandId !== 'string') return null
@@ -23,67 +22,18 @@ const numFromBrandId = (brandId: unknown): number | null => {
   return Number.isFinite(n) ? n : null
 }
 
-// ---------------------------------------------------------------------------
-// Landing pages (brandless)
-// ---------------------------------------------------------------------------
-export async function createLP(args: { lp: LP }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
-  const lp = args.lp || {}
-  const payload = await getPayload({ config })
-
-  // `'bold_modern'` is the collection default and names no template. It is an
-  // explicit alias now, so it still resolves, and it is canonicalised on the way
-  // in so a page created today does not need the alias tomorrow.
-  const template = canonicalTemplateId('lp', (lp.templateId as string) || 'bold_modern')
-  if (!template.ok) return { ok: false, error: template.error }
-
-  try {
-    const created = (await payload.create({
-      collection: 'funnel-landing-pages',
-      data: {
-        name: (lp.name as string) || 'Untitled LP',
-        slug: (lp.slug as string) || `lp-${Date.now().toString(36)}`,
-        template_id: template.id,
-        angle: (lp.angle as string) || 'pain',
-        is_published: Boolean(lp.isPublished),
-        sections: lp.sections ?? [],
-      } as never,
-      user: user as never,
-      overrideAccess: false,
-    })) as { id: number | string }
-    revalidatePath(PATH)
-    return { ok: true, id: String(created.id) }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'create failed' }
-  }
-}
-
-export async function saveLP(args: { id: string; patch: Record<string, unknown> }): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
-  const payload = await getPayload({ config })
-
-  // A patch may or may not carry a template. When it does, it goes through the
-  // same gate a create does; a partial update is not a way around validation.
-  const patch = { ...(args.patch || {}) }
-  if ('template_id' in patch) {
-    const template = canonicalTemplateId('lp', patch.template_id)
-    if (!template.ok) return { ok: false, error: template.error }
-    patch.template_id = template.id
-  }
-
-  try {
-    await payload.update({ collection: 'funnel-landing-pages', id: args.id, data: patch as never, user: user as never, overrideAccess: false })
-    revalidatePath(PATH)
-    return { ok: true }
-  } catch (err) {
-    return { ok: false, error: err instanceof Error ? err.message : 'save failed' }
-  }
-}
+/**
+ * A jsonb config bag, or an empty one.
+ *
+ * Arrays and scalars are rejected rather than stored: every reader of these
+ * columns indexes them by key, so a string that reached the column would read
+ * as an object with no keys everywhere except in the editor that wrote it.
+ */
+const asConfigObject = (v: unknown): Record<string, unknown> =>
+  v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
 
 /*
- * `cloneLP` and `deleteLP` lived here and are gone.
+ * `createLP`, `saveLP`, `cloneLP` and `deleteLP` lived here and are gone.
  *
  * They were written when a row was one brand's page. A row is now the TEMPLATE
  * every brand deploys, and `deleteLP` cascade-deleted every referencing
@@ -91,11 +41,13 @@ export async function saveLP(args: { id: string; patch: Record<string, unknown> 
  * one operator tidying the library would have taken down other tenants' live
  * pages without being asked to confirm anything.
  *
- * `cloneLpTemplate` and `deleteLpTemplate` in ../template-actions.ts replace
- * them, with the reference check and the archive-instead-of-drop rule for stock
- * rows. Both are deleted rather than kept as thin wrappers: a second delete path
- * that skips the guard is exactly the kind of duplicate this change exists to
- * remove, and a wrapper is one refactor away from being called directly.
+ * The four verbs in ../template-actions.ts replace them, with the reference
+ * check, the archive-instead-of-drop rule for stock rows, and validation of
+ * template copy against the slots the chosen renderer actually has. All four are
+ * deleted rather than kept as thin wrappers: every export of a `'use server'`
+ * module is a live endpoint, so an unused `saveLP` is not dead code, it is a
+ * second write path into the template library that skips those checks — and a
+ * wrapper is one refactor away from being called directly.
  */
 
 // ---------------------------------------------------------------------------
@@ -174,6 +126,38 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
     if (!q) return { ok: false, error: 'quiz flow not found' }
   }
 
+  /*
+   * Where this placement sends people.
+   *
+   * Validated HERE, not only at render. `normalizeDestinations` drops an unsafe
+   * value on the way out, which is the right thing for the visitor and the wrong
+   * thing for the operator: the URL they typed disappears with no word, and the
+   * page silently falls back to the brand's. Worse, the scheme allow-list is a
+   * security boundary - a destination ends up in an href and in
+   * `window.location` - so `javascript:` reaching the column at all is a stored
+   * sink waiting for a reader that forgets to normalize.
+   */
+  const destinationOverrides: Record<string, string> = {}
+  for (const [key, value] of Object.entries(asConfigObject(dep.destinationOverrides))) {
+    if (!DESTINATION_KEYS.includes(key as DestinationKey)) {
+      return { ok: false, error: `unknown destination "${key}"` }
+    }
+    if (typeof value !== 'string') {
+      return { ok: false, error: `destination "${key}" is not text` }
+    }
+    const url = value.trim()
+    // Empty means inherit the brand's URL. Storing '' would be an override to
+    // nothing, which resolves to the site default and looks like a lost setting.
+    if (!url) continue
+    if (!isSafeDestinationUrl(url)) {
+      return {
+        ok: false,
+        error: `${DESTINATION_LABELS[key as DestinationKey]} must be an https:// address, a tel:/mailto: link, or a path starting with /`,
+      }
+    }
+    destinationOverrides[key] = url
+  }
+
   // Resolve the host string from the editor back to a domain record id.
   // The host is resolved with `overrideAccess: true`, so the row it finds may
   // belong to ANY tenant. Binding a deployment to another brand's domain wrote a
@@ -203,6 +187,11 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
     embedded_progress_form: (dep.embeddedProgressForm as string) || null,
     quiz_deployment_id: (dep.quizDeploymentId as string) || '',
     content_overrides: overrides,
+    // Null rather than {} so "this placement overrides nothing" is one value
+    // rather than two, matching what the quiz side stores.
+    destination_overrides: Object.keys(destinationOverrides).length > 0 ? destinationOverrides : null,
+    utm: asConfigObject(dep.utm),
+    pixels: asConfigObject(dep.pixels),
     status: (dep.status as string) || 'draft',
   }
 

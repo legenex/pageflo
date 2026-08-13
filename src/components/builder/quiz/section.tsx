@@ -36,7 +36,7 @@ export const Section = ({ title, hint, right, divider = true, id, children }) =>
         style={{ width: 3, height: 18, borderRadius: 2, backgroundColor: T.primary, flexShrink: 0, marginTop: 2 }}
       />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700, color: T.text, letterSpacing: '-0.015em' }}>{title}</h3>
+        <h3 data-section-heading={id} style={{ margin: 0, fontSize: 16, fontWeight: 700, color: T.text, letterSpacing: '-0.015em' }}>{title}</h3>
         {hint ? (
           <div style={{ fontSize: 12, color: T.textMute, marginTop: 4, lineHeight: 1.55, maxWidth: 720 }}>{hint}</div>
         ) : null}
