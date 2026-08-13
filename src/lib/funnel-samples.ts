@@ -14,13 +14,37 @@
  * routine is wrapped so a failure can never break the page that calls it.
  */
 import type { Payload } from 'payload'
-import {
-  SAMPLE_LANDING_PAGES,
-  SAMPLE_LP_DEPLOYMENTS,
-  buildSeedSections,
-} from '@/components/builder/lp/section-copy'
+import { SAMPLE_LP_DEPLOYMENTS } from '@/components/builder/lp/section-copy'
 import { buildSeedQuiz } from '@/components/builder/quiz/seed-data'
 import { advBuildSeedAdvertorials } from '@/components/builder/advertorial/seed-data'
+
+/**
+ * The stock template a starter deployment is pointed at.
+ *
+ * This used to be a seeded "page" called MVA Pain First, which was an instance
+ * of `human_recovery_story` masquerading as a template — and, because the
+ * deployment picker offered pages, it was one of only three landing pages the
+ * product could deploy at all. The starter now points at the stock template row
+ * directly, which renders identically and leaves the library exactly the twelve.
+ */
+const STARTER_LP_TEMPLATE_KEY = 'human_recovery_story'
+
+/**
+ * The stock landing-page template row for a registry id.
+ *
+ * Returns null rather than creating one. `ensureTemplateRecords` owns
+ * materialising the library; a second creator here is how two rows for one
+ * template appear.
+ */
+const stockLandingPageId = async (payload: Payload, stockKey: string): Promise<number | null> => {
+  const res = await payload.find({
+    collection: 'funnel-landing-pages',
+    where: { stock_key: { equals: stockKey } },
+    limit: 1,
+    overrideAccess: true,
+  })
+  return res.docs[0] ? Number(res.docs[0].id) : null
+}
 
 const primaryDomainId = async (payload: Payload, siteId: number): Promise<number | null> => {
   const dom = await payload.find({
@@ -39,37 +63,11 @@ let samplesEnsured = false
 
 // Sample landing pages + quizzes (the "base" group, guarded by funnel_samples_seeded).
 const seedBase = async (payload: Payload, sites: number[]): Promise<void> => {
-  // 1) Sample landing pages (brandless), matched by slug so re-entry is safe.
-  const lpIdBySlug: Record<string, number | null> = {}
-  for (const spec of SAMPLE_LANDING_PAGES) {
-    const existing = await payload.find({
-      collection: 'funnel-landing-pages',
-      where: { slug: { equals: spec.slug } },
-      limit: 1,
-      overrideAccess: true,
-    })
-    if (existing.docs[0]) {
-      lpIdBySlug[spec.slug] = Number(existing.docs[0].id)
-      continue
-    }
-    const created = await payload.create({
-      collection: 'funnel-landing-pages',
-      data: {
-        name: spec.name,
-        slug: spec.slug,
-        template_id: spec.template_id,
-        angle: spec.angle,
-        is_published: spec.is_published,
-        sections: buildSeedSections(),
-      },
-      overrideAccess: true,
-    })
-    lpIdBySlug[spec.slug] = Number(created.id)
-  }
-
-  // 2) Sample LP deployments, bound to whichever sites exist (by index).
+  // 1) Sample LP deployments, bound to whichever sites exist (by index), and
+  //    pointed at STOCK TEMPLATE ROWS. No sample "pages" are created: a page
+  //    and a template are the same object now, and the library is the twelve.
   for (const dep of SAMPLE_LP_DEPLOYMENTS) {
-    const lpId = lpIdBySlug[dep.lpSlug] ?? null
+    const lpId = await stockLandingPageId(payload, dep.templateKey)
     const siteId = sites[Math.min(dep.siteIndex, sites.length - 1)] ?? null
     if (!lpId || siteId == null) continue
     const existing = await payload.find({
@@ -94,7 +92,7 @@ const seedBase = async (payload: Payload, sites: number[]): Promise<void> => {
     })
   }
 
-  // 3) Sample MVA Tiered Quiz, matched by slug.
+  // 2) Sample MVA Tiered Quiz, matched by slug.
   let quizId: number | null = null
   const existingQuiz = await payload.find({ collection: 'funnel-quizzes', where: { slug: { equals: 'mva' } }, limit: 1, overrideAccess: true })
   if (existingQuiz.docs[0]) {
@@ -109,7 +107,7 @@ const seedBase = async (payload: Payload, sites: number[]): Promise<void> => {
     quizId = Number(created.id)
   }
 
-  // 4) Sample quiz deployment bound to the first site.
+  // 3) Sample quiz deployment bound to the first site.
   const qSiteId = sites[0] ?? null
   let quizDeploymentId: string | null = null
   if (quizId != null && qSiteId != null) {
@@ -229,32 +227,17 @@ const seedOnce = async (payload: Payload): Promise<void> => {
 // and Quiz deployment from day one — no manual 'now go to the LP builder
 // and create a deployment for this brand' step.
 // -----------------------------------------------------------------------------
-const ensureMvaLandingPageId = async (payload: Payload): Promise<number | null> => {
-  // The "MVA Pain First" brandless LP is the canonical starter. If for some
-  // reason it doesn't exist yet, seed it on the fly.
-  const slug = 'mva-pain-first'
-  const existing = await payload.find({
-    collection: 'funnel-landing-pages',
-    where: { slug: { equals: slug } },
-    limit: 1,
-    overrideAccess: true,
-  })
-  if (existing.docs[0]) return Number(existing.docs[0].id)
-  const spec = SAMPLE_LANDING_PAGES.find((p) => p.slug === slug) ?? SAMPLE_LANDING_PAGES[0]
-  const created = await payload.create({
-    collection: 'funnel-landing-pages',
-    data: {
-      name: spec.name,
-      slug: spec.slug,
-      template_id: spec.template_id,
-      angle: spec.angle,
-      is_published: spec.is_published,
-      sections: buildSeedSections(),
-    },
-    overrideAccess: true,
-  })
-  return Number(created.id)
-}
+/**
+ * The stock template every new brand's starter deployment is bound to.
+ *
+ * This used to seed a sample page called "MVA Pain First" on the fly if it was
+ * absent, which is how deleting that sample from the library silently
+ * re-created it on the next brand. It now names the stock row and creates
+ * nothing: if the library has not been materialised yet, the caller records a
+ * warning and the brand is still usable.
+ */
+const starterLandingPageId = async (payload: Payload): Promise<number | null> =>
+  stockLandingPageId(payload, STARTER_LP_TEMPLATE_KEY)
 
 const ensureMvaQuizId = async (payload: Payload): Promise<number | null> => {
   const existing = await payload.find({
@@ -338,9 +321,9 @@ export const seedStarterFunnelsForBrand = async (
 
   let lpId: number | null = null
   try {
-    lpId = await ensureMvaLandingPageId(payload)
+    lpId = await starterLandingPageId(payload)
   } catch (err) {
-    warnings.push(logStep(siteId, 'ensureMvaLandingPageId', err))
+    warnings.push(logStep(siteId, 'starterLandingPageId', err))
   }
 
   // Pull the brand's slug + display name so deployment paths and names
@@ -423,7 +406,7 @@ export const seedStarterFunnelsForBrand = async (
         const dep = await payload.create({
           collection: 'funnel-lp-deployments',
           data: {
-            name: `${displayName} · MVA Pain First`,
+            name: `${displayName} · Human Recovery Story`,
             landing_page: lpId,
             site: siteId,
             domain: domainId,
@@ -439,7 +422,7 @@ export const seedStarterFunnelsForBrand = async (
       warnings.push(logStep(siteId, 'lp deployment create', err))
     }
   } else {
-    warnings.push('lp deployment skipped: no brandless MVA LP available')
+    warnings.push(`lp deployment skipped: no stock landing-page template row for "${STARTER_LP_TEMPLATE_KEY}" yet`)
   }
 
   return { ok: true, quizDeploymentId, quizPath, lpDeploymentId, lpPath, warnings }

@@ -89,6 +89,19 @@ export const FunnelLpDeployments: CollectionConfig = {
           'This deployment\'s own copy, keyed by the template\'s slot ids. Overrides ONLY: a slot with no entry renders the stock template\'s wording, so a corrected template reaches every deployment at once and no deployment holds a private copy of the markup.',
       },
     },
+    /**
+     * Where this placement sends people, overriding the brand's own URLs.
+     *
+     * A landing page that embeds a quiz genuinely delivers leads, so the
+     * destination cascade (deployment -> brand -> site page, see
+     * src/lib/quiz-destinations.ts) has to have a deployment rung on this side
+     * too. Without it the `Destination URL's` tab would be a tab about nothing.
+     */
+    { name: 'destination_overrides', type: 'json' },
+    /** UTM defaults for this placement. */
+    { name: 'utm', type: 'json' },
+    /** Per-provider pixel ids for this placement. */
+    { name: 'pixels', type: 'json' },
     {
       name: 'status',
       type: 'select',

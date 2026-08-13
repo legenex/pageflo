@@ -5,8 +5,8 @@ import { siteToBrand, type DomainLite } from './brand-map'
 import { normalizeDeploymentPath } from './quiz-deployment-path'
 import { isClaimedByAuthoredContent, pathVariantsFor } from './public-path-claims'
 import { resolveEmbeddedQuiz, resolveQuizDeploymentById, type ResolvedQuizDeployment } from './quiz-deployment'
-import { recommendedQuizTemplateFor } from './template-registry'
-import { resolveForRender, reportTemplateFallback } from './template-registry'
+import { recommendedQuizTemplateFor, resolveTemplate } from './template-registry'
+import { asSlotted } from './lp-templates'
 
 /**
  * Server-side resolution of a public funnel landing page.
@@ -29,15 +29,18 @@ export type PublicLandingPage = {
   /** Canonical: aliases already resolved, never a raw stored value. */
   templateId: string
   /**
-   * True when the stored id named no template and a stand-in was drawn. Carried
-   * on the resolved object rather than only logged, so a preflight can refuse to
-   * publish a page whose template does not exist and the builder can badge it.
+   * Always false on this side now: an unresolvable id refuses to serve instead
+   * of drawing a stand-in. Kept because the shared publish preflight reads the
+   * same field for both kinds of deployment.
    */
   templateFellBack: boolean
-  /** The id that was stored, when it differs from what rendered. */
+  /** The raw stored id, so a report can name what an operator actually wrote. */
   requestedTemplateId: string
   angle: string
+  /** Node-renderer copy. Empty for the twelve ported templates, which use slots. */
   sections: unknown[]
+  /** The TEMPLATE's own slot copy, before this deployment's overrides. */
+  slotOverrides: Record<string, string>
 }
 
 export type PublicLpDeployment = {
@@ -66,12 +69,27 @@ export type PublicLpDeployment = {
 export type ResolvedLpDeployment = {
   deployment: PublicLpDeployment
   landingPage: PublicLandingPage
+  /**
+   * The slot map the renderer must be given: template copy with the
+   * deployment's copy layered on top. Precomputed so the two callers that
+   * render a landing page cannot merge it two different ways.
+   */
+  composedOverrides: Record<string, string>
   brand: ReturnType<typeof siteToBrand>
   /** The quiz that runs in the hero, already themed. Null when none is linked. */
   quiz: ResolvedQuizDeployment | null
   siteId: number
   siteSlug: string
 }
+
+/**
+ * One grep-able prefix for every reason a landing page declined to serve.
+ *
+ * These are refusals, not fallbacks. The old code drew SOMETHING for a bad
+ * template id, so the only evidence was a page that looked wrong to whoever
+ * happened to open it.
+ */
+export const LP_TEMPLATE_REFUSED = '[lp-deployment] refused'
 
 const relId = (v: unknown): string =>
   v == null ? '' : typeof v === 'object' ? String((v as { id: unknown }).id ?? '') : String(v)
@@ -168,8 +186,42 @@ const resolveLpDeploymentUncached = async (
   // everywhere, not only where someone remembered to pause a deployment.
   if (!includeUnpublished && !lpDoc.is_published) return null
 
+  /*
+   * The template is resolved BEFORE the content gate, because which content a
+   * page needs depends on which renderer draws it.
+   *
+   * Strict, and no stand-in. `resolveForRender` used to hand back template zero
+   * for an id that named nothing, which meant a landing page could serve a
+   * different law firm's design than the one an operator chose and the only
+   * evidence was that the page looked wrong. On a legal-advertising page,
+   * serving nothing is the better side of that trade.
+   */
+  const templateRes = resolveTemplate('lp', lpDoc.template_id)
+  if (!templateRes.ok || templateRes.template.kind !== 'lp') {
+    console.warn(
+      `${LP_TEMPLATE_REFUSED}: deployment ${doc.id} (page ${lpDoc.id}) stores template_id ` +
+        `"${String(lpDoc.template_id ?? '')}" — ${templateRes.ok ? 'not a landing-page template' : templateRes.error}. Not served.`,
+    )
+    return null
+  }
+  const template = templateRes.template
+
+  /*
+   * Sections are required only by the renderer that reads them.
+   *
+   * The twelve ported templates are the handoff's own markup: `render.tsx`
+   * returns the PortedTemplateView branch before it ever looks at
+   * `toNodeSections(sections)`, and their editable copy lives in slot overrides
+   * instead. A blanket "no sections, no page" gate therefore 404s every
+   * deployment of a stock template — which is every deployment, once templates
+   * are records. The four identity templates genuinely have nothing to draw
+   * without sections, and still refuse.
+   */
   const sections = Array.isArray(lpDoc.sections) ? (lpDoc.sections as unknown[]) : []
-  if (sections.length === 0) return null
+  if (template.renderer === 'identity' && sections.length === 0) return null
+
+  /** The template's OWN copy. A deployment layers its copy over this. */
+  const templateSlotOverrides = normalizeOverrides(lpDoc.slot_overrides)
 
   const siteDoc = await payload
     .findByID({ collection: 'sites', id: siteId, depth: 0, overrideAccess: true })
@@ -219,14 +271,25 @@ const resolveLpDeploymentUncached = async (
       ? await resolveQuizDeploymentById(quizDeploymentId, siteId, includeUnpublished)
       : null
 
-  // Resolved here, once, rather than by whichever renderer reads the row. The
-  // template id travels canonical from this point, so the metadata pass, the
-  // render and any preflight all agree, and a stored id that names nothing is
-  // written to the log instead of quietly becoming template zero.
-  const templateRes = reportTemplateFallback(
-    `lp deployment ${doc.id}`,
-    resolveForRender('lp', lpDoc.template_id),
-  )
+  /*
+   * A page that was BUILT to run a quiz and cannot must not serve.
+   *
+   * The failure this closes is quieter than a 404 and worse: the renderer takes
+   * `hasForm={Boolean(resolved.quiz)}`, so an unresolvable quiz produced a live
+   * lead-generation page, at its real URL, under the brand, with no form on it.
+   * Nothing in the funnel reports zero conversions as an error.
+   *
+   * Only when a quiz was BOUND. A landing page with no quiz at all is a
+   * legitimate thing to publish and is untouched.
+   */
+  if ((ownQuizId || quizDeploymentId) && !quiz) {
+    console.warn(
+      `${LP_TEMPLATE_REFUSED}: deployment ${doc.id} binds a quiz ` +
+        `(${ownQuizId ? `flow ${ownQuizId}` : `deployment ${quizDeploymentId}`}) that did not resolve. ` +
+        'Not served, rather than served without its form.',
+    )
+    return null
+  }
 
   return {
     deployment: {
@@ -243,12 +306,26 @@ const resolveLpDeploymentUncached = async (
       id: String(lpDoc.id),
       name: String(lpDoc.name ?? ''),
       slug: String(lpDoc.slug ?? ''),
-      templateId: templateRes.template.id,
-      templateFellBack: templateRes.usedFallback,
-      requestedTemplateId: templateRes.requestedId,
+      templateId: template.id,
+      // Resolution is strict now, so this can only be false. The field stays
+      // because the shared publish preflight reads it for both kinds and the
+      // quiz side is a different resolver.
+      templateFellBack: false,
+      requestedTemplateId: String(lpDoc.template_id ?? ''),
       angle: String(lpDoc.angle ?? 'pain'),
       sections,
+      slotOverrides: templateSlotOverrides,
     },
+    /**
+     * What the renderer is actually given: the template's own copy with this
+     * deployment's copy on top.
+     *
+     * Merged here rather than in the renderer because there is exactly one
+     * right answer and more than one renderer entry point. A slot present in
+     * neither map draws the reference's wording, so a corrected template still
+     * reaches every deployment that has not overridden that slot.
+     */
+    composedOverrides: { ...templateSlotOverrides, ...normalizeOverrides(doc.content_overrides) },
     brand: siteToBrand(siteDoc as unknown as Record<string, unknown>, domainList),
     quiz,
     siteId,
@@ -273,19 +350,44 @@ export const lpDeploymentMeta = (
   resolved: ResolvedLpDeployment,
 ): { title: string; description: string; image: string | null } => {
   const { landingPage, brand, deployment } = resolved
+  const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
+
+  /*
+   * Where the copy is depends on which renderer draws the page.
+   *
+   * The four identity templates keep it in `sections[].copy`. The twelve ported
+   * ones have no sections at all — their words are slots — so reading only the
+   * hero section gave every stock-template page the same canned description and
+   * a title made of the deployment's internal name. That is a real regression
+   * in search and social, and it is invisible on the page itself.
+   */
+  const fromSlots = (): { headline: string; sub: string } => {
+    const res = resolveTemplate('lp', landingPage.templateId)
+    if (!res.ok || res.template.kind !== 'lp' || !res.template.template) {
+      return { headline: '', sub: '' }
+    }
+    const slots = asSlotted(res.template.template).slots
+    const pick = (role: string): string => {
+      const slot = slots.find((s) => s.role === role)
+      if (!slot) return ''
+      return str(resolved.composedOverrides[slot.id] ?? slot.default)
+    }
+    return { headline: pick('headline'), sub: pick('subheadline') || pick('trust_line') }
+  }
 
   const hero = (landingPage.sections as Array<Record<string, unknown>>).find(
     (s) => s && s.type === 'hero',
   )
   const copy = (hero?.copy ?? {}) as Record<string, unknown>
-  const str = (v: unknown): string => (typeof v === 'string' ? v.trim() : '')
+  const slotCopy = hero ? { headline: '', sub: '' } : fromSlots()
 
   const brandName = brand.displayName || brand.name || ''
-  const headline = str(copy.headline) || deployment.name || landingPage.name
+  const headline = str(copy.headline) || slotCopy.headline || deployment.name || landingPage.name
   const title = [headline, brandName].filter(Boolean).join(' | ')
   const description =
     str(copy.subheadline) ||
     str(copy.sub) ||
+    slotCopy.sub ||
     brand.tagline ||
     `Find out where you stand${brandName ? ` with ${brandName}` : ''}. Takes about a minute.`
 

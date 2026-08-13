@@ -44,8 +44,10 @@ export type PublicQuizDeployment = {
   requestedTemplateId: string
   status: string
   embedPreviewBg: string
-  headerConfig: Record<string, unknown> | null
-  footerConfig: Record<string, unknown> | null
+  // No header/footer here on purpose: page chrome is authored on the brand
+  // (brand_identity.defaultHeader / defaultFooter, resolved by siteToBrand), so a
+  // deployment has nothing to say about it. The funnel_quiz_deployments columns
+  // are retained but no longer read.
   bodySectionOverrides: unknown[] | null
   destinationOverrides: DestinationMap
   utm: Record<string, unknown>
@@ -222,8 +224,6 @@ const hydrateQuizDeployment = async (
     requestedTemplateId: templateRes.requestedId,
     status: String(doc.status ?? 'draft'),
     embedPreviewBg: String(doc.embed_preview_bg ?? ''),
-    headerConfig: (doc.header_config ?? null) as Record<string, unknown> | null,
-    footerConfig: (doc.footer_config ?? null) as Record<string, unknown> | null,
     bodySectionOverrides: Array.isArray(doc.body_section_overrides)
       ? (doc.body_section_overrides as unknown[])
       : null,

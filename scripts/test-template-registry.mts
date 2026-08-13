@@ -268,15 +268,40 @@ t(!canonicalTemplateId('lp', '').ok, 'an empty id does not canonicalise')
  * was created pointing at a template that did not exist and rendered as
  * TEMPLATES[0]. A registry that only guards operator input would not have caught
  * that: the bad ids were in the repository.
+ *
+ * The sample landing PAGES no longer exist — a page and a template are one
+ * object now — so what is checked here is the starter deployments, which name a
+ * stock template directly.
  */
 {
-  const { SAMPLE_LANDING_PAGES } = await import('../src/components/builder/lp/section-copy.ts')
-  t(SAMPLE_LANDING_PAGES.length > 0, 'there are sample landing pages to check')
-  for (const s of SAMPLE_LANDING_PAGES) {
-    t(resolveTemplate('lp', s.template_id).ok, `seeded landing page "${s.slug}" names a template that resolves (${s.template_id})`)
+  const copy = await import('../src/components/builder/lp/section-copy.ts')
+  t(
+    !('SAMPLE_LANDING_PAGES' in copy),
+    'nothing exports SAMPLE_LANDING_PAGES any more — sample pages are not seeded',
+  )
+
+  const { SAMPLE_LP_DEPLOYMENTS, RETIRED_SAMPLE_LANDING_PAGES } = copy
+  t(SAMPLE_LP_DEPLOYMENTS.length > 0, 'there are starter deployments to check')
+  for (const d of SAMPLE_LP_DEPLOYMENTS) {
+    const res = resolveTemplate('lp', d.templateKey)
+    t(res.ok, `starter deployment "${d.name}" names a template that resolves (${d.templateKey})`)
+    // Must be one of the TWELVE, not a legacy identity id: a starter binds to
+    // the stock library, and `ensureTemplateRecords` only materialises those.
+    t(
+      res.ok && res.template.kind === 'lp' && res.template.stock,
+      `starter deployment "${d.name}" names a STOCK template (${d.templateKey})`,
+    )
   }
-  const distinct = new Set(SAMPLE_LANDING_PAGES.map((s) => s.template_id))
-  t(distinct.size === SAMPLE_LANDING_PAGES.length, 'the seeded samples are three DIFFERENT templates, not three names for one')
+
+  // The retirement table has to keep naming real templates: `retireSampleLandingPages`
+  // repoints a sample's deployments onto the stock row for the SAME renderer,
+  // and an id that resolves to nothing would leave the sample in place forever.
+  for (const s of RETIRED_SAMPLE_LANDING_PAGES) {
+    t(
+      resolveTemplate('lp', s.template_id).ok,
+      `retired sample "${s.slug}" names a template that still resolves (${s.template_id})`,
+    )
+  }
 
   const collections = readFileSync(new URL('../src/collections/FunnelLandingPages.ts', import.meta.url).pathname, 'utf8')
   const lpDefault = collections.match(/name: 'template_id'[^}]*defaultValue: '([^']+)'/)?.[1]

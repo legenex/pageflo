@@ -9,8 +9,9 @@
 //      brand identity — colours, fonts, logos, taglines, display name.
 //      They beat brand_identity.* every time.
 //   2. brand_identity.* (JSON column) is for funnel-only extensions:
-//      contact CTA copy, legal disclaimer, default body sections, bg
-//      pattern. Anything that has no Site.brand equivalent.
+//      contact CTA copy, legal disclaimer, default body sections, default
+//      page chrome (header + footer), bg pattern. Anything that has no
+//      Site.brand equivalent.
 //
 // So: editing a colour in the Site brand editor instantly recolours every
 // quiz, LP, advertorial, and site page that points at that Site, even if
@@ -30,6 +31,19 @@ export type DomainLite = {
 }
 
 const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback)
+
+const obj = (v: unknown): Record<string, unknown> =>
+  v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
+
+const bool = (v: unknown, fallback: boolean): boolean => (typeof v === 'boolean' ? v : fallback)
+
+// Sizes are pixel values a renderer puts straight into a style, so a stored 0 or
+// a negative is treated as "not set" rather than passed through - a zero-height
+// logo or zero-size copyright line is not a choice the editor can express, and
+// on an attorney-advertising page an invisible disclaimer is the failure mode
+// worth spending a branch on.
+const num = (v: unknown, fallback: number): number =>
+  typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : fallback
 
 // Field-by-field "non-empty wins" merge for nested colour/typography/etc.
 // objects. brand_identity's fields fill in any slot Site.brand left empty
@@ -213,6 +227,41 @@ export function siteToBrand(s: Record<string, unknown>, domainList: DomainLite[]
   if (!urls.privacy && legalResolved.privacyUrl) urls.privacy = legalResolved.privacyUrl
   if (!urls.terms && legalResolved.termsUrl) urls.terms = legalResolved.termsUrl
 
+  // Standalone page chrome (the header strip and the footer) is a BRAND concern,
+  // not a per-placement one: a brand's pages wear one header, and authoring it on
+  // each deployment meant two deployments of the same quiz could disagree about
+  // whose logo and whose copyright line the visitor saw.
+  //
+  // Every field resolves to a real value even when brand_identity has no chrome
+  // at all, which is the whole point of deriving rather than defaulting to null:
+  // the footer carries legal.copyright, and on an attorney-advertising page a
+  // missing copyright line is a compliance regression, not a cosmetic one.
+  const callDigits = contactResolved.callNumber.replace(/[^\d+]/g, '')
+  const callHref = callDigits ? `tel:${callDigits}` : ''
+  const headerIdentity = obj(identity.defaultHeader)
+  const headerCta = obj(headerIdentity.ctaButton)
+  const defaultHeader = {
+    logoEnabled: bool(headerIdentity.logoEnabled, true),
+    ctaButton: {
+      // A brand with no number has nothing to dial, so the button is off by
+      // default rather than rendering a dead `tel:`.
+      enabled: bool(headerCta.enabled, Boolean(callHref)),
+      // The brand already authors its call-to-action copy once, under contact.
+      // Reading it here is what stops the header saying one thing and every
+      // in-page call button saying another.
+      text: str(headerCta.text) || contactResolved.callCtaText,
+      url: str(headerCta.url) || callHref,
+      fontSize: num(headerCta.fontSize, 11),
+    },
+  }
+  const footerIdentity = obj(identity.defaultFooter)
+  const defaultFooter = {
+    logoEnabled: bool(footerIdentity.logoEnabled, true),
+    logoSize: num(footerIdentity.logoSize, 32),
+    showCopyright: bool(footerIdentity.showCopyright, true),
+    fontSize: num(footerIdentity.fontSize, 12),
+  }
+
   // Top-level scalars: Site.brand wins, fall back to brand_identity, then
   // to a sensible default.
   const pick = (siteVal: string, identityKey: string, fallback = ''): string => {
@@ -254,6 +303,8 @@ export function siteToBrand(s: Record<string, unknown>, domainList: DomainLite[]
     bgPattern: (typeof identity.bgPattern === 'string' && identity.bgPattern) || 'plus',
     bgColor: colorsResolved.background,
     defaultBodySections: Array.isArray(identity.defaultBodySections) ? (identity.defaultBodySections as unknown[]) : [],
+    defaultHeader,
+    defaultFooter,
     __domainCount: domainList.length,
     __domains: domainList,
   }

@@ -440,8 +440,13 @@ export function QuizRuntime({
   const pagePal = resolvePagePalette(brand, templateId)
   const standalone = !chromeless
   const sections = deployment?.bodySectionOverrides || brand?.defaultBodySections || []
-  const headerConfig = deployment?.headerConfig
-  const footerConfig = deployment?.footerConfig
+  // Page chrome comes from the BRAND, never from the placement. Two deployments
+  // of one quiz under one brand cannot disagree about whose logo, whose call
+  // button and whose copyright line the page shows, because there is only one
+  // place to author it. brand-map resolves both objects for every brand, so the
+  // standalone page can never lose its footer copyright.
+  const headerConfig = brand?.defaultHeader
+  const footerConfig = brand?.defaultFooter
   const progress = quiz.steps.length ? Math.min(100, ((stepIdx + 1) / quiz.steps.length) * 100) : 0
 
   // Destinations resolve deployment -> brand -> site page. Computed here and
