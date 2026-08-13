@@ -33,6 +33,7 @@ import { join, basename } from 'node:path'
 
 import { runReferenceComponent, expandReference } from './lp-reference-runtime.mjs'
 import { extractSlots } from '../src/lib/lp-slots/extract.ts'
+import { stripAnnotationChips, remainingAnnotationTokens } from '../src/lib/lp-slots/strip-annotations.ts'
 import { defaultHtml, validateTemplateSlots } from '../src/lib/lp-slots/model.ts'
 
 const REVIEW = process.argv[2] ?? 'review'
@@ -142,6 +143,17 @@ for (const file of files) {
   const { html: expanded, loops } = expandReference(html, values)
   html = expanded
 
+  // The designer's own notes about what belongs where. Nothing resolves them,
+  // so left in they reach a visitor as literal braces; a browser-level render
+  // check found sixteen doing exactly that across five templates.
+  const stripped = stripAnnotationChips(html)
+  html = stripped.html
+  const leftover = remainingAnnotationTokens(html)
+  if (leftover.length > 0) {
+    console.error(`  ${slug}: annotation tokens survived the strip: ${[...new Set(leftover)].join(', ')}`)
+    process.exitCode = 1
+  }
+
   const seen = new Map()
   html = html.replace(/#([0-9a-fA-F]{6}|[0-9a-fA-F]{3})\b/g, (hex) => {
     const token = tokenFor(hex)
@@ -215,6 +227,7 @@ export const unsupported: LpUnsupportedRegion[] = ${JSON.stringify(slotted.unsup
   console.log(
     `  ${slug.padEnd(28)} ${String(html.length).padStart(6)} bytes  ${String(tokens.length).padStart(2)} tokens  ` +
     `${String(slotted.slots.length).padStart(3)} slots  ${loops ? `${loops} loop(s)  ` : ''}` +
+    `${stripped.chipsRemoved + stripped.containersRemoved ? `-${stripped.chipsRemoved + stripped.containersRemoved} anno  ` : ''}` +
     `${validation.ok ? 'valid' : `INVALID (${validation.problems.length})`}${note ? `  [${note}]` : ''}`,
   )
   for (const p of validation.problems) console.log(`      ${p.code}: ${p.detail}`)

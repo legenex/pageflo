@@ -10,7 +10,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, Settings, Eye, Power, PowerOff, ListChecks, Rocket, Edit3, Copy, Trash2,
-  Plus, Code2, Save, X, Undo2, Redo2, Archive, ArchiveRestore, Loader2, Check, AlertTriangle,
+  Plus, Code2, Save, X, Undo2, Redo2, Archive, ArchiveRestore, Loader2, Check, AlertTriangle, LayoutTemplate,
 } from 'lucide-react'
 import { T, Btn, Input, Select, Label, Pill, IconBtn, ConfirmDialog, Toast, PageHeader } from '../ui'
 import { BodySectionEditor, AddBodySectionPicker, BODY_SECTION_DEFS } from '../body-sections'
@@ -32,6 +32,7 @@ import {
 } from '@/app/(app)/admin/(top)/quizzes/actions'
 import { buildQuizEmbedSnippet, QUIZ_EMBED_INCOMPLETE } from '@/lib/quiz-embed'
 import { selectableOptions } from '@/lib/selectable'
+import { TemplateLibrary } from '@/components/builder/templates/TemplateLibrary'
 import { BrandQuickEdit } from '../brand/BrandQuickEdit'
 import {
   DESTINATION_KEYS, DESTINATION_LABELS, resolveDestination, destinationOrigin, isSafeDestinationUrl,
@@ -113,7 +114,17 @@ const QuizBuilderTopBar = ({
 )
 
 const QuizBuilderTabBar = ({ active, onChange }) => {
-  const tabs = [{ id: 'quizzes', label: 'Quizzes', icon: ListChecks }, { id: 'deployments', label: 'Deployments', icon: Rocket }]
+  // Three surfaces, and the third is not a nicety. "Which twenty templates are
+  // there" was a question the product could not answer: the only way to see one
+  // was to already be editing a deployment, so people picked whatever was
+  // already selected. The catalogue is the STOCK registry, never the quizzes
+  // people have built - see TemplateLibrary for why that distinction is load
+  // bearing.
+  const tabs = [
+    { id: 'quizzes', label: 'Quiz Builder', icon: ListChecks },
+    { id: 'deployments', label: 'Deployments', icon: Rocket },
+    { id: 'templates', label: 'Templates', icon: LayoutTemplate },
+  ]
   return <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 4px', borderBottom: `1px solid ${T.border}` }}>
     {tabs.map((t) => {
       const isActive = active === t.id
@@ -264,9 +275,15 @@ const DeploymentListView = ({ deployments, quizzes, brands, onOpen, onClone, onD
 
 const ListShell = ({ tab, onTabChange, onCreate, children }) => {
   const createLabel = { quizzes: 'New Quiz', deployments: 'New Deployment' }[tab]
-  const subheading = { quizzes: 'Flow logic. The questions, routing, tier conditions.', deployments: 'Live URLs. A quiz at a domain and path under a specific brand.' }[tab]
+  const subheading = {
+    quizzes: 'Flow logic. The questions, routing, tier conditions.',
+    deployments: 'Live URLs. A quiz at a domain and path under a specific brand.',
+    templates: 'The stock visual library. Every preview is a real render, not a picture of one.',
+  }[tab]
   return <div style={{ flex: 1, padding: '24px 32px', overflowY: 'auto' }}>
-    <PageHeader title="Quizzes" subtitle={subheading} primaryAction={<Btn variant="primary" size="md" icon={Plus} onClick={onCreate}>{createLabel}</Btn>} />
+    {/* The Templates tab is a catalogue, not a workspace: there is nothing to
+        create on it, and an action that did nothing would be worse than none. */}
+    <PageHeader title="Quizzes" subtitle={subheading} primaryAction={createLabel ? <Btn variant="primary" size="md" icon={Plus} onClick={onCreate}>{createLabel}</Btn> : null} />
     <QuizBuilderTabBar active={tab} onChange={onTabChange} />
     <div style={{ marginTop: 18 }}>{children}</div>
   </div>
@@ -1130,6 +1147,7 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
         onPreview={(id) => { openQuiz(id); setPreviewSource('list-quizzes'); setPreviewDeploymentId(null); setView('preview') }}
         onRename={(id, name) => patchQuizById(id, { name })}
       />}
+      {tab === 'templates' && <TemplateLibrary kind="quiz" brands={brands} />}
       {tab === 'deployments' && <DeploymentListView deployments={deployments} quizzes={quizzes} brands={brands} onOpen={openDeployment} onClone={cloneDeploymentHandler} onDelete={deleteDeploymentHandler} onToggleStatus={toggleDeploymentStatus} onCopyEmbed={(id) => setShowEmbed(id)} onPreview={(id) => { const dep = deployments.find((d) => d.id === id); if (!dep) return; openQuiz(dep.quizId); setPreviewSource('list-deployments'); setPreviewDeploymentId(id); setView('preview') }} onRename={(id, name) => { const d = deployments.find((x) => x.id === id); setDeployments((ds) => ds.map((x) => x.id === id ? { ...x, name } : x)); if (d) saveQuizDeployment({ deployment: { ...d, name } }) }} />}
     </ListShell>}
 

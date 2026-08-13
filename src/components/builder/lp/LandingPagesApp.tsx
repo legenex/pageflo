@@ -10,6 +10,8 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { selectableOptions } from '@/lib/selectable'
+import { TemplateLibrary } from '@/components/builder/templates/TemplateLibrary'
+import { EXPECTED_LP_TEMPLATE_COUNT } from '@/lib/template-registry'
 import {
   Rocket, Eye, Edit3, Copy, Power, PowerOff, Trash2, EyeOff, Layers, Sparkles, Save,
   X, Plus, Check, Loader2, Palette, ChevronRight, MoveUp, MoveDown, Plug,
@@ -1026,13 +1028,25 @@ export function LandingPagesApp({ initialLandingPages, initialDeployments, brand
           title="Landing Pages"
           subtitle="Brandless pages with placeholders. Deploy each page to one or more brand domains."
           primaryAction={
-            lpTab === 'pages'
-              ? <Btn variant="primary" size="md" icon={Sparkles} onClick={() => setAiWizardOpen(true)}>New with Claude</Btn>
-              : <Btn variant="primary" size="md" icon={Plus} onClick={() => { setEditingDeployment({ id: '', landingPageId: '', brandId: '', domain: '', path: '/c/', quizDeploymentId: '', status: 'draft' }); setSubView('lp_deployment_edit') }}>New Deployment</Btn>
+            // The Templates tab is a catalogue of the stock library. There is
+            // nothing to create on it, and an action that did nothing there
+            // would be worse than no action.
+            lpTab === 'templates'
+              ? null
+              : lpTab === 'pages'
+                ? <Btn variant="primary" size="md" icon={Sparkles} onClick={() => setAiWizardOpen(true)}>New with Claude</Btn>
+                : <Btn variant="primary" size="md" icon={Plus} onClick={() => { setEditingDeployment({ id: '', landingPageId: '', brandId: '', domain: '', path: '/c/', quizDeploymentId: '', status: 'draft' }); setSubView('lp_deployment_edit') }}>New Deployment</Btn>
           }
           secondaryAction={lpTab === 'pages' ? <Btn variant="secondary" size="md" icon={Plus} onClick={createBlankLP}>Blank LP</Btn> : null}
         />
-        <TabBar active={lpTab} onChange={setLpTab} tabs={[{ id: 'pages', label: 'Pages', count: landingPages.length }, { id: 'deployments', label: 'Deployments', count: lpDeployments.length }]} />
+        {/* The twelve are the STOCK library, so the count is the registry's, not
+            the number of pages somebody has built from it. Listing content under
+            the catalogue's name is how a library stops describing what exists. */}
+        <TabBar active={lpTab} onChange={setLpTab} tabs={[
+          { id: 'pages', label: 'Pages', count: landingPages.length },
+          { id: 'templates', label: 'Templates', count: EXPECTED_LP_TEMPLATE_COUNT },
+          { id: 'deployments', label: 'Deployments', count: lpDeployments.length },
+        ]} />
         <div style={{ marginTop: 18 }}>
           {lpTab === 'pages' && (
             <LandingPagesListView
@@ -1046,6 +1060,7 @@ export function LandingPagesApp({ initialLandingPages, initialDeployments, brand
               onRename={renameLP}
             />
           )}
+          {lpTab === 'templates' && <TemplateLibrary kind="lp" brands={brands} />}
           {lpTab === 'deployments' && (
             <LPDeploymentListView
               deployments={lpDeployments}

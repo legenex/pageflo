@@ -181,6 +181,59 @@ export function onPrimaryText(brandPrimary: string): string {
 }
 
 /**
+ * The brand's accent, at a lightness that is READABLE on a given ground.
+ *
+ * `getSafeTextColor` picks from a candidate list and therefore answers "what
+ * colour can this text be"; this answers a different question — "how light must
+ * THIS colour be to work here" — and the difference matters because an accent
+ * carries brand identity. Substituting a safe near-black for a brand's gold
+ * makes the page readable and stops it being that brand's page.
+ *
+ * So hue and saturation are held and only lightness moves, in one direction
+ * chosen by the ground, until the ratio clears. A browser-level check across
+ * the twelve ported templates found this: with the raw primary used directly, a
+ * gold-accented brand produced between 25 and 143 unreadable text runs PER
+ * TEMPLATE, and a red-accented one produced up to 22. The reference designs
+ * were readable; what broke them was substituting a brand colour into a slot
+ * whose contrast nobody re-verified.
+ *
+ * Returns the closest it got when no lightness clears the target — an accent
+ * that is as readable as its hue allows, never white-on-white, and the caller
+ * can see the achieved ratio.
+ */
+export function readableAccent(
+  accentHex: string,
+  groundHex: string,
+  minRatio = 4.5,
+): { hex: string; ratio: number; adjusted: boolean } {
+  const rgb = parseHex(accentHex)
+  const groundLum = relativeLuminance(groundHex)
+  if (!rgb || groundLum == null) return { hex: accentHex, ratio: 1, adjusted: false }
+
+  const start = contrastRatio(accentHex, groundHex) ?? 1
+  if (start >= minRatio) return { hex: accentHex, ratio: start, adjusted: false }
+
+  const [h, s] = rgbToHsl(rgb)
+  // Away from the ground: darken on a light ground, lighten on a dark one.
+  // Going the other way can also reach the ratio, at the cost of an accent that
+  // reads as a different colour entirely.
+  const goDarker = groundLum > 0.5
+  let best = { hex: accentHex, ratio: start, adjusted: false }
+
+  for (let step = 1; step <= 100; step++) {
+    const [, , l0] = rgbToHsl(rgb)
+    const l = goDarker ? Math.max(0, l0 - step / 100) : Math.min(1, l0 + step / 100)
+    const hex = hslToHex(h, s, l)
+    const ratio = contrastRatio(hex, groundHex)
+    if (ratio == null) continue
+    if (ratio > best.ratio) best = { hex, ratio, adjusted: true }
+    if (ratio >= minRatio) return { hex, ratio, adjusted: true }
+    if (l === 0 || l === 1) break
+  }
+  return best
+}
+
+/**
  * Effective OPAQUE base color for a translucent overlay sitting on a backdrop.
  * Used by glass/gradient templates: text sits on rgba(overlay, alpha) over
  * `backdropHex`. We composite to an opaque hex so getSafeTextColor can run.
