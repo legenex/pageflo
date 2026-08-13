@@ -135,9 +135,82 @@ export const stripAnnotationChips = (html: string): StripResult => {
   return { html: out, chipsRemoved, containersRemoved }
 }
 
+/* --------------------------------------------------- bracketed placeholders */
+
+/**
+ * The handoff's OTHER annotation: a bracketed upper-case label.
+ *
+ *     [LEGAL DISCLOSURE] · {{brand.disclaimer}} + {{brand.tcpaText}}
+ *     [CASE RESULT PLACEHOLDER]
+ *
+ * Same category as the chips above and the same consequence: `[LEGAL DISCLOSURE]`
+ * and `[CASE RESULT PLACEHOLDER]` were rendering on public landing pages under
+ * every brand, because nothing had a reason to remove them and no operator had
+ * a reason to expect them.
+ *
+ * They are NOT removed from the markup, which is the difference from the chips,
+ * and there are two independent reasons:
+ *
+ *  - the image-well detector keys on exactly this shape. `[LOGO SLOT]` inside a
+ *    dashed box is how a well is FOUND, so a pre-extraction strip would delete
+ *    every image slot in the library.
+ *  - parity is a claim about the handoff's own bytes, and the slots have to stay
+ *    re-derivable from the shipped markup. Emptying a default removes the text a
+ *    slot was derived from, so the slot would not survive a re-extraction.
+ *
+ * So the cleaned text becomes `liveDefault` — what a VISITOR is shown — and
+ * `default` stays the reference's. A default that was ONLY a label has no honest
+ * replacement: its `liveDefault` is empty and the slot is marked `mustSupply`,
+ * which the publish preflight refuses. `[CASE RESULT PLACEHOLDER]` is a case
+ * result on a legal advertising page, and the two acceptable outcomes are that
+ * an operator writes a real one or that the page does not go live.
+ */
+const BRACKET_PLACEHOLDER = /\s*[·•+:,;—–-]?\s*\[[A-Z0-9 ·/_-]{3,}\]\s*[·•+:,;—–-]?\s*/g
+
+/**
+ * The designer's concatenation instruction between two tokens.
+ *
+ * `{{brand.disclaimer}} + {{brand.tcpaText}}` means "these two, run together".
+ * Rendered literally a visitor reads "…not a law firm. + Message and data rates
+ * may apply.", which is the annotation surviving in a subtler form than the
+ * label did.
+ */
+const TOKEN_JOINER = /\}\}\s*\+\s*\{\{/g
+
+export type PlaceholderStrip = { text: string; removed: number; emptied: boolean }
+
+/** Remove bracketed placeholder labels from one slot default. */
+export const stripPlaceholderLabels = (value: string): PlaceholderStrip => {
+  BRACKET_PLACEHOLDER.lastIndex = 0
+  const matches = value.match(BRACKET_PLACEHOLDER)
+  if (!matches) return { text: value, removed: 0, emptied: false }
+
+  const text = value
+    .replace(BRACKET_PLACEHOLDER, ' ')
+    .replace(TOKEN_JOINER, '}} {{')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  return { text, removed: matches.length, emptied: text === '' }
+}
+
 /** Every annotation token still present. Empty is the passing state. */
 export const remainingAnnotationTokens = (html: string): string[] =>
   [...html.matchAll(/\{\{\s*((?:deployment|page)\.[\w.]+)\s*\}\}/g)].map((m) => m[1])
+
+/**
+ * Every bracketed placeholder label still present OUTSIDE an image well.
+ *
+ * The wells keep theirs by design — the label is what identifies a well, and the
+ * live render never emits one. Anything else is a label the extractor did not
+ * clean, and the extractor fails on it.
+ */
+export const remainingPlaceholderLabels = (
+  slots: Array<{ escaping: string; default: string; liveDefault?: string }>,
+): string[] =>
+  slots
+    .filter((s) => s.escaping !== 'image')
+    .flatMap((s) => [...(s.liveDefault ?? s.default).matchAll(/\[([A-Z0-9 ·/_-]{3,})\]/g)].map((m) => m[1]))
 
 /** Re-exported so the extractor can report on what it walked. */
 export { inner }

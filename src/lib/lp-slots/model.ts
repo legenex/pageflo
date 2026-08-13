@@ -37,7 +37,25 @@
  */
 
 import { RESOLVABLE_TOKEN_KEYS } from '@/components/builder/lp/tokens'
+import { relativeLuminance } from '@/lib/builder/page-lint'
+import { resolveCssColor } from '@/lib/lp-templates/resolve-css-color'
 import type { LpQuizMount } from './quiz-mount'
+
+/**
+ * Whether a template colour declaration paints something dark.
+ *
+ * Derived through the same variables the wrapper sets rather than guessed from
+ * the reference's own hex, so a light template deployed under a dark brand
+ * chooses the dark-ground logo. An unresolvable declaration answers `false` —
+ * the light mark — because that is what the references themselves assume and a
+ * wrong guess in the other direction hides a dark logo on a dark band.
+ */
+const isDarkDeclaration = (declaration: string, vars?: Record<string, string>): boolean => {
+  const hex = resolveCssColor(declaration, vars ?? {})
+  if (!hex) return false
+  const lum = relativeLuminance(hex)
+  return lum != null && lum < 0.5
+}
 
 /* ------------------------------------------------------------------- roles */
 
@@ -140,6 +158,47 @@ export type LpSlot = {
    * src slot emits, and the editor needs it to show the two together.
    */
   pairedWith?: string
+  /**
+   * What KIND of asset an image well is asking for.
+   *
+   * A LOGO has a brand-level answer and a neutral fallback — the brand's own
+   * name, set in the type the design chose for that well. Any other picture has
+   * neither, so an unfilled one is REMOVED rather than stood in for: a page with
+   * one fewer photograph is a page, and a page with a labelled grey rectangle on
+   * it is a mockup somebody published.
+   */
+  /**
+   * The reference has NO usable content for this slot, so an operator must
+   * write some before the page can go live.
+   *
+   * Set where the handoff's own content was only an annotation label —
+   * `[CASE RESULT PLACEHOLDER]` — which is a case result on a legal advertising
+   * page. There is no honest default for that, so the slot ships empty and the
+   * publish preflight refuses until somebody fills it. Distinct from `required`,
+   * which means "must not be BLANKED": a headline is required and ships with the
+   * reference's own perfectly good words.
+   */
+  mustSupply?: boolean
+  /**
+   * What a VISITOR is shown when nothing overrides this slot.
+   *
+   * Absent for almost every slot, where the reference's own copy is the answer.
+   * Present where the handoff's content carried one of its own annotations —
+   * `[LEGAL DISCLOSURE] · {{brand.disclaimer}}` cleans to the token alone — so
+   * `default` can stay the reference's bytes, which is what keeps parity a claim
+   * about the handoff and keeps the slots re-derivable from the shipped markup.
+   */
+  liveDefault?: string
+  assetKind?: 'logo' | 'image'
+  /** The reference's own presentation of an image well. See `renderImageWell`. */
+  well?: {
+    /** The well's opening tag verbatim, for its geometry. */
+    openTag: string
+    /** The style of the label inside it, reused when a brand falls back to its name. */
+    labelStyle: string
+    /** The opaque ground it sits on, for choosing a light or dark logo. */
+    surface: string
+  }
 }
 
 /**
@@ -219,6 +278,137 @@ export const isSafeImageUrl = (value: string): boolean => {
   return false
 }
 
+/* ------------------------------------------------------------ image wells */
+
+/**
+ * A brand's artwork, as an image well needs it.
+ *
+ * `vars` is the CSS variable table the template wrapper sets, so a well's own
+ * ground can be RESOLVED rather than assumed and a brand's light or dark logo
+ * chosen against the colour it will actually be seen on. Passing nothing there
+ * is honest and falls back to the light mark, which is what the references
+ * themselves assume.
+ */
+export type BrandAssets = {
+  logoUrl: string
+  logoUrlDark: string
+  /** What a brand with no artwork is called. Never empty on a real brand. */
+  wordmark: string
+  vars?: Record<string, string>
+}
+
+export type ComposeOptions = {
+  /** The brand's artwork. Absent means no brand is in hand. */
+  assets?: BrandAssets | null
+  /**
+   * Emit the reference's own placeholder wells verbatim.
+   *
+   * ONLY for the parity target. Every other caller degrades, because the
+   * default has to be the safe one: a caller that forgets this flag renders a
+   * page, and a caller that forgot the opposite flag published `[LOGO SLOT]` to
+   * a live public landing page, which is where this rule comes from.
+   */
+  keepReferencePlaceholders?: boolean
+}
+
+/**
+ * Turn a placeholder well's own style into a FILLED well's style.
+ *
+ * The design draws an empty well as a dashed frame around a grey fill. Both are
+ * the drawing of an absence: once something is in the well they are wrong, and
+ * a real brand logo arriving inside a dashed grey box was what shipped.
+ *
+ * The frame is made transparent rather than removed, so the well keeps the
+ * exact size it had — dropping a 1.5px border on both axes moves everything
+ * beside it by three pixels, which is a parity regression nobody would connect
+ * to a logo.
+ */
+export const filledWellStyle = (openTag: string): string => {
+  const style = /\sstyle\s*=\s*"([^"]*)"/i.exec(openTag)?.[1] ?? ''
+  return style
+    .split(';')
+    .map((decl) => {
+      const [rawProp, ...rest] = decl.split(':')
+      const prop = rawProp.trim().toLowerCase()
+      const value = rest.join(':').trim()
+      if (!prop || !value) return ''
+      if (prop === 'background' || prop === 'background-color' || prop === 'background-image') return ''
+      if (prop.startsWith('border') && /\bdashed\b/i.test(value)) {
+        const width = value.trim().split(/\s+/)[0]
+        return `${prop}:${width} solid transparent`
+      }
+      return `${prop}:${value}`
+    })
+    .filter(Boolean)
+    .join(';')
+}
+
+/** The element name an opening tag opens. */
+const tagNameOf = (openTag: string): string => (/^<([a-zA-Z][\w:-]*)/.exec(openTag)?.[1] ?? 'div').toLowerCase()
+
+/**
+ * What an image well renders as.
+ *
+ * Four outcomes, in this order:
+ *
+ *  1. THE DEPLOYMENT'S OWN URL. An operator who chose a picture gets it.
+ *  2. THE BRAND'S LOGO, for a well the design asked for a logo in. This is the
+ *     Brand Identity asset contract doing its job: a brand supplies its mark
+ *     once and every well in every template that wants one has it, rather than
+ *     an operator pasting the same URL into twelve deployments.
+ *  3. THE BRAND'S NAME, for a logo well when the brand has no mark. Set in the
+ *     type the design chose for that well, inside the well's own box. Every
+ *     brand has a name, so this outcome is always available and always says
+ *     something true.
+ *  4. NOTHING, for any other picture. A page with one fewer photograph is a
+ *     page. A page with a dashed grey rectangle labelled `[BRAND IMAGE SLOT]`
+ *     is a mockup somebody published, and that is what was measured live.
+ */
+const renderImageWell = (
+  slot: LpSlot,
+  url: string,
+  alt: string,
+  assets: BrandAssets | null | undefined,
+): string => {
+  const well = slot.well
+  const openTag = well?.openTag ?? ''
+  const tag = tagNameOf(openTag)
+  const geometry = filledWellStyle(openTag)
+  const isLogo = slot.assetKind === 'logo'
+
+  const picture = (src: string): string =>
+    `<${tag} style="${escapeHtmlText(geometry)}">` +
+    `<img src="${escapeHtmlText(src)}" alt="${escapeHtmlText(alt)}" loading="lazy" decoding="async" ` +
+    // `contain` for a mark, `cover` for a photograph. Cropping a logo to fill a
+    // box is how a brand's name loses its last two letters.
+    `style="display:block;width:100%;height:100%;object-fit:${isLogo ? 'contain' : 'cover'}"></${tag}>`
+
+  if (url) return picture(url)
+  if (!assets) return ''
+
+  if (isLogo) {
+    const dark = isDarkDeclaration(well?.surface ?? '', assets.vars)
+    // Through the same allow-list a deployment override goes through. A brand's
+    // logo URL is tenant input that reaches a `src`, so "it came from the brand
+    // record" is not a reason to trust it — that is exactly the reasoning that
+    // put a stored XSS in this component once already.
+    const candidates = dark
+      ? [assets.logoUrlDark, assets.logoUrl]
+      : [assets.logoUrl, assets.logoUrlDark]
+    const mark = candidates.find((c) => c && isSafeImageUrl(c) && c.trim() !== '') ?? ''
+    if (mark) return picture(mark)
+
+    const name = assets.wordmark.trim()
+    if (!name) return ''
+    return (
+      `<${tag} style="${escapeHtmlText(geometry)}">` +
+      `<span style="${escapeHtmlText(well?.labelStyle ?? '')}">${escapeHtmlText(name)}</span></${tag}>`
+    )
+  }
+
+  return ''
+}
+
 /* -------------------------------------------------------------- composition */
 
 export type ComposeResult = {
@@ -246,6 +436,7 @@ export type ComposeResult = {
 export const composeTemplate = (
   template: LpSlottedTemplate,
   overrides: LpSlotOverrides = {},
+  opts: ComposeOptions = {},
 ): ComposeResult => {
   const byId = new Map(template.slots.map((s) => [s.id, s]))
   const unknownOverrides = Object.keys(overrides).filter((k) => !byId.has(k))
@@ -270,37 +461,50 @@ export const composeTemplate = (
 
     const raw = Object.prototype.hasOwnProperty.call(overrides, id) ? overrides[id] : undefined
 
-    // An image slot's override is a URL, and an empty one means "no image", not
-    // "empty box": the reference's own placeholder is what an unfilled image
-    // looks like, and it is what keeps the default render byte-identical.
+    /*
+     * An image slot is a WELL — the reference's dashed box — and its override is
+     * a URL. Four things can be true of it and only one of them is "render the
+     * design's placeholder":
+     *
+     *  - an operator supplied a URL          -> that picture
+     *  - a brand supplied a logo             -> that mark, for a logo well
+     *  - a brand supplied neither            -> its name, or nothing
+     *  - the caller asked for the reference  -> the placeholder, for parity
+     *
+     * The last is a deliberate opt-in and the ONLY path that can put
+     * `[LOGO SLOT]` on a page, because that string was measured on a live public
+     * landing page and the default has to be the one that cannot do it.
+     */
     if (slot.escaping === 'image') {
       const url = (raw ?? '').trim()
-      if (url === '') { out.push(slot.default); continue }
-      if (!isSafeImageUrl(url)) {
-        refused.push({ id, reason: `"${url.slice(0, 60)}" is not an allowed image URL` })
-        out.push(slot.default)
-        continue
+      let safe = ''
+      if (url !== '') {
+        if (isSafeImageUrl(url)) safe = url
+        else refused.push({ id, reason: `"${url.slice(0, 60)}" is not an allowed image URL` })
       }
+      if (opts.keepReferencePlaceholders && safe === '') { out.push(slot.default); continue }
+
       const altSlot = slot.pairedWith ? byId.get(slot.pairedWith) : undefined
       const alt = altSlot
         ? (Object.prototype.hasOwnProperty.call(overrides, altSlot.id) ? overrides[altSlot.id] : altSlot.default)
         : ''
-      applied.push(id)
-      out.push(
-        `<img src="${escapeHtmlText(url)}" alt="${escapeHtmlText(alt)}" loading="lazy" ` +
-        `style="display:block;width:100%;height:100%;object-fit:cover">`,
-      )
+      if (safe !== '') applied.push(id)
+      out.push(renderImageWell(slot, safe, alt, opts.assets))
       continue
     }
 
-    if (raw === undefined || raw === slot.default) {
-      out.push(slot.default)
+    // What this slot says with nothing overriding it. The reference's own copy,
+    // except where that copy was an annotation the design was making to itself.
+    const stock = opts.keepReferencePlaceholders ? slot.default : slot.liveDefault ?? slot.default
+
+    if (raw === undefined || raw === slot.default || raw === stock) {
+      out.push(stock)
       continue
     }
 
     if (URL_ROLES.has(slot.role) && !isSafeImageUrl(raw)) {
       refused.push({ id, reason: `"${raw.slice(0, 60)}" is not an allowed image URL` })
-      out.push(slot.default)
+      out.push(stock)
       continue
     }
 
@@ -311,9 +515,15 @@ export const composeTemplate = (
   return { html: out.join(''), unknownOverrides, refused, applied }
 }
 
-/** The template exactly as the reference drew it. The parity target. */
+/**
+ * The template exactly as the reference drew it. The parity target.
+ *
+ * The one caller that WANTS the placeholder wells: parity is a claim about the
+ * asset, and an asset that degraded its own image wells would no longer be the
+ * handoff's markup.
+ */
 export const defaultHtml = (template: LpSlottedTemplate): string =>
-  composeTemplate(template, {}).html
+  composeTemplate(template, {}, { keepReferencePlaceholders: true }).html
 
 /* ------------------------------------------------------------- quiz mount */
 
@@ -393,9 +603,10 @@ const markMountTag = (openTag: string): string =>
 export const composeTemplateWithQuizMount = (
   template: LpSlottedTemplate,
   overrides: LpSlotOverrides = {},
+  opts: ComposeOptions = {},
 ): ComposeWithMountResult => {
   const mount = template.quizMount
-  const base = composeTemplate(template, overrides)
+  const base = composeTemplate(template, overrides, opts)
   if (!mount) {
     return {
       ...base,
@@ -428,7 +639,7 @@ export const composeTemplateWithQuizMount = (
     for (const k of keys) {
       if (Object.prototype.hasOwnProperty.call(overrides, k)) scoped[k] = overrides[k]
     }
-    return composeTemplate({ ...template, parts: ['', ''], slotIds: [id], quizMount: null }, scoped).html
+    return composeTemplate({ ...template, parts: ['', ''], slotIds: [id], quizMount: null }, scoped, opts).html
   }
 
   /**
@@ -623,6 +834,21 @@ export const validateOverrides = (
 ): SlotValidation => {
   const problems: SlotProblem[] = []
   const byId = new Map(template.slots.map((s) => [s.id, s]))
+
+  // Slots the reference could not fill. Checked over the TEMPLATE rather than
+  // over the overrides, because the failure here is an override that is absent
+  // — the one thing a loop over what was supplied can never see.
+  for (const slot of template.slots) {
+    if (!slot.mustSupply) continue
+    if (isInsideQuizMount(template, slot.id)) continue
+    const value = Object.prototype.hasOwnProperty.call(overrides, slot.id) ? overrides[slot.id] : ''
+    if (typeof value !== 'string' || value.trim() === '') {
+      problems.push({
+        code: 'missing_required_role',
+        detail: `"${slot.id}" (${slot.role}, ${slot.sectionLabel}) has no content: the design left a placeholder here and only you can say what belongs in it`,
+      })
+    }
+  }
 
   for (const [id, value] of Object.entries(overrides)) {
     const slot = byId.get(id)

@@ -75,16 +75,38 @@ const portedFor = (slug, context) => {
  * resolved a single brand token. The two halves of that defect are independent
  * and both had to be fixed for one placeholder to work.
  */
-const useComposed = (template, brand, overrides) =>
+/**
+ * The brand's artwork, in the shape an image well needs.
+ *
+ * This is the Brand Identity asset contract reaching the templates. A brand
+ * supplies its mark ONCE and every logo well in every template has it; a brand
+ * with no mark falls back to its own name; a well asking for a photograph and
+ * given nothing disappears. The one thing that can no longer happen is the
+ * reference's `[LOGO SLOT]` label reaching a visitor, which is what was measured
+ * on a live public landing page.
+ */
+const brandAssets = (brand, vars) => {
+  const str = (v) => (typeof v === 'string' ? v.trim() : '')
+  return {
+    logoUrl: str(brand?.logoUrl),
+    logoUrlDark: str(brand?.logoUrlDark),
+    wordmark: str(brand?.displayName) || str(brand?.name) || str(brand?.shortName),
+    vars,
+  }
+}
+
+const useComposed = (template, brand, overrides, vars) =>
   useMemo(() => {
     if (!template) return { html: '', htmlWithMount: '', refused: [], unknownOverrides: [], mountedSlotIds: [] }
-    const composed = composeTemplateWithQuizMount(asSlotted(template), overrides ?? {})
+    const composed = composeTemplateWithQuizMount(asSlotted(template), overrides ?? {}, {
+      assets: brandAssets(brand, vars),
+    })
     return {
       ...composed,
       html: resolveTokensForHtml(composed.html, { brand }),
       htmlWithMount: resolveTokensForHtml(composed.htmlWithMount, { brand }),
     }
-  }, [template, brand, overrides])
+  }, [template, brand, overrides, vars])
 
 /**
  * The live quiz, portalled into the card the reference drew.
@@ -153,7 +175,7 @@ export const PortedTemplateView = ({
   // none; the ported markup supplies its own reference values regardless.
   const palette = useMemo(() => resolveLpPalette(getLpIdentity('a'), brand), [brand])
   const style = useMemo(() => (template ? templateStyle(template, palette) : {}), [template, palette])
-  const composed = useComposed(template, brand, overrides)
+  const composed = useComposed(template, brand, overrides, style)
   const host = useRef(null)
 
   /*
@@ -219,7 +241,9 @@ export const portedTemplateDocument = (slug, brand, overrides = null) => {
   // Same two steps as the mounted view, through the same functions. A thumbnail
   // that composed differently from the page would be a preview of a page that
   // does not exist, which is the whole reason there is one composition path.
-  const composed = composeTemplate(asSlotted(template), overrides ?? {})
+  const composed = composeTemplate(asSlotted(template), overrides ?? {}, {
+    assets: brandAssets(brand, templateStyle(template, palette)),
+  })
   const html = resolveTokensForHtml(composed.html, { brand })
   return `<!doctype html><html><head><meta charset="utf-8">
 <link rel="stylesheet" href="${TEMPLATE_FONTS_HREF}">

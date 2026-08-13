@@ -56,7 +56,7 @@
  * facts about the handoff worth stopping on.
  */
 
-import { scan, walk, textOf, type ScannedNode } from './scan'
+import { scan, walk, textOf, openTagOf, opaqueBackgroundAt, type ScannedNode } from './scan'
 
 /** Sectioning elements. Expansion stops below them; see rule 5. */
 const SECTIONING = new Set(['section', 'header', 'footer', 'main', 'article', 'aside', 'nav', 'body'])
@@ -152,36 +152,6 @@ const hasNavButton = (html: string, root: ScannedNode): boolean => {
   return found
 }
 
-/**
- * The background declaration on one opening tag, verbatim.
- *
- * Both spellings, because the references use `background` far more often than
- * `background-color` and a rule that only read the long form would find nothing
- * in eleven of the twelve templates.
- */
-const backgroundOf = (openTag: string): string => {
-  const style = /\sstyle\s*=\s*"([^"]*)"/i.exec(openTag)?.[1] ?? ''
-  return (/(?:^|;)\s*background(?:-color)?\s*:\s*([^;]+)/i.exec(style)?.[1] ?? '').trim()
-}
-
-/** The verbatim opening tag of one element. */
-const openTagOf = (html: string, n: ScannedNode): string => html.slice(n.start, n.contentStart)
-
-/**
- * The nearest declared background at or above an element.
- *
- * A translucent value is skipped rather than returned: `rgba(255,255,255,.12)`
- * is a tint OVER something, so it is not the opaque colour a text contrast is
- * computed against, and treating it as one would produce a confident wrong
- * answer. Walking past it reaches the panel that actually supplies the ground.
- */
-const opaqueSurfaceAt = (html: string, start: ScannedNode): string => {
-  for (let n: ScannedNode | null = start; n; n = n.parent) {
-    const bg = backgroundOf(openTagOf(html, n))
-    if (bg && !/^(transparent$|rgba\()/i.test(bg)) return bg
-  }
-  return ''
-}
 
 /** An element carrying no text at all — a rail, a divider, a spacer. */
 const isContentless = (html: string, n: ScannedNode): boolean => textOf(html, n) === ''
@@ -292,7 +262,7 @@ export const findQuizMount = (html: string): QuizMountResult => {
     candidates.push({
       card: { ...anchor, start, end },
       openTag: openTagOf(html, anchor),
-      surface: opaqueSurfaceAt(html, anchor),
+      surface: opaqueBackgroundAt(html, anchor),
       evidence: {
         answerButtons: group.answers,
         stepIndicator: Boolean(stepAncestor),

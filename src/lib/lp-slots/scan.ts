@@ -215,3 +215,26 @@ export const styleProp = (n: ScannedNode, prop: string): string => {
   const m = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, 'i').exec(style)
   return m ? m[1].trim() : ''
 }
+
+/** An element's verbatim opening tag, sliced from the original string. */
+export const openTagOf = (html: string, n: ScannedNode): string => html.slice(n.start, n.contentStart)
+
+/**
+ * The nearest OPAQUE background at or above an element, verbatim.
+ *
+ * "At or above", because the references draw most cards as transparent columns
+ * inside a coloured shell: reading only the element's own tag answers "" for
+ * most of the library. "Opaque", because `rgba(255,255,255,.12)` is a tint OVER
+ * something rather than a ground, and anything deriving a contrast or choosing
+ * a light-or-dark asset against it would produce a confident wrong answer.
+ *
+ * Returns the declaration as written, so it keeps the `var(--lp-nNNN, #hex)`
+ * form and resolves through the same variables the rest of the template does.
+ */
+export const opaqueBackgroundAt = (html: string, start: ScannedNode): string => {
+  for (let n: ScannedNode | null = start; n; n = n.parent) {
+    const decl = styleProp(n, 'background') || styleProp(n, 'background-color')
+    if (decl && !/^(transparent$|rgba\()/i.test(decl)) return decl
+  }
+  return ''
+}

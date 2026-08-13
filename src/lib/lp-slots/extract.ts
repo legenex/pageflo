@@ -27,8 +27,9 @@
  * rule is one the reference actually follows; none is a guess about what a
  * designer probably meant.
  */
-import { scan, walk, inner, textOf, attr, styleProp, type ScannedNode } from './scan'
+import { scan, walk, inner, textOf, attr, styleProp, openTagOf, opaqueBackgroundAt, type ScannedNode } from './scan'
 import type { LpSlot, LpSlottedTemplate, LpUnsupportedRegion, SlotRole } from './model'
+import { stripPlaceholderLabels, remainingPlaceholderLabels } from './strip-annotations'
 
 /* ------------------------------------------------------------ what is text */
 
@@ -302,8 +303,23 @@ export const extractSlots = (slug: string, html: string, opts: ExtractOptions = 
     imageBoxes.push({ box, label })
   })
 
+  // The whole box is the slot now, so anything at or inside it belongs to the
+  // image well and must not also become a text slot.
   const inImageBox = (n: ScannedNode): boolean =>
-    imageBoxes.some(({ box }) => n.start >= box.contentStart && n.end <= box.contentEnd)
+    imageBoxes.some(({ box }) => n.start >= box.start && n.end <= box.end)
+
+  /** The deepest element inside a well that carries its bracketed label. */
+  const deepestLabelIn = (box: ScannedNode): ScannedNode | null => {
+    let found: ScannedNode | null = null
+    walk(box.children, (d) => {
+      if (BRACKET_LABEL.test(textOf(html, d))) {
+        let deeper = false
+        walk(d.children, (g) => { if (BRACKET_LABEL.test(textOf(html, g))) deeper = true })
+        if (!deeper) found = d
+      }
+    })
+    return found
+  }
 
   /* --- pass 1: which elements are slots ---------------------------------- */
 
@@ -379,6 +395,10 @@ export const extractSlots = (slug: string, html: string, opts: ExtractOptions = 
     node: ScannedNode
     /** Alt text to pair with, for an image box. */
     altDefault?: string
+    assetKind?: 'logo' | 'image'
+    boxOpenTag?: string
+    labelStyle?: string
+    surface?: string
   }
   const cuts: Cut[] = []
 
@@ -394,13 +414,40 @@ export const extractSlots = (slug: string, html: string, opts: ExtractOptions = 
   }
 
   for (const { box, label } of imageBoxes) {
+    /*
+     * The cut is the WHOLE BOX, not its label.
+     *
+     * It used to be the label alone, which had two consequences on a live page.
+     * A supplied logo rendered INSIDE the reference's dashed placeholder frame,
+     * so a real brand asset arrived wearing a dashed grey box. And a brand with
+     * no asset rendered the label itself: `[LOGO SLOT]` was measured on a live
+     * public landing page. Owning the box is what lets an unfilled well
+     * disappear and a filled one be just the picture.
+     */
+    const innerLabel = deepestLabelIn(box)
     cuts.push({
-      start: box.contentStart,
-      end: box.contentEnd,
+      start: box.start,
+      end: box.end,
       role: 'image_src',
       escaping: 'image',
-      value: inner(html, box),
+      value: html.slice(box.start, box.end),
       node: box,
+      // What KIND of asset the design is asking for. A logo has a brand-level
+      // answer and a neutral fallback (the wordmark); a photograph has neither,
+      // so an unfilled one is removed rather than stood in for.
+      assetKind: /\b(LOGO|MARK|BADGE|SEAL|ICON|WORDMARK)\b/.test(label) ? 'logo' : 'image',
+      // The well's own geometry, so a filled or degraded well keeps the size
+      // and position the design gave it.
+      boxOpenTag: openTagOf(html, box),
+      // The reference's own type for the label, reused verbatim when a brand
+      // with no logo falls back to its name. Inventing a size and a face here
+      // would put the one piece of typography on the page that the design did
+      // not choose.
+      labelStyle: innerLabel ? (attr(innerLabel, 'style')?.value ?? '') : '',
+      // The opaque ground this well sits on, for choosing between a brand's
+      // light and dark logo. Derived, never assumed - the same rule the colour
+      // system enforces for text.
+      surface: opaqueBackgroundAt(html, box),
       // "BRAND IMAGE / VIDEO SLOT" -> "Brand image / video". A real starting
       // point rather than an empty required field, and better than nothing if
       // an operator ships without touching it.
@@ -527,7 +574,13 @@ export const extractSlots = (slug: string, html: string, opts: ExtractOptions = 
       // the check something operators route around.
       required: c.role === 'headline' || (c.role === 'disclaimer' && plainLength >= 80),
       maxChars: Math.max(40, Math.ceil(plainLength * 1.6)),
-      ...(c.escaping === 'image' ? { pairedWith: `${id}__alt` } : {}),
+      ...(c.escaping === 'image'
+        ? {
+            pairedWith: `${id}__alt`,
+            assetKind: c.assetKind ?? 'image',
+            well: { openTag: c.boxOpenTag ?? '', labelStyle: c.labelStyle ?? '', surface: c.surface ?? '' },
+          }
+        : {}),
     })
 
     if (c.escaping === 'image') {
@@ -547,6 +600,39 @@ export const extractSlots = (slug: string, html: string, opts: ExtractOptions = 
     }
   }
   parts.push(html.slice(cursor))
+
+  /* --- pass 3: bracketed placeholder labels in text slots ------------------ */
+  //
+  // `[LEGAL DISCLOSURE]` and `[CASE RESULT PLACEHOLDER]` were rendering on
+  // public landing pages under every brand. They are the handoff annotating
+  // itself, exactly as the `{{deployment.*}}` chips are, and are removed for the
+  // same reason.
+  //
+  // AFTER extraction rather than before, and this ordering is load-bearing: the
+  // image-well detector keys on precisely this shape, so a pre-extraction strip
+  // would delete every image slot in the library. The caller recomposes `html`
+  // from the cleaned defaults, so the parts/defaults invariant survives.
+  for (const slot of slots) {
+    if (slot.escaping === 'image' || slot.escaping === 'meta') continue
+    const stripped = stripPlaceholderLabels(slot.default)
+    if (stripped.removed === 0) continue
+    // `default` stays the REFERENCE'S, so parity is still a claim about the
+    // handoff's own markup and re-deriving the slots from the shipped `html`
+    // still reproduces them. `liveDefault` is what a visitor is shown.
+    slot.liveDefault = stripped.text
+    if (stripped.emptied) {
+      // Nothing honest to put here. The well renders empty and the publish
+      // preflight refuses the page until an operator writes a real one.
+      slot.mustSupply = true
+      slot.required = true
+      slot.maxChars = Math.max(slot.maxChars, 80)
+    }
+  }
+
+  const leftoverLabels = remainingPlaceholderLabels(slots)
+  if (leftoverLabels.length > 0) {
+    problems.push(`bracketed placeholder labels survive outside an image well: ${[...new Set(leftoverLabels)].join(', ')}`)
+  }
 
   // Placeholders the render pipeline does not resolve, outside a loop body.
   const scriptPlaceholders = new Set<string>()
