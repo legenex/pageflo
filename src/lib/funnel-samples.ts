@@ -65,9 +65,31 @@ let samplesEnsured = false
 
 // Sample landing pages + quizzes (the "base" group, guarded by funnel_samples_seeded).
 const seedBase = async (payload: Payload, sites: number[]): Promise<void> => {
-  // 1) Sample LP deployments, bound to whichever sites exist (by index), and
+  // 1) Sample MVA Tiered Quiz, matched by slug — created FIRST, because the
+  //    LP deployments below bind it. The old order created live landing-page
+  //    deployments with no flow at all, and the renderer (correctly) refuses
+  //    to serve a ported page whose quiz cannot mount, so every sample landed
+  //    as a live 404.
+  let quizId: number | null = null
+  const existingQuiz = await payload.find({ collection: 'funnel-quizzes', where: { slug: { equals: 'mva' } }, limit: 1, overrideAccess: true })
+  if (existingQuiz.docs[0]) {
+    quizId = Number(existingQuiz.docs[0].id)
+  } else {
+    const q = buildSeedQuiz()
+    const created = await payload.create({
+      collection: 'funnel-quizzes',
+      data: { name: q.name, slug: q.slug, is_published: q.isPublished, tiers: q.tiers, steps: q.steps, nodes: q.nodes, custom_fields: q.customFields },
+      overrideAccess: true,
+    })
+    quizId = Number(created.id)
+  }
+
+  // 2) Sample LP deployments, bound to whichever sites exist (by index), and
   //    pointed at STOCK TEMPLATE ROWS. No sample "pages" are created: a page
   //    and a template are the same object now, and the library is the twelve.
+  //    Each binds the sample flow DIRECTLY — the binding the product prefers —
+  //    and an existing sample row with no binding at all is healed rather than
+  //    skipped, because a live deployment with no flow serves nothing.
   for (const dep of SAMPLE_LP_DEPLOYMENTS) {
     const lpId = await stockLandingPageId(payload, dep.templateKey)
     const siteId = sites[Math.min(dep.siteIndex, sites.length - 1)] ?? null
@@ -88,25 +110,11 @@ const seedBase = async (payload: Payload, sites: number[]): Promise<void> => {
         domain: await primaryDomainId(payload, siteId),
         path: dep.path,
         status: dep.status,
+        quiz: quizId,
         quiz_deployment_id: '',
       },
       overrideAccess: true,
     })
-  }
-
-  // 2) Sample MVA Tiered Quiz, matched by slug.
-  let quizId: number | null = null
-  const existingQuiz = await payload.find({ collection: 'funnel-quizzes', where: { slug: { equals: 'mva' } }, limit: 1, overrideAccess: true })
-  if (existingQuiz.docs[0]) {
-    quizId = Number(existingQuiz.docs[0].id)
-  } else {
-    const q = buildSeedQuiz()
-    const created = await payload.create({
-      collection: 'funnel-quizzes',
-      data: { name: q.name, slug: q.slug, is_published: q.isPublished, tiers: q.tiers, steps: q.steps, nodes: q.nodes, custom_fields: q.customFields },
-      overrideAccess: true,
-    })
-    quizId = Number(created.id)
   }
 
   // 3) Sample quiz deployment bound to the first site.
@@ -202,10 +210,53 @@ const seedAdvertorials = async (payload: Payload, sites: number[]): Promise<void
   }
 }
 
+/**
+ * Bind the sample flow to any RECOGNIZED sample LP deployment that has no
+ * binding at all.
+ *
+ * Runs even when the one-time seed markers are set, because the defect it
+ * repairs was created BY an earlier seeder: live sample deployments seeded
+ * with neither a flow nor a legacy pointer, which the renderer (correctly)
+ * refuses to serve. Recognition is strict — the row must sit at a seeder
+ * path, on the stock template row the seeder put there, with no binding of
+ * either kind — so an operator's own unbound deployment is never touched;
+ * that case is `pnpm reconcile:lp-quiz`'s, and it needs a person.
+ */
+const healUnboundSampleLps = async (payload: Payload): Promise<void> => {
+  const mva = await payload.find({ collection: 'funnel-quizzes', where: { slug: { equals: 'mva' } }, limit: 1, overrideAccess: true })
+  const quizId = mva.docs[0] ? Number(mva.docs[0].id) : null
+  if (quizId == null) return
+  for (const dep of SAMPLE_LP_DEPLOYMENTS) {
+    const lpId = await stockLandingPageId(payload, dep.templateKey)
+    if (!lpId) continue
+    const rows = await payload.find({
+      collection: 'funnel-lp-deployments',
+      where: { and: [{ landing_page: { equals: lpId } }, { path: { equals: dep.path } }] },
+      limit: 1,
+      depth: 0,
+      overrideAccess: true,
+    })
+    const row = rows.docs[0] as { id: number | string; quiz?: unknown; quiz_deployment_id?: unknown } | undefined
+    if (!row) continue
+    const hasFlow = row.quiz != null && String(row.quiz) !== ''
+    const hasLegacy = typeof row.quiz_deployment_id === 'string' && row.quiz_deployment_id !== ''
+    if (hasFlow || hasLegacy) continue
+    await payload.update({
+      collection: 'funnel-lp-deployments',
+      id: row.id,
+      data: { quiz: quizId },
+      overrideAccess: true,
+    })
+  }
+}
+
 const seedOnce = async (payload: Payload): Promise<void> => {
   const cfg = await payload.findGlobal({ slug: 'integration-config', overrideAccess: true })
   const needBase = !cfg?.funnel_samples_seeded
   const needAdv = !cfg?.funnel_advertorial_samples_seeded
+  await healUnboundSampleLps(payload).catch((err) => {
+    reportError('job', err, { operation: 'funnel-samples:heal-unbound' })
+  })
   if (!needBase && !needAdv) { samplesEnsured = true; return }
 
   // Brands == Sites. Deployments need a real Site; quizzes/LPs/ads are brandless.
