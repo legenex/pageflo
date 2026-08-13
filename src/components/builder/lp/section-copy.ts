@@ -137,15 +137,37 @@ export const buildSeedSections = () =>
 // said so. They are now three real, distinct templates chosen to match each
 // sample's angle; `scripts/test-template-registry.mts` asserts they resolve, so
 // a seed cannot go back to naming a template that does not exist.
-export const SAMPLE_LANDING_PAGES = [
+/**
+ * NO LONGER SEEDED. This is the recognition table for retiring them.
+ *
+ * These three were seeded as landing-page "pages" under a model where a page
+ * and a template were different objects. They are not templates — they are
+ * three instances of three real stock templates — and while they existed they
+ * were what the deployment picker offered INSTEAD of the twelve.
+ *
+ * The constant survives because removing them safely needs to know exactly what
+ * they looked like: `retireSampleLandingPages` in src/lib/template-records/
+ * matches a row against this table plus the seed section copy, and only deletes
+ * a row that is still byte-for-byte what the seeder wrote. Anything edited since
+ * is somebody's work and is kept.
+ *
+ * Do not add to this list. A new entry would be a new sample page, which is the
+ * shape being removed.
+ */
+export const RETIRED_SAMPLE_LANDING_PAGES = [
   { name: 'MVA Pain First', slug: 'mva-pain-first', template_id: 'human_recovery_story', angle: 'pain', is_published: true },
   { name: 'Authority Build', slug: 'authority-build', template_id: 'authority_network', angle: 'authority', is_published: false },
   { name: 'Editorial Test', slug: 'editorial-test', template_id: 'editorial_investigation_v2', angle: 'community', is_published: false },
 ]
 
-// The artifact's sample deployments (buildSeedLPDeployments), mapped to whichever
-// brand sites exist (by index) so references are always valid.
+/**
+ * Starter deployments, mapped to whichever brand sites exist (by index).
+ *
+ * `templateKey` names a STOCK TEMPLATE directly. It used to be `lpSlug`,
+ * pointing at one of the sample pages above, which is how a sample became a
+ * dependency of every new brand.
+ */
 export const SAMPLE_LP_DEPLOYMENTS = [
-  { name: 'MVA Pain First · CMC', lpSlug: 'mva-pain-first', siteIndex: 0, path: '/c/pain', status: 'live' },
-  { name: 'Authority Build · CAC', lpSlug: 'authority-build', siteIndex: 1, path: '/truck', status: 'draft' },
+  { name: 'Human Recovery Story · CMC', templateKey: 'human_recovery_story', siteIndex: 0, path: '/c/pain', status: 'live' },
+  { name: 'Authority Network · CAC', templateKey: 'authority_network', siteIndex: 1, path: '/truck', status: 'draft' },
 ]

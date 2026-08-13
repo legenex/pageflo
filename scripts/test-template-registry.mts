@@ -268,15 +268,40 @@ t(!canonicalTemplateId('lp', '').ok, 'an empty id does not canonicalise')
  * was created pointing at a template that did not exist and rendered as
  * TEMPLATES[0]. A registry that only guards operator input would not have caught
  * that: the bad ids were in the repository.
+ *
+ * The sample landing PAGES no longer exist — a page and a template are one
+ * object now — so what is checked here is the starter deployments, which name a
+ * stock template directly.
  */
 {
-  const { SAMPLE_LANDING_PAGES } = await import('../src/components/builder/lp/section-copy.ts')
-  t(SAMPLE_LANDING_PAGES.length > 0, 'there are sample landing pages to check')
-  for (const s of SAMPLE_LANDING_PAGES) {
-    t(resolveTemplate('lp', s.template_id).ok, `seeded landing page "${s.slug}" names a template that resolves (${s.template_id})`)
+  const copy = await import('../src/components/builder/lp/section-copy.ts')
+  t(
+    !('SAMPLE_LANDING_PAGES' in copy),
+    'nothing exports SAMPLE_LANDING_PAGES any more — sample pages are not seeded',
+  )
+
+  const { SAMPLE_LP_DEPLOYMENTS, RETIRED_SAMPLE_LANDING_PAGES } = copy
+  t(SAMPLE_LP_DEPLOYMENTS.length > 0, 'there are starter deployments to check')
+  for (const d of SAMPLE_LP_DEPLOYMENTS) {
+    const res = resolveTemplate('lp', d.templateKey)
+    t(res.ok, `starter deployment "${d.name}" names a template that resolves (${d.templateKey})`)
+    // Must be one of the TWELVE, not a legacy identity id: a starter binds to
+    // the stock library, and `ensureTemplateRecords` only materialises those.
+    t(
+      res.ok && res.template.kind === 'lp' && res.template.stock,
+      `starter deployment "${d.name}" names a STOCK template (${d.templateKey})`,
+    )
   }
-  const distinct = new Set(SAMPLE_LANDING_PAGES.map((s) => s.template_id))
-  t(distinct.size === SAMPLE_LANDING_PAGES.length, 'the seeded samples are three DIFFERENT templates, not three names for one')
+
+  // The retirement table has to keep naming real templates: `retireSampleLandingPages`
+  // repoints a sample's deployments onto the stock row for the SAME renderer,
+  // and an id that resolves to nothing would leave the sample in place forever.
+  for (const s of RETIRED_SAMPLE_LANDING_PAGES) {
+    t(
+      resolveTemplate('lp', s.template_id).ok,
+      `retired sample "${s.slug}" names a template that still resolves (${s.template_id})`,
+    )
+  }
 
   const collections = readFileSync(new URL('../src/collections/FunnelLandingPages.ts', import.meta.url).pathname, 'utf8')
   const lpDefault = collections.match(/name: 'template_id'[^}]*defaultValue: '([^']+)'/)?.[1]
@@ -328,16 +353,63 @@ t(
   t(/resolveForRender\(\s*'lp'/.test(lpRender), "the LP builder's templateFor resolves through the registry")
   const quizTheme = readFileSync(join(SRC, 'lib/quiz-theme.ts'), 'utf8')
   t(/resolveForRender\(\s*'quiz'/.test(quizTheme), 'quiz-theme resolves through the registry')
+  /*
+   * The two PUBLIC resolvers are held to a stronger rule than the builder
+   * seams above: they must not call `resolveForRender` at all.
+   *
+   * That function exists so a render path cannot 500 over a bad row, and it
+   * pays for that by returning a stand-in. On a public deployment the stand-in
+   * IS the bug — it serves a different law firm's design than the one an
+   * operator chose, and the only evidence is that the page looks wrong. Both
+   * resolvers refuse now, and refusing is only meaningful if nothing downstream
+   * quietly supplies a substitute.
+   */
   const quizDep = readFileSync(join(SRC, 'lib/quiz-deployment.ts'), 'utf8')
-  t(/resolveForRender\(\s*'quiz'/.test(quizDep), 'the public quiz deployment resolver goes through the registry')
   const lpDep = readFileSync(join(SRC, 'lib/lp-deployment.ts'), 'utf8')
-  t(/resolveForRender\(\s*'lp'/.test(lpDep), 'the public LP deployment resolver goes through the registry')
+  const calls = (src: string, fn: string): boolean =>
+    src
+      .split('\n')
+      .some((l) => !/^\s*(\/\/|\*|\/\*)/.test(l) && new RegExp(`\\b${fn}\\(`).test(l))
 
-  // The save paths must refuse, not canonicalise-or-shrug.
+  t(!calls(quizDep, 'resolveForRender'), 'the public quiz resolver never draws a stand-in template')
+  t(!calls(lpDep, 'resolveForRender'), 'the public LP resolver never draws a stand-in template')
+  t(/REFUSED/.test(quizDep), 'the public quiz resolver refuses an unresolvable template, by name')
+  t(/REFUSED/.test(lpDep), 'the public LP resolver refuses an unresolvable template, by name')
+  // The quiz resolver must reach the RECORD, not the code registry: a cloned
+  // template's id names no renderer, which is the point of the two id fields.
+  t(
+    /getQuizTemplateRecordByTemplateId/.test(quizDep),
+    'the public quiz resolver resolves through the template records',
+  )
+
+  /*
+   * BOTH save paths must resolve a quiz template through the RECORDS.
+   *
+   * They did not agree: the quiz side asked the records and the landing-page
+   * side asked the code registry for `embedded_quiz_template_id`, where a clone
+   * names nothing by design. So the LP editor offered every enabled record —
+   * clones included — and the save then rejected the whole form, losing every
+   * other edit on it. Asserted as "neither calls the registry helper directly"
+   * rather than "both call the shared one", because the failure mode is reaching
+   * PAST the seam, and a new caller can always be added.
+   */
   const quizActions = readFileSync(join(SRC, 'app/(app)/admin/(top)/quizzes/actions.ts'), 'utf8')
-  t(/canonicalTemplateId\(\s*'quiz'/.test(quizActions), 'saving a quiz deployment validates its template id')
-  t(/if\s*\(!template\.ok\)\s*return/.test(quizActions), 'and refuses the save when it does not resolve')
   const lpActions = readFileSync(join(SRC, 'app/(app)/admin/(top)/landing-pages/actions.ts'), 'utf8')
+  for (const [label, src] of [['quiz', quizActions], ['landing-page', lpActions]] as const) {
+    t(
+      /resolveQuizTemplateSelection/.test(src),
+      `the ${label} save path resolves a quiz template through the records`,
+    )
+    t(
+      !/canonicalTemplateId\(\s*'quiz'/.test(src),
+      `the ${label} save path does not reach past the records to the code registry (a clone names nothing there)`,
+    )
+  }
+  t(
+    /resolveLpTemplateSelection/.test(lpActions),
+    'saving a landing-page deployment checks the template record is selectable, not merely that its renderer exists',
+  )
+  t(/if\s*\(!template\.ok\)\s*return/.test(quizActions), 'and refuses the save when it does not resolve')
   t(/canonicalTemplateId\(\s*'lp'/.test(lpActions), 'saving a landing page validates its template id')
   t(/if\s*\(!template\.ok\)\s*return/.test(lpActions), 'and refuses the save when it does not resolve')
 }

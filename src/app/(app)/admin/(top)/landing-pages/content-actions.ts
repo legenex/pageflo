@@ -75,7 +75,24 @@ const loadContext = async (payload, user, deploymentId: string) => {
     if (typeof v === 'string') overrides[k] = v
   }
 
-  return { ok: true as const, deployment, lp, ported, overrides, siteId: gate.siteId }
+  /*
+   * What this deployment INHERITS when it says nothing: the template's own copy
+   * where it has any, else the reference's.
+   *
+   * This used to be the reference's wording alone, which was right while a
+   * template had no copy of its own. Now that a template does, an operator who
+   * types the template's wording into a deployment field would have had it
+   * PINNED as a deployment override — so a later correction to the template
+   * would reach every deployment except the ones that agreed with it.
+   */
+  const inherited = new Map<string, string>()
+  const templateSlotOverrides = (lp.slot_overrides ?? {}) as Record<string, unknown>
+  for (const slot of ported.slots) {
+    const own = templateSlotOverrides[slot.id]
+    inherited.set(slot.id, typeof own === 'string' ? own : slot.default)
+  }
+
+  return { ok: true as const, deployment, lp, ported, overrides, inherited, siteId: gate.siteId }
 }
 
 const writeOverrides = async (payload, user, deployment, ported, next: Record<string, string>) => {
@@ -109,7 +126,6 @@ export async function setDeploymentCopy(args: {
   const ctx = await loadContext(payload, user, args.deploymentId)
   if (!ctx.ok) return ctx
 
-  const stock = new Map(ctx.ported.slots.map((s) => [s.id, s.default]))
   let next = { ...ctx.overrides }
   for (const [id, value] of Object.entries(args.edits ?? {})) {
     if (value === null) { next = resetToDefault(next, [id]); continue }
@@ -119,9 +135,12 @@ export async function setDeploymentCopy(args: {
     if (isInsideQuizMount(asSlotted(ctx.ported), id)) {
       return { ok: false, error: `"${id}" is inside the quiz card; that copy comes from the quiz flow` }
     }
-    // Typing the stock wording back in is a reset, not a pin: the two look the
-    // same today and behave differently when the template is corrected.
-    if (stock.get(id) === value) next = resetToDefault(next, [id])
+    // Typing the INHERITED wording back in is a reset, not a pin: the two look
+    // the same today and behave differently when the template is corrected.
+    // Compared against what this deployment would inherit — the template's copy
+    // where it has any — not against the reference, which is a different string
+    // the moment somebody edits the template.
+    if (ctx.inherited.get(id) === value) next = resetToDefault(next, [id])
     else next[id] = value
   }
 
@@ -192,14 +211,19 @@ export async function writeDeploymentCopy(args: {
     }
   }
 
-  // Only the slots the QUIZ does not own. The card's question, its answers and
-  // its Back/Continue labels are the flow's, so a model writing into them would
-  // be writing copy no visitor is ever shown.
-  const targets = targetsFromSlots(
-    editableSlots(asSlotted(ctx.ported)),
-    ctx.overrides,
-    args.slotIds?.length ? { ids: args.slotIds } : {},
-  )
+  /*
+   * Only the slots the QUIZ does not own — the card's question, its answers and
+   * its Back/Continue labels are the flow's, so a model writing into them would
+   * be writing copy no visitor is ever shown. And the assistant is shown what
+   * this deployment currently SAYS, which for an un-overridden slot is the
+   * template's copy rather than the reference's: on a template whose wording
+   * has been edited, the reference is text nobody would ever see.
+   */
+  const inheritedSlots = editableSlots(asSlotted(ctx.ported)).map((s) => ({
+    ...s,
+    default: ctx.inherited.get(s.id) ?? s.default,
+  }))
+  const targets = targetsFromSlots(inheritedSlots, ctx.overrides, args.slotIds?.length ? { ids: args.slotIds } : {})
 
   const result = await generateContent(
     {

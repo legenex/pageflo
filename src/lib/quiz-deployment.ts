@@ -2,7 +2,8 @@ import { cache } from 'react'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { siteToBrand, type DomainLite } from './brand-map'
-import { resolveForRender, reportTemplateFallback } from './template-registry'
+import { resolveTemplate } from './template-registry'
+import { getQuizTemplateRecordByTemplateId } from './template-records'
 import { normalizeDeploymentPath } from './quiz-deployment-path'
 import { normalizeDestinations, type DestinationMap } from './quiz-destinations'
 import { isClaimedByAuthoredContent, pathVariantsFor } from './public-path-claims'
@@ -35,17 +36,30 @@ export type PublicQuizDeployment = {
   /** Canonical: aliases already resolved, never a raw stored value. */
   templateId: string
   /**
-   * True when the stored id named no template and a stand-in was drawn. Carried
-   * on the resolved object rather than only logged, so the publish preflight can
-   * refuse it and the builder can badge it.
+   * Always false now: an id matching no template record refuses to serve rather
+   * than drawing a stand-in. Kept because the shared publish preflight reads the
+   * same field for landing-page deployments too.
    */
   templateFellBack: boolean
-  /** The id that was stored, when it differs from what rendered. */
+  /** The template id the operator actually stored — a record id, not a renderer. */
   requestedTemplateId: string
+  /** The selectable template's own name, for admin surfaces and logs. */
+  templateName: string
+  /**
+   * Which progress treatment to draw.
+   *
+   * The deployment's own choice, else the template record's default, else null
+   * meaning "whatever the renderer chose". This was READ by QuizRuntime and
+   * never SET here, so the `progress_form` column an operator could edit reached
+   * the public page as `undefined` on every request since it shipped.
+   */
+  progressForm: string | null
   status: string
   embedPreviewBg: string
-  headerConfig: Record<string, unknown> | null
-  footerConfig: Record<string, unknown> | null
+  // No header/footer here on purpose: page chrome is authored on the brand
+  // (brand_identity.defaultHeader / defaultFooter, resolved by siteToBrand), so a
+  // deployment has nothing to say about it. The funnel_quiz_deployments columns
+  // are retained but no longer read.
   bodySectionOverrides: unknown[] | null
   destinationOverrides: DestinationMap
   utm: Record<string, unknown>
@@ -69,6 +83,51 @@ export type ResolvedQuizDeployment = {
   brand: ReturnType<typeof siteToBrand>
   siteId: number
   siteSlug: string
+}
+
+/** One grep-able prefix for every reason a quiz declined to serve. */
+export const QUIZ_TEMPLATE_REFUSED = '[quiz-deployment] refused'
+
+/**
+ * The template record a stored id names, for a RENDER path.
+ *
+ * Existence only. `is_enabled` is a rule about what new deployments may choose;
+ * consulting it here would take every live page on a template down the moment
+ * somebody tidied the library, which is the opposite of what disabling means.
+ *
+ * Returns null rather than a stand-in, and tolerates the table not existing —
+ * on a database where the migration has not run, every public path would
+ * otherwise become a 500 instead of a 404.
+ */
+const resolveQuizTemplateRecordForRender = async (
+  payload: Awaited<ReturnType<typeof getPayload>>,
+  storedId: string,
+): Promise<{ templateId: string; rendererKey: string; name: string; progressForm: string | null } | null> => {
+  const record = await getQuizTemplateRecordByTemplateId(payload, storedId).catch(() => null)
+  if (record) {
+    if (record.rendererError) return null
+    const cfg = record.configOverrides ?? {}
+    return {
+      templateId: record.templateId,
+      rendererKey: record.rendererKey,
+      name: record.name,
+      progressForm: typeof cfg.progressForm === 'string' && cfg.progressForm ? cfg.progressForm : null,
+    }
+  }
+
+  /*
+   * No record, but the id is one of the twenty (or one of the six legacy
+   * aliases). This is the pre-reconcile window: a database that has been
+   * migrated but where `ensureTemplateRecords` has not run yet, which is every
+   * database for the length of one deploy. Falling back to the CODE registry
+   * here is not a silent stand-in — it resolves the id the operator actually
+   * chose, to the renderer it has always named.
+   */
+  const code = resolveTemplate('quiz', storedId)
+  if (code.ok && code.template.kind === 'quiz') {
+    return { templateId: code.template.id, rendererKey: code.template.id, name: code.template.name, progressForm: null }
+  }
+  return null
 }
 
 const asArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
@@ -203,27 +262,57 @@ const hydrateQuizDeployment = async (
     kind: typeof d.kind === 'string' ? d.kind : undefined,
   }))
 
-  // One resolution for the whole hydration, reported once. `resolveQuizTemplateId`
-  // below used to be the only thing that looked at this id, and it answered
-  // silently, so a deployment stored under a typo rendered as the neutral skin
-  // with nothing anywhere recording that a choice had been discarded.
-  const templateRes = reportTemplateFallback(
-    `quiz deployment ${doc.id}`,
-    resolveForRender('quiz', doc.template_id ?? 'default'),
-  )
+  /*
+   * One resolution for the whole hydration, and it goes through the RECORD.
+   *
+   * The stored id names a `funnel-quiz-templates` row; that row's
+   * `renderer_key` names the code renderer. Resolving straight against the code
+   * registry — which is what this did — cannot see a cloned template at all,
+   * because a clone's id is its own and deliberately names no renderer.
+   *
+   * And it no longer falls back. `resolveForRender` answered an unknown id with
+   * the neutral skin and said so only in a log, so a deployment saved under a
+   * typo rendered in a template nobody chose and looked fine. Refusing means the
+   * public router 404s and the admin says which id is wrong, which is the whole
+   * difference between a bug you find and one you ship.
+   *
+   * `is_enabled` is deliberately NOT consulted here. Disabling a template is a
+   * statement about what NEW deployments may choose; taking every live page on
+   * it down as a side effect is not something an operator asked for.
+   */
+  const storedTemplateId = String(doc.template_id ?? '')
+  const record = await resolveQuizTemplateRecordForRender(payload, storedTemplateId)
+  if (!record) {
+    console.warn(
+      `${QUIZ_TEMPLATE_REFUSED}: deployment ${doc.id} stores template id "${storedTemplateId}", ` +
+        'which matches no quiz template. Not served.',
+    )
+    return null
+  }
 
   const deployment: PublicQuizDeployment = {
     id: String(doc.id),
     name: String(doc.name ?? ''),
     path: normalizeDeploymentPath(String(doc.path ?? '')),
     renderMode: doc.render_mode === 'embed' ? 'embed' : 'standalone',
-    templateId: templateRes.template.id,
-    templateFellBack: templateRes.usedFallback,
-    requestedTemplateId: templateRes.requestedId,
+    /*
+     * The RENDERER key, not the record's id.
+     *
+     * Everything downstream — `getTemplateConfig`, `quizTheme`, the progress and
+     * answer forms — is keyed by what draws the quiz, and a clone's own id draws
+     * nothing. `requestedTemplateId` keeps the operator's stored choice so a log
+     * line or a badge can name it.
+     */
+    templateId: record.rendererKey,
+    templateFellBack: false,
+    requestedTemplateId: record.templateId,
+    /** The selectable template's own name, for admin surfaces. */
+    templateName: record.name,
+    // Deployment choice, else the template record's default, else the renderer's.
+    progressForm:
+      typeof doc.progress_form === 'string' && doc.progress_form ? doc.progress_form : record.progressForm,
     status: String(doc.status ?? 'draft'),
     embedPreviewBg: String(doc.embed_preview_bg ?? ''),
-    headerConfig: (doc.header_config ?? null) as Record<string, unknown> | null,
-    footerConfig: (doc.footer_config ?? null) as Record<string, unknown> | null,
     bodySectionOverrides: Array.isArray(doc.body_section_overrides)
       ? (doc.body_section_overrides as unknown[])
       : null,
@@ -299,8 +388,10 @@ export const resolveEmbeddedQuiz = cache(async (
       progress_form: args.progressForm,
       status: 'live',
       destination_overrides: null,
-      header_config: {},
-      footer_config: {},
+      // No chrome keys: the header and footer are the brand's, and an embedded
+      // quiz draws neither. They were previously synthesised as `{}`, which is
+      // truthy - the only thing keeping an empty bordered header strip off an
+      // embedded quiz was the renderer's separate `standalone` guard.
       body_section_overrides: null,
       utm: {},
       pixels: {},

@@ -1,17 +1,25 @@
 import type { CollectionConfig } from 'payload'
 import { isAuthenticated } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
-import { resolveTemplate } from '../lib/template-registry'
+import { validateStoredQuizTemplateId } from '../lib/template-records/id'
 
-/** See FunnelLandingPages: the server actions are not the only writer. */
-const validateQuizTemplateId = (value: unknown): true | string => {
-  if (value == null || value === '') return true
-  const r = resolveTemplate('quiz', value)
-  return r.ok ? true : r.error
-}
+/**
+ * See FunnelLandingPages: the server actions are not the only writer.
+ *
+ * SHAPE, not existence. Quiz templates are records now, and a clone's
+ * `template_id` names no code renderer by design, so checking against the code
+ * registry here refused every cloned skin at every door — which is exactly what
+ * the renderer-identity suite caught. Existence is checked where a database
+ * read is safe: the server action, the publish preflight, and the render path,
+ * which refuses to serve rather than drawing a stand-in.
+ * `src/lib/template-records/id.ts` states the full division and why a validator
+ * must not query.
+ */
+const validateQuizTemplateId = validateStoredQuizTemplateId
 
 // A quiz deployment binds a brandless FunnelQuiz to a brand (Site) + domain +
-// path, plus render/template/chrome/tracking config. Mirrors the artifact.
+// path, plus render/template/tracking config. Mirrors the artifact, minus the
+// page chrome, which is now the brand's (see the deprecated columns below).
 export const FunnelQuizDeployments: CollectionConfig = {
   slug: 'funnel-quiz-deployments',
   labels: { singular: 'Funnel Quiz Deployment', plural: 'Funnel Quiz Deployments' },
@@ -57,9 +65,28 @@ export const FunnelQuizDeployments: CollectionConfig = {
     // nodes reference a destination by name; see src/lib/quiz-destinations.ts
     // for the deployment -> brand -> site-page cascade.
     { name: 'destination_overrides', type: 'json' },
-    { name: 'header_config', type: 'json' },
-    { name: 'footer_config', type: 'json' },
-    { name: 'body_section_overrides', type: 'json' },
+    // DEPRECATED chrome columns. Page chrome moved to the brand
+    // (Sites.brand_identity.defaultHeader / defaultFooter, resolved by
+    // siteToBrand): a header and footer belong to the brand wearing the page, and
+    // authoring them per deployment let two deployments of one quiz under one
+    // brand show different logos and different copyright lines. Nothing reads
+    // these any more. They are kept, and only hidden, because dropping the
+    // columns would destroy what authors already wrote into them.
+    {
+      name: 'header_config',
+      type: 'json',
+      admin: { hidden: true, description: 'Deprecated. Page chrome is authored on Brand Identity (defaultHeader). Retained so existing data is not destroyed.' },
+    },
+    {
+      name: 'footer_config',
+      type: 'json',
+      admin: { hidden: true, description: 'Deprecated. Page chrome is authored on Brand Identity (defaultFooter). Retained so existing data is not destroyed.' },
+    },
+    {
+      name: 'body_section_overrides',
+      type: 'json',
+      admin: { hidden: true, description: 'Deprecated. Body sections are authored on Brand Identity (defaultBodySections). Retained so existing data is not destroyed.' },
+    },
     { name: 'utm', type: 'json' },
     { name: 'pixels', type: 'json' },
   ],

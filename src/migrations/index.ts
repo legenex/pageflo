@@ -41,6 +41,7 @@ import * as migration_20260813_120000_lp_deployment_content_overrides from './20
 import * as migration_20260813_180000_lp_deployment_embedded_quiz from './20260813_180000_lp_deployment_embedded_quiz'
 import * as migration_20260813_210000_locked_documents_funnel_rels from './20260813_210000_locked_documents_funnel_rels'
 import * as migration_20260813_213000_integration_config_sample_markers from './20260813_213000_integration_config_sample_markers'
+import * as migration_20260813_220000_template_records from './20260813_220000_template_records'
 
 export const migrations = [
   {
@@ -177,5 +178,18 @@ export const migrations = [
     up: migration_20260813_213000_integration_config_sample_markers.up,
     down: migration_20260813_213000_integration_config_sample_markers.down,
     name: '20260813_213000_integration_config_sample_markers',
+  },
+  {
+    /*
+     * Renamed from 20260813_210000_template_records at integration time: the
+     * release branch already used the 210000 prefix, and two files sharing an
+     * ordering prefix would make the directory sort (which IS the run order)
+     * an alphabetical accident. The migration is idempotent throughout, so a
+     * database that already recorded it under the old name converges cleanly
+     * when the renamed file re-runs.
+     */
+    up: migration_20260813_220000_template_records.up,
+    down: migration_20260813_220000_template_records.down,
+    name: '20260813_220000_template_records',
   },
 ];

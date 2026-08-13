@@ -9,8 +9,9 @@
 //      brand identity — colours, fonts, logos, taglines, display name.
 //      They beat brand_identity.* every time.
 //   2. brand_identity.* (JSON column) is for funnel-only extensions:
-//      contact CTA copy, legal disclaimer, default body sections, bg
-//      pattern. Anything that has no Site.brand equivalent.
+//      contact CTA copy, legal disclaimer, default body sections, default
+//      page chrome (header + footer), bg pattern. Anything that has no
+//      Site.brand equivalent.
 //
 // So: editing a colour in the Site brand editor instantly recolours every
 // quiz, LP, advertorial, and site page that points at that Site, even if
@@ -31,6 +32,19 @@ export type DomainLite = {
 
 const str = (v: unknown, fallback = ''): string => (typeof v === 'string' ? v : fallback)
 
+const obj = (v: unknown): Record<string, unknown> =>
+  v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
+
+const bool = (v: unknown, fallback: boolean): boolean => (typeof v === 'boolean' ? v : fallback)
+
+// Sizes are pixel values a renderer puts straight into a style, so a stored 0 or
+// a negative is treated as "not set" rather than passed through. A zero-height
+// logo or a zero-size copyright line is not a choice the editor can express, and
+// an invisible copyright line on an attorney-advertising page is the failure
+// mode worth spending a branch on.
+const num = (v: unknown, fallback: number): number =>
+  typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : fallback
+
 // Field-by-field "non-empty wins" merge for nested colour/typography/etc.
 // objects. brand_identity's fields fill in any slot Site.brand left empty
 // without ever overriding a Site.brand value.
@@ -45,6 +59,74 @@ const mergeNested = (
     if (!out[k] && typeof v === 'string' && v.trim() !== '') out[k] = v
   }
   return out
+}
+
+/** The standalone-page header and footer a brand renders its funnels with. */
+export type BrandChrome = {
+  header: {
+    logoEnabled: boolean
+    ctaButton: { enabled: boolean; text: string; url: string; fontSize: number }
+  }
+  footer: { logoEnabled: boolean; logoSize: number; showCopyright: boolean; fontSize: number }
+}
+
+/**
+ * Resolve the page chrome a brand's standalone funnel pages wear.
+ *
+ * Chrome is a BRAND concern, not a per-placement one. It used to be authored on
+ * each quiz deployment, which meant two deployments of one quiz under one brand
+ * could show different logos, different call buttons and different copyright
+ * lines, and a deployment created without chrome showed none at all.
+ *
+ * Nothing here can resolve to null. That is the point: the footer carries
+ * `legal.copyright`, and on an attorney-advertising page a missing copyright
+ * line is a compliance regression rather than a cosmetic one, so a brand that
+ * has never opened the chrome editor still renders a complete header and footer.
+ *
+ * Exported so the brand editor can display exactly what the renderer will paint.
+ * A second derivation in the editor is how "what you see" and "what ships" drift
+ * apart.
+ */
+export function resolveDefaultChrome(
+  identity: Record<string, unknown> | null | undefined,
+  contact: { callNumber?: string; callCtaText?: string } | null | undefined,
+): BrandChrome {
+  const ident = obj(identity)
+  const callDigits = str(contact?.callNumber).replace(/[^\d+]/g, '')
+  const callHref = callDigits ? `tel:${callDigits}` : ''
+
+  const header = obj(ident.defaultHeader)
+  const cta = obj(header.ctaButton)
+  const storedUrl = str(cta.url).trim()
+  const footer = obj(ident.defaultFooter)
+
+  return {
+    header: {
+      logoEnabled: bool(header.logoEnabled, true),
+      ctaButton: {
+        // A brand with no number has nothing to dial, so the button starts off
+        // rather than rendering a dead `tel:`.
+        enabled: bool(cta.enabled, Boolean(callHref)),
+        // The brand authors its call-to-action copy once, under contact. Reading
+        // it here is what stops the header saying one thing while every in-page
+        // call button says another.
+        text: str(cta.text).trim() || str(contact?.callCtaText).trim() || 'CLICK HERE TO CALL',
+        // A stored `tel:` is a COPY of the brand's call number, and the brand
+        // editor saves the resolved object back, so a copy would keep dialling
+        // the old number long after the brand changed it. Phone links are
+        // therefore always re-derived; any other destination (a booking page,
+        // say) is a real authoring choice and is kept.
+        url: !storedUrl || storedUrl.startsWith('tel:') ? callHref : storedUrl,
+        fontSize: num(cta.fontSize, 11),
+      },
+    },
+    footer: {
+      logoEnabled: bool(footer.logoEnabled, true),
+      logoSize: num(footer.logoSize, 32),
+      showCopyright: bool(footer.showCopyright, true),
+      fontSize: num(footer.fontSize, 12),
+    },
+  }
 }
 
 export function siteToBrand(s: Record<string, unknown>, domainList: DomainLite[]) {
@@ -213,6 +295,8 @@ export function siteToBrand(s: Record<string, unknown>, domainList: DomainLite[]
   if (!urls.privacy && legalResolved.privacyUrl) urls.privacy = legalResolved.privacyUrl
   if (!urls.terms && legalResolved.termsUrl) urls.terms = legalResolved.termsUrl
 
+  const chrome = resolveDefaultChrome(identity, contactResolved)
+
   // Top-level scalars: Site.brand wins, fall back to brand_identity, then
   // to a sensible default.
   const pick = (siteVal: string, identityKey: string, fallback = ''): string => {
@@ -254,6 +338,8 @@ export function siteToBrand(s: Record<string, unknown>, domainList: DomainLite[]
     bgPattern: (typeof identity.bgPattern === 'string' && identity.bgPattern) || 'plus',
     bgColor: colorsResolved.background,
     defaultBodySections: Array.isArray(identity.defaultBodySections) ? (identity.defaultBodySections as unknown[]) : [],
+    defaultHeader: chrome.header,
+    defaultFooter: chrome.footer,
     __domainCount: domainList.length,
     __domains: domainList,
   }

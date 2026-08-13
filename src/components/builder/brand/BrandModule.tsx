@@ -22,6 +22,9 @@ import { saveBrandIdentity, createBrandSite, deleteBrandSite, aiGenerateBrand, p
 import {
   DESTINATION_KEYS, DESTINATION_LABELS, DESTINATION_HINTS, DEFAULT_PATHS, isSafeDestinationUrl,
 } from '@/lib/quiz-destinations'
+// The renderer's own chrome derivation. Shared rather than mirrored, so the
+// editor cannot show a header the public page will not paint.
+import { resolveDefaultChrome } from '@/lib/brand-map'
 // The same limits the server enforces, so the picker cannot offer more than the
 // action will accept. The server's check is the control; these are the hint.
 import {
@@ -672,6 +675,15 @@ const BrandEditor = ({ brand, isDraft, onSave, onBack }) => {
   // brand instead of being typed into individual quiz nodes.
   const updUrls = (p) => update({ urls: { ...(draft.urls || {}), ...p } })
 
+  // Page chrome for this brand's standalone funnel pages. Resolved through the
+  // SAME function the renderer uses, so the editor shows the header and footer a
+  // visitor will actually get - including for a brand that has never opened this
+  // tab, whose chrome is derived rather than blank.
+  const chrome = resolveDefaultChrome(draft, draft.contact)
+  const updHeader = (p) => update({ defaultHeader: { ...(draft.defaultHeader || {}), ...p } })
+  const updHeaderCta = (p) => update({ defaultHeader: { ...(draft.defaultHeader || {}), ctaButton: { ...((draft.defaultHeader || {}).ctaButton || {}), ...p } } })
+  const updFooter = (p) => update({ defaultFooter: { ...(draft.defaultFooter || {}), ...p } })
+
   const sections = draft.defaultBodySections || []
   const addSection = (type) => { update({ defaultBodySections: [...sections, { id: genId('s'), type, enabled: true, config: {} }] }); setPickerOpen(false) }
   const updSection = (s) => update({ defaultBodySections: sections.map((x) => (x.id === s.id ? s : x)) })
@@ -687,6 +699,7 @@ const BrandEditor = ({ brand, isDraft, onSave, onBack }) => {
     { id: 'typography', label: 'Typography' }, { id: 'contact', label: 'Contact' },
     { id: 'domains', label: 'Domains' }, { id: 'legal', label: 'Legal' },
     { id: 'urls', label: 'URLs' },
+    { id: 'chrome', label: 'Default Header & Footer' },
     { id: 'sections', label: `Default Body Sections · ${sections.length}` },
   ]
 
@@ -854,6 +867,69 @@ const BrandEditor = ({ brand, isDraft, onSave, onBack }) => {
                   )}
                 </div>
               ))}
+            </div>
+          )}
+
+          {tab === 'chrome' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <div style={{ fontSize: 12.5, color: T.textMute, lineHeight: 1.55 }}>
+                The header and footer every standalone funnel page under this brand wears. They are set once here, not per deployment,
+                so two pages running the same quiz can never show different logos or different copyright lines. Embedded and inline
+                placements draw no chrome at all.
+              </div>
+
+              <div style={{ padding: 14, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 8 }}>
+                <div style={{ fontSize: 13, color: T.text, fontWeight: 600, marginBottom: 10 }}>Header</div>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+                  <button onClick={() => updHeader({ logoEnabled: !chrome.header.logoEnabled })} style={{ padding: '6px 11px', borderRadius: 5, fontSize: 10.5, fontWeight: 600, backgroundColor: chrome.header.logoEnabled ? `${T.success}22` : T.bgElev2, border: `1px solid ${chrome.header.logoEnabled ? T.success : T.border}`, color: chrome.header.logoEnabled ? T.success : T.textMute, cursor: 'pointer', fontFamily: '"JetBrains Mono", monospace' }}>{chrome.header.logoEnabled ? 'ON LOGO' : 'OFF LOGO'}</button>
+                  <button onClick={() => updHeaderCta({ enabled: !chrome.header.ctaButton.enabled })} style={{ padding: '6px 11px', borderRadius: 5, fontSize: 10.5, fontWeight: 600, backgroundColor: chrome.header.ctaButton.enabled ? `${T.success}22` : T.bgElev2, border: `1px solid ${chrome.header.ctaButton.enabled ? T.success : T.border}`, color: chrome.header.ctaButton.enabled ? T.success : T.textMute, cursor: 'pointer', fontFamily: '"JetBrains Mono", monospace' }}>{chrome.header.ctaButton.enabled ? 'ON CTA BUTTON' : 'OFF CTA BUTTON'}</button>
+                </div>
+                <div style={{ fontSize: 10.5, color: T.textLow, marginBottom: 12, lineHeight: 1.45 }}>
+                  With the logo off, the brand&apos;s display name is shown instead. A brand with no logo URL always shows the name.
+                </div>
+                {chrome.header.ctaButton.enabled && (
+                  <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr', gap: 8 }}>
+                    <div>
+                      <Label>CTA Text</Label>
+                      <Input value={(draft.defaultHeader || {}).ctaButton?.text ?? chrome.header.ctaButton.text} onChange={(e) => updHeaderCta({ text: e.target.value })} placeholder={chrome.header.ctaButton.text} />
+                    </div>
+                    <div>
+                      <Label>CTA URL</Label>
+                      <Input mono value={(draft.defaultHeader || {}).ctaButton?.url ?? chrome.header.ctaButton.url} onChange={(e) => updHeaderCta({ url: e.target.value })} placeholder={chrome.header.ctaButton.url || 'tel:+1...'} />
+                      {/* A tel: link is a copy of the Call Number, so the renderer
+                          re-derives it rather than trusting a stored copy. Saying
+                          so here is what stops someone editing this field and
+                          wondering why the live page dials something else. */}
+                      <div style={{ fontSize: 10.5, color: chrome.header.ctaButton.url ? T.textLow : T.warning, marginTop: 4, lineHeight: 1.45 }}>
+                        {chrome.header.ctaButton.url
+                          ? `Links to ${chrome.header.ctaButton.url}. Phone links follow the Call Number on the Contact tab; enter a full https:// address to send this button somewhere else.`
+                          : 'This brand has no Call Number, so the button has nowhere to go and will not render. Set one on the Contact tab, or enter a full https:// address here.'}
+                      </div>
+                    </div>
+                    <div><Label>Font Size (px)</Label><Input type="number" value={chrome.header.ctaButton.fontSize} onChange={(e) => updHeaderCta({ fontSize: parseInt(e.target.value) || 11 })} /></div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ padding: 14, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 8 }}>
+                <div style={{ fontSize: 13, color: T.text, fontWeight: 600, marginBottom: 10 }}>Footer</div>
+                <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
+                  <button onClick={() => updFooter({ logoEnabled: !chrome.footer.logoEnabled })} style={{ padding: '6px 11px', borderRadius: 5, fontSize: 10.5, fontWeight: 600, backgroundColor: chrome.footer.logoEnabled ? `${T.success}22` : T.bgElev2, border: `1px solid ${chrome.footer.logoEnabled ? T.success : T.border}`, color: chrome.footer.logoEnabled ? T.success : T.textMute, cursor: 'pointer', fontFamily: '"JetBrains Mono", monospace' }}>{chrome.footer.logoEnabled ? 'ON LOGO' : 'OFF LOGO'}</button>
+                  <button onClick={() => updFooter({ showCopyright: !chrome.footer.showCopyright })} style={{ padding: '6px 11px', borderRadius: 5, fontSize: 10.5, fontWeight: 600, backgroundColor: chrome.footer.showCopyright ? `${T.success}22` : T.bgElev2, border: `1px solid ${chrome.footer.showCopyright ? T.success : T.border}`, color: chrome.footer.showCopyright ? T.success : T.textMute, cursor: 'pointer', fontFamily: '"JetBrains Mono", monospace' }}>{chrome.footer.showCopyright ? 'ON COPYRIGHT' : 'OFF COPYRIGHT'}</button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <div><Label>Logo Size (px)</Label><Input type="number" value={chrome.footer.logoSize} onChange={(e) => updFooter({ logoSize: parseInt(e.target.value) || 32 })} /></div>
+                  <div><Label>Font Size (px)</Label><Input type="number" value={chrome.footer.fontSize} onChange={(e) => updFooter({ fontSize: parseInt(e.target.value) || 12 })} /></div>
+                </div>
+                {/* Turning the copyright off is a compliance decision on an
+                    attorney-advertising page, so it is stated rather than left
+                    to be discovered on a live funnel. */}
+                <div style={{ fontSize: 10.5, color: chrome.footer.showCopyright ? T.textLow : T.warning, marginTop: 10, lineHeight: 1.45 }}>
+                  {chrome.footer.showCopyright
+                    ? `Shows the Legal tab's copyright line: ${draft.legal?.copyright || 'not set yet, so nothing will render'}.`
+                    : 'The copyright line is hidden on every standalone page under this brand.'}
+                </div>
+              </div>
             </div>
           )}
 

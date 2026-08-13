@@ -9,6 +9,7 @@ import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { invokeLLM } from '@/lib/ai/invoke'
 import { canonicalTemplateId } from '@/lib/template-registry'
+import { resolveQuizTemplateSelection } from '@/lib/template-records/select'
 import { relationId, requireDeploymentSiteAdmin } from '@/lib/authz'
 
 const PATH = '/admin/quizzes'
@@ -163,10 +164,22 @@ export async function saveQuizDeployment(args: { deployment: Record<string, unkn
   })
   if (!gate.ok) return gate
 
+  // What the row already stores, so a template that has since been disabled does
+  // not block an edit that leaves the choice alone. Read separately from the
+  // authz gate on purpose: that helper derives the Site and returns nothing else,
+  // and widening it for one caller's convenience is how a gate grows a bypass.
+  let currentTemplateId = ''
+  if (isExisting) {
+    const existing = await payload
+      .findByID({ collection: 'funnel-quiz-deployments', id: dep.id, depth: 0, overrideAccess: true })
+      .catch(() => null)
+    currentTemplateId = typeof existing?.template_id === 'string' ? existing.template_id : ''
+  }
+
   // A template id that names nothing must stop the save. It used to default to
   // `'default'` and resolve silently at render time, so a typo produced a page
   // that looked wrong with nothing anywhere saying why.
-  const template = canonicalTemplateId('quiz', dep.templateId ?? 'default')
+  const template = await resolveQuizTemplateSelection(payload, dep.templateId, currentTemplateId)
   if (!template.ok) return { ok: false, error: template.error }
 
   // The host is resolved with `overrideAccess: true`, so the row it finds may
@@ -198,9 +211,11 @@ export async function saveQuizDeployment(args: { deployment: Record<string, unkn
     status: dep.status || 'draft',
     embed_preview_bg: dep.embedPreviewBg || '',
     destination_overrides: dep.destinationOverrides ?? null,
-    header_config: dep.headerConfig ?? {},
-    footer_config: dep.footerConfig ?? {},
-    body_section_overrides: dep.bodySectionOverrides ?? null,
+    // header_config / footer_config / body_section_overrides are deliberately
+    // absent. The columns are deprecated (Brand Identity owns page chrome and
+    // body sections); writing `{}` into them on every save kept resurrecting an
+    // empty header strip and would overwrite what an author wrote before the
+    // move. Omitting the keys leaves the stored values untouched.
     utm: dep.utm ?? {},
     pixels: dep.pixels ?? {},
   }

@@ -6,6 +6,11 @@ import { LandingPagesApp } from '@/components/builder/lp/LandingPagesApp'
 import { buildBrandsFromSites } from '@/lib/brand-map'
 import { ensureFunnelSamples, ensureStarterFunnelsForAllBrands } from '@/lib/funnel-samples'
 import { ensureBrandTokensSyncedForAllBrands } from '@/app/(app)/admin/(top)/brands/brand-identities/actions'
+import {
+  ensureTemplateLibrary,
+  listLpTemplateRecords,
+  listQuizTemplateRecords,
+} from '@/lib/template-records'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,40 +20,55 @@ const relId = (v: unknown): string => {
   return String(v)
 }
 
+const asStringMap = (v: unknown): Record<string, string> => {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return {}
+  const out: Record<string, string> = {}
+  for (const [k, val] of Object.entries(v as Record<string, unknown>)) {
+    if (typeof val === 'string') out[k] = val
+  }
+  return out
+}
+
+const asObject = (v: unknown): Record<string, unknown> =>
+  v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
+
 export default async function LandingPagesPage() {
   const payload = await getPayload({ config })
+
+  // ORDER IS LOAD-BEARING. `ensureTemplateLibrary` materialises the twelve stock
+  // template rows and then retires the sample pages by repointing their
+  // deployments onto those rows, and `ensureFunnelSamples` /
+  // `ensureStarterFunnelsForAllBrands` bind their starter deployments to a stock
+  // row looked up by `stock_key`. Run the other way round, the starters find no
+  // row and every brand lands with a deployment that has no template.
+  await ensureTemplateLibrary(payload)
   await ensureFunnelSamples(payload)
   await ensureStarterFunnelsForAllBrands(payload)
   await ensureBrandTokensSyncedForAllBrands()
-  const [lpRes, depRes, sitesRes, domainsRes, quizRes, quizDepRes] = await Promise.all([
-    payload.find({ collection: 'funnel-landing-pages', limit: 500, sort: '-updatedAt', overrideAccess: true }),
+
+  const [templates, quizTemplates, depRes, sitesRes, domainsRes, quizRes, quizDepRes] = await Promise.all([
+    // The record layer, never the code registry: what an operator may select,
+    // rename, disable or delete is a row, and this is the one place that knows.
+    listLpTemplateRecords(payload),
+    listQuizTemplateRecords(payload),
     payload.find({ collection: 'funnel-lp-deployments', limit: 1000, depth: 0, overrideAccess: true }),
     payload.find({ collection: 'sites', limit: 500, sort: 'name', overrideAccess: true }),
     payload.find({ collection: 'domains', limit: 1000, sort: ['-primary'], overrideAccess: true }),
     payload.find({ collection: 'funnel-quizzes', limit: 500, overrideAccess: true }),
+    // Standalone quiz deployments, so a row whose only binding is the legacy
+    // `quiz_deployment_id` pointer can be resolved to a flow — or flagged as
+    // dangling when its target was deleted, which is the state three of four
+    // live rows were found in.
     payload.find({ collection: 'funnel-quiz-deployments', limit: 1000, depth: 0, overrideAccess: true }),
   ])
-
-  const landingPages = lpRes.docs.map((r) => ({
-    id: String(r.id),
-    name: r.name,
-    slug: r.slug,
-    // The raw stored value. Substituting a default here would be a fourth
-    // opinion about what an absent id means; the registry has the only one.
-    templateId: r.template_id ?? '',
-    angle: r.angle ?? 'pain',
-    isPublished: Boolean(r.is_published),
-    sections: Array.isArray(r.sections) ? r.sections : [],
-    createdAt: r.createdAt,
-    updatedAt: r.updatedAt,
-  }))
 
   const brands = buildBrandsFromSites(
     sitesRes.docs as unknown as Array<Record<string, unknown>>,
     domainsRes.docs as unknown as Array<Record<string, unknown>>,
   )
 
-  // Domains for the deployment editor's domain picker (keyed by brand = site).
+  // Domains for the deployment list's orphan check. The editor's picker reads
+  // `brand.__domains` instead, because it also needs certificate state.
   const domainHostById = new Map<string, string>()
   const editorDomains = domainsRes.docs.map((d) => {
     const sid = d.site == null ? null : typeof d.site === 'object' ? Number((d.site as { id: unknown }).id) : Number(d.site)
@@ -57,30 +77,34 @@ export default async function LandingPagesPage() {
   })
 
   const deployments = depRes.docs.map((r) => {
-    const lpId = relId(r.landing_page)
     const siteId = relId(r.site)
     const domId = relId(r.domain)
     return {
       id: String(r.id),
       name: r.name ?? '',
-      landingPageId: lpId,
+      // The TEMPLATE ROW this deployment renders. Named `landingPageId` because
+      // that is the column, `landing_page`, that stores it.
+      landingPageId: relId(r.landing_page),
       brandId: siteId ? `site_${siteId}` : '',
       domainId: domId,
       domain: domId ? domainHostById.get(domId) ?? '' : '',
       path: r.path ?? '',
-      // The flow this deployment runs. The editor binds THIS; the legacy
-      // standalone-deployment pointer below is carried read-only so a row that
-      // still has one can be seen and migrated rather than silently reset.
+      // The flow this page runs. The editor picks a quiz FLOW directly now;
+      // `quizDeploymentId` is the older pointer at a standalone quiz page, kept
+      // read-only so a row that still carries one can be seen and migrated
+      // rather than silently reset by an unrelated save.
       quizId: relId(r.quiz),
-      embeddedQuizTemplateId: r.embedded_quiz_template_id ?? '',
-      embeddedProgressForm: r.embedded_progress_form ?? '',
       quizDeploymentId: r.quiz_deployment_id ?? '',
-      contentOverrides: (r.content_overrides ?? {}) as Record<string, string>,
+      embeddedQuizTemplateId: r.embedded_quiz_template_id ?? '',
+      embeddedProgressForm: r.embedded_progress_form ?? null,
+      contentOverrides: asStringMap(r.content_overrides),
+      destinationOverrides: asObject(r.destination_overrides),
+      utm: asObject(r.utm),
+      pixels: asObject(r.pixels),
       status: r.status ?? 'draft',
     }
   })
 
-  // Real quizzes + quiz deployments so the LP deployment editor's quiz picker populates.
   // The whole quiz, not just its name. The hero form runs the REAL quiz runtime
   // rather than a drawing of one, so without the steps and nodes the builder
   // shows an empty card where the most important thing on the page goes, and
@@ -98,25 +122,20 @@ export default async function LandingPagesPage() {
     nodes: Array.isArray(r.nodes) ? r.nodes : [],
     customFields: Array.isArray(r.custom_fields) ? r.custom_fields : [],
   }))
-  const quizDeployments = quizDepRes.docs.map((r) => {
-    const siteId = relId(r.site)
-    const domId = relId(r.domain)
-    return {
-      id: String(r.id),
-      quizId: relId(r.quiz),
-      brandId: siteId ? `site_${siteId}` : '',
-      domain: domId ? domainHostById.get(domId) ?? '' : '',
-      path: r.path ?? '',
-    }
-  })
+
+  const quizDeployments = quizDepRes.docs.map((r) => ({
+    id: String(r.id),
+    quizId: relId(r.quiz),
+  }))
 
   return (
     <LandingPagesApp
-      initialLandingPages={landingPages}
+      initialTemplates={templates}
       initialDeployments={deployments}
       brands={brands}
       domains={editorDomains}
       quizzes={quizzes}
+      quizTemplates={quizTemplates}
       quizDeployments={quizDeployments}
     />
   )

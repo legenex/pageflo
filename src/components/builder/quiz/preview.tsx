@@ -393,6 +393,11 @@ export const QuizPreviewView = ({ quiz, brand, deployment, onBackToBuilder, bran
   const effectiveBrand = brands.find((b) => b.id === selectedBrandId) || brand
   const renderMode = effectiveDeployment?.renderMode || 'standalone'
   const sections = effectiveDeployment?.bodySectionOverrides || effectiveBrand?.defaultBodySections || []
+  // Same source as the public runtime: the brand owns the header and footer, so
+  // switching the Brand selector above repaints the chrome and the preview keeps
+  // showing what a visitor would actually get.
+  const headerConfig = effectiveBrand?.defaultHeader
+  const footerConfig = effectiveBrand?.defaultFooter
 
   // Node resolution and step sequencing both come from quiz-graph so the
   // preview walks the flow exactly as the builder draws it (and, in turn,
@@ -515,12 +520,12 @@ export const QuizPreviewView = ({ quiz, brand, deployment, onBackToBuilder, bran
         <Btn variant="secondary" size="sm" icon={RotateCw} onClick={reset}>Reset</Btn>
       </div>
 
-      {renderMode === 'standalone' && effectiveDeployment?.headerConfig && <div style={{ padding: '14px 24px', borderBottom: `1px solid ${C.primary}33`, display: 'flex', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+      {renderMode === 'standalone' && headerConfig && <div style={{ padding: '14px 24px', borderBottom: `1px solid ${C.primary}33`, display: 'flex', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
         <div style={{ flex: 1 }}>
-          {effectiveDeployment.headerConfig.logoEnabled && effectiveBrand.logoUrl ? <img loading="lazy" decoding="async" src={effectiveBrand.logoUrl} alt={effectiveBrand.displayName} style={{ height: 28 }} /> :
-            effectiveDeployment.headerConfig.logoEnabled ? <div style={{ fontSize: 18, color: pagePal.text, fontWeight: 700, letterSpacing: '-0.01em' }}>{effectiveBrand.displayName}</div> : null}
+          {headerConfig.logoEnabled && effectiveBrand.logoUrl ? <img loading="lazy" decoding="async" src={effectiveBrand.logoUrl} alt={effectiveBrand.displayName} style={{ height: 28 }} /> :
+            headerConfig.logoEnabled ? <div style={{ fontSize: 18, color: pagePal.text, fontWeight: 700, letterSpacing: '-0.01em' }}>{effectiveBrand.displayName}</div> : null}
         </div>
-        {effectiveDeployment.headerConfig.ctaButton?.enabled && <a href={effectiveDeployment.headerConfig.ctaButton.url || '#'} style={{ padding: '8px 16px', backgroundColor: C.primary, color: pagePal.onPrimary, borderRadius: effectiveBrand.contact.callCtaStyle === 'pill' ? 999 : 8, fontSize: effectiveDeployment.headerConfig.ctaButton.fontSize || 11, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6, letterSpacing: '0.02em' }}><Phone size={12} /> {effectiveDeployment.headerConfig.ctaButton.text}</a>}
+        {headerConfig.ctaButton?.enabled && headerConfig.ctaButton?.url && <a href={headerConfig.ctaButton.url} style={{ padding: '8px 16px', backgroundColor: C.primary, color: pagePal.onPrimary, borderRadius: effectiveBrand.contact.callCtaStyle === 'pill' ? 999 : 8, fontSize: headerConfig.ctaButton.fontSize || 11, fontWeight: 600, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6, letterSpacing: '0.02em' }}><Phone size={12} /> {headerConfig.ctaButton.text}</a>}
       </div>}
 
       <div style={{ padding: '40px 20px' }}>
@@ -536,9 +541,9 @@ export const QuizPreviewView = ({ quiz, brand, deployment, onBackToBuilder, bran
 
       {renderMode === 'standalone' && currentNode && currentNode.type !== 'endpoint' && sections.map((s) => renderBodySection(s, effectiveBrand, effectiveDeployment, pagePal))}
 
-      {renderMode === 'standalone' && effectiveDeployment?.footerConfig && <div style={{ padding: '28px 24px', borderTop: `1px solid ${C.primary}22`, textAlign: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
-        {effectiveDeployment.footerConfig.logoEnabled && effectiveBrand.logoUrl ? <img loading="lazy" decoding="async" src={effectiveBrand.logoUrl} alt={effectiveBrand.displayName} style={{ height: effectiveDeployment.footerConfig.logoSize || 32, marginBottom: 12 }} /> : null}
-        {effectiveDeployment.footerConfig.showCopyright && <div style={{ fontSize: effectiveDeployment.footerConfig.fontSize || 12, color: pagePal.muted }}>{effectiveBrand.legal.copyright}</div>}
+      {renderMode === 'standalone' && footerConfig && <div style={{ padding: '28px 24px', borderTop: `1px solid ${C.primary}22`, textAlign: 'center', backgroundColor: 'rgba(0,0,0,0.2)' }}>
+        {footerConfig.logoEnabled && effectiveBrand.logoUrl ? <img loading="lazy" decoding="async" src={effectiveBrand.logoUrl} alt={effectiveBrand.displayName} style={{ height: footerConfig.logoSize || 32, marginBottom: 12 }} /> : null}
+        {footerConfig.showCopyright && effectiveBrand.legal?.copyright ? <div style={{ fontSize: footerConfig.fontSize || 12, color: pagePal.muted }}>{effectiveBrand.legal.copyright}</div> : null}
       </div>}
     </div>
 

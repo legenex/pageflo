@@ -2,110 +2,115 @@
 /* eslint-disable */
 'use client'
 
-// Ported verbatim from the artifact: the Landing Pages module (list + Deployments
-// tab + 3-pane builder + section/template modals + deployment editor + AI wizard +
-// preview). localStorage is replaced by server actions; direct Anthropic calls go
-// through invokeLLM server actions.
+/**
+ * Landing Pages: TEMPLATES and DEPLOYMENTS, and nothing else.
+ *
+ * The module used to have three tabs. `Pages` listed rows the product called
+ * pages but which every brand deployed, `Templates` listed the twelve code
+ * renderers and could only be looked at, and `Deployments` picked from the first
+ * list. Two names for one idea, and the only one an operator could act on was
+ * the wrong one: a deployment picked a "page", so the twelve designs the
+ * business bought were unreachable.
+ *
+ * There is one library now. `Templates` is the management surface for the
+ * records in `src/lib/template-records/`, and `Deployments` binds one of those
+ * records to a brand, a domain and a path. Everything on either tab reaches the
+ * database through the actions in `../../app/(app)/admin/(top)/template-actions.ts`
+ * and `landing-pages/actions.ts`; nothing here reads the code registry's
+ * catalogue except to answer "what draws this row".
+ */
 
-import { useState, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { selectableOptions } from '@/lib/selectable'
-import { TemplateLibrary } from '@/components/builder/templates/TemplateLibrary'
-import { EXPECTED_LP_TEMPLATE_COUNT } from '@/lib/template-registry'
 import {
-  Rocket, Eye, Edit3, Copy, Power, PowerOff, Trash2, EyeOff, Layers, Sparkles, Save,
-  X, Plus, Check, Loader2, Palette, ChevronRight, MoveUp, MoveDown, Plug,
+  Rocket, Eye, Edit3, Sparkles, X, Plus, Loader2, Palette, ChevronRight, Plug,
+  Power, PowerOff, Trash2,
 } from 'lucide-react'
+
+import { selectableOptions } from '@/lib/selectable'
 import {
-  T, genId, Btn, Input, Textarea, Select, Label, Pill, IconBtn, ConfirmDialog, Toast,
-  PageHeader, EmptyState, TabBar, TopBar, brandShortName,
+  T, Btn, Input, Textarea, Select, Label, Pill, IconBtn, ConfirmDialog, Toast,
+  PageHeader, EmptyState, TopBar, brandShortName,
 } from '../ui'
 import {
   TEMPLATES, ANGLES, LivePreview, PREVIEW_BRAND_DEFAULT,
-  templateFor, templatePreviewSurface, templateLook, templatePalette, GALLERY_TEMPLATES, SKELETON_TEMPLATES,
+  templateFor, templatePreviewSurface, templatePalette, GALLERY_TEMPLATES, SKELETON_TEMPLATES,
 } from './render'
 import { BrandQuickEdit } from '../brand/BrandQuickEdit'
 import { NodeTree } from './NodeTree'
-import { PortedTemplateView } from './PortedTemplate'
-import { listQuizTemplates, recommendedQuizTemplateFor } from '@/lib/template-registry'
-import { PROGRESS_FORM_LABELS } from '@/lib/quiz-templates/model'
 import { NodeInspector } from './NodeInspector'
+import { SectionHeading } from './SectionHeading'
+import { TemplateListView } from './TemplateListView'
+import { LPDeploymentEditor } from './LPDeploymentEditor'
+import { SlotSectionFields, SlotSectionNav, slotGroupsFor } from './SlotEditor'
 import { treeIcon } from './nodes/icons'
 import {
   SECTION_SPECS, SECTION_TYPES as NODE_SECTION_TYPES, newNodeId, sectionSpec,
 } from '@/lib/lp-nodes/model'
 import { toNodeSections } from '@/lib/lp-nodes/from-legacy'
 import { instantiateSkeleton } from '@/lib/lp-skeletons'
-import { createLP, saveLP, cloneLP, deleteLP, saveDeployment, deleteDeployment, aiWriteSectionNodes } from '@/app/(app)/admin/(top)/landing-pages/actions'
+import { saveDeployment, deleteDeployment, aiWriteSectionNodes } from '@/app/(app)/admin/(top)/landing-pages/actions'
+import {
+  createLpTemplate, cloneLpTemplate, saveLpTemplate, setLpTemplateEnabled, deleteLpTemplate,
+} from '@/app/(app)/admin/(top)/template-actions'
 import { elementSpec } from '@/lib/lp-nodes/model'
 
 // ============================================================================
-// LANDING PAGE LIST VIEW
+// TOP-LEVEL TAB BAR
 // ============================================================================
-const LandingPagesListView = ({ landingPages, lpDeployments, onOpen, onClone, onDelete, onTogglePublish, onPreview, onRename }) => {
-  const [renamingId, setRenamingId] = useState(null)
-  const [renameDraft, setRenameDraft] = useState('')
-  if (landingPages.length === 0) {
-    return <EmptyState icon={Rocket} title="No landing pages yet" subtitle="Build your first brandless landing page. Then deploy it to one or more brand domains." />
-  }
-  const startRename = (lp) => { setRenamingId(lp.id); setRenameDraft(lp.name) }
-  const commitRename = () => { if (renamingId && renameDraft.trim()) onRename(renamingId, renameDraft.trim()); setRenamingId(null) }
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {landingPages.map((lp) => {
-        const template = templateFor(lp.templateId)
-        const swatch = templatePreviewSurface(template, null)
-        const angle = ANGLES.find((a) => a.id === lp.angle)
-        const depCount = lpDeployments.filter((d) => d.landingPageId === lp.id).length
-        return (
-          <div key={lp.id} style={{ padding: 14, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 9, backgroundColor: swatch.bg, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Rocket size={16} color={swatch.accent} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                {renamingId === lp.id ? (
-                  <input autoFocus value={renameDraft} onChange={(e) => setRenameDraft(e.target.value)} onBlur={commitRename} onKeyDown={(e) => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setRenamingId(null) }} style={{ flex: 1, maxWidth: 300, backgroundColor: T.bg, border: `1px solid ${T.primary}`, borderRadius: 4, padding: '3px 8px', color: T.text, fontSize: 14, fontWeight: 600, outline: 'none' }} />
-                ) : (
-                  <span onClick={(e) => { e.stopPropagation(); startRename(lp) }} style={{ fontSize: 14, fontWeight: 600, color: T.text, cursor: 'text' }} title="Click to rename">{lp.name}</span>
-                )}
-                <Pill color={lp.isPublished ? T.success : T.warning}>{lp.isPublished ? 'LIVE' : 'DRAFT'}</Pill>
-                <Pill color={T.purple}>{template?.name}</Pill>
-                <Pill color={T.info}>{angle?.label}</Pill>
-                <Pill color={T.textMute}>{(lp.sections || []).length} sections</Pill>
-                <Pill color={depCount > 0 ? T.success : T.textLow}>{depCount} deployments</Pill>
-              </div>
-              <div style={{ fontSize: 11, color: T.textLow, fontFamily: '"JetBrains Mono", monospace' }}>/{lp.slug}</div>
-            </div>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <Btn variant="ghost" size="sm" icon={Eye} onClick={() => onPreview(lp.id)}>Preview</Btn>
-              <Btn variant="primary" size="sm" icon={Edit3} onClick={() => onOpen(lp.id)}>Edit</Btn>
-              <IconBtn icon={Copy} onClick={() => onClone(lp)} />
-              <IconBtn icon={lp.isPublished ? PowerOff : Power} onClick={() => onTogglePublish(lp.id)} />
-              <IconBtn icon={Trash2} onClick={() => onDelete(lp.id)} style={{ color: T.danger }} />
-            </div>
-          </div>
-        )
-      })}
-    </div>
-  )
-}
+/**
+ * A local copy of `TabBar` for one reason: a stable per-tab test hook.
+ *
+ * The shared component takes no attributes, and a suite that has to find a tab
+ * by its visible label breaks the first time the label is reworded. The styling
+ * is deliberately identical.
+ */
+const LpTabBar = ({ active, onChange, tabs }) => (
+  <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${T.border}` }}>
+    {tabs.map((t) => (
+      <button
+        key={t.id}
+        data-lp-tab={t.id}
+        aria-current={active === t.id ? 'true' : undefined}
+        onClick={() => onChange(t.id)}
+        style={{
+          padding: '10px 16px',
+          backgroundColor: 'transparent',
+          border: 'none',
+          borderBottom: active === t.id ? `2px solid ${T.primary}` : '2px solid transparent',
+          color: active === t.id ? T.text : T.textMute,
+          fontSize: 13,
+          fontWeight: 600,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontFamily: '"Inter", system-ui, sans-serif',
+          marginBottom: -1,
+        }}
+      >
+        {t.label}
+        {t.count !== undefined && <Pill color={active === t.id ? T.primary : T.textLow}>{t.count}</Pill>}
+      </button>
+    ))}
+  </div>
+)
 
 // ============================================================================
 // LP DEPLOYMENT LIST VIEW
 // ============================================================================
-const LPDeploymentListView = ({ deployments, landingPages, brands, quizDeployments, quizzes, domains, onOpen, onDelete, onToggleStatus, onPreview, onRename }) => {
+const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDeployments, domains, onOpen, onDelete, onToggleStatus, onPreview, onRename }) => {
   const [renamingId, setRenamingId] = useState(null)
   const [renameDraft, setRenameDraft] = useState('')
   if (deployments.length === 0) {
-    return <EmptyState icon={Plug} title="No deployments yet" subtitle="A deployment maps a landing page to a brand and domain. The same page can be deployed multiple times to different brands." />
+    return <EmptyState icon={Plug} title="No deployments yet" subtitle="A deployment maps a landing page template to a brand and domain. The same template can be deployed many times, to many brands." />
   }
   const startRename = (dep) => { setRenamingId(dep.id); setRenameDraft(dep.name || '') }
   const commitRename = () => { if (renamingId) { onRename(renamingId, renameDraft.trim()); setRenamingId(null) } }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {deployments.map((dep) => {
-        const lp = landingPages.find((p) => p.id === dep.landingPageId)
+        const template = templates.find((t) => t.id === dep.landingPageId)
         const brand = brands.find((b) => b.id === dep.brandId)
         const orphaned = !!dep.brandId && !brand
         // The flow this deployment runs, resolved the way the RESOLVER resolves
@@ -126,11 +131,11 @@ const LPDeploymentListView = ({ deployments, landingPages, brands, quizDeploymen
         const orphanedDomain = !!dep.domainId && !refDomain
         const domainStr = refDomain?.domain || dep.domain || ''
         const url = domainStr ? `https://${domainStr}${dep.path || ''}` : `https://preview.legenex.com/lp/${dep.id}`
-        const depName = dep.name || (lp ? `${lp.name} · ${brand?.displayName || 'No brand'}` : 'Untitled deployment')
+        const depName = dep.name || (template ? `${template.name} · ${brand?.displayName || 'No brand'}` : 'Untitled deployment')
         const primary = brand?.colors?.primary
         const background = brand?.colors?.background
         return (
-          <div key={dep.id} style={{ padding: 14, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div key={dep.id} data-lp-deployment={dep.id} style={{ padding: 14, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 42, height: 42, borderRadius: 9, background: primary ? `linear-gradient(135deg, ${primary}, ${background || primary})` : T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12, flexShrink: 0, overflow: 'hidden' }}>
               {brand?.faviconUrl ? <img loading="lazy" decoding="async" src={brand.faviconUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : brand ? brandShortName(brand) : <Rocket size={18} />}
             </div>
@@ -143,14 +148,16 @@ const LPDeploymentListView = ({ deployments, landingPages, brands, quizDeploymen
                 )}
                 <Pill color={dep.status === 'live' ? T.success : dep.status === 'paused' ? T.warning : T.textLow}>{(dep.status || 'draft').toUpperCase()}</Pill>
                 {!domainStr && <Pill color={T.info}>PREVIEW URL</Pill>}
+                {!template && <Pill color={T.danger}>Template missing, pick one to fix</Pill>}
+                {template?.rendererError && <Pill color={T.danger}>Template renderer broken</Pill>}
                 {orphaned && <Pill color={T.warning}>Brand missing, select a new brand to fix</Pill>}
                 {orphanedDomain && <Pill color={T.warning}>Domain missing, falling back to preview URL</Pill>}
                 {brokenLegacy && <Pill color={T.danger}>Quiz missing, this page has no funnel</Pill>}
                 {!dep.quizId && !dep.quizDeploymentId && <Pill color={T.warning}>No quiz attached</Pill>}
               </div>
               <div style={{ fontSize: 11, color: T.textMute, fontFamily: '"JetBrains Mono", monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</div>
-              <div style={{ fontSize: 10, color: T.textLow, marginTop: 3, display: 'flex', gap: 10 }}>
-                <span>LP: {lp?.name || 'unknown'}</span>
+              <div style={{ fontSize: 10, color: T.textLow, marginTop: 3, display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <span>Template: {template?.name || 'unknown'}</span>
                 <span>{'·'}</span>
                 <span>{brand?.displayName || 'No brand'}</span>
                 <span>{'·'}</span>
@@ -161,7 +168,7 @@ const LPDeploymentListView = ({ deployments, landingPages, brands, quizDeploymen
             <div style={{ display: 'flex', gap: 6 }}>
               <Btn variant="ghost" size="sm" icon={Eye} onClick={() => onPreview(dep)} aria-label="Preview deployment">Preview</Btn>
               <Btn variant="secondary" size="sm" icon={Edit3} onClick={() => onOpen(dep)} aria-label="Edit deployment">Edit</Btn>
-              <IconBtn icon={dep.status === 'live' ? PowerOff : Power} onClick={() => onToggleStatus(dep.id)} aria-label={dep.status === 'live' ? 'Unpublish deployment' : 'Publish deployment'} />
+              <IconBtn icon={dep.status === 'live' ? PowerOff : Power} onClick={() => onToggleStatus(dep.id)} aria-label={dep.status === 'live' ? 'Pause deployment' : 'Publish deployment'} />
               <IconBtn icon={Trash2} onClick={() => onDelete(dep.id)} style={{ color: T.danger }} aria-label="Delete deployment" />
             </div>
           </div>
@@ -172,7 +179,7 @@ const LPDeploymentListView = ({ deployments, landingPages, brands, quizDeploymen
 }
 
 // ============================================================================
-// ADD SECTION MODAL
+// ADD SECTION MODAL (legacy identity templates only)
 // ============================================================================
 const AddSectionModal = ({ open, onClose, onAdd }) => {
   if (!open) return null
@@ -209,79 +216,66 @@ const AddSectionModal = ({ open, onClose, onAdd }) => {
 }
 
 // ============================================================================
-// TEMPLATE GALLERY MODAL
+// RENDERER PICKER
 // ============================================================================
 /**
- * Pick a template, and separately decide whether to take its structure.
+ * Which CODE draws this template row.
  *
- * These are two different acts and the gallery says so. Choosing a template
- * always applies its LOOK - palette, faces, radii, mark - which is safe: it
- * repaints the page you have. Taking its STRUCTURE replaces the sections, which
- * throws away the copy, so it is a second button behind a confirmation rather
- * than a side effect of clicking a card.
+ * Deliberately not the record gallery. The gallery answers "which template
+ * should this deployment use", and its cards are rows; this answers "which of
+ * the shipped designs is this row", and its cards are renderers. Conflating them
+ * is how the module ended up with a library nothing could select.
  *
- * A template whose skeleton has not been built yet says so plainly instead of
- * offering a button that would hand out another template's shape.
+ * The four legacy identity renderers are offered separately and last. They are
+ * the only ones whose copy travels as nodes, which is why they are still here at
+ * all - and why a row on one is edited with the element tree rather than slots.
  */
-const TemplateGalleryModal = ({ open, onClose, onPickLook, onPickStructure, currentTemplateId, brand }) => {
-  const [confirming, setConfirming] = useState(null)
-  useEffect(() => { if (open) setConfirming(null) }, [open])
+const RendererPickerModal = ({ open, onClose, currentTemplateId, onPick }) => {
   if (!open) return null
+  const legacy = TEMPLATES.filter((t) => !t.ported)
+  const card = (t) => {
+    const isCurrent = t.id === currentTemplateId
+    const s = templatePreviewSurface(t, null)
+    return (
+      <button
+        key={t.id}
+        data-renderer={t.id}
+        onClick={() => { if (!isCurrent) onPick(t.id); onClose() }}
+        style={{ textAlign: 'left', padding: 0, backgroundColor: T.bgElev, border: `2px solid ${isCurrent ? T.primary : T.border}`, borderRadius: 10, cursor: 'pointer', overflow: 'hidden', color: T.text }}
+      >
+        <div style={{ height: 44, backgroundColor: s.bg, display: 'flex', alignItems: 'center', paddingLeft: 12, gap: 6 }}>
+          {[s.accentFill, s.card, s.text].map((c, i) => <span key={i} style={{ width: 14, height: 14, borderRadius: 3, backgroundColor: c, border: `1px solid ${s.line}` }} />)}
+        </div>
+        <div style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 13, fontWeight: 700 }}>{t.name}</span>
+            {t.code && <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 9, color: T.textLow }}>{t.code}</span>}
+            {isCurrent && <Pill color={T.primary}>CURRENT</Pill>}
+          </div>
+          <div style={{ fontSize: 11, color: T.textMute, lineHeight: 1.45 }}>{t.blurb}</div>
+        </div>
+      </button>
+    )
+  }
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 110, backgroundColor: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 1180, maxHeight: '90vh', backgroundColor: T.bg, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 1080, maxHeight: '90vh', backgroundColor: T.bg, border: `1px solid ${T.border}`, borderRadius: 14, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <div style={{ padding: 22, borderBottom: `1px solid ${T.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <div style={{ fontSize: 16, fontWeight: 700, color: T.text }}>Templates</div>
-            <div style={{ fontSize: 11.5, color: T.textMute, marginTop: 2 }}>Twelve templates, ported from the design handoff. Each preview is a real render in the brand you are previewing as, so what you see is what the page becomes.</div>
+            <div style={{ fontSize: 16, fontWeight: 700, color: T.text }}>Which design draws this template</div>
+            <div style={{ fontSize: 11.5, color: T.textMute, marginTop: 2 }}>Changing it replaces the layout. Copy written against the old design does not carry over, because a slot belongs to the design it was cut from.</div>
           </div>
           <IconBtn icon={X} onClick={onClose} />
         </div>
-        <div style={{ padding: 22, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14, alignItems: 'start' }}>
-          {GALLERY_TEMPLATES.map((t) => {
-            const isCurrent = t.id === currentTemplateId
-            return (
-              // Tagged with its id so a capture job can drive a named card
-              // rather than guessing at a card from the text inside it.
-              <div key={t.id} data-template={t.id} style={{ backgroundColor: T.bgElev, border: `2px solid ${isCurrent ? T.primary : T.border}`, borderRadius: 10, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                {/* A real render of the template, shrunk. The cards used to draw
-                    an identity's wordmark, which made all twelve identical: the
-                    ports have no identity of their own, they ARE the design. */}
-                {/* flexShrink:0 is load-bearing: this sits in a flex column,
-                    and without it the fixed height collapses to nothing and the
-                    preview silently disappears. */}
-                {/* No thumbnail here, deliberately, and this is the second
-                    honest answer rather than the first one that worked.
-                    Four containment approaches - overflow on a sized box,
-                    absolute positioning, clip-path, and finally an iframe -
-                    each measured exactly right and each ended with the
-                    template's own markup painting over this card's name and
-                    action. Measuring the layout kept reporting success while
-                    an element screenshot kept showing otherwise, so whatever
-                    is wrong is not the containment, and shipping a picker
-                    whose cards bleed into each other is worse than shipping
-                    one that reads correctly without a picture. The preview
-                    belongs here and will come back once the cause is actually
-                    understood; see the build log. */}
-                <div style={{ padding: 13, display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 700, color: T.text }}>{t.name}</span>
-                    <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 9, color: T.textLow }}>{t.code}</span>
-                    <Pill color={T.purple}>{String(t.family).toUpperCase()} FORM</Pill>
-                    {isCurrent && <Pill color={T.primary}>CURRENT</Pill>}
-                  </div>
-                  <div style={{ fontSize: 11, color: T.textMute, lineHeight: 1.5, flex: 1 }}>{t.blurb}</div>
-                  <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 9, color: T.textLow, lineHeight: 1.6 }}>
-                    <div>CHANNELS {'·'} {t.channels}</div>
-                    <div>QUIZ {'·'} {t.quizPlacement}</div>
-                  </div>
-                  <Btn variant={isCurrent ? 'secondary' : 'primary'} size="sm" onClick={() => { onPickLook(t.id); onClose() }}>
-                    {isCurrent ? 'Currently applied' : 'Use this template'}
-                  </Btn>
-                </div>
-              </div>
-            )
-          })}
+        <div style={{ padding: 22, overflowY: 'auto' }}>
+          <SectionHeading eyebrow="Ported" title={`The ${GALLERY_TEMPLATES.length} shipped designs`} hint="Pixel ports of the design handoff. Their copy is edited as slots." />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12, marginBottom: 26 }}>
+            {GALLERY_TEMPLATES.map(card)}
+          </div>
+          <SectionHeading eyebrow="Legacy" title="Identity templates" hint="Kept resolvable for rows already built on them. Their copy is an element tree, not slots." />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 12 }}>
+            {legacy.map(card)}
+          </div>
         </div>
       </div>
     </div>
@@ -289,19 +283,20 @@ const TemplateGalleryModal = ({ open, onClose, onPickLook, onPickStructure, curr
 }
 
 // ============================================================================
-// AI NEW LP WIZARD
+// AI NEW TEMPLATE WIZARD
 // ============================================================================
 /**
- * A new page: the template's skeleton, filled section by section.
+ * A new template: the design's skeleton, filled section by section.
  *
  * The structure comes from the skeleton and the model only writes into it, one
  * call per section, ids as the contract. It cannot add a section, remove one or
  * reorder anything, which is what keeps "generated with Claude" and "built from
- * template B" the same page rather than two.
+ * design B" the same page rather than two.
  *
- * Only templates with a skeleton can be chosen here, because there is nothing
- * to fill in otherwise. Offering the others and quietly substituting another
- * template's shape is the failure this whole change is about.
+ * Only designs with a skeleton can be chosen here, because there is nothing to
+ * fill in otherwise. The twelve ported designs carry their copy in slots rather
+ * than nodes, so they are edited rather than generated; offering them and
+ * quietly substituting another design's shape is the failure this guards.
  */
 const AINewLPWizard = ({ open, onClose, onCreate }) => {
   const withStructure = SKELETON_TEMPLATES
@@ -324,7 +319,7 @@ const AINewLPWizard = ({ open, onClose, onCreate }) => {
   const template = templateFor(templateId)
 
   const generate = async () => {
-    if (!template.skeleton) { setError('That template has no structure yet.'); return }
+    if (!template.skeleton) { setError('That design has no structure yet.'); return }
     setBusy(true); setError(null); setProgress(0)
     try {
       const sections = instantiateSkeleton(template.skeleton)
@@ -356,11 +351,10 @@ const AINewLPWizard = ({ open, onClose, onCreate }) => {
         }),
       )
 
-      onCreate({
-        name: name || `${angleLabel} LP`,
-        slug: (name || 'new-lp').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+      await onCreate({
+        name: name || `${angleLabel} template`,
+        slug: (name || 'new-template').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
         templateId, angle, sections: written,
-        isPublished: false,
       })
       onClose()
     } catch (err) {
@@ -378,7 +372,7 @@ const AINewLPWizard = ({ open, onClose, onCreate }) => {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <Sparkles size={18} color={T.purple} />
             <div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: T.text }}>New landing page with Claude</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: T.text }}>New template with Claude</div>
               <div style={{ fontSize: 11, color: T.textMute, marginTop: 2 }}>Step {step} of {stepCount}</div>
             </div>
           </div>
@@ -387,9 +381,9 @@ const AINewLPWizard = ({ open, onClose, onCreate }) => {
         <div style={{ padding: 22, minHeight: 280 }}>
           {step === 1 && (
             <div>
-              <Label>Page name</Label>
+              <Label>Template name</Label>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="MVA Truck Urgency" autoFocus />
-              <div style={{ fontSize: 11, color: T.textMute, marginTop: 10 }}>This page will be brandless. You attach brands when you deploy it.</div>
+              <div style={{ fontSize: 11, color: T.textMute, marginTop: 10 }}>This template will be brandless. You attach brands when you deploy it.</div>
             </div>
           )}
           {step === 2 && (
@@ -407,7 +401,7 @@ const AINewLPWizard = ({ open, onClose, onCreate }) => {
           )}
           {step === 3 && (
             <div>
-              <Label>Template</Label>
+              <Label>Design</Label>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
                 {SKELETON_TEMPLATES.map((t) => {
                   const s = templatePreviewSurface(t, null)
@@ -464,35 +458,89 @@ const AINewLPWizard = ({ open, onClose, onCreate }) => {
 }
 
 // ============================================================================
-// LANDING PAGE BUILDER (3-pane)
+// TEMPLATE EDITOR (3-pane)
 // ============================================================================
-export const LandingPageBuilder = ({ landingPage, brands, onBrandSaved, quizDeployments, quizzes, onBack, onUpdate, onTogglePublish, onSetTemplate, onSetStructure, onPreview }) => {
+/**
+ * The three-pane builder, editing a TEMPLATE rather than a deployment.
+ *
+ * Left is navigation and the template's own settings, centre is a live render,
+ * right is the inspector for whatever the left pane selected. Which inspector
+ * depends on the renderer, and that is not a preference:
+ *
+ *  - the twelve PORTED designs have no node tree - `PortedTemplateView` offers
+ *    no element affordances by design - so their copy is edited as SLOTS,
+ *    grouped by the section labels the reference itself carries;
+ *  - the four LEGACY identity designs keep the element tree, because their copy
+ *    genuinely is a tree of nodes.
+ *
+ * Nothing brand-specific is ever written here. See the preview picker below.
+ */
+export const LandingPageBuilder = ({ template, brands, onBrandSaved, quizzes, onBack, onPatch, onToggleEnabled, onPreview }) => {
   const [selectedId, setSelectedId] = useState(null)
   const [addOpen, setAddOpen] = useState(false)
-  const [galleryOpen, setGalleryOpen] = useState(false)
-  const [previewBrandId, setPreviewBrandId] = useState(brands[0]?.id || null)
+  const [rendererOpen, setRendererOpen] = useState(false)
+  const [slotSection, setSlotSection] = useState(null)
+  // PREVIEW ONLY. This picker never writes a brand colour, a brand phone number
+  // or a line of brand copy into the template record: a template is brandless by
+  // construction and the brand is applied at deploy time. It exists so an author
+  // can see what a real client's visitor gets before publishing.
+  const [previewBrandId, setPreviewBrandId] = useState(null)
+  const [previewQuizId, setPreviewQuizId] = useState(null)
+  const [slotDiag, setSlotDiag] = useState(null)
+
   const previewBrand = brands.find((b) => b.id === previewBrandId) || PREVIEW_BRAND_DEFAULT
-  const brandEditor = <BrandQuickEdit brand={brands.find((b) => b.id === previewBrandId)} onSaved={onBrandSaved} />
-  const matchingQuizDeps = quizDeployments.filter((qd) => qd.brandId === previewBrandId)
-  const [previewQuizDepId, setPreviewQuizDepId] = useState(matchingQuizDeps[0]?.id || null)
-  useEffect(() => {
-    const dep = quizDeployments.find((q) => q.id === previewQuizDepId)
-    if (!dep || dep.brandId !== previewBrandId) {
-      const next = quizDeployments.find((q) => q.brandId === previewBrandId)
-      setPreviewQuizDepId(next?.id || null)
-    }
-  }, [previewBrandId, quizDeployments, previewQuizDepId])
+  const previewQuiz = quizzes.find((q) => q.id === previewQuizId) || null
+  /*
+   * A row whose design does not resolve is drawn as NOTHING, deliberately.
+   *
+   * `templateFor` falls back to the first template so a render path always has
+   * something, which is right for a visitor and wrong here: previewing template
+   * zero under this row's name is precisely the "looks correct, is not" failure
+   * the record's `rendererError` exists to make visible. So the fallback is used
+   * only where a design is known to resolve.
+   */
+  const broken = Boolean(template.rendererError)
+  const renderer = templateFor(template.templateId)
+  const rendererName = broken ? (template.templateId || 'none') : renderer.name
 
-  const previewQuizDep = quizDeployments.find((q) => q.id === previewQuizDepId)
-  const previewQuiz = quizzes.find((q) => q.id === previewQuizDep?.quizId)
-  const template = templateFor(landingPage.templateId)
+  const slotGroups = useMemo(() => slotGroupsFor(template.templateId), [template.templateId])
+  const usesSlots = Boolean(slotGroups)
+  const overrides = template.slotOverrides || {}
+  const overridesKey = useMemo(() => JSON.stringify(overrides), [overrides])
 
-  // Whatever the page is stored as comes through as nodes, so the builder only
-  // ever works in one vocabulary. A page written before the node model is
-  // converted here and saved back as nodes the first time anything is changed.
-  const sections = toNodeSections(landingPage.sections)
-  const setSections = (next) => onUpdate({ ...landingPage, sections: next, updatedAt: Date.now() })
+  // Reset the section selection when the renderer changes: slot section numbers
+  // belong to the design they were cut from.
+  useEffect(() => { setSlotSection(null); setSelectedId(null) }, [template.id, template.templateId])
 
+  const activeSection = slotGroups ? (slotGroups.some((g) => g.section === slotSection) ? slotSection : slotGroups[0]?.section) : null
+  const activeGroup = slotGroups ? slotGroups.find((g) => g.section === activeSection) || null : null
+
+  /*
+   * A composer complaint is stamped with the override set that produced it, so
+   * a warning cannot outlive the copy it was about. Reporting is an effect in
+   * the preview, so the callback identity has to change with the overrides or
+   * the fresh set is never re-reported.
+   */
+  const onSlotDiagnostics = useCallback((d) => { setSlotDiag({ forKey: overridesKey, ...d }) }, [overridesKey])
+  const liveDiag = slotDiag && slotDiag.forKey === overridesKey ? slotDiag : null
+
+  const setSlot = (id, value) => {
+    const next = { ...overrides }
+    // Absent means "use the design's own wording"; an empty string would
+    // override it with nothing. See composeTemplate.
+    if (value === '') delete next[id]
+    else next[id] = value
+    onPatch({ slotOverrides: next })
+  }
+  const resetSlot = (id) => {
+    const next = { ...overrides }
+    delete next[id]
+    onPatch({ slotOverrides: next })
+  }
+
+  // ---- legacy identity editing (nodes) -------------------------------------
+  const sections = toNodeSections(template.sections)
+  const setSections = (next) => onPatch({ sections: next })
   const selectedSection = sections.find((s) => s.id === selectedId) || sections.find((s) => s.elements.some((e) => e.id === selectedId)) || null
   const selectedElement = selectedSection ? selectedSection.elements.find((e) => e.id === selectedId) || null : null
 
@@ -504,7 +552,6 @@ export const LandingPageBuilder = ({ landingPage, brands, onBrandSaved, quizDepl
     ;[out[index], out[to]] = [out[to], out[index]]
     return out
   }
-
   const moveSection = (id, dir) => setSections(move(sections, sections.findIndex((s) => s.id === id), dir))
   const toggleSection = (id) => patchSection(id, (s) => ({ ...s, isVisible: s.isVisible === false ? undefined : false }))
   const deleteSection = (id) => { setSections(sections.filter((s) => s.id !== id)); if (selectedId === id) setSelectedId(null) }
@@ -516,7 +563,6 @@ export const LandingPageBuilder = ({ landingPage, brands, onBrandSaved, quizDepl
     setSections([...sections, section])
     setSelectedId(section.id)
   }
-
   const moveElement = (sectionId, elId, dir) =>
     patchSection(sectionId, (s) => ({ ...s, elements: move(s.elements, s.elements.findIndex((e) => e.id === elId), dir) }))
   const toggleElement = (sectionId, elId) =>
@@ -540,50 +586,162 @@ export const LandingPageBuilder = ({ landingPage, brands, onBrandSaved, quizDepl
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
       <TopBar
-        crumbs={`ADMIN / FUNNELS / LANDING PAGES`}
-        title={landingPage.name}
-        isPublished={landingPage.isPublished}
+        crumbs="ADMIN / FUNNELS / LANDING PAGES / TEMPLATE"
+        title={template.name}
         onBack={onBack}
         onPreview={onPreview}
-        onPublish={() => onTogglePublish(landingPage.id)}
-        actions={<Btn variant="ghost" size="sm" icon={Palette} onClick={() => setGalleryOpen(true)}>Template: {template.name}</Btn>}
+        actions={
+          <>
+            <Pill color={template.isEnabled ? T.success : T.textLow}>{template.isEnabled ? 'ENABLED' : 'DISABLED'}</Pill>
+            <Btn variant="ghost" size="sm" icon={Palette} onClick={() => setRendererOpen(true)}>Design: {rendererName}</Btn>
+            <Btn variant="secondary" size="sm" icon={template.isEnabled ? PowerOff : Power} onClick={() => onToggleEnabled(template)}>
+              {template.isEnabled ? 'Disable' : 'Enable'}
+            </Btn>
+          </>
+        }
       />
+
       <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '288px 1fr 340px', overflow: 'hidden' }}>
+        {/* ---------------------------------------------------------- left */}
         <div style={{ borderRight: `1px solid ${T.border}`, overflowY: 'auto', backgroundColor: T.bg, padding: 14 }}>
-          <NodeTree
-            sections={sections}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onMoveSection={moveSection}
-            onToggleSection={toggleSection}
-            onDeleteSection={deleteSection}
-            onMoveElement={moveElement}
-            onToggleElement={toggleElement}
-            onDeleteElement={deleteElement}
-            onAddElement={addElement}
-            onAddSection={() => setAddOpen(true)}
-          />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 20 }}>
+            <div><Label>Name</Label><Input value={template.name} onChange={(e) => onPatch({ name: e.target.value })} /></div>
+            <div>
+              <Label>Slug</Label>
+              <Input mono value={template.slug} onChange={(e) => onPatch({ slug: e.target.value })} />
+              <div style={{ fontSize: 10, color: T.textLow, marginTop: 4 }}>Lower case, dashes. It identifies the template, not a public URL: the URL is the deployment&apos;s path.</div>
+            </div>
+            <div>
+              <Label>Angle</Label>
+              <Select value={template.angle} onChange={(e) => onPatch({ angle: e.target.value })}>
+                {ANGLES.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
+              </Select>
+            </div>
+            <div>
+              <Label>Design</Label>
+              <Btn variant="secondary" size="sm" icon={Palette} onClick={() => setRendererOpen(true)} style={{ width: '100%', justifyContent: 'space-between' }}>
+                {rendererName}
+                <ChevronRight size={12} />
+              </Btn>
+              {template.rendererError ? (
+                <div style={{ fontSize: 10.5, color: T.danger, marginTop: 6, lineHeight: 1.5 }}>{template.rendererError}</div>
+              ) : (
+                <div style={{ fontSize: 10, color: T.textLow, marginTop: 6, lineHeight: 1.5 }}>
+                  {usesSlots ? 'Copy is edited as slots, section by section.' : (renderer.structure || 'This design has a look but no structure yet.')}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div style={{ padding: 12, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 8, marginBottom: 20 }}>
+            <Label style={{ marginBottom: 8 }}>Preview as</Label>
+            <Select value={previewBrandId || ''} onChange={(e) => setPreviewBrandId(e.target.value || null)}>
+              <option value="">No brand (the design&apos;s own colours)</option>
+              {selectableOptions({
+                records: brands,
+                selectedId: previewBrandId,
+                toRecord: (b) => ({ id: b.id, label: b.displayName, status: b.status === 'archived' ? 'archived' : 'published' }),
+              }).map((o) => <option key={o.id} value={o.id} disabled={o.disabled}>{o.label}{o.archived ? ' - ARCHIVED' : ''}</option>)}
+            </Select>
+            <BrandQuickEdit brand={brands.find((b) => b.id === previewBrandId)} onSaved={onBrandSaved} />
+            <div style={{ fontSize: 10.5, color: T.textMute, marginTop: 6, lineHeight: 1.5 }}>
+              Preview only. Nothing about the brand is written into the template: the same template under two brands is one layout in two palettes.
+            </div>
+            {!usesSlots && (
+              <div style={{ marginTop: 10 }}>
+                <Label style={{ marginBottom: 6 }}>Quiz in the hero (preview)</Label>
+                <Select value={previewQuizId || ''} onChange={(e) => setPreviewQuizId(e.target.value || null)}>
+                  <option value="">None</option>
+                  {quizzes.map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}
+                </Select>
+              </div>
+            )}
+          </div>
+
+          {broken ? (
+            <div style={{ fontSize: 11.5, color: T.textMute, lineHeight: 1.55 }}>
+              There is no structure to show until this template names a design that exists.
+            </div>
+          ) : usesSlots ? (
+            <SlotSectionNav groups={slotGroups} selectedSection={activeSection} onSelect={setSlotSection} overrides={overrides} />
+          ) : (
+            <NodeTree
+              sections={sections}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onMoveSection={moveSection}
+              onToggleSection={toggleSection}
+              onDeleteSection={deleteSection}
+              onMoveElement={moveElement}
+              onToggleElement={toggleElement}
+              onDeleteElement={deleteElement}
+              onAddElement={addElement}
+              onAddSection={() => setAddOpen(true)}
+            />
+          )}
         </div>
 
+        {/* -------------------------------------------------------- centre */}
         <div style={{ overflowY: 'auto', backgroundColor: '#0c1118', padding: 24 }} onClick={() => setSelectedId(null)}>
           <div style={{ maxWidth: 1180, margin: '0 auto' }} onClick={(e) => e.stopPropagation()}>
+            {broken ? (
+              <div style={{ padding: 40, backgroundColor: T.bg, border: `1px solid ${T.danger}`, borderRadius: 10, textAlign: 'center' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>Nothing is drawn for this template</div>
+                <div style={{ fontSize: 12.5, color: T.danger, marginTop: 8, lineHeight: 1.6 }}>{template.rendererError}</div>
+                <div style={{ fontSize: 12, color: T.textMute, marginTop: 8, lineHeight: 1.6, maxWidth: 460, margin: '8px auto 0' }}>
+                  Another design is not shown in its place: that would look like a working template and deploy like one.
+                </div>
+                <div style={{ marginTop: 16 }}>
+                  <Btn variant="primary" size="md" icon={Palette} onClick={() => setRendererOpen(true)}>Pick a design</Btn>
+                </div>
+              </div>
+            ) : (
             <LivePreview
-              landingPage={{ ...landingPage, sections }}
+              landingPage={{ ...template, sections }}
               brand={previewBrand}
-              quizDepLabel={previewQuiz?.name}
               quiz={previewQuiz}
+              quizDepLabel={previewQuiz?.name}
               selectedId={selectedId}
               onSelectNode={setSelectedId}
+              slotOverrides={usesSlots ? overrides : null}
+              onSlotDiagnostics={usesSlots ? onSlotDiagnostics : null}
             />
+            )}
           </div>
         </div>
 
+        {/* --------------------------------------------------------- right */}
         <div style={{ borderLeft: `1px solid ${T.border}`, overflowY: 'auto', backgroundColor: T.bg, padding: 18 }}>
-          {selectedSection ? (
+          {liveDiag && (
+            <div style={{ marginBottom: 14, padding: 10, backgroundColor: `${T.danger}11`, border: `1px solid ${T.danger}66`, borderRadius: 6, fontSize: 11, color: T.danger, lineHeight: 1.5 }}>
+              {liveDiag.unknown.length > 0 && <div>Copy stored for {liveDiag.unknown.join(', ')} names nothing in this design and is not on the page.</div>}
+              {liveDiag.refused.map((r) => <div key={r.id}>{r.id}: {r.reason}</div>)}
+            </div>
+          )}
+
+          {broken ? (
+            <>
+              <SectionHeading eyebrow="Inspector" title="Fix the design first" hint="A template that names no design has no copy to edit: which fields exist depends on which design draws it." />
+              <Btn variant="primary" size="sm" icon={Palette} onClick={() => setRendererOpen(true)}>Pick a design</Btn>
+            </>
+          ) : usesSlots ? (
+            activeGroup ? (
+              <>
+                <SectionHeading
+                  eyebrow={`Section ${String(activeGroup.section).padStart(2, '0')}`}
+                  title={activeGroup.label}
+                  hint="Leave a field empty to keep the design's own wording. What you type replaces it for every deployment of this template, unless that deployment overrides it again."
+                />
+                <SlotSectionFields group={activeGroup} overrides={overrides} onChange={setSlot} onReset={resetSlot} />
+              </>
+            ) : (
+              <div style={{ fontSize: 12, color: T.textMute }}>This design exposes no editable copy.</div>
+            )
+          ) : selectedSection ? (
             <NodeInspector
               section={selectedSection}
               element={selectedElement}
-              palette={templatePalette(template, previewBrand)}
+              palette={templatePalette(renderer, previewBrand)}
               splits={Boolean(sectionSpec(selectedSection.type)?.splits)}
               onChangeSection={updateSection}
               onChangeElement={updateElement}
@@ -593,58 +751,8 @@ export const LandingPageBuilder = ({ landingPage, brands, onBrandSaved, quizDepl
             />
           ) : (
             <>
-              <Label>Page settings</Label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 22 }}>
-                <div><Label>Name</Label><Input value={landingPage.name} onChange={(e) => onUpdate({ ...landingPage, name: e.target.value })} /></div>
-                <div><Label>Slug</Label><Input mono value={landingPage.slug} onChange={(e) => onUpdate({ ...landingPage, slug: e.target.value })} /></div>
-                <div>
-                  <Label>Angle</Label>
-                  <Select value={landingPage.angle} onChange={(e) => onUpdate({ ...landingPage, angle: e.target.value })}>
-                    {ANGLES.map((a) => <option key={a.id} value={a.id}>{a.label}</option>)}
-                  </Select>
-                </div>
-                <div>
-                  <Label>Template</Label>
-                  <Btn variant="secondary" size="sm" icon={Palette} onClick={() => setGalleryOpen(true)} style={{ width: '100%', justifyContent: 'space-between' }}>
-                    {template.name}
-                    <ChevronRight size={12} />
-                  </Btn>
-                  <div style={{ fontSize: 10, color: T.textLow, marginTop: 6, lineHeight: 1.5 }}>
-                    {template.structure || 'This template has a look but no structure yet.'}
-                  </div>
-                </div>
-              </div>
-
-              <div style={{ padding: 12, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 8, marginBottom: 18 }}>
-                <Label style={{ marginBottom: 8 }}>Preview as</Label>
-                <Select value={previewBrandId || ''} onChange={(e) => setPreviewBrandId(e.target.value || null)}>
-                  <option value="">No brand (placeholders)</option>
-                  {selectableOptions({
-                    records: brands,
-                    selectedId: previewBrandId,
-                    toRecord: (b) => ({ id: b.id, label: b.displayName, status: b.status === 'archived' ? 'archived' : 'published' }),
-                  }).map((o) => <option key={o.id} value={o.id} disabled={o.disabled}>{o.label}{o.archived ? ' - ARCHIVED' : ''}</option>)}
-                </Select>
-                {brandEditor}
-                <div style={{ fontSize: 10.5, color: T.textMute, marginTop: 6, lineHeight: 1.5 }}>
-                  The brand owns the colours. The template owns the shape, the faces and the structure, so the same page under two brands is the same layout in two palettes. Pick one here to see what a visitor gets.
-                </div>
-                {previewBrandId && (
-                  <div style={{ marginTop: 10 }}>
-                    <Label style={{ marginBottom: 6 }}>Quiz deployment (preview)</Label>
-                    <Select value={previewQuizDepId || ''} onChange={(e) => setPreviewQuizDepId(e.target.value || null)}>
-                      <option value="">None</option>
-                      {matchingQuizDeps.map((q) => {
-                        const qz = quizzes.find((z) => z.id === q.quizId)
-                        return <option key={q.id} value={q.id}>{qz?.name || q.id}</option>
-                      })}
-                    </Select>
-                    {matchingQuizDeps.length === 0 && <div style={{ fontSize: 10.5, color: T.warning, marginTop: 6 }}>This brand has no quiz deployments yet. Create one in Funnels {'›'} Quizzes.</div>}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ paddingTop: 14, borderTop: `1px solid ${T.border}`, fontSize: 11, color: T.textMute }}>
+              <SectionHeading eyebrow="Inspector" title="Nothing selected" hint="Pick a section or an element in the tree on the left to edit it." />
+              <div style={{ fontSize: 11, color: T.textMute }}>
                 <div style={{ marginBottom: 6, fontFamily: '"JetBrains Mono", monospace', fontSize: 9.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: T.textLow }}>Placeholders</div>
                 <div style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 10, lineHeight: 1.7, color: T.textDim }}>
                   {`{{brand.displayName}}`}<br />{`{{brand.callNumber}}`}<br />{`{{brand.copyright}}`}<br />{`{{brand.disclaimer}}`}<br />{`{{brand.privacyUrl}}`}<br />{`{{brand.termsUrl}}`}<br />{`{{site.year}}`}
@@ -657,225 +765,72 @@ export const LandingPageBuilder = ({ landingPage, brands, onBrandSaved, quizDepl
       </div>
 
       <AddSectionModal open={addOpen} onClose={() => setAddOpen(false)} onAdd={addSection} />
-      <TemplateGalleryModal
-        open={galleryOpen}
-        currentTemplateId={landingPage.templateId}
-        onClose={() => setGalleryOpen(false)}
-        brand={previewBrand}
-        onPickLook={(tplId) => onSetTemplate(landingPage.id, tplId)}
-        onPickStructure={(tplId) => { onSetStructure(landingPage.id, tplId); setSelectedId(null) }}
+      <RendererPickerModal
+        open={rendererOpen}
+        currentTemplateId={template.templateId}
+        onClose={() => setRendererOpen(false)}
+        onPick={(id) => onPatch({ templateId: id, slotOverrides: {} }, { confirmRenderer: true })}
       />
     </div>
   )
 }
 
 // ============================================================================
-// LP DEPLOYMENT EDITOR
+// PREVIEW MODAL
 // ============================================================================
-const LPDeploymentEditor = ({ deployment, landingPages, brands, domains, quizDeployments, quizzes, onSave, onDelete, onCancel, onToast, onPreview }) => {
-  const [draft, setDraft] = useState(deployment)
-  useEffect(() => { setDraft(deployment) }, [deployment?.id])
-  if (!draft) return null
-
-  const brandDomains = domains.filter((d) => d.brandId === draft.brandId)
-  // The legacy pointer is DISPLAYED and never edited. A row that still carries
-  // one keeps working until a flow is chosen; see the note in the panel below.
-  const legacyQuizDep = Boolean(draft.quizDeploymentId)
-  const legacyQuizDepMissing = legacyQuizDep && !quizDeployments.some((qd) => qd.id === draft.quizDeploymentId)
-  const quizSkins = listQuizTemplates()
-  const previewURL = `https://preview.legenex.com/lp/${draft.id || 'new'}`
-  const finalURL = draft.domain ? `https://${draft.domain}${draft.path || ''}` : previewURL
-
-  const handleSave = () => {
-    if (!draft.landingPageId) { onToast?.({ message: 'Pick a landing page first.', type: 'error' }); return }
-    if (!draft.brandId) { onToast?.({ message: 'Pick a brand first.', type: 'error' }); return }
-    // A landing page's whole job is the quiz in it. Going live without one puts
-    // an empty card where the funnel goes, so it is refused here as well as in
-    // the publish preflight - the earlier of the two is the useful one.
-    if (!draft.quizId && !draft.quizDeploymentId && draft.status === 'live') {
-      onToast?.({ message: 'Pick a quiz flow before going live.', type: 'error' }); return
-    }
-    const next = { ...draft, id: draft.id || genId('ldep'), status: draft.status || 'draft', path: draft.path || '' }
-    onSave(next)
-    onToast?.({ message: draft.domain ? 'Deployment saved.' : 'Deployment saved as preview URL.', type: 'success' })
-  }
-
-  const lp = landingPages.find((p) => p.id === draft.landingPageId)
-  const tplName = lp ? templateFor(lp.templateId).name : null
-  const angleName = ANGLES.find((a) => a.id === lp?.angle)?.label
-  // What the embed is drawn in when the deployment does not choose: the landing
-  // page's own recommendation, named rather than left as "default" so an
-  // operator can see what they are accepting.
-  const recommendedSkinName = lp
-    ? quizSkins.find((t) => t.id === recommendedQuizTemplateFor(lp.templateId))?.name ?? null
-    : null
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
-      <TopBar
-        crumbs={`ADMIN / FUNNELS / LANDING PAGES / DEPLOYMENT`}
-        title={draft.name || lp?.name || 'New deployment'}
-        onBack={onCancel}
-        actions={
-          <>
-            {draft.id && <Btn variant="ghost" size="sm" icon={Eye} onClick={() => onPreview?.(draft)}>Preview</Btn>}
-            {draft.id && <Btn variant="danger" size="sm" icon={Trash2} onClick={() => onDelete(draft.id)}>Delete</Btn>}
-            <Btn variant="ghost" size="sm" onClick={onCancel}>Cancel</Btn>
-            <Btn variant="primary" size="sm" icon={Save} onClick={handleSave}>Save Deployment</Btn>
-          </>
-        }
-      />
-      <div style={{ flex: 1, overflowY: 'auto', padding: 28 }}>
-        <div style={{ maxWidth: 720, margin: '0 auto' }}>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: T.text, letterSpacing: '-0.02em' }}>Deployment</h1>
-          <div style={{ fontSize: 13, color: T.textMute, marginTop: 4, marginBottom: 24 }}>Map a landing page to a brand domain and path. This is what visitors will actually see.</div>
-          <div style={{ padding: 20, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 10, display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div>
-              <Label>Deployment name</Label>
-              <Input value={draft.name || ''} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="eg CMC Pain First / Truck Campaign" />
-              <div style={{ fontSize: 11, color: T.textMute, marginTop: 6 }}>An internal label so you can tell deployments apart in the list. Defaults to the LP + brand if blank.</div>
-            </div>
-            <div>
-              <Label>Landing page</Label>
-              <Select value={draft.landingPageId || ''} onChange={(e) => setDraft({ ...draft, landingPageId: e.target.value })}>
-                <option value="">Pick a landing page</option>
-                {landingPages.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-              </Select>
-            </div>
-            <div>
-              <Label>Brand</Label>
-              <Select value={draft.brandId || ''} onChange={(e) => setDraft({ ...draft, brandId: e.target.value, domain: '' })}>
-                <option value="">Pick a brand</option>
-                {selectableOptions({
-                records: brands,
-                selectedId: draft.brandId,
-                toRecord: (b) => ({ id: b.id, label: b.displayName, status: b.status === 'archived' ? 'archived' : 'published' }),
-              }).map((o) => <option key={o.id} value={o.id} disabled={o.disabled}>{o.label}{o.archived ? ' - ARCHIVED' : ''}</option>)}
-              </Select>
-            </div>
-            <div>
-              <Label>Domain</Label>
-              <Select value={draft.domain || ''} onChange={(e) => setDraft({ ...draft, domain: e.target.value })} disabled={!draft.brandId}>
-                <option value="">{brandDomains.length === 0 ? 'No domains for this brand (preview URL will be used)' : 'No domain attached (use preview URL)'}</option>
-                {brandDomains.map((d) => <option key={d.id} value={d.domain}>{d.domain}{d.isPrimary ? ' (primary)' : ''}</option>)}
-              </Select>
-              <div style={{ fontSize: 11, color: T.textMute, marginTop: 6, lineHeight: 1.55 }}>Domains come from the brand. Manage them in <span style={{ color: T.text }}>Brands {'›'} Domains</span>.</div>
-            </div>
-            <div>
-              <Label>Path</Label>
-              <Input mono value={draft.path || ''} onChange={(e) => setDraft({ ...draft, path: e.target.value })} placeholder="/c/your-path" />
-              <div style={{ fontSize: 11, color: T.textMute, marginTop: 6 }}>
-                Final URL: <span style={{ color: draft.domain ? T.text : T.warning, fontFamily: '"JetBrains Mono", monospace' }}>{finalURL}</span>
-                {!draft.domain && <Pill color={T.info} style={{ marginLeft: 8 }}>PREVIEW URL</Pill>}
-              </div>
-            </div>
-            <div>
-              <Label>Quiz flow</Label>
-              <Select value={draft.quizId || ''} onChange={(e) => setDraft({ ...draft, quizId: e.target.value })}>
-                <option value="">Pick the flow this page runs</option>
-                {quizzes.map((q) => (
-                  <option key={q.id} value={q.id} disabled={q.isArchived}>
-                    {q.name}{q.isArchived ? ' - ARCHIVED' : q.isPublished ? '' : ' - unpublished'}
-                  </option>
-                ))}
-              </Select>
-              <div style={{ fontSize: 11, color: T.textMute, marginTop: 6, lineHeight: 1.55 }}>
-                The flow itself, not a second published quiz page. Flows are brandless, so the
-                same one runs under every brand and this deployment supplies the brand.
-              </div>
-            </div>
-            <div>
-              <Label>Embedded quiz look</Label>
-              <Select value={draft.embeddedQuizTemplateId || ''} onChange={(e) => setDraft({ ...draft, embeddedQuizTemplateId: e.target.value })}>
-                <option value="">Recommended for this landing page{recommendedSkinName ? ` (${recommendedSkinName})` : ''}</option>
-                {quizSkins.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </Select>
-              <div style={{ fontSize: 11, color: T.textMute, marginTop: 6 }}>
-                How the quiz is DRAWN inside this page. The landing page owns the page; this owns the card.
-              </div>
-            </div>
-            <div>
-              <Label>Progress treatment</Label>
-              <Select value={draft.embeddedProgressForm || ''} onChange={(e) => setDraft({ ...draft, embeddedProgressForm: e.target.value })}>
-                <option value="">The quiz look&apos;s own</option>
-                {PROGRESS_FORM_LABELS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-              </Select>
-            </div>
-            {legacyQuizDep && (
-              <div style={{ padding: 12, border: `1px solid ${T.warning}`, borderRadius: 8, fontSize: 11.5, color: T.textMute, lineHeight: 1.6 }}>
-                <span style={{ color: T.warning, fontWeight: 600 }}>Legacy binding.</span>{' '}
-                This deployment still points at the standalone quiz deployment{' '}
-                <span style={{ fontFamily: '"JetBrains Mono", monospace', color: T.text }}>{draft.quizDeploymentId}</span>
-                {legacyQuizDepMissing ? ', which no longer exists' : ''}. It is read only and is used
-                only while no flow is chosen above. Picking a flow replaces it on save.
-              </div>
-            )}
-            <div>
-              <Label>Status</Label>
-              <Select value={draft.status || 'draft'} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
-                <option value="draft">Draft</option>
-                <option value="live">Live</option>
-                <option value="paused">Paused</option>
-              </Select>
-            </div>
-          </div>
-          {lp && (
-            <div style={{ marginTop: 16, padding: 18, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 10 }}>
-              <Label style={{ marginBottom: 10 }}>Page reference</Label>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <Pill color={T.purple}>{tplName}</Pill>
-                <Pill color={T.info}>{angleName}</Pill>
-                <Pill color={T.textMute}>{lp.sections.length} sections</Pill>
-                <Pill color={lp.isPublished ? T.success : T.warning}>{lp.isPublished ? 'Published' : 'Draft'}</Pill>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ============================================================================
-// LP PREVIEW MODAL
-// ============================================================================
-const LPPreviewModal = ({ previewState, landingPages, brands, lpDeployments, quizzes, quizDeployments, onClose }) => {
+const LPPreviewModal = ({ previewState, templates, brands, deployments, quizzes, onClose }) => {
   const [brandOverride, setBrandOverride] = useState(null)
-  useEffect(() => { setBrandOverride(null) }, [previewState?.lpId, previewState?.deploymentId])
+  useEffect(() => { setBrandOverride(null) }, [previewState?.templateId, previewState?.deploymentId])
   if (!previewState) return null
 
-  const lp = landingPages.find((p) => p.id === (previewState.lpId || lpDeployments.find((d) => d.id === previewState.deploymentId)?.landingPageId))
-  if (!lp) return null
+  const deployment = previewState.deploymentId ? deployments.find((d) => d.id === previewState.deploymentId) : null
+  const template = templates.find((t) => t.id === (previewState.templateId || deployment?.landingPageId))
+  if (!template) return null
 
-  const deployment = previewState.deploymentId ? lpDeployments.find((d) => d.id === previewState.deploymentId) : null
   const lockedBrandId = deployment?.brandId
-  const selectedBrandId = lockedBrandId || brandOverride || brands[0]?.id
+  const selectedBrandId = lockedBrandId || brandOverride
   const brand = brands.find((b) => b.id === selectedBrandId)
 
-  let quizDep = deployment?.quizDeploymentId ? quizDeployments.find((qd) => qd.id === deployment.quizDeploymentId) : null
-  if (!quizDep && brand) quizDep = quizDeployments.find((qd) => qd.brandId === brand.id)
-  const quiz = quizDep ? quizzes.find((q) => q.id === quizDep.quizId) : null
+  /*
+   * The same merge `resolveLpDeployment` precomputes as `composedOverrides`:
+   * the template's own copy with the deployment's copy on top. Merging it
+   * differently here would make this a preview of a page that does not exist.
+   */
+  const slotOverrides = { ...(template.slotOverrides || {}), ...(deployment?.contentOverrides || {}) }
+  const quiz = deployment ? quizzes.find((q) => q.id === deployment.quizId) || null : null
 
-  const url = deployment ? (deployment.domain ? `https://${deployment.domain}${deployment.path || ''}` : `https://preview.legenex.com/lp/${deployment.id}`) : `https://preview.legenex.com/lp/${lp.id}`
+  const url = deployment
+    ? (deployment.domain ? `https://${deployment.domain}${deployment.path || ''}` : `https://preview.legenex.com/lp/${deployment.id}`)
+    : `https://preview.legenex.com/lp/${template.slug}`
 
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 150, backgroundColor: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column' }}>
+    // Announced as a dialog, and addressable by the template it is showing. It
+    // is a full-viewport overlay, so it is the element most in need of being
+    // reachable by what it is.
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Preview: ${template.name}`}
+      data-preview-modal={template.id}
+      style={{ position: 'fixed', inset: 0, zIndex: 150, backgroundColor: 'rgba(0,0,0,0.92)', display: 'flex', flexDirection: 'column' }}
+    >
       <div style={{ height: 56, flexShrink: 0, padding: '0 20px', backgroundColor: T.bg, borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <Eye size={15} color={T.primary} />
-          <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Preview: {lp.name}</span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Preview: {template.name}</span>
           {deployment && <Pill color={T.info}>DEPLOYMENT</Pill>}
         </div>
         <div style={{ width: 1, height: 26, backgroundColor: T.border }} />
         <div style={{ fontSize: 12, color: T.textMute, fontFamily: '"JetBrains Mono", monospace' }}>{url}</div>
         <div style={{ flex: 1 }} />
-        {!deployment && brands.length > 1 && (
+        {!deployment && brands.length > 0 && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 11, color: T.textMute, fontFamily: '"JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Preview as</span>
-            <Select value={brandOverride || brands[0]?.id || ''} onChange={(e) => setBrandOverride(e.target.value)} style={{ width: 200 }}>
+            <Select value={brandOverride || ''} onChange={(e) => setBrandOverride(e.target.value || null)} style={{ width: 220 }}>
+              <option value="">No brand (the design&apos;s own colours)</option>
               {selectableOptions({
                 records: brands,
-                selectedId: brandOverride || brands[0]?.id || '',
+                selectedId: brandOverride,
                 toRecord: (b) => ({ id: b.id, label: b.displayName || b.name, status: b.status === 'archived' ? 'archived' : 'published' }),
               }).map((o) => <option key={o.id} value={o.id} disabled={o.disabled}>{o.label}{o.archived ? ' - ARCHIVED' : ''}</option>)}
             </Select>
@@ -885,7 +840,26 @@ const LPPreviewModal = ({ previewState, landingPages, brands, lpDeployments, qui
       </div>
       <div style={{ flex: 1, overflowY: 'auto', backgroundColor: '#0c1118', padding: 24 }}>
         <div style={{ maxWidth: 1180, margin: '0 auto' }}>
-          <LivePreview landingPage={lp} brand={brand} quiz={quiz} quizDepLabel={quiz?.name} editable={false} />
+          {/* One guard for every way into this modal. A broken row must not be
+              previewed as some other design: the public resolver refuses to
+              serve it, so a preview that draws something is a lie about what a
+              visitor would get. */}
+          {template.rendererError ? (
+            <div style={{ padding: 40, backgroundColor: T.bg, border: `1px solid ${T.danger}`, borderRadius: 10, textAlign: 'center' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>There is nothing to preview</div>
+              <div style={{ fontSize: 12.5, color: T.danger, marginTop: 8, lineHeight: 1.6 }}>{template.rendererError}</div>
+              <div style={{ fontSize: 12, color: T.textMute, marginTop: 8 }}>This template does not serve either. Open it and pick a design.</div>
+            </div>
+          ) : (
+            <LivePreview
+              landingPage={template}
+              brand={brand}
+              quiz={quiz}
+              quizDepLabel={quiz?.name}
+              editable={false}
+              slotOverrides={slotOverrides}
+            />
+          )}
         </div>
       </div>
     </div>
@@ -895,121 +869,214 @@ const LPPreviewModal = ({ previewState, landingPages, brands, lpDeployments, qui
 // ============================================================================
 // ORCHESTRATOR
 // ============================================================================
-export function LandingPagesApp({ initialLandingPages, initialDeployments, brands: initialBrands, domains, quizzes = [], quizDeployments = [] }) {
+export function LandingPagesApp({ initialTemplates, initialDeployments, brands: initialBrands, domains, quizzes = [], quizTemplates = [], quizDeployments = [] }) {
   // Held locally so an edit made from inside the builder repaints the preview
   // at once. The server copy is authoritative on the next load; this only
   // closes the gap between saving and seeing.
   const [brands, setBrands] = useState(initialBrands)
   const onBrandSaved = (next) => setBrands((prev) => prev.map((b) => (b.siteId === next.siteId ? { ...b, ...next } : b)))
   const router = useRouter()
-  const [landingPages, setLandingPages] = useState(initialLandingPages)
+  const [templates, setTemplates] = useState(initialTemplates)
   const [lpDeployments, setLpDeployments] = useState(initialDeployments)
   const [subView, setSubView] = useState('lp_list')
-  const [editingLPId, setEditingLPId] = useState(null)
+  const [editingTemplateId, setEditingTemplateId] = useState(null)
   const [editingDeployment, setEditingDeployment] = useState(null)
-  const [lpTab, setLpTab] = useState('pages')
+  const [lpTab, setLpTab] = useState('templates')
   const [previewState, setPreviewState] = useState(null)
   const [aiWizardOpen, setAiWizardOpen] = useState(false)
   const [confirm, setConfirm] = useState(null)
+  // A refusal or a warning from the server is shown in full and stays until it
+  // is dismissed. A toast would truncate it and take it away after 3 seconds,
+  // and these messages name the deployments an operator has to go and fix.
+  const [notice, setNotice] = useState(null)
   const [toast, setToast] = useState(null)
-  const saveTimer = useRef(null)
+  const [pendingOpenId, setPendingOpenId] = useState(null)
 
-  // Only resync from the server when sitting on the list (avoids clobbering an open builder).
+  /*
+   * Debounced saves, keyed by WHICH FIELDS they carry.
+   *
+   * One shared timer would let a slot edit cancel a pending rename, because the
+   * later timeout replaces the earlier one and each patch carries only its own
+   * keys. Keyed timers keep independent edits independent, and every one of them
+   * is flushed before the editor closes.
+   */
+  const pendingSaves = useRef({})
+  const saveTimers = useRef({})
+
+  const runSave = useCallback((key) => {
+    const job = pendingSaves.current[key]
+    if (!job) return Promise.resolve({ ok: true })
+    delete pendingSaves.current[key]
+    clearTimeout(saveTimers.current[key])
+    delete saveTimers.current[key]
+    return saveLpTemplate(job).then((res) => {
+      if (!res.ok) setToast({ message: res.error, type: 'error' })
+      return res
+    })
+  }, [])
+
+  const queueTemplateSave = useCallback((id, patch) => {
+    const key = `${id}:${Object.keys(patch).sort().join(',')}`
+    pendingSaves.current[key] = { id, patch }
+    clearTimeout(saveTimers.current[key])
+    saveTimers.current[key] = setTimeout(() => runSave(key), 450)
+  }, [runSave])
+
+  const flushTemplateSaves = useCallback(
+    () => Promise.all(Object.keys(pendingSaves.current).map(runSave)),
+    [runSave],
+  )
+
+  // Only resync from the server when sitting on the list, so a refresh triggered
+  // by one action cannot clobber an editor somebody is typing into.
   useEffect(() => {
     if (subView === 'lp_list') {
-      setLandingPages(initialLandingPages)
+      setTemplates(initialTemplates)
       setLpDeployments(initialDeployments)
     }
-  }, [initialLandingPages, initialDeployments, subView])
+  }, [initialTemplates, initialDeployments, subView])
 
-  const lpPatch = (lp) => ({
-    name: lp.name, slug: lp.slug, template_id: lp.templateId, angle: lp.angle,
-    is_published: lp.isPublished, sections: lp.sections,
-  })
+  /*
+   * Open the editor on a row the SERVER has confirmed, rather than on a local
+   * guess at what it created. `createLpTemplate` returns an id and nothing else
+   * - the slug it derived, for one, is its own - so inventing a record here
+   * would show the operator fields that do not match the row.
+   */
+  useEffect(() => {
+    if (!pendingOpenId) return
+    if (templates.some((t) => t.id === pendingOpenId)) {
+      setEditingTemplateId(pendingOpenId)
+      setSubView('template_editor')
+      setPendingOpenId(null)
+    }
+  }, [templates, pendingOpenId])
 
-  // Builder edits update local state immediately and debounce a server save.
-  const updateLP = (lp) => {
-    setLandingPages((arr) => arr.map((p) => (p.id === lp.id ? lp : p)))
-    clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => { saveLP({ id: lp.id, patch: lpPatch(lp) }) }, 450)
+  const editingTemplate = templates.find((t) => t.id === editingTemplateId) || null
+
+  /** Where a refusal or a warning about deployments sends the operator. */
+  const showDeployments = () => {
+    setSubView('lp_list')
+    setEditingTemplateId(null)
+    setLpTab('deployments')
   }
 
-  const togglePublishLP = (id) => {
-    setLandingPages((arr) => arr.map((p) => (p.id === id ? { ...p, isPublished: !p.isPublished } : p)))
-    const lp = landingPages.find((p) => p.id === id)
-    if (lp) saveLP({ id, patch: { is_published: !lp.isPublished } }).then(() => router.refresh())
+  /* ------------------------------------------------------------- templates */
+
+  const applyTemplatePatch = (id, patch) => {
+    setTemplates((arr) => arr.map((t) => (t.id === id ? { ...t, ...patch } : t)))
+    queueTemplateSave(id, patch)
   }
 
-  // Two separate acts, kept separate. Changing the template repaints the page
-  // in that identity and touches nothing else. Taking its structure replaces
-  // the sections outright, which loses the copy, so it is its own verb behind
-  // its own confirmation rather than a consequence of picking a colour scheme.
-  const setTemplate = (lpId, tplId) => {
-    setLandingPages((arr) => arr.map((p) => (p.id === lpId ? { ...p, templateId: tplId } : p)))
-    saveLP({ id: lpId, patch: { template_id: tplId } })
-  }
-
-  const setStructure = (lpId, tplId) => {
-    const tpl = templateFor(tplId)
-    if (!tpl.skeleton) { setToast({ message: `${tpl.name} has no structure built yet.`, type: 'error' }); return }
-    const sections = instantiateSkeleton(tpl.skeleton)
-    setLandingPages((arr) => arr.map((p) => (p.id === lpId ? { ...p, templateId: tplId, sections } : p)))
-    saveLP({ id: lpId, patch: { template_id: tplId, sections } })
-    setToast({ message: `Rebuilt from ${tpl.name}. Nothing is written yet.`, type: 'success' })
-  }
-
-  const cloneLPHandler = (lp) => {
-    cloneLP({ id: lp.id }).then((res) => { if (res.ok) router.refresh(); else setToast({ message: res.error, type: 'error' }) })
-  }
-
-  const deleteLPHandler = (id) => {
+  // The record's field names and the action's patch keys are the same five
+  // words, so the editor patches the record and the patch IS the payload.
+  const patchTemplate = (id, patch, opts = {}) => {
+    if (!opts.confirmRenderer) { applyTemplatePatch(id, patch); return }
+    const current = templates.find((t) => t.id === id)
+    const copyCount = Object.keys(current?.slotOverrides || {}).length
+    if (copyCount === 0) { applyTemplatePatch(id, patch); return }
     setConfirm({
-      title: 'Delete landing page?',
-      message: 'This also removes all deployments that reference it.',
+      title: 'Change the design?',
+      message: `${copyCount} line${copyCount === 1 ? '' : 's'} of copy were written against ${templateFor(current.templateId).name}. Slot ids belong to the design they were cut from, so that copy is cleared rather than left pointing at nothing.`,
+      confirmText: 'Change design',
+      onConfirm: () => { setConfirm(null); applyTemplatePatch(id, patch) },
+    })
+  }
+
+  const createBlankTemplate = () => {
+    createLpTemplate({ name: 'Untitled template' }).then((res) => {
+      if (!res.ok) { setToast({ message: res.error, type: 'error' }); return }
+      setToast({ message: 'Template created.', type: 'success' })
+      setPendingOpenId(res.id)
+      router.refresh()
+    })
+  }
+
+  const createFromWizard = async (lp) => {
+    const created = await createLpTemplate({ name: lp.name, rendererKey: lp.templateId })
+    if (!created.ok) { setToast({ message: created.error, type: 'error' }); return }
+    // Two calls because they answer two questions: `createLpTemplate` mints the
+    // row and the design that draws it, and only `saveLpTemplate` carries copy.
+    // The row's origin reads BLANK rather than CLAUDE: neither action accepts an
+    // origin, and inventing one client side would be a value the server never
+    // agreed to.
+    const saved = await saveLpTemplate({ id: created.id, patch: { slug: lp.slug, angle: lp.angle, sections: lp.sections } })
+    setToast(
+      saved.ok
+        ? { message: 'Template written by Claude.', type: 'success' }
+        : { message: `Template created, but its copy did not save: ${saved.error}`, type: 'error' },
+    )
+    setPendingOpenId(created.id)
+    router.refresh()
+  }
+
+  const cloneTemplate = (t) => {
+    cloneLpTemplate({ id: t.id }).then((res) => {
+      if (!res.ok) { setToast({ message: res.error, type: 'error' }); return }
+      setToast({ message: `Cloned "${t.name}".`, type: 'success' })
+      router.refresh()
+    })
+  }
+
+  const toggleTemplateEnabled = (t) => {
+    const enabled = !t.isEnabled
+    // Optimistic, and it mirrors the server rule exactly: enabling opens both
+    // gates, disabling touches only selectability so live pages keep serving.
+    setTemplates((arr) => arr.map((x) => (x.id === t.id ? { ...x, isEnabled: enabled, isPublished: enabled ? true : x.isPublished } : x)))
+    setLpTemplateEnabled({ id: t.id, enabled }).then((res) => {
+      if (!res.ok) {
+        setTemplates((arr) => arr.map((x) => (x.id === t.id ? t : x)))
+        setToast({ message: res.error, type: 'error' })
+        return
+      }
+      if (res.warning) {
+        setNotice({
+          title: `"${t.name}" is disabled for new deployments`,
+          message: res.warning,
+          actionText: 'See deployments',
+          onAction: showDeployments,
+        })
+      } else {
+        setToast({
+          message: enabled ? `"${t.name}" can be selected again.` : `"${t.name}" is disabled for new deployments.`,
+          type: 'success',
+        })
+      }
+      router.refresh()
+    })
+  }
+
+  const deleteTemplate = (t) => {
+    setConfirm({
+      title: `Delete "${t.name}"?`,
+      message: t.stockKey
+        ? 'This is a stock template. The library is rebuilt from code on every boot, so it is archived rather than dropped: it stops being selectable and the removal sticks.'
+        : 'A deployment that still uses this template blocks the delete, and you will be told which.',
+      confirmText: 'Delete',
       onConfirm: () => {
-        deleteLP({ id }).then((res) => {
-          if (!res.ok) { setToast({ message: res.error, type: 'error' }); setConfirm(null); return }
-          setLandingPages((arr) => arr.filter((p) => p.id !== id))
-          setLpDeployments((arr) => arr.filter((d) => d.landingPageId !== id))
-          setConfirm(null)
+        setConfirm(null)
+        deleteLpTemplate({ id: t.id }).then((res) => {
+          if (!res.ok) {
+            // The refusal names the deployments in the way. It is shown verbatim
+            // rather than summarised: "3 deployments use this" makes an operator
+            // go looking, and the action already did the looking.
+            setNotice({ title: 'This template cannot be deleted', message: res.error, actionText: 'See deployments', onAction: showDeployments })
+            return
+          }
+          setTemplates((arr) => arr.filter((x) => x.id !== t.id))
+          setToast({ message: res.archived ? `"${t.name}" archived.` : `"${t.name}" deleted.`, type: 'success' })
           router.refresh()
         })
       },
     })
   }
 
-  const createBlankLP = () => {
-    // A blank page still gets a SHAPE, from the first template that has one.
-    // Starting from nothing means starting from a screen with no way in, and
-    // the skeleton carries no copy, so nothing has to be deleted before writing.
-    const tpl = TEMPLATES.find((t) => t.skeleton) || TEMPLATES[0]
-    const lp = {
-      name: 'Untitled LP',
-      slug: `untitled-${Date.now().toString(36).slice(-4)}`,
-      templateId: tpl.id, angle: tpl.angleDefault,
-      sections: tpl.skeleton ? instantiateSkeleton(tpl.skeleton) : [], isPublished: false,
-    }
-    createLP({ lp }).then((res) => {
-      if (!res.ok) { setToast({ message: res.error, type: 'error' }); return }
-      setLandingPages((arr) => [...arr, { ...lp, id: res.id }])
-      setEditingLPId(res.id)
-      setSubView('lp_builder')
-    })
-  }
-
-  const createFromWizard = (lp) => {
-    createLP({ lp }).then((res) => {
-      if (!res.ok) { setToast({ message: res.error, type: 'error' }); return }
-      setLandingPages((arr) => [...arr, { ...lp, id: res.id }])
-      setEditingLPId(res.id)
-      setSubView('lp_builder')
-    })
-  }
+  /* ----------------------------------------------------------- deployments */
 
   const persistDeployment = (dep) => {
     saveDeployment({ deployment: dep }).then((res) => {
       if (!res.ok) { setToast({ message: res.error, type: 'error' }); return }
       setSubView('lp_list'); setLpTab('deployments'); setEditingDeployment(null)
+      setToast({ message: dep.domain ? 'Deployment saved.' : 'Deployment saved as a preview URL.', type: 'success' })
       router.refresh()
     })
   }
@@ -1017,12 +1084,13 @@ export function LandingPagesApp({ initialLandingPages, initialDeployments, brand
   const deleteDeploymentHandler = (id) => {
     setConfirm({
       title: 'Delete deployment?',
-      message: 'The landing page itself remains. Only this deployment goes away.',
+      message: 'The template itself remains. Only this placement goes away.',
+      confirmText: 'Delete',
       onConfirm: () => {
         deleteDeployment({ id }).then((res) => {
           if (!res.ok) { setToast({ message: res.error, type: 'error' }); setConfirm(null); return }
           setLpDeployments((arr) => arr.filter((d) => d.id !== id))
-          setConfirm(null); setSubView('lp_list'); setLpTab('deployments')
+          setConfirm(null); setSubView('lp_list'); setLpTab('deployments'); setEditingDeployment(null)
           router.refresh()
         })
       },
@@ -1034,52 +1102,69 @@ export function LandingPagesApp({ initialLandingPages, initialDeployments, brand
     if (!dep) return
     const status = dep.status === 'live' ? 'paused' : 'live'
     setLpDeployments((arr) => arr.map((d) => (d.id === id ? { ...d, status } : d)))
-    saveDeployment({ deployment: { ...dep, status } }).then(() => router.refresh())
+    saveDeployment({ deployment: { ...dep, status } }).then((res) => {
+      if (!res.ok) {
+        setLpDeployments((arr) => arr.map((d) => (d.id === id ? dep : d)))
+        setToast({ message: res.error, type: 'error' })
+        return
+      }
+      router.refresh()
+    })
   }
 
-  const renameLP = (id, name) => {
-    setLandingPages((arr) => arr.map((p) => (p.id === id ? { ...p, name } : p)))
-    saveLP({ id, patch: { name } })
-  }
   const renameDeployment = (id, name) => {
-    setLpDeployments((arr) => arr.map((d) => (d.id === id ? { ...d, name } : d)))
     const dep = lpDeployments.find((d) => d.id === id)
-    if (dep) saveDeployment({ deployment: { ...dep, name } })
+    if (!dep) return
+    setLpDeployments((arr) => arr.map((d) => (d.id === id ? { ...d, name } : d)))
+    saveDeployment({ deployment: { ...dep, name } }).then((res) => {
+      if (!res.ok) setToast({ message: res.error, type: 'error' })
+    })
   }
 
-  const editingLP = landingPages.find((p) => p.id === editingLPId)
+  const newDeployment = () => {
+    setEditingDeployment({
+      id: '', name: '', landingPageId: '', brandId: '', domainId: '', domain: '', path: '/c/',
+      quizId: '', quizDeploymentId: '', embeddedQuizTemplateId: '', embeddedProgressForm: null,
+      contentOverrides: {}, destinationOverrides: {}, utm: {}, pixels: {}, status: 'draft',
+    })
+    setSubView('lp_deployment_edit')
+  }
+
+  /* ------------------------------------------------------------------ view */
 
   let body
-  if (subView === 'lp_builder' && editingLP) {
+  if (subView === 'template_editor' && editingTemplate) {
     body = (
       <LandingPageBuilder
-        onBrandSaved={onBrandSaved}
-        landingPage={editingLP}
+        template={editingTemplate}
         brands={brands}
-        quizDeployments={quizDeployments}
+        onBrandSaved={onBrandSaved}
         quizzes={quizzes}
-        onBack={() => { clearTimeout(saveTimer.current); if (editingLP) saveLP({ id: editingLP.id, patch: lpPatch(editingLP) }).then(() => router.refresh()); setSubView('lp_list'); setEditingLPId(null) }}
-        onUpdate={updateLP}
-        onTogglePublish={togglePublishLP}
-        onSetTemplate={setTemplate}
-        onSetStructure={setStructure}
-        onPreview={() => setPreviewState({ kind: 'lp', lpId: editingLP.id })}
+        onBack={() => {
+          // Flush before leaving: the list re-reads from the server, so an
+          // unsent keystroke would look like it had been saved and then lost.
+          flushTemplateSaves().then(() => router.refresh())
+          setSubView('lp_list'); setEditingTemplateId(null); setLpTab('templates')
+        }}
+        onPatch={(patch, opts) => patchTemplate(editingTemplate.id, patch, opts)}
+        onToggleEnabled={toggleTemplateEnabled}
+        onPreview={() => setPreviewState({ templateId: editingTemplate.id })}
       />
     )
   } else if (subView === 'lp_deployment_edit') {
     body = (
       <LPDeploymentEditor
         deployment={editingDeployment}
-        landingPages={landingPages}
+        templates={templates}
         brands={brands}
-        domains={domains}
-        quizDeployments={quizDeployments}
         quizzes={quizzes}
+        quizTemplates={quizTemplates}
+        onBrandSaved={onBrandSaved}
         onSave={persistDeployment}
         onDelete={deleteDeploymentHandler}
         onCancel={() => { setSubView('lp_list'); setEditingDeployment(null); setLpTab('deployments') }}
         onToast={setToast}
-        onPreview={(dep) => setPreviewState({ kind: 'deployment', deploymentId: dep.id })}
+        onPreview={(dep) => (dep.id ? setPreviewState({ deploymentId: dep.id }) : setToast({ message: 'Save the deployment first.', type: 'error' }))}
       />
     )
   } else {
@@ -1087,53 +1172,47 @@ export function LandingPagesApp({ initialLandingPages, initialDeployments, brand
       <div style={{ flex: 1, padding: '24px 32px', overflowY: 'auto' }}>
         <PageHeader
           title="Landing Pages"
-          subtitle="Brandless pages with placeholders. Deploy each page to one or more brand domains."
+          subtitle="One brandless library of templates, and the deployments that put them on a brand's domain."
           primaryAction={
-            // The Templates tab is a catalogue of the stock library. There is
-            // nothing to create on it, and an action that did nothing there
-            // would be worse than no action.
             lpTab === 'templates'
-              ? null
-              : lpTab === 'pages'
-                ? <Btn variant="primary" size="md" icon={Sparkles} onClick={() => setAiWizardOpen(true)}>New with Claude</Btn>
-                : <Btn variant="primary" size="md" icon={Plus} onClick={() => { setEditingDeployment({ id: '', landingPageId: '', brandId: '', domain: '', path: '/c/', quizId: '', embeddedQuizTemplateId: '', embeddedProgressForm: '', quizDeploymentId: '', status: 'draft' }); setSubView('lp_deployment_edit') }}>New Deployment</Btn>
+              ? <Btn variant="primary" size="md" icon={Sparkles} onClick={() => setAiWizardOpen(true)}>New template with Claude</Btn>
+              : <Btn variant="primary" size="md" icon={Plus} onClick={newDeployment}>New Deployment</Btn>
           }
-          secondaryAction={lpTab === 'pages' ? <Btn variant="secondary" size="md" icon={Plus} onClick={createBlankLP}>Blank LP</Btn> : null}
+          secondaryAction={
+            lpTab === 'templates'
+              ? <Btn variant="secondary" size="md" icon={Plus} onClick={createBlankTemplate}>New blank template</Btn>
+              : null
+          }
         />
-        {/* The twelve are the STOCK library, so the count is the registry's, not
-            the number of pages somebody has built from it. Listing content under
-            the catalogue's name is how a library stops describing what exists. */}
-        <TabBar active={lpTab} onChange={setLpTab} tabs={[
-          { id: 'pages', label: 'Pages', count: landingPages.length },
-          { id: 'templates', label: 'Templates', count: EXPECTED_LP_TEMPLATE_COUNT },
+        <LpTabBar active={lpTab} onChange={setLpTab} tabs={[
+          { id: 'templates', label: 'Templates', count: templates.length },
           { id: 'deployments', label: 'Deployments', count: lpDeployments.length },
         ]} />
         <div style={{ marginTop: 18 }}>
-          {lpTab === 'pages' && (
-            <LandingPagesListView
-              landingPages={landingPages}
-              lpDeployments={lpDeployments}
-              onOpen={(id) => { setEditingLPId(id); setSubView('lp_builder') }}
-              onClone={cloneLPHandler}
-              onDelete={deleteLPHandler}
-              onTogglePublish={togglePublishLP}
-              onPreview={(id) => setPreviewState({ kind: 'lp', lpId: id })}
-              onRename={renameLP}
+          {lpTab === 'templates' && (
+            <TemplateListView
+              templates={templates}
+              deployments={lpDeployments}
+              onPreview={(t) => setPreviewState({ templateId: t.id })}
+              onEdit={(t) => { setEditingTemplateId(t.id); setSubView('template_editor') }}
+              onClone={cloneTemplate}
+              onToggleEnabled={toggleTemplateEnabled}
+              onDelete={deleteTemplate}
+              onRename={(id, name) => patchTemplate(id, { name })}
             />
           )}
-          {lpTab === 'templates' && <TemplateLibrary kind="lp" brands={brands} />}
           {lpTab === 'deployments' && (
             <LPDeploymentListView
               deployments={lpDeployments}
-              landingPages={landingPages}
+              templates={templates}
               brands={brands}
-              quizDeployments={quizDeployments}
               quizzes={quizzes}
+              quizDeployments={quizDeployments}
               domains={domains}
               onOpen={(dep) => { setEditingDeployment(dep); setSubView('lp_deployment_edit') }}
               onDelete={deleteDeploymentHandler}
               onToggleStatus={toggleDepStatus}
-              onPreview={(dep) => setPreviewState({ kind: 'deployment', deploymentId: dep.id })}
+              onPreview={(dep) => setPreviewState({ deploymentId: dep.id })}
               onRename={renameDeployment}
             />
           )}
@@ -1148,8 +1227,31 @@ export function LandingPagesApp({ initialLandingPages, initialDeployments, brand
       {body}
 
       <AINewLPWizard open={aiWizardOpen} onClose={() => setAiWizardOpen(false)} onCreate={createFromWizard} />
-      <LPPreviewModal previewState={previewState} landingPages={landingPages} brands={brands} lpDeployments={lpDeployments} quizzes={quizzes} quizDeployments={quizDeployments} onClose={() => setPreviewState(null)} />
-      <ConfirmDialog open={!!confirm} title={confirm?.title} message={confirm?.message} confirmText="Delete" onConfirm={confirm?.onConfirm} onCancel={() => setConfirm(null)} />
+      <LPPreviewModal
+        previewState={previewState}
+        templates={templates}
+        brands={brands}
+        deployments={lpDeployments}
+        quizzes={quizzes}
+        onClose={() => setPreviewState(null)}
+      />
+      <ConfirmDialog
+        open={!!confirm}
+        title={confirm?.title}
+        message={confirm?.message}
+        confirmText={confirm?.confirmText || 'Confirm'}
+        onConfirm={confirm?.onConfirm}
+        onCancel={() => setConfirm(null)}
+      />
+      <ConfirmDialog
+        open={!!notice}
+        title={notice?.title}
+        message={notice?.message}
+        confirmText={notice?.actionText || 'OK'}
+        cancelText="Close"
+        onConfirm={() => { const act = notice?.onAction; setNotice(null); act?.() }}
+        onCancel={() => setNotice(null)}
+      />
       <Toast message={toast?.message} type={toast?.type} onDismiss={() => setToast(null)} />
     </div>
   )

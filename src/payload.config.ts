@@ -16,6 +16,7 @@ import { FunnelLandingPages } from './collections/FunnelLandingPages'
 import { FunnelLpDeployments } from './collections/FunnelLpDeployments'
 import { FunnelQuizzes } from './collections/FunnelQuizzes'
 import { FunnelQuizDeployments } from './collections/FunnelQuizDeployments'
+import { FunnelQuizTemplates } from './collections/FunnelQuizTemplates'
 import { FunnelAdvertorials } from './collections/FunnelAdvertorials'
 import { FunnelAdvertorialDeployments } from './collections/FunnelAdvertorialDeployments'
 import { Leads } from './collections/Leads'
@@ -62,6 +63,7 @@ export default buildConfig({
     FunnelLpDeployments,
     FunnelQuizzes,
     FunnelQuizDeployments,
+    FunnelQuizTemplates,
     FunnelAdvertorials,
     FunnelAdvertorialDeployments,
     Leads,

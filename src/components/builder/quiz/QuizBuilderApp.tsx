@@ -13,14 +13,14 @@ import {
   Plus, Code2, Save, X, Undo2, Redo2, Archive, ArchiveRestore, Loader2, Check, AlertTriangle, LayoutTemplate,
 } from 'lucide-react'
 import { T, Btn, Input, Select, Label, Pill, IconBtn, ConfirmDialog, Toast, PageHeader } from '../ui'
-import { BodySectionEditor, AddBodySectionPicker, BODY_SECTION_DEFS } from '../body-sections'
-import { NODE_TYPE_FOR_QTYPE, QUIZ_TEMPLATES, RENDER_MODES, PIXEL_PROVIDERS } from './config'
+import { NODE_TYPE_FOR_QTYPE, RENDER_MODES, PIXEL_PROVIDERS } from './config'
 import { genId, mkA, defaultLeadFormFields, VISIBLE_BY_DEFAULT } from './seed-data'
 import { QuizFlowGrid } from './builder'
 import { NodeEditorModal, SettingsModal, AddStepModal } from './editors'
 import { QuizPreviewView, NodePreviewModal } from './preview'
-import { auditQuizTemplateColors, resolveQuizTemplate, PROGRESS_FORM_LABELS } from './templates'
-import { TemplatePreview } from './TemplatePreview'
+import { auditQuizTemplateColors, PROGRESS_FORM_LABELS } from './templates'
+import { Section } from './section'
+import { QuizTemplatesPanel, quizSpecForRecord, defaultProgressFor } from './QuizTemplatesPanel'
 import { brandShortName } from '../ui'
 import {
   moveStepBy, duplicateStep, duplicateNode, deleteStep,
@@ -32,7 +32,7 @@ import {
 } from '@/app/(app)/admin/(top)/quizzes/actions'
 import { buildQuizEmbedSnippet, QUIZ_EMBED_INCOMPLETE } from '@/lib/quiz-embed'
 import { selectableOptions } from '@/lib/selectable'
-import { TemplateLibrary } from '@/components/builder/templates/TemplateLibrary'
+import { TemplateGallery } from '@/components/builder/templates/TemplateGallery'
 import { BrandQuickEdit } from '../brand/BrandQuickEdit'
 import {
   DESTINATION_KEYS, DESTINATION_LABELS, resolveDestination, destinationOrigin, isSafeDestinationUrl,
@@ -114,22 +114,25 @@ const QuizBuilderTopBar = ({
 )
 
 const QuizBuilderTabBar = ({ active, onChange }) => {
-  // Three surfaces, and the third is not a nicety. "Which twenty templates are
-  // there" was a question the product could not answer: the only way to see one
-  // was to already be editing a deployment, so people picked whatever was
-  // already selected. The catalogue is the STOCK registry, never the quizzes
-  // people have built - see TemplateLibrary for why that distinction is load
-  // bearing.
+  // Three surfaces, in the order the work happens: author a flow, choose how it
+  // looks, put it somewhere. "Quiz Flows" rather than "Quiz Builder" because the
+  // data model, the deployment editor and the runtime all call it a flow, and
+  // the tab was the last place still calling it something else.
+  //
+  // Flows and templates stay separate concepts. A flow is questions, routing and
+  // tiers; a template is width, progress, answers and icons. One flow runs under
+  // many templates and one template dresses many flows, so merging the two tabs
+  // would be merging the two halves of that product.
   const tabs = [
-    { id: 'quizzes', label: 'Quiz Builder', icon: ListChecks },
-    { id: 'deployments', label: 'Deployments', icon: Rocket },
+    { id: 'quizzes', label: 'Quiz Flows', icon: ListChecks },
     { id: 'templates', label: 'Templates', icon: LayoutTemplate },
+    { id: 'deployments', label: 'Deployments', icon: Rocket },
   ]
   return <div style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '0 4px', borderBottom: `1px solid ${T.border}` }}>
     {tabs.map((t) => {
       const isActive = active === t.id
       const Icon = t.icon
-      return <button key={t.id} onClick={() => onChange(t.id)} style={{ padding: '14px 18px', backgroundColor: 'transparent', border: 'none', borderBottom: `2px solid ${isActive ? T.primary : 'transparent'}`, color: isActive ? T.text : T.textMute, fontSize: 13, fontWeight: 500, fontFamily: '"Inter", sans-serif', cursor: 'pointer', marginBottom: -1, display: 'inline-flex', alignItems: 'center', gap: 7, letterSpacing: '-0.005em' }}>
+      return <button key={t.id} data-quiz-tab={t.id} aria-current={isActive ? 'page' : undefined} onClick={() => onChange(t.id)} style={{ padding: '14px 18px', backgroundColor: 'transparent', border: 'none', borderBottom: `2px solid ${isActive ? T.primary : 'transparent'}`, color: isActive ? T.text : T.textMute, fontSize: 13, fontWeight: 500, fontFamily: '"Inter", sans-serif', cursor: 'pointer', marginBottom: -1, display: 'inline-flex', alignItems: 'center', gap: 7, letterSpacing: '-0.005em' }}>
         <Icon size={14} /> {t.label}
       </button>
     })}
@@ -221,7 +224,7 @@ const QuizListView = ({
   </div>
 }
 
-const DeploymentListView = ({ deployments, quizzes, brands, onOpen, onClone, onDelete, onToggleStatus, onCopyEmbed, onPreview, onRename }) => {
+const DeploymentListView = ({ deployments, quizzes, brands, templates, onOpen, onClone, onDelete, onToggleStatus, onCopyEmbed, onPreview, onRename }) => {
   const [renamingId, setRenamingId] = useState(null)
   const [renameDraft, setRenameDraft] = useState('')
   const startRename = (d) => { setRenamingId(d.id); setRenameDraft(d.name || '') }
@@ -237,7 +240,20 @@ const DeploymentListView = ({ deployments, quizzes, brands, onOpen, onClone, onD
         const depName = d.name || (q ? `${q.name} · ${brand?.displayName || 'No brand'}` : 'Untitled deployment')
         const primary = brand?.colors?.primary
         const background = brand?.colors?.background
-        return <div key={d.id} style={{ backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 10, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 20 }}>
+        // The stored id resolved against the library. It used to be shown raw and
+        // upper-cased, so a deployment pointing at a template that no longer
+        // exists looked exactly like one pointing at a template that does.
+        const template = templates.find((t) => t.templateId === d.templateId)
+        return <div
+          key={d.id}
+          data-quiz-deployment={d.id}
+          // The whole row opens it. The guard is what keeps that from also
+          // firing when the click was for one of the row's own controls - a
+          // Delete that ALSO navigated into the editor behind its own confirm
+          // dialog is the classic version of this bug.
+          onClick={(e) => { if (e.target.closest('button, input, a, select')) return; onOpen(d.id) }}
+          style={{ backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 10, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 20, cursor: 'pointer' }}
+        >
           <div style={{ width: 40, height: 40, borderRadius: 8, background: primary ? `linear-gradient(135deg, ${primary}, ${background || primary})` : T.bgElev2, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 11, overflow: 'hidden' }}>
             {brand?.faviconUrl ? <img loading="lazy" decoding="async" src={brand.faviconUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : brand ? brandShortName(brand) : <Rocket size={18} />}
           </div>
@@ -252,7 +268,9 @@ const DeploymentListView = ({ deployments, quizzes, brands, onOpen, onClone, onD
               {!domainStr && <Pill color={T.info}>PREVIEW URL</Pill>}
               {orphaned && <Pill color={T.warning}>Brand missing, select a new brand to fix</Pill>}
               {d.renderMode && <Pill color={d.renderMode === 'embed' ? T.info : T.purple}>{(d.renderMode || 'standalone').toUpperCase()}</Pill>}
-              {d.templateId && <Pill color={T.textMute}>{(d.templateId || 'default').toUpperCase()}</Pill>}
+              {template
+                ? <Pill color={template.isEnabled ? T.textMute : T.warning}>{template.name}{template.isEnabled ? '' : ' · DISABLED'}</Pill>
+                : <Pill color={T.danger}>{d.templateId ? `UNKNOWN TEMPLATE: ${d.templateId}` : 'NO TEMPLATE'}</Pill>}
             </div>
             <div style={{ fontSize: 11, color: T.textMute, fontFamily: '"JetBrains Mono", monospace', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{url}</div>
             <div style={{ display: 'flex', gap: 10, marginTop: 4, fontSize: 11, color: T.textLow, fontFamily: '"JetBrains Mono", monospace', flexWrap: 'wrap' }}>
@@ -274,15 +292,16 @@ const DeploymentListView = ({ deployments, quizzes, brands, onOpen, onClone, onD
 }
 
 const ListShell = ({ tab, onTabChange, onCreate, children }) => {
-  const createLabel = { quizzes: 'New Quiz', deployments: 'New Deployment' }[tab]
+  const createLabel = { quizzes: 'New Quiz Flow', templates: 'New Template', deployments: 'New Deployment' }[tab]
   const subheading = {
     quizzes: 'Flow logic. The questions, routing, tier conditions.',
-    deployments: 'Live URLs. A quiz at a domain and path under a specific brand.',
-    templates: 'The stock visual library. Every preview is a real render, not a picture of one.',
+    templates: 'The visual library. Manage what a deployment can be rendered in; every preview is a real render, not a picture of one.',
+    deployments: 'Live URLs. A quiz flow at a domain and path under a specific brand.',
   }[tab]
   return <div style={{ flex: 1, padding: '24px 32px', overflowY: 'auto' }}>
-    {/* The Templates tab is a catalogue, not a workspace: there is nothing to
-        create on it, and an action that did nothing would be worse than none. */}
+    {/* Templates is a workspace now, not a catalogue: it creates, clones,
+        disables and deletes records, so it carries a create action like the
+        other two. */}
     <PageHeader title="Quizzes" subtitle={subheading} primaryAction={createLabel ? <Btn variant="primary" size="md" icon={Plus} onClick={onCreate}>{createLabel}</Btn> : null} />
     <QuizBuilderTabBar active={tab} onChange={onTabChange} />
     <div style={{ marginTop: 18 }}>{children}</div>
@@ -293,17 +312,24 @@ const TrackingTab = ({ draft, update }) => {
   const pixels = draft.pixels || {}
   const updPixel = (provider, p) => update({ pixels: { ...pixels, [provider]: { ...(pixels[provider] || {}), ...p } } })
   const updUtm = (p) => update({ utm: { ...(draft.utm || {}), ...p } })
-  return <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-    <div style={{ padding: 14, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 8 }}>
-      <div style={{ fontSize: 13, color: T.text, fontWeight: 600, marginBottom: 10 }}>UTM Defaults</div>
-      <div style={{ fontSize: 11, color: T.textMute, marginBottom: 10 }}>Used when no UTM parameters are passed in the URL. Captured params override these.</div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+  return <div style={{ display: 'flex', flexDirection: 'column', gap: 22 }}>
+    <Section
+      id="utm"
+      divider={false}
+      title="UTM defaults"
+      hint="Used when no UTM parameters are passed in the URL. Parameters captured from the visitor's link always override these."
+    >
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
         <div><Label>Source</Label><Input mono value={(draft.utm || {}).source || ''} onChange={(e) => updUtm({ source: e.target.value })} placeholder="meta" /></div>
         <div><Label>Medium</Label><Input mono value={(draft.utm || {}).medium || ''} onChange={(e) => updUtm({ medium: e.target.value })} placeholder="cpc" /></div>
         <div><Label>Campaign</Label><Input mono value={(draft.utm || {}).campaign || ''} onChange={(e) => updUtm({ campaign: e.target.value })} placeholder="mva_q1" /></div>
       </div>
-    </div>
-    <div style={{ fontSize: 10, color: T.textMute, fontFamily: '"JetBrains Mono", monospace', textTransform: 'uppercase', letterSpacing: '0.14em', marginTop: 8 }}>Pixels & CAPI Providers</div>
+    </Section>
+    <Section
+      id="pixels"
+      title="Pixels & CAPI providers"
+      hint="Client-side pixels and their server-side conversion APIs for this deployment. A pixel and its CAPI event share one event id so the platform can de-duplicate them."
+    >
     {PIXEL_PROVIDERS.map((p) => {
       const cfg = pixels[p.id] || { enabled: false }
       return <div key={p.id} style={{ padding: 14, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 8 }}>
@@ -320,6 +346,7 @@ const TrackingTab = ({ draft, update }) => {
         </div>}
       </div>
     })}
+    </Section>
   </div>
 }
 
@@ -335,12 +362,16 @@ const DestinationsPanel = ({ draft, brand, onChange }) => {
   const overrides = draft.destinationOverrides || {}
   const ctx = { deployment: overrides, brand: brand?.urls }
 
-  return <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-    <div style={{ fontSize: 12.5, color: T.textMute, lineHeight: 1.55 }}>
+  return <Section
+    id="destinations"
+    divider={false}
+    title="Destination URL's"
+    hint={<>
       Quiz nodes point at a destination by name, so this deployment can send traffic somewhere different
-      from the brand&apos;s default without editing the quiz. Leave a field blank to inherit.
-      {brand ? null : ' Pick a brand on the Basics tab to see what would be inherited.'}
-    </div>
+      from the brand&apos;s default without editing the quiz flow. Leave a field blank to inherit.
+      {brand ? null : ' Pick a brand on the General tab to see what would be inherited.'}
+    </>}
+  >
     {DESTINATION_KEYS.map((key) => {
       const value = overrides[key] || ''
       const resolved = resolveDestination(key, ctx)
@@ -362,20 +393,16 @@ const DestinationsPanel = ({ draft, brand, onChange }) => {
         </div> : null}
       </div>
     })}
-  </div>
+  </Section>
 }
 
-const DeploymentEditor = ({ deployment, isDraft, quizzes, brands, onBrandSaved, onSave, onBack }) => {
+const DeploymentEditor = ({ deployment, isDraft, quizzes, brands, templates, onBrandSaved, onSave, onBack }) => {
   const [draft, setDraft] = useState(deployment)
   const [dirty, setDirty] = useState(isDraft || false)
-  const [tab, setTab] = useState('basics')
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [tab, setTab] = useState('general')
   const [leaveReq, setLeaveReq] = useState(false)
   useEffect(() => { setDraft(deployment); setDirty(isDraft || false) }, [deployment, isDraft])
   const update = (p) => { setDraft((d) => ({ ...d, ...p })); setDirty(true) }
-  const updHeader = (p) => update({ headerConfig: { ...draft.headerConfig, ...p } })
-  const updHeaderCta = (p) => updHeader({ ctaButton: { ...(draft.headerConfig?.ctaButton || {}), ...p } })
-  const updFooter = (p) => update({ footerConfig: { ...draft.footerConfig, ...p } })
 
   // The brand paints the quiz. A deployment picks a template; it never authors
   // a colour, so what the contrast audit below judges IS what ships.
@@ -404,28 +431,41 @@ const DeploymentEditor = ({ deployment, isDraft, quizzes, brands, onBrandSaved, 
     isEligible: (_rec, d) => d.status === 'active' && d.sslStatus === 'active',
   })
 
-  const isOverriding = draft.bodySectionOverrides !== null && draft.bodySectionOverrides !== undefined
-  const effectiveSections = isOverriding ? draft.bodySectionOverrides : (brand?.defaultBodySections || [])
-  const toggleOverride = () => { if (isOverriding) update({ bodySectionOverrides: null }); else update({ bodySectionOverrides: JSON.parse(JSON.stringify(brand?.defaultBodySections || [])) }) }
-  const updSection = (s) => update({ bodySectionOverrides: effectiveSections.map((x) => x.id === s.id ? s : x) })
-  const delSection = (id) => update({ bodySectionOverrides: effectiveSections.filter((s) => s.id !== id) })
-  const addSection = (type) => { update({ bodySectionOverrides: [...effectiveSections, { id: genId('s'), type, enabled: true, config: {} }] }); setPickerOpen(false) }
-  const moveSection = (idx, dir) => { const a = [...effectiveSections]; const ni = idx + dir; if (ni < 0 || ni >= a.length) return;[a[idx], a[ni]] = [a[ni], a[idx]]; update({ bodySectionOverrides: a }) }
-
   const handleBack = () => { if (dirty) setLeaveReq(true); else onBack() }
-  const handleSave = () => { onSave(draft); setDirty(false) }
-  const handleSaveAndExit = () => { onSave(draft); setDirty(false); onBack() }
+  // Save STAYS. It used to call the same handler as Save & Exit, which returned
+  // to the list either way - so the two buttons did the same thing and pressing
+  // the one that says Save threw away where you were.
+  const handleSave = () => { onSave(draft, { exit: false }); setDirty(false) }
+  const handleSaveAndExit = () => { onSave(draft, { exit: true }); setDirty(false); onBack() }
 
   const embedCode = buildQuizEmbedSnippet({ deploymentId: draft.id, domain: draft.domain, path: draft.path })
 
+  // The record the stored id names, so every template question on this screen -
+  // the gallery's selection, the progress default, the contrast audit - is
+  // answered from the library rather than from the code registry. A clone's id
+  // names no renderer, so the registry cannot answer them.
+  const template = templates.find((t) => t.templateId === draft.templateId) || null
+  const templateSpec = quizSpecForRecord(template)
+  const templateProgress = defaultProgressFor(template)
+  // The audit runs on the RENDERER, which is what actually draws: a clone and
+  // its source produce identical colours and must report identically.
+  const colorViolations = template && !template.rendererError && brand
+    ? auditQuizTemplateColors(template.rendererKey, brand)
+    : []
+
+  /*
+   * Three tabs, and the two that are gone are gone on purpose. Header / Footer
+   * and Body Sections authored page chrome per deployment, which let two
+   * deployments of one quiz under one brand show different logos and different
+   * copyright lines; Brand Identity owns that now. Render & Embed held one
+   * choice - embed or standalone - which belongs beside the quiz and brand it
+   * qualifies rather than on a tab of its own.
+   */
   const tabs = [
-    { id: 'basics', label: 'Basics' },
-    { id: 'render', label: 'Render & Embed' },
-    { id: 'destinations', label: `Destinations${Object.keys(draft.destinationOverrides || {}).length ? ' · OVERRIDE' : ''}` },
-    { id: 'chrome', label: 'Header / Footer', show: draft.renderMode === 'standalone' },
-    { id: 'sections', label: `Body Sections${isOverriding ? ' · OVERRIDE' : ''}`, show: draft.renderMode === 'standalone' },
+    { id: 'general', label: 'General' },
+    { id: 'destinations', label: `Destination URL's${Object.keys(draft.destinationOverrides || {}).length ? ' · OVERRIDE' : ''}` },
     { id: 'tracking', label: 'Tracking & Pixels' },
-  ].filter((t) => t.show !== false)
+  ]
 
   return <>
     <div style={{ flex: 1, overflowY: 'auto', backgroundColor: T.bg }}>
@@ -436,7 +476,7 @@ const DeploymentEditor = ({ deployment, isDraft, quizzes, brands, onBrandSaved, 
               <div style={{ fontSize: 24, color: T.text, fontWeight: 700, letterSpacing: '-0.025em', fontFamily: '"JetBrains Mono", monospace' }}>{draft.domain}{draft.path}</div>
               {isDraft && <Pill color={T.warning}>NEW · NOT SAVED</Pill>}
             </div>
-            <div style={{ fontSize: 12.5, color: T.textMute, marginTop: 4 }}>{(quizzes.find((q) => q.id === draft.quizId) || {}).name || '-'} · {(brands.find((b) => b.id === draft.brandId) || {}).displayName || '-'} · {draft.renderMode}</div>
+            <div style={{ fontSize: 12.5, color: T.textMute, marginTop: 4 }}>{(quizzes.find((q) => q.id === draft.quizId) || {}).name || '-'} · {(brands.find((b) => b.id === draft.brandId) || {}).displayName || '-'} · {draft.renderMode} · {template ? template.name : draft.templateId ? `unknown template "${draft.templateId}"` : 'no template'}</div>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             {dirty && !isDraft && <Pill color={T.warning} style={{ alignSelf: 'center' }}>UNSAVED</Pill>}
@@ -446,60 +486,75 @@ const DeploymentEditor = ({ deployment, isDraft, quizzes, brands, onBrandSaved, 
           </div>
         </div>
         <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${T.border}`, marginBottom: 22, overflowX: 'auto' }}>
-          {tabs.map((t) => <button key={t.id} onClick={() => setTab(t.id)} style={{ padding: '11px 14px', backgroundColor: 'transparent', border: 'none', borderBottom: `2px solid ${tab === t.id ? T.primary : 'transparent'}`, color: tab === t.id ? T.text : T.textMute, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', marginBottom: -1, whiteSpace: 'nowrap' }}>{t.label}</button>)}
+          {tabs.map((t) => <button key={t.id} data-deployment-tab={t.id} aria-current={tab === t.id ? 'page' : undefined} onClick={() => setTab(t.id)} style={{ padding: '11px 14px', backgroundColor: 'transparent', border: 'none', borderBottom: `2px solid ${tab === t.id ? T.primary : 'transparent'}`, color: tab === t.id ? T.text : T.textMute, fontSize: 13, fontWeight: 600, cursor: 'pointer', marginBottom: -1, whiteSpace: 'nowrap' }}>{t.label}</button>)}
         </div>
 
-        {tab === 'basics' && <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        {tab === 'general' && <div style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
+          <Section
+            id="deployment"
+            divider={false}
+            title="Deployment"
+            hint="What runs, for whom, and where it answers. One quiz flow, under one brand, at one URL."
+          >
             <div>
-              <Label>Quiz</Label>
-              <Select value={draft.quizId} onChange={(e) => update({ quizId: e.target.value })}>
-                <option value="">- pick quiz -</option>
-                {quizOptions.map((o) => <option key={o.id} value={o.id} disabled={o.disabled}>{o.label}{o.archived ? ' · ARCHIVED' : ''}</option>)}
-              </Select>
-              {quizOptions.some((o) => o.archived) && <div style={{ fontSize: 10.5, color: T.warning, marginTop: 4 }}>
-                This deployment points at an archived quiz. Restore it on the Quizzes tab, or pick another. It is kept here rather than dropped so the reference is not lost silently.
-              </div>}
-            </div>
-            <div><Label>Brand</Label>
-              <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <Select value={draft.brandId} onChange={(e) => update({ brandId: e.target.value })}><option value="">- pick brand -</option>{brands.map((b) => <option key={b.id} value={b.id}>{b.displayName}</option>)}</Select>
-                </div>
-                {/* Beside the picker, because the moment you notice a colour is
-                    wrong is the moment you are looking at which brand is set. */}
-                <BrandQuickEdit brand={brands.find((b) => b.id === draft.brandId)} onSaved={onBrandSaved} align="right" />
+              <Label>Deployment name</Label>
+              <Input value={draft.name || ''} onChange={(e) => update({ name: e.target.value })} placeholder="MVA · pain angle · paid social" />
+              <div style={{ fontSize: 10.5, color: T.textLow, marginTop: 4 }}>
+                Internal only. It is how this deployment is found in the list and named in a refusal message; visitors never see it.
               </div>
             </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
-            <div>
-              <Label>Domain</Label>
-              {domainOptions.length > 0 ? (
-                <Select value={draft.domain} onChange={(e) => update({ domain: e.target.value })}>
-                  <option value="">- pick domain -</option>
-                  {domainOptions.map((o) => <option key={o.id} value={o.id} disabled={o.disabled}>{o.label}</option>)}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div>
+                <Label>Quiz flow</Label>
+                <Select value={draft.quizId} onChange={(e) => update({ quizId: e.target.value })}>
+                  <option value="">- pick quiz flow -</option>
+                  {quizOptions.map((o) => <option key={o.id} value={o.id} disabled={o.disabled}>{o.label}{o.archived ? ' · ARCHIVED' : ''}</option>)}
                 </Select>
-              ) : (
-                <div style={{ padding: 10, backgroundColor: T.bgElev, border: `1px solid ${T.warning}`, borderRadius: 6, fontSize: 11.5, color: T.warning }}>
-                  {draft.brandId
-                    ? <>This brand has no domain with an active certificate yet. <a href="/admin/brands/domains" style={{ color: T.info }}>Connect a domain</a>, then come back.</>
-                    : 'Pick a brand first. Domains are listed per brand.'}
+                {quizOptions.some((o) => o.archived) && <div style={{ fontSize: 10.5, color: T.warning, marginTop: 4 }}>
+                  This deployment points at an archived quiz flow. Restore it on the Quiz Flows tab, or pick another. It is kept here rather than dropped so the reference is not lost silently.
+                </div>}
+              </div>
+              <div><Label>Brand</Label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Select value={draft.brandId} onChange={(e) => update({ brandId: e.target.value })}><option value="">- pick brand -</option>{brands.map((b) => <option key={b.id} value={b.id}>{b.displayName}</option>)}</Select>
+                  </div>
+                  {/* Beside the picker, because the moment you notice a colour is
+                      wrong is the moment you are looking at which brand is set. */}
+                  <BrandQuickEdit brand={brands.find((b) => b.id === draft.brandId)} onSaved={onBrandSaved} align="right" />
                 </div>
-              )}
-              {domainOptions.some((o) => o.disabled) && <div style={{ fontSize: 10.5, color: T.warning, marginTop: 4 }}>
-                A domain shown greyed out is not ready to serve traffic. Publishing to it is blocked until its status and certificate are both active.
-              </div>}
+              </div>
             </div>
-            <div><Label>Path</Label><Input mono value={draft.path} onChange={(e) => update({ path: e.target.value })} placeholder="/s/mva" /></div>
-          </div>
-          <div><Label>Status</Label><Select value={draft.status} onChange={(e) => update({ status: e.target.value })}><option value="draft">Draft</option><option value="live">Live</option><option value="paused">Paused</option></Select></div>
-        </div>}
+            <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 12 }}>
+              <div>
+                <Label>Domain</Label>
+                {domainOptions.length > 0 ? (
+                  <Select value={draft.domain} onChange={(e) => update({ domain: e.target.value })}>
+                    <option value="">- pick domain -</option>
+                    {domainOptions.map((o) => <option key={o.id} value={o.id} disabled={o.disabled}>{o.label}</option>)}
+                  </Select>
+                ) : (
+                  <div style={{ padding: 10, backgroundColor: T.bgElev, border: `1px solid ${T.warning}`, borderRadius: 6, fontSize: 11.5, color: T.warning }}>
+                    {draft.brandId
+                      ? <>This brand has no domain with an active certificate yet. <a href="/admin/brands/domains" style={{ color: T.info }}>Connect a domain</a>, then come back.</>
+                      : 'Pick a brand first. Domains are listed per brand.'}
+                  </div>
+                )}
+                {domainOptions.some((o) => o.disabled) && <div style={{ fontSize: 10.5, color: T.warning, marginTop: 4 }}>
+                  A domain shown greyed out is not ready to serve traffic. Publishing to it is blocked until its status and certificate are both active.
+                </div>}
+              </div>
+              <div><Label>Path</Label><Input mono value={draft.path} onChange={(e) => update({ path: e.target.value })} placeholder="/s/mva" /></div>
+            </div>
+            <div><Label>Status</Label><Select value={draft.status} onChange={(e) => update({ status: e.target.value })}><option value="draft">Draft</option><option value="live">Live</option><option value="paused">Paused</option></Select></div>
+          </Section>
 
-        {tab === 'render' && <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <Label>Render Mode</Label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+          <Section
+            id="render-mode"
+            title="Render mode"
+            hint="Whether this deployment is a page of its own or a card dropped into someone else's. It decides what the template is drawn inside, so it comes before the template."
+          >
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {RENDER_MODES.map((m) => {
                 const active = draft.renderMode === m.id
                 return <button key={m.id} onClick={() => update({ renderMode: m.id })} style={{ padding: 14, backgroundColor: active ? T.bgElev2 : T.bgElev, border: `1px solid ${active ? T.primary : T.border}`, borderRadius: 8, cursor: 'pointer', textAlign: 'left', color: T.text }}>
@@ -508,72 +563,94 @@ const DeploymentEditor = ({ deployment, isDraft, quizzes, brands, onBrandSaved, 
                 </button>
               })}
             </div>
-          </div>
-          <div>
-            <Label>Visual Template</Label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
-              {QUIZ_TEMPLATES.map((t) => {
-                const active = (draft.templateId || 'minimal') === t.id
-                // Color-overlap detector: flag any template that would render
-                // unreadable text for THIS brand before it ships.
-                const violations = brand ? auditQuizTemplateColors(t.id, brand) : []
-                const hasError = violations.some((v) => v.severity === 'error')
-                const hasWarn = violations.length > 0
-                return <button key={t.id} onClick={() => update({ templateId: t.id })} title={hasWarn ? violations.map((v) => v.message).join('\n') : undefined} style={{ padding: 10, backgroundColor: active ? T.bgElev2 : T.bgElev, border: `1px solid ${active ? T.primary : hasError ? T.danger : T.border}`, borderRadius: 8, cursor: 'pointer', textAlign: 'left', color: T.text, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <TemplatePreview spec={resolveQuizTemplate(t.id)} brand={brand} progress={active ? draft.progressForm : null} />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <div style={{ width: 14, height: 14, borderRadius: '50%', border: `2px solid ${active ? T.primary : T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{active && <div style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: T.primary }} />}</div>
-                    <span style={{ fontSize: 12.5, fontWeight: 600 }}>{t.name}</span>
-                    <span style={{ fontFamily: '"JetBrains Mono", monospace', fontSize: 9, color: T.textLow }}>{t.code}</span>
-                    {hasWarn && <span style={{ marginLeft: 'auto', fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 3, letterSpacing: '0.04em', backgroundColor: hasError ? `${T.danger}22` : `${T.warning}22`, color: hasError ? T.danger : T.warning }}>{hasError ? 'LOW CONTRAST' : 'CHECK'}</span>}
-                  </div>
-                  <div style={{ fontSize: 11, color: T.textMute, lineHeight: 1.4 }}>{t.desc}</div>
-                </button>
-              })}
-            </div>
-            <div style={{ fontSize: 10.5, color: T.textLow, marginTop: 6 }}>Brand colours still apply. The template controls width, answers, typography and icon policy. A <span style={{ color: T.warning }}>CHECK</span> / <span style={{ color: T.danger }}>LOW CONTRAST</span> tag means this template plus the selected brand has a colour overlap that hurts readability.</div>
-          </div>
+            {draft.renderMode === 'standalone' && <div style={{ fontSize: 11, color: T.textMute, lineHeight: 1.55 }}>
+              The header and footer of a standalone page come from Brand Identity, not from here: they belong to the
+              brand wearing the page, and two deployments of one quiz under one brand must not show different logos.
+            </div>}
+            {draft.renderMode === 'embed' && <>
+              <div>
+                <Label>Embed preview background</Label>
+                <div style={{ display: 'flex', gap: 5 }}>
+                  <input type="color" value={draft.embedPreviewBg || '#0a1a3a'} onChange={(e) => update({ embedPreviewBg: e.target.value })} style={{ width: 40, height: 32, padding: 2, border: `1px solid ${T.border}`, borderRadius: 6, backgroundColor: T.bg, cursor: 'pointer' }} />
+                  <Input mono value={draft.embedPreviewBg || ''} onChange={(e) => update({ embedPreviewBg: e.target.value })} style={{ flex: 1 }} />
+                </div>
+                <div style={{ fontSize: 10.5, color: T.textLow, marginTop: 4 }}>
+                  Preview only. It stands in for the colour of the page you are embedding into, so the card can be judged against it.
+                </div>
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                  <Label style={{ marginBottom: 0 }}>Embed code</Label>
+                  <Btn variant="secondary" size="xs" icon={Copy} onClick={() => { if (embedCode) navigator.clipboard.writeText(embedCode) }} disabled={!embedCode} style={!embedCode ? { opacity: 0.5 } : {}}>Copy</Btn>
+                </div>
+                {embedCode
+                  ? <>
+                    <pre style={{ margin: 0, padding: 12, backgroundColor: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, fontFamily: '"JetBrains Mono", monospace', fontSize: 11.5, color: T.textDim, overflow: 'auto' }}>{embedCode}</pre>
+                    <div style={{ fontSize: 10.5, color: T.textLow, marginTop: 6 }}>Paste this on any page. The loader is served from this deployment&apos;s own domain, so there is no third-party script and no CORS setup. The frame reports its height as the visitor moves through the quiz, so it grows and shrinks in place.</div>
+                  </>
+                  : <div style={{ padding: 12, backgroundColor: T.bg, border: `1px solid ${T.warning}`, borderRadius: 6, fontSize: 11.5, color: T.warning }}>{QUIZ_EMBED_INCOMPLETE}</div>}
+              </div>
+            </>}
+          </Section>
 
-          <div>
-            <Label>Progress</Label>
-            {/* What the template would show if nothing is overridden, named so
-                "Match the template" is a concrete choice rather than a blank. */}
-            <Select
-              value={draft.progressForm || ''}
-              onChange={(e) => update({ progressForm: e.target.value || null })}
-            >
-              <option value="">
-                Match the template ({PROGRESS_FORM_LABELS.find((p) => p.id === resolveQuizTemplate(draft.templateId).progress)?.label ?? 'template default'})
-              </option>
-              {PROGRESS_FORM_LABELS.map((p) => (
-                <option key={p.id} value={p.id}>{p.label} {'·'} from {p.from}</option>
+          <Section
+            id="template"
+            title="Quiz template"
+            hint={<>
+              The visual template this deployment renders in: width, progress, answer form and icon policy. Colour is
+              never the template&apos;s, it is the brand&apos;s, so every preview below is drawn in
+              {brand ? ` ${brand.displayName || brand.name}` : ' the neutral palette until a brand is picked'}.
+              Manage the library itself on the Templates tab.
+            </>}
+          >
+            {/* The library, not the code registry: a template created or cloned
+                by an operator is selectable here on the same footing as the
+                twenty stock ones, and a disabled one is shown with the reason
+                rather than quietly missing. */}
+            <TemplateGallery
+              kind="quiz"
+              templates={templates}
+              brands={brands}
+              brandId={draft.brandId}
+              selectedId={draft.templateId}
+              onSelect={(t) => update({ templateId: t.templateId })}
+              emptyMessage="No quiz templates in the library yet. Create one on the Templates tab."
+            />
+
+            {/* The colour audit the old grid ran per card, kept for the SELECTED
+                template. A brand can still make a readable template unreadable,
+                and this is the last screen before it ships. */}
+            {colorViolations.length > 0 && <div style={{ padding: 12, borderRadius: 8, border: `1px solid ${colorViolations.some((v) => v.severity === 'error') ? T.danger : T.warning}`, backgroundColor: T.bgElev }}>
+              <div style={{ fontSize: 12, fontWeight: 600, color: colorViolations.some((v) => v.severity === 'error') ? T.danger : T.warning, marginBottom: 6 }}>
+                {colorViolations.some((v) => v.severity === 'error') ? 'Low contrast with this brand' : 'Check contrast with this brand'}
+              </div>
+              {colorViolations.map((v, i) => (
+                <div key={i} style={{ fontSize: 11, color: T.textDim, lineHeight: 1.5 }}>{v.message}</div>
               ))}
-            </Select>
-            <div style={{ fontSize: 10.5, color: T.textLow, marginTop: 6, lineHeight: 1.5 }}>
-              Each template comes with its own way of showing progress. Change it here to borrow another one without changing anything else about the template: the width, the answers and the icons stay as they are.
-            </div>
-          </div>
-          {draft.renderMode === 'embed' && <>
+            </div>}
+
             <div>
-              <Label>Embed Preview Background</Label>
-              <div style={{ display: 'flex', gap: 5 }}>
-                <input type="color" value={draft.embedPreviewBg || '#0a1a3a'} onChange={(e) => update({ embedPreviewBg: e.target.value })} style={{ width: 40, height: 32, padding: 2, border: `1px solid ${T.border}`, borderRadius: 6, backgroundColor: T.bg, cursor: 'pointer' }} />
-                <Input mono value={draft.embedPreviewBg || ''} onChange={(e) => update({ embedPreviewBg: e.target.value })} style={{ flex: 1 }} />
+              <Label>Progress</Label>
+              {/* What this deployment would show if nothing is overridden, named
+                  so "Match the template" is a concrete choice rather than a blank.
+                  The template's own default wins over the renderer's, because a
+                  template that set one meant it. */}
+              <Select
+                value={draft.progressForm || ''}
+                onChange={(e) => update({ progressForm: e.target.value || null })}
+              >
+                <option value="">
+                  Match the template ({PROGRESS_FORM_LABELS.find((p) => p.id === templateProgress.id)?.label ?? 'template default'})
+                </option>
+                {PROGRESS_FORM_LABELS.map((p) => (
+                  <option key={p.id} value={p.id}>{p.label} {'·'} from {p.from}</option>
+                ))}
+              </Select>
+              <div style={{ fontSize: 10.5, color: T.textLow, marginTop: 6, lineHeight: 1.5 }}>
+                Each template comes with its own way of showing progress. Change it here to borrow another one without changing anything else: the width, the answers and the icons stay as they are.
               </div>
             </div>
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <Label style={{ marginBottom: 0 }}>Embed Code</Label>
-                <Btn variant="secondary" size="xs" icon={Copy} onClick={() => { if (embedCode) navigator.clipboard.writeText(embedCode) }} disabled={!embedCode} style={!embedCode ? { opacity: 0.5 } : {}}>Copy</Btn>
-              </div>
-              {embedCode
-                ? <>
-                  <pre style={{ margin: 0, padding: 12, backgroundColor: T.bg, border: `1px solid ${T.border}`, borderRadius: 6, fontFamily: '"JetBrains Mono", monospace', fontSize: 11.5, color: T.textDim, overflow: 'auto' }}>{embedCode}</pre>
-                  <div style={{ fontSize: 10.5, color: T.textLow, marginTop: 6 }}>Paste this on any page. The loader is served from this deployment&apos;s own domain, so there is no third-party script and no CORS setup. The frame reports its height as the visitor moves through the quiz, so it grows and shrinks in place.</div>
-                </>
-                : <div style={{ padding: 12, backgroundColor: T.bg, border: `1px solid ${T.warning}`, borderRadius: 6, fontSize: 11.5, color: T.warning }}>{QUIZ_EMBED_INCOMPLETE}</div>}
-            </div>
-          </>}
+          </Section>
         </div>}
 
         {tab === 'destinations' && <DestinationsPanel
@@ -587,56 +664,10 @@ const DeploymentEditor = ({ deployment, isDraft, quizzes, brands, onBrandSaved, 
           }}
         />}
 
-        {tab === 'chrome' && <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-          <div style={{ padding: 14, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 8 }}>
-            <div style={{ fontSize: 13, color: T.text, fontWeight: 600, marginBottom: 10 }}>Header</div>
-            <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
-              <button onClick={() => updHeader({ logoEnabled: !draft.headerConfig?.logoEnabled })} style={{ padding: '6px 11px', borderRadius: 5, fontSize: 10.5, fontWeight: 600, backgroundColor: draft.headerConfig?.logoEnabled ? `${T.success}22` : T.bgElev2, border: `1px solid ${draft.headerConfig?.logoEnabled ? T.success : T.border}`, color: draft.headerConfig?.logoEnabled ? T.success : T.textMute, cursor: 'pointer', fontFamily: '"JetBrains Mono", monospace' }}>{draft.headerConfig?.logoEnabled ? 'ON LOGO' : 'OFF LOGO'}</button>
-              <button onClick={() => updHeaderCta({ enabled: !(draft.headerConfig?.ctaButton || {}).enabled })} style={{ padding: '6px 11px', borderRadius: 5, fontSize: 10.5, fontWeight: 600, backgroundColor: (draft.headerConfig?.ctaButton || {}).enabled ? `${T.success}22` : T.bgElev2, border: `1px solid ${(draft.headerConfig?.ctaButton || {}).enabled ? T.success : T.border}`, color: (draft.headerConfig?.ctaButton || {}).enabled ? T.success : T.textMute, cursor: 'pointer', fontFamily: '"JetBrains Mono", monospace' }}>{(draft.headerConfig?.ctaButton || {}).enabled ? 'ON CTA BUTTON' : 'OFF CTA BUTTON'}</button>
-            </div>
-            {(draft.headerConfig?.ctaButton || {}).enabled && <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1fr', gap: 8 }}>
-              <div><Label>CTA Text</Label><Input value={(draft.headerConfig?.ctaButton || {}).text || ''} onChange={(e) => updHeaderCta({ text: e.target.value })} /></div>
-              <div><Label>CTA URL</Label><Input mono value={(draft.headerConfig?.ctaButton || {}).url || ''} onChange={(e) => updHeaderCta({ url: e.target.value })} placeholder="tel:+1..." /></div>
-              <div><Label>Font Size</Label><Input type="number" value={(draft.headerConfig?.ctaButton || {}).fontSize || 11} onChange={(e) => updHeaderCta({ fontSize: parseInt(e.target.value) || 11 })} /></div>
-            </div>}
-          </div>
-          <div style={{ padding: 14, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 8 }}>
-            <div style={{ fontSize: 13, color: T.text, fontWeight: 600, marginBottom: 10 }}>Footer</div>
-            <div style={{ display: 'flex', gap: 16, marginBottom: 12 }}>
-              <button onClick={() => updFooter({ logoEnabled: !draft.footerConfig?.logoEnabled })} style={{ padding: '6px 11px', borderRadius: 5, fontSize: 10.5, fontWeight: 600, backgroundColor: draft.footerConfig?.logoEnabled ? `${T.success}22` : T.bgElev2, border: `1px solid ${draft.footerConfig?.logoEnabled ? T.success : T.border}`, color: draft.footerConfig?.logoEnabled ? T.success : T.textMute, cursor: 'pointer', fontFamily: '"JetBrains Mono", monospace' }}>{draft.footerConfig?.logoEnabled ? 'ON LOGO' : 'OFF LOGO'}</button>
-              <button onClick={() => updFooter({ showCopyright: !draft.footerConfig?.showCopyright })} style={{ padding: '6px 11px', borderRadius: 5, fontSize: 10.5, fontWeight: 600, backgroundColor: draft.footerConfig?.showCopyright ? `${T.success}22` : T.bgElev2, border: `1px solid ${draft.footerConfig?.showCopyright ? T.success : T.border}`, color: draft.footerConfig?.showCopyright ? T.success : T.textMute, cursor: 'pointer', fontFamily: '"JetBrains Mono", monospace' }}>{draft.footerConfig?.showCopyright ? 'ON COPYRIGHT' : 'OFF COPYRIGHT'}</button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-              <div><Label>Logo Size (px)</Label><Input type="number" value={draft.footerConfig?.logoSize || 32} onChange={(e) => updFooter({ logoSize: parseInt(e.target.value) || 32 })} /></div>
-              <div><Label>Font Size (px)</Label><Input type="number" value={draft.footerConfig?.fontSize || 12} onChange={(e) => updFooter({ fontSize: parseInt(e.target.value) || 12 })} /></div>
-            </div>
-          </div>
-        </div>}
-
-        {tab === 'sections' && <div>
-          <div style={{ padding: 12, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 8, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, color: T.text, fontWeight: 600 }}>{isOverriding ? 'Using Custom Sections' : `Inheriting from Brand: ${brand?.displayName || 'none'}`}</div>
-              <div style={{ fontSize: 11.5, color: T.textMute, marginTop: 2 }}>{isOverriding ? 'These sections only apply to this deployment' : 'Changes to the brand will reflect here'}</div>
-            </div>
-            <Btn variant={isOverriding ? 'danger' : 'secondary'} size="md" onClick={toggleOverride}>{isOverriding ? 'Reset to Brand Default' : 'Override for this Deployment'}</Btn>
-          </div>
-          {effectiveSections.map((s, i) => isOverriding ?
-            <BodySectionEditor key={s.id} section={s} onUpdate={updSection} onDelete={() => delSection(s.id)} onMoveUp={() => moveSection(i, -1)} onMoveDown={() => moveSection(i, 1)} /> :
-            <div key={s.id} style={{ padding: 12, backgroundColor: T.bgElev, border: `1px dashed ${T.border}`, borderRadius: 8, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 10, opacity: 0.7 }}>
-              <Pill color={s.enabled ? T.success : T.textMute}>{s.enabled ? 'ON' : 'OFF'}</Pill>
-              <div style={{ fontSize: 12.5, color: T.text }}>{BODY_SECTION_DEFS[s.type]?.label || s.type}</div>
-              <div style={{ flex: 1, fontSize: 11, color: T.textMute }}>read-only · override to edit</div>
-            </div>,
-          )}
-          {isOverriding && <Btn variant="secondary" size="md" icon={Plus} onClick={() => setPickerOpen(true)} style={{ marginTop: 8 }}>Add Section</Btn>}
-        </div>}
-
         {tab === 'tracking' && <TrackingTab draft={draft} update={update} />}
       </div>
     </div>
-    {pickerOpen && <AddBodySectionPicker onPick={addSection} onClose={() => setPickerOpen(false)} />}
-    <ConfirmDialog open={leaveReq} title={isDraft ? 'Discard new deployment?' : 'Leave deployment editor?'} message={isDraft ? 'This deployment has not been saved and will be discarded.' : 'You have unsaved changes.'} confirmText={isDraft ? 'Discard' : 'Save & Leave'} cancelText="Stay" tertiaryText={isDraft ? null : 'Discard'} onConfirm={() => { if (isDraft) { setLeaveReq(false); onBack() } else { handleSave(); setLeaveReq(false); onBack() } }} onCancel={() => setLeaveReq(false)} onTertiary={() => { setLeaveReq(false); onBack() }} />
+    <ConfirmDialog open={leaveReq} title={isDraft ? 'Discard new deployment?' : 'Leave deployment editor?'} message={isDraft ? 'This deployment has not been saved and will be discarded.' : 'You have unsaved changes.'} confirmText={isDraft ? 'Discard' : 'Save & Leave'} cancelText="Stay" tertiaryText={isDraft ? null : 'Discard'} onConfirm={() => { setLeaveReq(false); if (isDraft) onBack(); else handleSaveAndExit() }} onCancel={() => setLeaveReq(false)} onTertiary={() => { setLeaveReq(false); onBack() }} />
   </>
 }
 
@@ -667,7 +698,13 @@ const EmbedCodeModal = ({ deployment, onClose }) => {
 // ============================================================================
 // ORCHESTRATOR
 // ============================================================================
-export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: initialBrands }) {
+export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: initialBrands, quizTemplates = [] }) {
+  // Deliberately NOT copied into state. Every template mutation is a server
+  // action that revalidates this route, so `router.refresh()` is the only thing
+  // that has to happen for the list to be right - and a local copy would be one
+  // more place that can disagree with the library, which is the defect the
+  // records change exists to remove.
+  const templates = quizTemplates
   // Held locally so a brand edit made from inside the builder repaints the
   // preview at once instead of after a reload.
   const [brands, setBrands] = useState(initialBrands)
@@ -695,6 +732,9 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
   const [showEmbed, setShowEmbed] = useState(null)
   const [leaveBuilderReq, setLeaveBuilderReq] = useState(false)
   const [toast, setToast] = useState(null)
+  // Owned here rather than by the panel because the button that opens it lives
+  // in the page header, which the shell renders.
+  const [createTemplateOpen, setCreateTemplateOpen] = useState(false)
 
   // --- save state -----------------------------------------------------------
   // The builder autosaves on a debounce, so "dirty" is not a boolean the UI can
@@ -948,13 +988,35 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
     saveQuizDeployment({ deployment: { ...d, status } }).then(() => router.refresh())
   }
   const createDeployment = () => {
-    const d = { id: '', quizId: quizzes[0]?.id || '', brandId: brands[0]?.id || '', domain: '', path: `/new-${Date.now().toString(36)}`, status: 'draft', renderMode: 'standalone', templateId: 'default', headerConfig: { logoEnabled: true, ctaButton: { enabled: true, text: 'CLICK HERE TO CALL', url: 'tel:', fontSize: 11 } }, footerConfig: { logoEnabled: true, logoSize: 32, showCopyright: true, fontSize: 12 }, bodySectionOverrides: null, embedPreviewBg: '#0a1a3a', utm: { source: '', medium: '', campaign: '' }, pixels: {} }
+    // A REAL template id, taken from the library. It used to seed `'default'`,
+    // which is a legacy alias rather than a template: nothing in the gallery
+    // matched it, so a new deployment opened with no visible selection and the
+    // id it saved was resolved by an alias table nobody could see. An empty
+    // library seeds '' and the gallery says there is nothing to choose.
+    const firstSelectable = templates.find((t) => t.isEnabled && !t.rendererError && !t.archivedAt)
+    const d = { id: '', name: '', quizId: quizzes[0]?.id || '', brandId: brands[0]?.id || '', domain: '', path: `/new-${Date.now().toString(36)}`, status: 'draft', renderMode: 'standalone', templateId: firstSelectable?.templateId ?? '', embedPreviewBg: '#0a1a3a', utm: { source: '', medium: '', campaign: '' }, pixels: {} }
     setDraftDeployment(d); setCurrentDeploymentId(null); setView('deploymentEdit')
   }
-  const persistDeployment = (d) => {
+  const persistDeployment = (d, opts = {}) => {
     saveQuizDeployment({ deployment: d }).then((res) => {
       if (!res.ok) { setToast({ message: res.error, type: 'error' }); return }
-      setView('list'); setTab('deployments'); setDraftDeployment(null); router.refresh()
+      if (opts.exit === false) {
+        /*
+         * Stay put. A brand-new deployment has to adopt the id the server just
+         * minted, or the next Save creates a SECOND row instead of updating the
+         * one it made - and the saved row has to land in local state in the same
+         * tick, because the editor unmounts the moment nothing resolves the id
+         * and the list resync deliberately only runs in list view.
+         */
+        const saved = { ...d, id: res.id }
+        setDeployments((ds) => ds.some((x) => x.id === saved.id) ? ds.map((x) => (x.id === saved.id ? saved : x)) : [...ds, saved])
+        setDraftDeployment(null)
+        setCurrentDeploymentId(saved.id)
+        setToast({ message: 'Deployment saved.', type: 'success' })
+        router.refresh()
+        return
+      }
+      setView('list'); setTab('deployments'); setDraftDeployment(null); setCurrentDeploymentId(null); router.refresh()
     })
   }
 
@@ -1132,7 +1194,7 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
       previewSource={previewSource}
     />}
 
-    {view === 'list' && <ListShell tab={tab} onTabChange={setTab} onCreate={tab === 'quizzes' ? createQuizHandler : createDeployment}>
+    {view === 'list' && <ListShell tab={tab} onTabChange={setTab} onCreate={tab === 'quizzes' ? createQuizHandler : tab === 'templates' ? () => setCreateTemplateOpen(true) : createDeployment}>
       {tab === 'quizzes' && <QuizListView
         quizzes={quizzes}
         brands={brands}
@@ -1147,8 +1209,15 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
         onPreview={(id) => { openQuiz(id); setPreviewSource('list-quizzes'); setPreviewDeploymentId(null); setView('preview') }}
         onRename={(id, name) => patchQuizById(id, { name })}
       />}
-      {tab === 'templates' && <TemplateLibrary kind="quiz" brands={brands} />}
-      {tab === 'deployments' && <DeploymentListView deployments={deployments} quizzes={quizzes} brands={brands} onOpen={openDeployment} onClone={cloneDeploymentHandler} onDelete={deleteDeploymentHandler} onToggleStatus={toggleDeploymentStatus} onCopyEmbed={(id) => setShowEmbed(id)} onPreview={(id) => { const dep = deployments.find((d) => d.id === id); if (!dep) return; openQuiz(dep.quizId); setPreviewSource('list-deployments'); setPreviewDeploymentId(id); setView('preview') }} onRename={(id, name) => { const d = deployments.find((x) => x.id === id); setDeployments((ds) => ds.map((x) => x.id === id ? { ...x, name } : x)); if (d) saveQuizDeployment({ deployment: { ...d, name } }) }} />}
+      {tab === 'templates' && <QuizTemplatesPanel
+        templates={templates}
+        brands={brands}
+        createOpen={createTemplateOpen}
+        onCreateClose={() => setCreateTemplateOpen(false)}
+        onToast={setToast}
+        onChanged={() => router.refresh()}
+      />}
+      {tab === 'deployments' && <DeploymentListView deployments={deployments} quizzes={quizzes} brands={brands} templates={templates} onOpen={openDeployment} onClone={cloneDeploymentHandler} onDelete={deleteDeploymentHandler} onToggleStatus={toggleDeploymentStatus} onCopyEmbed={(id) => setShowEmbed(id)} onPreview={(id) => { const dep = deployments.find((d) => d.id === id); if (!dep) return; openQuiz(dep.quizId); setPreviewSource('list-deployments'); setPreviewDeploymentId(id); setView('preview') }} onRename={(id, name) => { const d = deployments.find((x) => x.id === id); setDeployments((ds) => ds.map((x) => x.id === id ? { ...x, name } : x)); if (d) saveQuizDeployment({ deployment: { ...d, name } }) }} />}
     </ListShell>}
 
     {view === 'builder' && currentQuiz && <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -1172,7 +1241,7 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
 
     {view === 'preview' && currentQuiz && <QuizPreviewView quiz={currentQuiz} brand={previewBrand} deployment={previewDep} brands={brands} deployments={deployments} onBackToBuilder={() => setView('builder')} />}
 
-    {view === 'deploymentEdit' && currentDeployment && <DeploymentEditor onBrandSaved={onBrandSaved} deployment={currentDeployment} isDraft={!!draftDeployment} quizzes={quizzes} brands={brands} onSave={persistDeployment} onBack={() => { setView('list'); setTab('deployments'); setDraftDeployment(null); setCurrentDeploymentId(null) }} />}
+    {view === 'deploymentEdit' && currentDeployment && <DeploymentEditor onBrandSaved={onBrandSaved} deployment={currentDeployment} isDraft={!!draftDeployment} quizzes={quizzes} brands={brands} templates={templates} onSave={persistDeployment} onBack={() => { setView('list'); setTab('deployments'); setDraftDeployment(null); setCurrentDeploymentId(null) }} />}
 
     {selectedNode && <NodeEditorModal
       node={selectedNode}

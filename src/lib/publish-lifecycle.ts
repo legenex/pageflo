@@ -47,6 +47,7 @@ import { canonicalTemplateId, resolveTemplate } from '@/lib/template-registry'
 import { asSlotted } from '@/lib/lp-templates'
 import { validateOverrides } from '@/lib/lp-slots/model'
 import { domainEligibility } from '@/lib/domain-eligibility'
+import { getQuizTemplateRecordByTemplateId, getLpTemplateRecord } from '@/lib/template-records'
 
 /* ------------------------------------------------------------------- states */
 
@@ -183,6 +184,54 @@ const checkConsent = (quiz: Record<string, unknown> | null): PreflightCheck => {
     : fail('consent', 'The flow carries consent language', 'no node in this quiz mentions consent or TCPA')
 }
 
+/**
+ * The template a deployment names must EXIST as a record and be ENABLED.
+ *
+ * `checkTemplateResolves` asks the code registry, which is the wrong question
+ * twice over now. It cannot see a cloned template at all — a clone's id names no
+ * code renderer by design — and it cannot see that a stock template has been
+ * disabled or deleted, because a module export has no such state.
+ *
+ * Enabled is required HERE and nowhere in the render path, and the asymmetry is
+ * the point: disabling a template stops new deployments choosing it and stops a
+ * paused one being resumed onto it, while the pages already live on it keep
+ * serving. Publishing is the moment that decision gets made, so it is the moment
+ * to enforce it.
+ */
+const checkQuizTemplateRecord = async (
+  payload: Payload,
+  rawId: unknown,
+): Promise<PreflightCheck> => {
+  const id = 'quiz-template'
+  const label = 'Quiz visual template is available'
+  const stored = typeof rawId === 'string' ? rawId.trim() : ''
+  if (!stored) return fail(id, label, 'no quiz template has been selected')
+
+  const record = await getQuizTemplateRecordByTemplateId(payload, stored).catch(() => null)
+  if (!record) return fail(id, label, `template id "${stored}" matches no quiz template`)
+  if (record.rendererError) return fail(id, label, record.rendererError)
+  if (record.archivedAt) return fail(id, label, `"${record.name}" has been deleted`)
+  if (!record.isEnabled) return fail(id, label, `"${record.name}" is disabled and cannot be published onto`)
+  return pass(id, label)
+}
+
+const checkLpTemplateRecord = async (
+  payload: Payload,
+  landingPageId: unknown,
+): Promise<PreflightCheck> => {
+  const id = 'lp-template-record'
+  const label = 'Landing-page template is available'
+  const rowId = relationId(landingPageId)
+  if (rowId === null) return fail(id, label, 'no landing-page template has been selected')
+
+  const record = await getLpTemplateRecord(payload, String(rowId)).catch(() => null)
+  if (!record) return fail(id, label, 'the selected landing-page template no longer exists')
+  if (record.rendererError) return fail(id, label, record.rendererError)
+  if (record.archivedAt) return fail(id, label, `"${record.name}" has been deleted`)
+  if (!record.isEnabled) return fail(id, label, `"${record.name}" is disabled and cannot be published onto`)
+  return pass(id, label)
+}
+
 export type PreflightContext = {
   payload: Payload
   user: AuthedUser | null
@@ -224,7 +273,7 @@ export const quizDeploymentPreflight = async (
   )
 
   checks.push(checkBrand(site))
-  checks.push(checkTemplateResolves('quiz', deployment.template_id))
+  checks.push(await checkQuizTemplateRecord(ctx.payload, deployment.template_id))
   checks.push(...checkQuizGraph(quiz))
   checks.push(checkConsent(quiz))
 
@@ -291,6 +340,7 @@ export const lpDeploymentPreflight = async (
     label: 'Landing-page visual template resolves',
   })
   checks.push(templateCheck)
+  checks.push(await checkLpTemplateRecord(ctx.payload, deployment.landing_page))
 
   // The deployment's own copy must still fit the template it deploys. A template
   // that changed under a saved deployment leaves overrides naming slots that no
@@ -299,7 +349,19 @@ export const lpDeploymentPreflight = async (
     const canonical = canonicalTemplateId('lp', landingPage?.template_id)
     const entry = canonical.ok ? resolveTemplate('lp', canonical.id) : null
     const ported = entry?.ok && entry.template.kind === 'lp' ? entry.template.template : null
-    const overrides = (deployment.content_overrides ?? {}) as Record<string, string>
+    /*
+     * The MERGED map, not the deployment's half.
+     *
+     * A template carries its own slot copy and a deployment layers its copy on
+     * top; the renderer is handed the merge. Validating only the deployment's
+     * half would let a template-level override naming a dead slot pass
+     * preflight and land silently in `unknownOverrides` at render, where the
+     * public path passes no diagnostics callback and nobody ever sees it.
+     */
+    const overrides = {
+      ...((landingPage?.slot_overrides ?? {}) as Record<string, string>),
+      ...((deployment.content_overrides ?? {}) as Record<string, string>),
+    }
     if (ported) {
       const v = validateOverrides(asSlotted(ported), overrides)
       checks.push(
@@ -364,9 +426,13 @@ export const lpDeploymentPreflight = async (
         ? pass('embedded-flow-published', 'The embedded quiz flow is published')
         : fail('embedded-flow-published', 'The embedded quiz flow is published', quiz?.is_archived ? 'it is archived' : 'it is not published'),
     )
+    // Through the RECORDS, like every other template check. Asking the code
+    // registry here refused every cloned skin, which is the same defect the
+    // landing-page save carried.
     const skin = str(deployment.embedded_quiz_template_id)
     if (skin) {
-      checks.push(checkTemplateResolves('quiz', skin, { id: 'embedded-quiz-template', label: 'Embedded quiz visual template resolves' }))
+      const check = await checkQuizTemplateRecord(ctx.payload, skin)
+      checks.push({ ...check, id: 'embedded-quiz-template', label: 'Embedded quiz visual template is available' })
     }
     checks.push(...checkQuizGraph(quiz))
     checks.push(checkConsent(quiz))
@@ -385,10 +451,29 @@ export const lpDeploymentPreflight = async (
           ? pass('embedded-quiz-tenant', 'The embedded quiz belongs to this brand')
           : fail('embedded-quiz-tenant', 'The embedded quiz belongs to this brand', 'it belongs to a different brand'),
       )
-      checks.push(checkTemplateResolves('quiz', quizDeployment.template_id, {
-        id: 'embedded-quiz-template',
-        label: 'Embedded quiz visual template resolves',
-      }))
+      /*
+       * The borrowed quiz deployment must be LIVE, and this is the check that
+       * earns its keep now.
+       *
+       * A landing page that binds a quiz it cannot resolve refuses to serve —
+       * a live lead-generation page with no form on it captures nothing and
+       * nothing in the funnel reports that as an error, so refusing is the
+       * safer failure. But the coupling is invisible: pausing the quiz
+       * deployment at `/s/<brand>` takes the brand's landing page at
+       * `/c/<brand>` to a 404, and the only other evidence is a log line. Every
+       * brand seeded by `seedStarterFunnelsForBrand` has exactly that pair.
+       */
+      checks.push(
+        String(quizDeployment.status ?? '') === 'live'
+          ? pass('embedded-quiz-live', 'The embedded quiz deployment is live')
+          : fail(
+              'embedded-quiz-live',
+              'The embedded quiz deployment is live',
+              `it is ${String(quizDeployment.status ?? 'draft')}, and this page does not serve without its form`,
+            ),
+      )
+      const borrowed = await checkQuizTemplateRecord(ctx.payload, str(quizDeployment.template_id))
+      checks.push({ ...borrowed, id: 'embedded-quiz-template', label: 'Embedded quiz visual template is available' })
       checks.push(...checkQuizGraph(quiz))
       checks.push(checkConsent(quiz))
     }

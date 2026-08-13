@@ -12,7 +12,8 @@ import config from '../payload.config'
 import { TEMPLATE_BODIES } from './templates'
 import { SEED_SITES, DEFAULT_LEGAL_PAGES } from './sites'
 import { HOME_BLOCKS_BY_SLUG } from './home-blocks'
-import { SAMPLE_LANDING_PAGES, SAMPLE_LP_DEPLOYMENTS, buildSeedSections } from '../components/builder/lp/section-copy'
+import { SAMPLE_LP_DEPLOYMENTS } from '../components/builder/lp/section-copy'
+import { ensureTemplateLibrary } from '../lib/template-records'
 import { buildSeedQuiz } from '../components/builder/quiz/seed-data'
 import { advBuildSeedAdvertorials } from '../components/builder/advertorial/seed-data'
 
@@ -236,35 +237,26 @@ const upsertTrackingConfig = async (
   log(`created tracking-config for site ${siteId}`)
 }
 
-// Sample brandless funnel landing pages (artifact buildSeedLandingPages).
-const upsertFunnelLP = async (
+/**
+ * The stock landing-page TEMPLATE row for a registry id.
+ *
+ * The seed used to create three sample "pages" here and point the sample
+ * deployments at them. A page and a template are the same object now, so the
+ * library is materialised by `ensureTemplateLibrary` from the code registry and
+ * the seed only binds deployments to it. Creating a row here again would put a
+ * fourth landing page beside the twelve and call it a template.
+ */
+const stockFunnelLpId = async (
   payload: Awaited<ReturnType<typeof getPayload>>,
-  spec: (typeof SAMPLE_LANDING_PAGES)[number],
+  stockKey: string,
 ): Promise<number | null> => {
-  const existing = await payload.find({
+  const res = await payload.find({
     collection: 'funnel-landing-pages',
-    where: { slug: { equals: spec.slug } },
+    where: { stock_key: { equals: stockKey } },
     limit: 1,
     overrideAccess: true,
   })
-  if (existing.docs[0]) {
-    log(`funnel LP exists: ${spec.slug}`)
-    return Number(existing.docs[0].id)
-  }
-  const created = await payload.create({
-    collection: 'funnel-landing-pages',
-    data: {
-      name: spec.name,
-      slug: spec.slug,
-      template_id: spec.template_id,
-      angle: spec.angle,
-      is_published: spec.is_published,
-      sections: buildSeedSections(),
-    },
-    overrideAccess: true,
-  })
-  log(`created funnel LP: ${spec.slug}`)
-  return Number(created.id)
+  return res.docs[0] ? Number(res.docs[0].id) : null
 }
 
 // Sample LP deployments (artifact buildSeedLPDeployments), bound to real sites.
@@ -378,15 +370,12 @@ const run = async () => {
     })
   }
 
-  log('seeding sample funnel landing pages...')
-  const lpIdBySlug: Record<string, number | null> = {}
-  for (const spec of SAMPLE_LANDING_PAGES) {
-    lpIdBySlug[spec.slug] = await upsertFunnelLP(payload, spec)
-  }
+  log('materialising the template libraries (12 landing page + 20 quiz)...')
+  await ensureTemplateLibrary(payload)
 
-  log('seeding sample LP deployments...')
+  log('seeding sample LP deployments (bound to stock templates)...')
   for (const dep of SAMPLE_LP_DEPLOYMENTS) {
-    const lpId = lpIdBySlug[dep.lpSlug] ?? null
+    const lpId = await stockFunnelLpId(payload, dep.templateKey)
     const site = siteIds[Math.min(dep.siteIndex, siteIds.length - 1)]
     if (!site) continue
     const dom = await payload.find({
