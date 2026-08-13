@@ -324,12 +324,16 @@ const webhookOutcomes = (quiz: Quiz, node: QuizNode): readonly Answer[] | null =
   return outcomes.length > 1 ? outcomes : null
 }
 
-export const situationAt = (quiz: Quiz, state: FlowState): NodeSituation => {
+export const situationAt = (
+  quiz: Quiz,
+  state: FlowState,
+  options: { lookupOutcomes?: boolean } = {},
+): NodeSituation => {
   const step = quiz.steps[state.stepIndex]
   const node = step ? resolveNodeForStep(quiz, step.key, state.tier) : null
   if (!node) return { kind: 'missing', node: null }
   if (isAutoAdvanceNode(node)) {
-    const outcomes = webhookOutcomes(quiz, node)
+    const outcomes = options.lookupOutcomes === false ? null : webhookOutcomes(quiz, node)
     if (outcomes) return { kind: 'auto_branch', node, answers: outcomes }
     return { kind: 'auto', node, answer: AUTO_ANSWER }
   }
@@ -506,6 +510,15 @@ export type PathRow = {
 export type EnumerationOptions = {
   maxPaths?: number
   maxDepth?: number
+  /**
+   * Whether a lookup node branches over what it could return. Default true.
+   *
+   * Setting it false walks the flow as if every lookup answered nothing, which
+   * is the honest picture of what the quiz can do ON ITS OWN. The difference
+   * between the two walks is exactly "what depends on a buyer's endpoint", and
+   * `tier_reachability` reports that difference rather than guessing at it.
+   */
+  lookupOutcomes?: boolean
 }
 
 export type PathEnumeration = {
@@ -548,6 +561,7 @@ export const stateKeyOf = (stepIndex: number, tier: string | null): string =>
 export const enumeratePaths = (quiz: Quiz, options: EnumerationOptions = {}): PathEnumeration => {
   const maxPaths = options.maxPaths ?? MAX_PATHS
   const maxDepth = options.maxDepth ?? MAX_DEPTH
+  const lookupOutcomes = options.lookupOutcomes !== false
 
   const rows: PathRow[] = []
   let depthCut = false
@@ -614,7 +628,7 @@ export const enumeratePaths = (quiz: Quiz, options: EnumerationOptions = {}): Pa
       return
     }
 
-    const situation = situationAt(quiz, state)
+    const situation = situationAt(quiz, state, { lookupOutcomes })
     if (situation.kind === 'missing') {
       emit('missing_variant', null, state.stepIndex, state.values, state.tier)
       return
@@ -738,6 +752,9 @@ export const replayAnswerIds = (
     tier: string | null,
   ): PathRow => ({
     answerIds: ids.slice(0, cursor),
+    // Only the outcomes actually consumed, so a replay that ended early reports
+    // the lookups it really met rather than the whole list it was handed.
+    lookupOutcomeIds: lookupIds.slice(0, lookupCursor),
     nodeIds: [...nodeIds],
     formNodeIds: [...formNodeIds],
     tier,

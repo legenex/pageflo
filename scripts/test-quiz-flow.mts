@@ -279,10 +279,10 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
   t(seed.steps.length === SEED_STEPS.length && seed.steps.length === 18, 'the seed fixture is the real 18-step MVA quiz')
   t(seed.tiers.length === SEED_TIERS.length && seed.tiers.length === 4, 'it declares four tiers')
   t(!walk.truncated, 'the seed quiz enumerates completely within the safe branch limit')
-  t(walk.rows.length === 1404, `the seed quiz has exactly 1404 paths (found ${walk.rows.length})`)
+  t(walk.rows.length === 3564, `the seed quiz has exactly 3564 paths (found ${walk.rows.length})`)
   t(walk.rows.every((r) => r.terminalKind === 'endpoint'), 'every seed path ends at an endpoint')
-  t(walk.rows.filter((r) => r.terminalNodeId === 'n_qual_thanks').length === 315, 'exactly 315 paths qualify')
-  t(walk.rows.filter((r) => r.terminalNodeId === 'n_dq_thanks').length === 1089, 'exactly 1089 paths are disqualified')
+  t(walk.rows.filter((r) => r.terminalNodeId === 'n_qual_thanks').length === 840, 'exactly 840 paths qualify')
+  t(walk.rows.filter((r) => r.terminalNodeId === 'n_dq_thanks').length === 2724, 'exactly 2724 paths are disqualified')
   t(walk.rows.every((r) => r.dqLead === (r.terminalNodeId === 'n_dq_thanks')), 'the DQ flag and the DQ endpoint agree on every single path')
   t(walk.rows.every((r) => r.formNodeIds.length > 0), 'every seed path passes through a lead form, so consent is always shown')
   t(walk.rows.reduce((m, r) => Math.max(m, r.answerIds.length), 0) === 12, 'the longest seed path asks 12 questions')
@@ -294,23 +294,27 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
   // The seed is a REAL flow with one real defect, and the suite pins it: a
   // regression that silences it is a regression in the validator.
   //
-  // It used to be two. `tier_reachability` no longer FAILS because the runtime
-  // calls the tier lookup now, so tiers 1, 2 and 4 are reported as
-  // lookup-assigned (warnings) instead of unreachable (errors). The variants
-  // scoped to them are still flagged by `reachability`, which is correct: a
-  // static walk cannot see a tier that only a live endpoint hands out.
+  // It used to fail two checks, then one. It now fails NONE, and that is the
+  // whole point of the webhook fix: the four tier-scoped variants that were
+  // dead (n_attorney_t2, n_attorney_t4, n_fault_t3, n_treatment_t34) were dead
+  // only because the runtime never called the tier lookup that assigns t1, t2
+  // and t4. The lookup executes, the walk branches over what it can return, and
+  // every variant the author drew is now on a path a visitor can actually walk.
+  //
+  // A regression that reintroduces a failure here is a regression in the fix.
   t(
-    json(failing) === json(['reachability']),
-    `the seed quiz fails exactly reachability (failing: ${failing.join(', ') || 'none'})`,
+    json(failing) === json([]),
+    `the seed quiz fails no checks (failing: ${failing.join(', ') || 'none'})`,
   )
 
   const reach = getCheck(v, 'reachability')
-  const unreachable = reach.errors.map((e) => e.nodeId).sort()
+  t(reach.ok && reach.errors.length === 0, 'no variant is unreachable any more')
   t(
-    json(unreachable) === json(['n_attorney_t2', 'n_attorney_t4', 'n_fault_t3', 'n_treatment_t34']),
-    `the four dead tier variants are named (found: ${unreachable.join(', ')})`,
+    ['n_attorney_t2', 'n_attorney_t4', 'n_fault_t3', 'n_treatment_t34'].every((id) =>
+      walk.visitedNodeIds.includes(id),
+    ),
+    'the four formerly-dead tier variants are each visited by a real enumerated path',
   )
-  t(reach.errors.every((e) => e.code === 'unreachable_variant'), 'every seed reachability error is an unreachable variant, not an unreachable step')
   t(reach.notes.some((n) => n.includes('exact')), 'the reachability result says it is exact rather than leaving the caller to guess')
 
   const tiers = getCheck(v, 'tier_reachability')
@@ -331,10 +335,13 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
     'the warning tells the operator what to check: that the endpoint returns the declared tier id',
   )
   t(
-    json(enumeratePaths(seed).activeTiers) === json(['t3']),
-    'only Tier 3 is reachable by ANSWER alone; the other three arrive from the lookup response',
+    json(enumeratePaths(seed, { lookupOutcomes: false }).activeTiers) === json(['t3']),
+    'walked WITHOUT the lookup, only Tier 3 is reachable - which is exactly why the other three depend on it',
   )
-  t(hasIssue(tiers, 'variant_shown_outside_its_tier'), 'variants shown to untiered visitors as a fallback are surfaced')
+  t(
+    json(enumeratePaths(seed).activeTiers) === json(['t1', 't2', 't3', 't4']),
+    'walked WITH the lookup, every declared tier becomes active',
+  )
 
   t(getCheck(v, 'cycle_traps').ok, 'the seed flow has no cycle traps')
   t(getCheck(v, 'valid_terminals').ok, 'every seed path ends somewhere valid')
@@ -363,16 +370,27 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
   t(json(a.rows) === json(b.rows), 'walking the same quiz twice produces an identical table')
   t(json(a.visitedNodeIds) === json(b.visitedNodeIds), 'and visits the same nodes')
 
-  const sequences = a.rows.map((r) => r.answerIds.join('>'))
-  t(new Set(sequences).size === sequences.length, 'no two paths take the same answers - the answer sequence identifies the outcome')
+  // The input to a qualification decision is what the VISITOR chose plus what
+  // the tier LOOKUP returned. Keying on answers alone was correct only while
+  // webhook nodes were skipped: now that they execute, two visitors can answer
+  // identically and qualify differently because the lookup said something
+  // different, and that is the flow working as authored rather than a defect.
+  const sequences = a.rows.map((r) => `${r.answerIds.join('>')}|${r.lookupOutcomeIds.join('>')}`)
+  t(new Set(sequences).size === sequences.length, 'no two paths share the same answers AND the same lookup result - together they identify the outcome')
+
+  // Answers alone must NOT identify the outcome any more, and that is asserted
+  // rather than assumed: if it still did, the lookup would not be steering
+  // anything and the fix would be decorative.
+  const answersOnly = a.rows.map((r) => r.answerIds.join('>'))
+  t(new Set(answersOnly).size < answersOnly.length, 'and the answers alone do not, because the lookup genuinely changes where a visitor lands')
 
   const outcome = (row: PathRow): string => json([row.tier, row.dqLead, row.terminalNodeId, row.values])
   let mismatches = 0
   for (const row of a.rows) {
-    const replay = replayAnswerIds(seed, row.answerIds)
+    const replay = replayAnswerIds(seed, row.answerIds, { lookupOutcomeIds: row.lookupOutcomeIds })
     if (!replay.ok || outcome(replay.row) !== outcome(row)) mismatches += 1
   }
-  t(mismatches === 0, `every one of the ${a.rows.length} paths reproduces its own outcome when replayed from its answer ids (${mismatches} mismatched)`)
+  t(mismatches === 0, `every one of the ${a.rows.length} paths reproduces its own outcome when replayed from its answers and lookup results (${mismatches} mismatched)`)
 
   const bogus = replayAnswerIds(seed, ['not_an_answer'])
   t(!bogus.ok, 'replaying an answer id that is not on the current node fails rather than guessing')
@@ -516,7 +534,7 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
   const tableA = buildPathTable(flow, { templateId: 'sq_quiz_first', brand: brandA, deployment: {} })
   const tableB = buildPathTable(flow, { templateId: 'sq_card_deck', brand: brandB, deployment: {} })
 
-  t(tableA.rows.length === 1404, 'the path table covers every path')
+  t(tableA.rows.length === 3564, 'the path table covers every path')
   t(
     json(tableA) === json(tableB),
     'THE PROPERTY: the same flow under a different template and a different brand produces a byte-identical path-to-outcome table',
@@ -840,8 +858,17 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
     shadow.warnings.some((w) => w.nodeId === 'n_extra' && w.message.includes('shared wins')),
     'and the report says why - shared beats a tier variant - rather than only that it is unreachable',
   )
+  // This used to be asserted against the seed, which exhibited it only because
+  // the tier lookup never ran and the tier-scoped rows were therefore never
+  // entered in their tier. The seed no longer has the defect, so the case gets
+  // a fixture that actually has it: Tier A is active, but the answer that sets
+  // it jumps straight past the row Tier A's own variant lives on.
+  const stepSkippedInTier = broken((q) => {
+    answerOf(q, 'n_q1', 'q1_yes').nextStepKey = 'lead'
+  })
+  const skipped = getCheck(validateQuizFlow(stepSkippedInTier), 'tier_reachability')
   t(
-    getCheck(validateQuizFlow(seed), 'tier_reachability').warnings.some((w) => w.code === 'variant_step_not_reached_in_tier'),
+    skipped.warnings.some((w) => w.code === 'variant_step_not_reached_in_tier' && w.nodeId === 'n_extra'),
     'a tier variant on a row nobody reaches in that tier is reported differently from a shadowed one',
   )
 
@@ -1042,11 +1069,11 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
   const full = getCheck(validateQuizFlow(seed), 'path_table')
   t(full.ok, 'the seed table is exhaustive at the default limits')
   t(full.notes.some((n) => n.includes('exhaustive')), 'and says so explicitly')
-  t(full.notes.some((n) => n.includes('1404')), 'and states how many paths it covers')
+  t(full.notes.some((n) => n.includes('3564')), 'and states how many paths it covers')
 
   // The table itself: every column a row is supposed to carry.
   const rows = buildPathTable(seed, {}).rows
-  t(rows.length === 1404, 'the path-to-outcome table has one row per path')
+  t(rows.length === 3564, 'the path-to-outcome table has one row per path')
   t(rows.every((r) => Array.isArray(r.answerIds)), 'every row carries the ordered answer ids it took')
   t(rows.every((r) => r.tier === null || seed.tiers.some((x) => x.id === r.tier)), 'every row carries a declared tier or none')
   t(rows.every((r) => typeof r.dqLead === 'boolean'), 'every row carries the dq_lead outcome')

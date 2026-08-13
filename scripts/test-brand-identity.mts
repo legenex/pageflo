@@ -1118,7 +1118,14 @@ const anythingAdmitted = (body: string, contentType: string): FetchLike => async
 })
 
 const admitted = (): UrlAdmission => ({ ok: true, url: new URL('https://public.example/'), addresses: ['93.184.216.34'] })
-const refused = (): UrlAdmission => ({ ok: false, code: 'blocked_address', reason: 'refused by the guard on the path' })
+// The semicolon is load-bearing, and this file is why `pnpm typecheck` was
+// failing at HEAD. An arrow whose body is a parenthesised object literal of
+// nothing but literals, followed by a line starting with `{`, is parsed by
+// TypeScript as a PARAMETER list still waiting for its `=>`. `admitted` above
+// escapes it only because `new URL(...)` cannot appear in a binding pattern, so
+// the parser backtracks. Removing this semicolon breaks the build, not the
+// style.
+const refused = (): UrlAdmission => ({ ok: false, code: 'blocked_address', reason: 'refused by the guard on the path' });
 
 {
   const viaFetchTextSafe: AssertFn = async (raw, options) => {

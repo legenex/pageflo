@@ -704,7 +704,11 @@ const checkValidTerminals = (
 // 6. Tier reachability
 // ---------------------------------------------------------------------------
 
-const checkTierReachability = (quiz: Quiz, walk: PathEnumeration): CheckResult => {
+const checkTierReachability = (
+  quiz: Quiz,
+  walk: PathEnumeration,
+  options: EnumerationOptions,
+): CheckResult => {
   const c = collect('tier_reachability', 'Tier reachability')
 
   if (quiz.tiers.length === 0) {
@@ -730,32 +734,45 @@ const checkTierReachability = (quiz: Quiz, walk: PathEnumeration): CheckResult =
     }
   }
 
+  // Two questions, deliberately kept apart.
+  //
+  //   CAN the flow enter this tier at all? `walk` answers that, and it branches
+  //   over what a lookup can return, so a tier the lookup assigns counts as
+  //   reachable. If it is not reachable even then, nothing can ever select it
+  //   and that is a real defect.
+  //
+  //   Can it enter WITHOUT an outside service? `unaided` answers that by
+  //   walking as though every lookup returned nothing. A tier reachable only
+  //   with the lookup is fine and intended - it is also a dependency on an
+  //   endpoint this validator cannot see, and saying so is the useful thing.
+  //
+  // Collapsing the two is how this check was wrong in both directions before:
+  // first erroring on tiers that were merely lookup-assigned, then going silent
+  // about the endpoint dependency altogether.
   const active = new Set(walk.activeTiers)
-  // A reachable webhook node that maps a response onto `tier` can put the flow
-  // into ANY declared tier, and what it actually returns lives on the buyer's
-  // endpoint rather than in this quiz. So a tier that no answer sets is not
-  // called unreachable when such a node exists - it is called unverifiable, and
-  // the difference matters: the old ERROR here was correct only while the
-  // runtime skipped webhook nodes, and it now reads as a flow defect when the
-  // real question is whether the endpoint returns that value.
-  const tierMayComeFromWebhook = setByResponse.size > 0
+  const unaided = new Set(
+    enumeratePaths(quiz, { ...options, lookupOutcomes: false }).activeTiers,
+  )
+  const lookupNodes = [...setByResponse].join(', ')
   for (const tier of quiz.tiers) {
-    if (active.has(tier.id)) continue
-    if (tierMayComeFromWebhook) {
-      c.warn({
-        code: 'tier_depends_on_webhook_response',
+    if (!active.has(tier.id)) {
+      const reason = setByAnswer.has(tier.id)
+        ? 'nothing that sets it is reachable'
+        : setByResponse.size > 0
+          ? 'no answer sets it, and no lookup can put the flow into it either'
+          : 'no answer sets it'
+      c.error({
+        code: 'unreachable_tier',
         tierId: tier.id,
-        message: `${tier.name} is never set by an answer. It becomes active only when the tier lookup (${[...setByResponse].join(', ')}) returns "${tier.id}". Confirm the live endpoint returns exactly that id - a value the quiz does not declare leaves the visitor on the shared fallback variant.`,
+        message: `${tier.name} is declared but never becomes active: ${reason}.`,
       })
       continue
     }
-    const reason = setByAnswer.has(tier.id)
-      ? 'nothing that sets it is reachable'
-      : 'no answer sets it'
-    c.error({
-      code: 'unreachable_tier',
+    if (unaided.has(tier.id)) continue
+    c.warn({
+      code: 'tier_depends_on_webhook_response',
       tierId: tier.id,
-      message: `${tier.name} is declared but never becomes active: ${reason}.`,
+      message: `${tier.name} is reachable, but only when the tier lookup (${lookupNodes}) returns "${tier.id}" - no answer sets it. Confirm the live endpoint returns exactly that id; a value the quiz does not declare leaves the visitor on the shared fallback variant.`,
     })
   }
 
@@ -1103,7 +1120,7 @@ export const validateQuizFlow = (quiz: Quiz, options: ValidateOptions = {}): Flo
     checkReachability(quiz, walk, graph),
     cycles.result,
     checkValidTerminals(quiz, walk, cycles.trappedStateKeys),
-    checkTierReachability(quiz, walk),
+    checkTierReachability(quiz, walk, options),
     checkDeterminism(quiz, walk, options),
     checkDestinationValidity(quiz, walk),
     checkReachableConsent(quiz, walk),
