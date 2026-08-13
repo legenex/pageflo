@@ -683,3 +683,122 @@ prompt. It matters less than it looks, because disobedience is refused by shape.
     pnpm test:isolation  12  (needs DATABASE_URI)
     pnpm typecheck    exit 0
     pnpm sweep:templates  200/27/24/0 — unchanged from baseline, no regression
+
+## Gates 8, 9, 10 and the adversarial repairs (done)
+
+### Gate 9 — the Quiz Flow validator (`66d1c07`)
+
+`src/lib/quiz-flow/` enumerates every path a visitor can take and checks ten
+named properties. It does not reimplement navigation: every hop calls
+`quiz-graph`'s own primitives in `QuizRuntime.advance()`'s exact order, so a
+verdict cannot disagree with what a visitor experiences.
+
+The gate's headline property is structural rather than checked: `enumeratePaths`
+takes NO presentation argument, so a template or brand cannot reach the graph.
+Asserted anyway — two templates × two real `siteToBrand` brands give
+byte-identical path tables.
+
+Wired into the publish preflight, replacing a shallower graph check written into
+that file. All ten checks appear as named preflight lines.
+
+**Its headline finding on the shipped seed data, NOT fixed** (a runtime change,
+and this gate is the checker): **webhook and verification nodes never execute.**
+`QuizRuntime` lists them invisible and its skip effect calls `advance()` without
+making the HTTP call, so `responseMappings` are never applied. In the seed that
+means `n_tier_lookup` never sets `tier` — so **tiers 1, 2 and 4 are unreachable
+and four authored question variants are dead**. Six further findings are in the
+commit message.
+
+The suite was mutation-tested with 12 mutants; the two survivors were real bugs
+in the validator itself and are fixed and pinned.
+
+    pnpm test:flow   197 passed
+
+### Gate 10 — an LP embeds a FLOW (`1feb723`)
+
+Embedding a quiz required pointing at a standalone quiz DEPLOYMENT, so it first
+required publishing a second public page at its own path — crawlable, competing
+for a URL, and needing to be kept in step. A deployment now names the flow
+directly with its own skin and progress form.
+
+One hydration path: `resolveEmbeddedQuiz` synthesises the row and hands it to the
+SAME `hydrateQuizDeployment` the standalone path uses. Its id is namespaced
+`lp:<id>` so it cannot be mistaken for a real deployment in a log or a lead row.
+
+**Migration is by FALLBACK, not backfill.** Existing rows keep
+`quiz_deployment_id`, read whenever `quiz` is null. Copying the deployment's quiz
+across would look tidier and would silently drop that deployment's own template,
+progress form and destination overrides — which are the reason somebody pointed
+at a deployment rather than a flow.
+
+### Gate 8 — the Brand Identity service (`d92f341`)
+
+A versioned Zod profile, an eight-rank precedence merge, nine source adapters and
+SSRF admission control. Precedence is a table and a contribution carries a KIND
+with nowhere to write a rank, so an image extractor cannot claim to be a brand
+document.
+
+PDF and DOCX are ranked as the brand documents they are and REFUSED with a
+reason rather than stubbed: an unverified parser produces a near-miss hex that
+looks right and is not.
+
+    pnpm test:brand-identity   405 passed
+
+### The adversarial pass broke six claims (`414893b`)
+
+The verifier was given acceptance criteria and told to refute them. Two of the
+worst were introduced by the gates it was reviewing.
+
+* **STORED XSS.** Adding `resolveTokens` to `PortedTemplateView` made brand
+  values reach `dangerouslySetInnerHTML` unescaped. Brand values are tenant free
+  text. Measured: **9 new elements with no override at all, 11 with a token
+  planted in one.** The same component renders in `/admin` UNSANDBOXED, so a
+  Site admin's display name executing as script runs in a super-admin's origin.
+  `resolveTokensForHtml` escapes the value and not the surrounding markup.
+* **`bold_modern` would have eaten a live page's copy.** It was aliased to
+  `editorial_investigation_v2` because `templateFor` returned `TEMPLATES[0]` —
+  but that only decided the builder's LABEL. The render branched separately on
+  the raw id, `isPortedTemplate('bold_modern')` was false, so the page drew the
+  operator's OWN sections. Aliasing to a ported template would have replaced
+  every such page with stock reference copy, including the seeded
+  `mva-pain-first`, which is published and deployed live at `/c/pain`. It now
+  aliases to `'a'`, the legacy identity template it always rendered as.
+* **`deleteQuizDeployment` and `deleteDeployment` had no gate at all.** Any
+  logged-in user could delete any tenant's deployment.
+* Three more: no field-level `template_id` validator (so REST and `/cms` stored
+  anything), a validator regex looser than the resolver's (the zero-width-space
+  form passed the check written to kill it), three silent defaults in
+  `quiz/preview.tsx` of which two named different templates.
+* **Decorative glyphs were stranding real copy.** The deepest-candidate rule
+  picked `<span>✓</span>` and left "No fee unless you receive a settlement" in a
+  literal part. 120 of 950 slots were glyphs. Fee and privacy claims across five
+  templates are editable now.
+
+Found while fixing the XSS: **the DOM harness was calling `resolveTokens`**, the
+node-path resolver, so it had been measuring a pipeline the product does not
+have. A test double of a sanitiser is the one thing that must never be a double.
+
+## Final measured state
+
+    pnpm typecheck            exit 0
+    pnpm test                 1406 assertions across 8 suites, 0 failed
+    pnpm test:dom             273 in Chromium, 0 failed
+    pnpm test:isolation       12 against a real database and a real login
+    pnpm sweep:templates      200 / 25 / 24 / 0
+
+The sweep's fixture failures went **27 -> 25**: the `resolve-tokens` empty-string
+fix (a brand that authored only colours was shipping an invalid `font-family`).
+The other three numbers are unchanged from the pre-existing baseline.
+
+## Not done, and why
+
+* **`fetch-bundle.ts` still has no SSRF protection.** `ssrf.ts` is a drop-in for
+  it; adopting it was declined during this run and the file is untouched.
+* **Webhook/verification nodes still do not execute.** Reported by the flow
+  validator with its consequences measured; fixing it is a runtime change.
+* **Domain-eligibility enforcement in the resolver is OFF by default.** The
+  mechanism is complete and logs every refusal;
+  `LEGALOS_ENFORCE_DOMAIN_ELIGIBILITY=true` turns it on. Flipping it 404s real
+  traffic on the strength of production rows that cannot be read from here.
+* **Advertorials are a fourth template id space** (`ADV_TEMPLATES`) outside the
+  registry. Out of scope for these gates, and now the only one left.
