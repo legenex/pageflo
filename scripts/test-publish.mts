@@ -56,15 +56,58 @@ const claim = (over: Partial<PathClaim> = {}): PathClaim => ({
 })
 
 /**
+ * The template libraries, as the stub serves them.
+ *
+ * The preflight asks whether the selected template EXISTS and is ENABLED, which
+ * the code registry cannot answer — a clone names no code renderer, and a
+ * module export cannot be disabled. So the stub has to carry rows, and carrying
+ * them is what lets the disabled and deleted cases below be tested at all.
+ */
+const QUIZ_TEMPLATE_ROWS = [
+  { id: 1, name: 'Quiz First', template_id: 'sq_quiz_first', renderer_key: 'sq_quiz_first', is_enabled: true, origin: 'stock', stock_key: 'sq_quiz_first' },
+  { id: 2, name: 'Editorial Inline', template_id: 'sq_editorial_inline', renderer_key: 'sq_editorial_inline', is_enabled: true, origin: 'stock', stock_key: 'sq_editorial_inline' },
+  { id: 3, name: 'Recovery Soft', template_id: 'sq_recovery_soft', renderer_key: 'sq_recovery_soft', is_enabled: true, origin: 'stock', stock_key: 'sq_recovery_soft' },
+  { id: 4, name: 'Case Dossier copy', template_id: 'sq_case_dossier_copy_x1', renderer_key: 'sq_case_dossier', is_enabled: true, origin: 'clone' },
+  { id: 5, name: 'Retired Skin', template_id: 'sq_direct_panel', renderer_key: 'sq_direct_panel', is_enabled: false, origin: 'stock', stock_key: 'sq_direct_panel' },
+]
+
+const LP_TEMPLATE_ROWS = [
+  // id 30 is the landing-page template the deployment fixtures below select.
+  { id: 30, name: 'Editorial Investigation', slug: PORTED_TEMPLATES[0].slug, template_id: PORTED_TEMPLATES[0].slug, is_enabled: true, is_published: true, origin: 'stock', stock_key: PORTED_TEMPLATES[0].slug },
+  { id: 31, name: 'Disabled Template', slug: PORTED_TEMPLATES[1].slug, template_id: PORTED_TEMPLATES[1].slug, is_enabled: false, is_published: true, origin: 'stock', stock_key: PORTED_TEMPLATES[1].slug },
+]
+
+/**
  * A Payload stub whose `find` answers from a declared table.
  *
  * Collections it is not given return empty, which is also what the real
- * `collectSiteClaims` does when a funnel table is absent.
+ * `collectSiteClaims` does when a funnel table is absent. The two template
+ * tables are supplied by default so every existing case keeps describing a
+ * deployment whose template is available; a case that wants otherwise overrides
+ * them explicitly.
  */
-const stubPayload = (rows: Record<string, Array<Record<string, unknown>>>) =>
-  ({
-    find: async ({ collection }: { collection: string }) => ({ docs: rows[collection] ?? [] }),
-  }) as never
+const stubPayload = (rows: Record<string, Array<Record<string, unknown>>>) => {
+  const table = (c: string): Array<Record<string, unknown>> => {
+    if (rows[c]) return rows[c]
+    if (c === 'funnel-quiz-templates') return QUIZ_TEMPLATE_ROWS
+    if (c === 'funnel-landing-pages') return LP_TEMPLATE_ROWS
+    return []
+  }
+  const matches = (doc: Record<string, unknown>, where: unknown): boolean => {
+    if (!where || typeof where !== 'object') return true
+    for (const [field, cond] of Object.entries(where as Record<string, { equals?: unknown }>)) {
+      if (cond && 'equals' in cond && String(doc[field] ?? '') !== String(cond.equals ?? '')) return false
+    }
+    return true
+  }
+  return {
+    find: async ({ collection, where }: { collection: string; where?: unknown }) => ({
+      docs: table(collection).filter((d) => matches(d, where)),
+    }),
+    findByID: async ({ collection, id }: { collection: string; id: unknown }) =>
+      table(collection).find((d) => String(d.id) === String(id)) ?? null,
+  } as never
+}
 
 /* ------------------------------------------------------------ normalisation */
 
@@ -321,11 +364,101 @@ const ACTIVE_DOMAIN = { id: 5, site: 1, host: 'acme.example', status: 'active', 
   t(r.warnings.some((c) => c.id === 'domain-ssl'), 'but the operator is TOLD, rather than discovering it')
 }
 
+/* ------------------------------------------- the template must be AVAILABLE */
+
+/*
+ * Publishing is the moment the "disabled" decision gets enforced, and the only
+ * moment. The render path deliberately ignores `is_enabled`, because disabling
+ * a template is a statement about what NEW deployments may choose — not a
+ * request to take every live page on it down. These four cases pin both halves
+ * of that asymmetry from the publish side.
+ */
+{
+  const r = await quizDeploymentPreflight(CTX(), {
+    deployment: { ...GOOD_DEP, template_id: 'sq_direct_panel' },
+    quiz: GOOD_QUIZ, site: SITE, domain: null,
+  })
+  t(!r.ok, 'publishing onto a DISABLED quiz template is blocked')
+  t(
+    r.blocking.some((c) => c.id === 'quiz-template' && /disabled/.test(c.detail ?? '')),
+    'and the refusal says the template is disabled, naming it',
+  )
+}
+
+{
+  const r = await quizDeploymentPreflight(CTX(), {
+    deployment: { ...GOOD_DEP, template_id: 'sq_no_such_skin' },
+    quiz: GOOD_QUIZ, site: SITE, domain: null,
+  })
+  t(!r.ok, 'publishing onto a quiz template id that matches no record is blocked')
+  t(
+    r.blocking.some((c) => c.id === 'quiz-template' && (c.detail ?? '').includes('sq_no_such_skin')),
+    'and the refusal names the id that is wrong, which is what an operator needs',
+  )
+}
+
+{
+  const r = await quizDeploymentPreflight(CTX(), {
+    deployment: { ...GOOD_DEP, template_id: '' },
+    quiz: GOOD_QUIZ, site: SITE, domain: null,
+  })
+  t(!r.ok, 'publishing with NO quiz template selected is blocked')
+}
+
+{
+  // A clone is a first-class template. The code registry cannot resolve its id
+  // at all, so this case only passes because the preflight asks the record.
+  const r = await quizDeploymentPreflight(CTX(), {
+    deployment: { ...GOOD_DEP, template_id: 'sq_case_dossier_copy_x1' },
+    quiz: GOOD_QUIZ, site: SITE, domain: null,
+  })
+  t(r.ok, `a deployment on a CLONED quiz template publishes${r.ok ? '' : ' — ' + r.blocking.map((c) => c.id + ':' + c.detail).join(', ')}`)
+}
+
 /* ------------------------------------------------------- landing-page preflight */
 
 const LP_TPL = PORTED_TEMPLATES[0]
 const GOOD_LP = { id: 30, is_published: true, template_id: LP_TPL.slug, sections: [{ type: 'hero' }] }
 const GOOD_LP_DEP = { id: 40, site: 1, landing_page: 30, domain: null, path: '/c/lp', status: 'draft', content_overrides: {}, quiz_deployment_id: '' }
+
+{
+  const r = await lpDeploymentPreflight(CTX(), {
+    deployment: { ...GOOD_LP_DEP, landing_page: 31 },
+    landingPage: { id: 31, is_published: true, template_id: PORTED_TEMPLATES[1].slug, sections: [] },
+    site: SITE, domain: null, quizDeployment: null, quiz: null,
+  })
+  t(!r.ok, 'publishing onto a DISABLED landing-page template is blocked')
+  t(
+    r.blocking.some((c) => c.id === 'lp-template-record' && /disabled/.test(c.detail ?? '')),
+    'and the refusal names the template and says it is disabled',
+  )
+}
+
+{
+  const r = await lpDeploymentPreflight(CTX(), {
+    deployment: { ...GOOD_LP_DEP, landing_page: 9999 },
+    landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: null,
+  })
+  t(!r.ok, 'publishing onto a landing-page template row that no longer exists is blocked')
+}
+
+{
+  /*
+   * The TEMPLATE's own copy is validated too, not only the deployment's.
+   *
+   * The renderer is handed the merge of the two, so a template-level override
+   * naming a dead slot would otherwise pass preflight and land silently in
+   * `unknownOverrides` at render — where the public path passes no diagnostics
+   * callback and nobody ever sees it.
+   */
+  const r = await lpDeploymentPreflight(CTX(), {
+    deployment: GOOD_LP_DEP,
+    landingPage: { ...GOOD_LP, slot_overrides: { s99_headline_404: 'copy for a slot that does not exist' } },
+    site: SITE, domain: null, quizDeployment: null, quiz: null,
+  })
+  t(!r.ok, "a TEMPLATE-level override naming a dead slot blocks publishing")
+  t(r.blocking.some((c) => c.id === 'overrides'), 'and it is reported as an override problem')
+}
 
 {
   const r = await lpDeploymentPreflight(CTX(), { deployment: GOOD_LP_DEP, landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: null })
