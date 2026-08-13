@@ -13,6 +13,8 @@
  * functions must decide from the records in front of them, so anything that
  * needed a live query to answer has already failed its own design.
  */
+import { readFileSync } from 'node:fs'
+
 import {
   effectivePath,
   scopesOverlap,
@@ -437,6 +439,42 @@ const GOOD_LP_DEP = { id: 40, site: 1, landing_page: 30, domain: null, path: '/c
     landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: own, quiz: GOOD_QUIZ,
   })
   t(r.ok && r.checks.some((c) => c.id === 'embedded-quiz'), 'a row still on the legacy standalone binding is unaffected')
+}
+
+/* ------------------------------------- the resolver actually calls the gate */
+
+/**
+ * `domainEligibility` is a pure decision and is tested as one everywhere above.
+ * None of that proves the RESOLVER consults it, and for a while it did not: the
+ * module imported the helper, declared an `ENFORCE_DOMAIN_ELIGIBILITY` switch,
+ * described enforcement in a header comment, and then resolved every host
+ * without ever calling either. Turning the switch on changed nothing, and a
+ * domain in `error` served exactly like a live one.
+ *
+ * The resolver needs a database, so it cannot be driven from here. Its source
+ * can be read, which is enough to catch the gate being removed again - the same
+ * technique `test-quiz-flow.mts` uses to keep the validator honest about the
+ * runtime.
+ */
+{
+  const resolver = readFileSync(new URL('../src/lib/site-resolver.ts', import.meta.url).pathname, 'utf8')
+  const body = resolver.slice(resolver.indexOf('export const resolveSiteByHost'))
+
+  t(/const admit = \(/.test(resolver), 'site-resolver defines the eligibility gate')
+  t(/domainEligibility\(domain\)/.test(resolver), 'and the gate asks domainEligibility for the verdict')
+  t(
+    /ENFORCE_DOMAIN_ELIGIBILITY/.test(resolver.slice(resolver.indexOf('const admit = ('))),
+    'and refuses only when enforcement is switched on',
+  )
+
+  const admitCalls = (body.match(/admit\(/g) ?? []).length
+  t(admitCalls >= 2, `resolveSiteByHost calls the gate on every branch that returns a site (found ${admitCalls})`)
+
+  // The two branches that can return a site: a direct host match and a
+  // redirects_from alias. Both must be gated, or an alias becomes a way to
+  // reach a domain that is not allowed to serve.
+  t(/if \(!admit\(domain as DomainLike, host\)\) return null/.test(body), 'the direct host match is gated')
+  t(/if \(!admit\(target as DomainLike, host\)\) return null/.test(body), 'the redirects_from alias is gated too')
 }
 
 /* ------------------------------------------------------------------ report */

@@ -62,6 +62,31 @@ export const invalidateHostCache = (host?: string): void => {
   else HOST_CACHE.clear()
 }
 
+/**
+ * May this domain answer for `host`?
+ *
+ * Always LOGS an ineligible domain with the reason. Only REFUSES it when the
+ * switch is on, so the list of what enforcement would change can be read out of
+ * the journal before anybody flips it.
+ *
+ * This function is the enforcement. `domainEligibility` and the switch above
+ * were imported and declared here for a while without either being called from
+ * `resolveSiteByHost`, so a `pending`, `provisioning` or `error` domain resolved
+ * exactly like a live one and turning the switch on changed nothing. A control
+ * that is described in a comment and absent from the code path is the same bug
+ * as no control.
+ */
+const admit = (domain: DomainLike, host: string): boolean => {
+  const verdict = domainEligibility(domain)
+  if (verdict.eligible) return true
+  // eslint-disable-next-line no-console
+  console.warn(
+    `${RESOLVER_ELIGIBILITY_LOG_PREFIX} ${host}: ${verdict.reason}` +
+      (ENFORCE_DOMAIN_ELIGIBILITY ? ' (refused)' : ' (served anyway: enforcement is off)'),
+  )
+  return !ENFORCE_DOMAIN_ELIGIBILITY
+}
+
 export const resolveSiteByHost = async (rawHost: string | null | undefined): Promise<ResolvedSite | null> => {
   const host = normalizeHost(rawHost)
   if (!host) return null
@@ -85,6 +110,7 @@ export const resolveSiteByHost = async (rawHost: string | null | undefined): Pro
     const domain = direct.docs[0]
     // Unassigned domain in the pool: do not resolve (treat as 404).
     if (!domain.site) return null
+    if (!admit(domain as DomainLike, host)) return null
     const siteId = typeof domain.site === 'object' ? domain.site.id : domain.site
     // Look up the primary host for this site (for canonical redirect / link emission).
     const primaryRow = await payload.find({
@@ -111,6 +137,10 @@ export const resolveSiteByHost = async (rawHost: string | null | undefined): Pro
   if (redirectRow.docs.length > 0) {
     const target = redirectRow.docs[0]
     if (!target.site) return null
+    // The host being resolved is an alias FOR this domain, so the domain it
+    // redirects to is the one that has to be servable. Sending a visitor to a
+    // host that cannot serve is worse than not resolving the alias at all.
+    if (!admit(target as DomainLike, host)) return null
     const siteId = typeof target.site === 'object' ? target.site.id : target.site
     const entry: CacheEntry = { siteId, primaryHost: target.host, redirectTo: target.host, expiresAt: now + CACHE_TTL_MS }
     HOST_CACHE.set(host, entry)
