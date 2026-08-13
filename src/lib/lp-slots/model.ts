@@ -888,6 +888,21 @@ export const validateTemplateSlots = (template: LpSlottedTemplate): SlotValidati
 export const validateOverrides = (
   template: LpSlottedTemplate,
   overrides: LpSlotOverrides,
+  opts: {
+    /**
+     * Whether every `mustSupply` placeholder must already have content.
+     *
+     * TRUE (the default) is the PUBLISH question: nothing goes live with an
+     * unfilled design placeholder, evaluated over the merged
+     * template-plus-deployment copy. FALSE is the LIBRARY question: a template
+     * record or a work-in-progress save may legitimately carry placeholders
+     * that a later template edit or deployment override will fill — refusing
+     * to store them would make the twelve stock designs impossible to
+     * materialise as records at all. Callers opt DOWN explicitly; anything
+     * that forgets stays strict.
+     */
+    requireComplete?: boolean
+  } = {},
 ): SlotValidation => {
   const problems: SlotProblem[] = []
   const byId = new Map(template.slots.map((s) => [s.id, s]))
@@ -895,15 +910,17 @@ export const validateOverrides = (
   // Slots the reference could not fill. Checked over the TEMPLATE rather than
   // over the overrides, because the failure here is an override that is absent
   // — the one thing a loop over what was supplied can never see.
-  for (const slot of template.slots) {
-    if (!slot.mustSupply) continue
-    if (isInsideQuizMount(template, slot.id)) continue
-    const value = Object.prototype.hasOwnProperty.call(overrides, slot.id) ? overrides[slot.id] : ''
-    if (typeof value !== 'string' || value.trim() === '') {
-      problems.push({
-        code: 'missing_required_role',
-        detail: `"${slot.id}" (${slot.role}, ${slot.sectionLabel}) has no content: the design left a placeholder here and only you can say what belongs in it`,
-      })
+  if (opts.requireComplete !== false) {
+    for (const slot of template.slots) {
+      if (!slot.mustSupply) continue
+      if (isInsideQuizMount(template, slot.id)) continue
+      const value = Object.prototype.hasOwnProperty.call(overrides, slot.id) ? overrides[slot.id] : ''
+      if (typeof value !== 'string' || value.trim() === '') {
+        problems.push({
+          code: 'missing_required_role',
+          detail: `"${slot.id}" (${slot.role}, ${slot.sectionLabel}) has no content: the design left a placeholder here and only you can say what belongs in it`,
+        })
+      }
     }
   }
 

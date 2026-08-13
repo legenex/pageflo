@@ -196,8 +196,10 @@ export async function saveLpTemplate(args: {
     const res = resolveTemplate('lp', targetId)
     if (!res.ok || res.template.kind !== 'lp') return { ok: false, error: 'this template names no renderer' }
     if (res.template.template) {
-      const verdict = validateOverrides(asSlotted(res.template.template), patch.slotOverrides as never)
-      if (!verdict.ok) return { ok: false, error: verdict.problems.join('; ') }
+      // Work in progress is saveable: completeness (every placeholder filled)
+      // is the publish preflight's question, asked over the merged copy.
+      const verdict = validateOverrides(asSlotted(res.template.template), patch.slotOverrides as never, { requireComplete: false })
+      if (!verdict.ok) return { ok: false, error: verdict.problems.map((p) => p.detail).join('; ') }
     } else if (Object.keys(patch.slotOverrides as object).length > 0) {
       // The four identity templates have no slots. Accepting copy for them
       // would store text nothing can ever draw.

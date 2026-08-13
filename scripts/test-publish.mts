@@ -571,7 +571,11 @@ const BOUND_LP_DEP = { ...GOOD_LP_DEP, quiz: 70 }
   // migration fallback, not a defect, and refusing it would take four live
   // pages down to make a point about the data model.
   const legacyDep = { ...GOOD_LP_DEP, quiz_deployment_id: '55' }
-  const legacyQuizDep = { id: 55, site: 1, quiz: 70, template_id: 'sq_editorial_inline' }
+  // `status: 'live'` because the renderer refuses a non-live borrowed
+  // deployment (resolveQuizDeploymentById), so the preflight's
+  // `embedded-quiz-live` check mirrors it. The point of this case is the
+  // BINDING: a resolving legacy pointer still counts as bound.
+  const legacyQuizDep = { id: 55, site: 1, quiz: 70, template_id: 'sq_editorial_inline', status: 'live' }
   const r = await lpDeploymentPreflight(CTX(), {
     deployment: legacyDep, landingPage: GOOD_LP, site: SITE, domain: null,
     quizDeployment: legacyQuizDep, quiz: GOOD_FLOW,

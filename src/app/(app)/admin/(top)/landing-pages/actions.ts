@@ -11,6 +11,7 @@ import { invokeLLM } from '@/lib/ai/invoke'
 import { canonicalTemplateId, resolveTemplate } from '@/lib/template-registry'
 import { resolveQuizTemplateSelection, resolveLpTemplateSelection } from '@/lib/template-records/select'
 import { relationId, requireDeploymentSiteAdmin } from '@/lib/authz'
+import { setLpDeploymentStatus } from '@/app/(app)/admin/(top)/publish-actions'
 import { asSlotted } from '@/lib/lp-templates'
 import { validateOverrides } from '@/lib/lp-slots/model'
 import { DESTINATION_KEYS, DESTINATION_LABELS, isSafeDestinationUrl, type DestinationKey } from '@/lib/quiz-destinations'
@@ -129,7 +130,9 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
     const entry = resolveTemplate('lp', template.id)
     const ported = entry.ok && entry.template.kind === 'lp' ? entry.template.template : null
     if (ported) {
-      const v = validateOverrides(asSlotted(ported), overrides)
+      // Incremental saves stay possible: the go-live transition below runs the
+      // full preflight, which demands completeness over the merged copy.
+      const v = validateOverrides(asSlotted(ported), overrides, { requireComplete: false })
       if (!v.ok) return { ok: false, error: v.problems.map((p) => p.detail).join('; ') }
     } else if (Object.keys(overrides).length > 0) {
       // A legacy identity template has no slots: its copy travels as nodes on
@@ -251,6 +254,25 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
   }
   if (quizId !== null) data.quiz_deployment_id = ''
 
+  /*
+   * GOING LIVE IS A PUBLISH, and a publish runs the preflight — every time,
+   * through every door. A save that wrote `status: 'live'` directly was a
+   * second, ungated publish path standing right next to the gated one, and it
+   * was the one the UI actually used.
+   *
+   * The content is saved either way (at the row's current status), and the
+   * live flip then goes through `setLpDeploymentStatus`, the ONE door that
+   * runs `lpDeploymentPreflight`. Refusal keeps the operator's edits and
+   * returns the blocking checks; it does not lose work to make a point.
+   * Going DOWN (live → paused/draft) stays ungated: taking a failing page
+   * offline must never be blocked. A row already live stays live through
+   * content edits — editing is not publishing.
+   */
+  const requestedStatus = String(data.status)
+  const currentStatus = existing && typeof existing.status === 'string' ? existing.status : 'draft'
+  const goingLive = requestedStatus === 'live' && currentStatus !== 'live'
+  if (goingLive) data.status = currentStatus
+
   try {
     let id: string
     if (isExisting) {
@@ -259,6 +281,13 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
     } else {
       const created = (await payload.create({ collection: 'funnel-lp-deployments', data: data as never, user: user as never, overrideAccess: false })) as { id: number | string }
       id = String(created.id)
+    }
+    if (goingLive) {
+      const flip = await setLpDeploymentStatus({ id, to: 'live' })
+      if (!flip.ok) {
+        revalidatePath(PATH)
+        return { ok: false, error: `Saved, but not published: ${flip.error}` }
+      }
     }
     revalidatePath(PATH)
     return { ok: true, id }

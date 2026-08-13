@@ -110,14 +110,18 @@ const main = async (): Promise<void> => {
   const [A, B] = lpTemplates
   t(A.templateId !== B.templateId, 'the two landing-page templates under test are genuinely different')
 
+  // `quiz` is bound on both: the twelve stock templates all carry a quiz
+  // mount, and the resolver refuses to serve a ported page whose funnel cannot
+  // mount. These fixtures are about template IDENTITY, so they bind the flow
+  // that makes them servable at all.
   const lpDepA = track('funnel-lp-deployments', await payload.create({
     collection: 'funnel-lp-deployments',
-    data: { name: `${RUN} lp A`, landing_page: Number(A.id), site: siteId, domain: Number(domain.id), path: `/${RUN}-a`, status: 'live' } as never,
+    data: { name: `${RUN} lp A`, landing_page: Number(A.id), site: siteId, domain: Number(domain.id), path: `/${RUN}-a`, status: 'live', quiz: Number(quiz.id) } as never,
     overrideAccess: true,
   }))
   const lpDepB = track('funnel-lp-deployments', await payload.create({
     collection: 'funnel-lp-deployments',
-    data: { name: `${RUN} lp B`, landing_page: Number(B.id), site: siteId, domain: Number(domain.id), path: `/${RUN}-b`, status: 'live' } as never,
+    data: { name: `${RUN} lp B`, landing_page: Number(B.id), site: siteId, domain: Number(domain.id), path: `/${RUN}-b`, status: 'live', quiz: Number(quiz.id) } as never,
     overrideAccess: true,
   }))
 

@@ -97,8 +97,10 @@ const loadContext = async (payload, user, deploymentId: string) => {
 
 const writeOverrides = async (payload, user, deployment, ported, next: Record<string, string>) => {
   // The same validation the save path runs. An assistant is not exempt from the
-  // rule that copy must name a slot that exists.
-  const v = validateOverrides(asSlotted(ported), next)
+  // rule that copy must name a slot that exists. Completeness is deliberately
+  // not demanded here — copy is written one slot at a time, and the publish
+  // preflight is what refuses to go live with a placeholder still empty.
+  const v = validateOverrides(asSlotted(ported), next, { requireComplete: false })
   if (!v.ok) return { ok: false as const, error: v.problems.map((p) => p.detail).join('; ') }
 
   await payload.update({

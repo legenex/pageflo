@@ -11,6 +11,7 @@ import { invokeLLM } from '@/lib/ai/invoke'
 import { canonicalTemplateId } from '@/lib/template-registry'
 import { resolveQuizTemplateSelection } from '@/lib/template-records/select'
 import { relationId, requireDeploymentSiteAdmin } from '@/lib/authz'
+import { setQuizDeploymentStatus } from '@/app/(app)/admin/(top)/publish-actions'
 
 const PATH = '/admin/quizzes'
 
@@ -169,11 +170,13 @@ export async function saveQuizDeployment(args: { deployment: Record<string, unkn
   // authz gate on purpose: that helper derives the Site and returns nothing else,
   // and widening it for one caller's convenience is how a gate grows a bypass.
   let currentTemplateId = ''
+  let currentStatus = 'draft'
   if (isExisting) {
     const existing = await payload
       .findByID({ collection: 'funnel-quiz-deployments', id: dep.id, depth: 0, overrideAccess: true })
       .catch(() => null)
     currentTemplateId = typeof existing?.template_id === 'string' ? existing.template_id : ''
+    currentStatus = typeof existing?.status === 'string' ? existing.status : 'draft'
   }
 
   // A template id that names nothing must stop the save. It used to default to
@@ -220,6 +223,16 @@ export async function saveQuizDeployment(args: { deployment: Record<string, unkn
     pixels: dep.pixels ?? {},
   }
 
+  /*
+   * GOING LIVE IS A PUBLISH — same rule as the landing-page save. Content is
+   * written at the row's current status, and the live flip goes through
+   * `setQuizDeploymentStatus`, the one door that runs the preflight. Refusal
+   * keeps the edits and reports the blocking checks. Going down stays ungated.
+   */
+  const requestedStatus = String(data.status)
+  const goingLive = requestedStatus === 'live' && currentStatus !== 'live'
+  if (goingLive) data.status = currentStatus
+
   try {
     let id
     if (isExisting) {
@@ -228,6 +241,13 @@ export async function saveQuizDeployment(args: { deployment: Record<string, unkn
     } else {
       const created = await payload.create({ collection: 'funnel-quiz-deployments', data, user, overrideAccess: false })
       id = String(created.id)
+    }
+    if (goingLive) {
+      const flip = await setQuizDeploymentStatus({ id, to: 'live' })
+      if (!flip.ok) {
+        revalidatePath(PATH)
+        return { ok: false, error: `Saved, but not published: ${flip.error}` }
+      }
     }
     revalidatePath(PATH)
     return { ok: true, id }

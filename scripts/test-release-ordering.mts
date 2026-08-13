@@ -63,6 +63,7 @@ const adminUri = base.replace(/\/[^/?]+(\?|$)/, '/postgres$1')
 const RELEASE_MIGRATIONS = [
   '20260813_210000_locked_documents_funnel_rels',
   '20260813_213000_integration_config_sample_markers',
+  '20260813_220000_template_records',
 ]
 
 const sh = (

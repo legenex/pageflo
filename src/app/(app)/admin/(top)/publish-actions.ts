@@ -194,9 +194,18 @@ export async function setLpDeploymentStatus(args: {
     deployment.domain ? load(payload, 'domains', deployment.domain) : Promise.resolve(null),
   ])
 
+  // The deployment's OWN flow first, the legacy standalone pointer only when
+  // it has none — the resolver's order, because a preflight that reads the
+  // legacy pointer alone reports "flow could not be loaded" for every
+  // deployment bound the way the product now prefers.
   const quizDeploymentId = typeof deployment.quiz_deployment_id === 'string' ? deployment.quiz_deployment_id : ''
   const quizDeployment = quizDeploymentId ? await load(payload, 'funnel-quiz-deployments', quizDeploymentId) : null
-  const quiz = quizDeployment ? await load(payload, 'funnel-quizzes', quizDeployment.quiz) : null
+  const ownQuizId = relationId(deployment.quiz)
+  const quiz = ownQuizId !== null
+    ? await load(payload, 'funnel-quizzes', ownQuizId)
+    : quizDeployment
+      ? await load(payload, 'funnel-quizzes', quizDeployment.quiz)
+      : null
 
   const preflight = await lpDeploymentPreflight(
     { payload, user, siteId },
@@ -280,7 +289,13 @@ export async function previewLpDeploymentPublish(args: { id: string }): Promise<
     deployment.domain ? load(payload, 'domains', deployment.domain) : Promise.resolve(null),
     quizDeploymentId ? load(payload, 'funnel-quiz-deployments', quizDeploymentId) : Promise.resolve(null),
   ])
-  const quiz = quizDeployment ? await load(payload, 'funnel-quizzes', quizDeployment.quiz) : null
+  // Own flow first, legacy pointer second — the resolver's order.
+  const ownQuizId = relationId(deployment.quiz)
+  const quiz = ownQuizId !== null
+    ? await load(payload, 'funnel-quizzes', ownQuizId)
+    : quizDeployment
+      ? await load(payload, 'funnel-quizzes', quizDeployment.quiz)
+      : null
   return {
     ok: true,
     preflight: await lpDeploymentPreflight({ payload, user, siteId }, { deployment, landingPage, site, domain, quizDeployment, quiz }),

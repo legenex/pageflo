@@ -176,7 +176,11 @@ export const guardLpSlotOverrides: CollectionBeforeChangeHook = async ({ data, o
     return data
   }
 
-  const verdict = validateOverrides(asSlotted(ported), data.slot_overrides as never)
+  // `requireComplete: false`: a library record is a design, and a design may
+  // carry placeholders awaiting a template edit or a deployment override. The
+  // publish preflight is what refuses to put an unfilled placeholder LIVE —
+  // over the merged template-plus-deployment copy, which this hook cannot see.
+  const verdict = validateOverrides(asSlotted(ported), data.slot_overrides as never, { requireComplete: false })
   if (!verdict.ok) {
     throw new APIError(verdict.problems.map((p: { detail: string }) => p.detail).join('; '), 400)
   }

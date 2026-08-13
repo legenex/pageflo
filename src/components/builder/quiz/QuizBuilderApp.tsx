@@ -985,7 +985,17 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
     if (!d) return
     const status = d.status === 'live' ? 'paused' : 'live'
     setDeployments((ds) => ds.map((x) => x.id === id ? { ...x, status } : x))
-    saveQuizDeployment({ deployment: { ...d, status } }).then(() => router.refresh())
+    // Going live runs the publish preflight server-side; a refusal must be
+    // SEEN, and the optimistic flip above must be rolled back or the list
+    // shows LIVE on a row the server just declined to publish.
+    saveQuizDeployment({ deployment: { ...d, status } }).then((res) => {
+      if (!res.ok) {
+        setDeployments((ds) => ds.map((x) => (x.id === id ? d : x)))
+        setToast({ message: res.error, type: 'error' })
+        return
+      }
+      router.refresh()
+    })
   }
   const createDeployment = () => {
     // A REAL template id, taken from the library. It used to seed `'default'`,
