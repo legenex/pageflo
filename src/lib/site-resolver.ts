@@ -119,8 +119,21 @@ export const resolveSiteByHost = async (rawHost: string | null | undefined): Pro
       limit: 1,
       overrideAccess: true,
     })
-    const primaryHost = primaryRow.docs[0]?.host ?? null
-    const redirectTo = !domain.primary && primaryHost && primaryHost !== host ? primaryHost : null
+    // The canonical target has to be servable too, and gating only the host in
+    // hand is not enough. Site 13 proved it in production the moment
+    // enforcement went on: its preview host was eligible, its primary
+    // (getwhatyoureowed.co) was not, and the resolver kept 307-ing every
+    // visitor onto the refused domain - which then fell through to the
+    // marketing site. The site was reachable on neither host, off two rows that
+    // were each individually handled "correctly".
+    //
+    // So an ineligible primary is not a redirect target and is not the
+    // canonical host. The host being served takes both jobs, which keeps the
+    // brand reachable on the domain that actually works.
+    const primaryDoc = primaryRow.docs[0]
+    const primaryUsable = Boolean(primaryDoc) && admit(primaryDoc as DomainLike, String(primaryDoc?.host ?? ''))
+    const primaryHost = primaryUsable ? (primaryDoc?.host ?? null) : host
+    const redirectTo = primaryUsable && !domain.primary && primaryHost && primaryHost !== host ? primaryHost : null
     const entry: CacheEntry = { siteId, primaryHost, redirectTo, expiresAt: now + CACHE_TTL_MS }
     HOST_CACHE.set(host, entry)
     return entry

@@ -475,6 +475,19 @@ const GOOD_LP_DEP = { id: 40, site: 1, landing_page: 30, domain: null, path: '/c
   // reach a domain that is not allowed to serve.
   t(/if \(!admit\(domain as DomainLike, host\)\) return null/.test(body), 'the direct host match is gated')
   t(/if \(!admit\(target as DomainLike, host\)\) return null/.test(body), 'the redirects_from alias is gated too')
+
+  // The canonical redirect target is the third place a domain gets served, and
+  // the one that is easy to miss: gating only the host in hand still lets an
+  // eligible host 307 every visitor onto a refused one.
+  t(/primaryUsable/.test(body), 'the canonical primary is checked for eligibility as well')
+  t(
+    /const redirectTo = primaryUsable && /.test(body),
+    'and an ineligible primary is never used as a redirect target',
+  )
+  t(
+    /const primaryHost = primaryUsable \? \(primaryDoc\?\.host \?\? null\) : host/.test(body),
+    'an ineligible primary is not advertised as the canonical host either',
+  )
 }
 
 /* ------------------------------------------------------------------ report */
