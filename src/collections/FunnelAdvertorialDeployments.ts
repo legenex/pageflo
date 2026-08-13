@@ -26,10 +26,9 @@ export const FunnelAdvertorialDeployments: CollectionConfig = {
     // via raw REST or /cms. `publishRequiresPreflight: false` because
     // advertorials have no preflight door; requiring one would make them
     // unpublishable rather than safer.
-    // NEGATIVE CONTROL - TEMPORARILY DISABLED
-    // beforeChange: [enforceDeploymentTenancy({ publishRequiresPreflight: false })],
+    beforeChange: [enforceDeploymentTenancy({ publishRequiresPreflight: false })],
     afterChange: [auditAfterChange],
-    // beforeDelete: [enforceDeploymentTenancyOnDelete],
+    beforeDelete: [enforceDeploymentTenancyOnDelete],
     afterDelete: [auditAfterDelete],
   },
   fields: [

@@ -429,6 +429,17 @@ try {
   // Reverse order so children go before parents; Sites cascade their own.
   for (const row of created.reverse()) {
     try {
+      if (row.collection === 'users') {
+        // The suite's own mutations wrote audit rows naming this user, and
+        // `audit_log.user_id` is NOT NULL while its FK is ON DELETE SET NULL —
+        // so deleting a user who ever wrote an audited change fails at the
+        // database and this suite leaked its probe users on every run. The
+        // audit rows removed here are ones this run caused. (The schema
+        // contradiction is a real product bug — an operator cannot be
+        // offboarded once audited — and needs AuditLog.user to go optional
+        // plus a DROP NOT NULL migration; a test teardown cannot fix that.)
+        await payload.delete({ collection: 'audit-log' as never, where: { user: { equals: row.id } }, overrideAccess: true })
+      }
       await payload.delete({ collection: row.collection as never, id: row.id, overrideAccess: true })
     } catch {
       // A row already removed by a Site cascade is expected.

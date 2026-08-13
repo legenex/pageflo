@@ -40,10 +40,9 @@ export const FunnelQuizDeployments: CollectionConfig = {
     // hook is what stops a logged-in user writing another brand's deployment
     // via raw REST or /cms. `publishRequiresPreflight`: going live outside
     // `setQuizDeploymentStatus` (the door that runs the preflight) is refused.
-    // NEGATIVE CONTROL - TEMPORARILY DISABLED
-    // beforeChange: [enforceDeploymentTenancy({ publishRequiresPreflight: true })],
+    beforeChange: [enforceDeploymentTenancy({ publishRequiresPreflight: true })],
     afterChange: [auditAfterChange],
-    // beforeDelete: [enforceDeploymentTenancyOnDelete],
+    beforeDelete: [enforceDeploymentTenancyOnDelete],
     afterDelete: [auditAfterDelete],
   },
   fields: [
