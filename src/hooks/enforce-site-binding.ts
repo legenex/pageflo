@@ -27,7 +27,7 @@
  */
 import type { CollectionBeforeValidateHook } from 'payload'
 
-import { relationId } from '@/lib/authz'
+import { relationId } from '@/lib/relation-id'
 
 type Role = 'admin' | 'editor' | 'analyst'
 

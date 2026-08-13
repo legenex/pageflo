@@ -204,18 +204,32 @@ export const PortedTemplateView = ({
 
   if (!template) return null
 
+  /*
+   * The mount-holed HTML is rendered ONLY when a runtime will fill the hole.
+   * A gallery card, a template editor with no flow chosen, or a deployment
+   * preview before a quiz is bound passes no `quiz` — and rendering
+   * `htmlWithMount` there painted an empty box where the design's quiz card
+   * belongs. Those contexts get the reference's own card drawing instead
+   * (inert: nothing wires its buttons), which is what a preview of the DESIGN
+   * should show. The public path always has a quiz, because the resolver
+   * refuses to serve a ported page without one.
+   */
+  const mounted = Boolean(quiz)
+
   return (
     <div className={`lp-ported ${className}`} style={style}>
       <link rel="stylesheet" href={TEMPLATE_FONTS_HREF} />
-      <div ref={host} dangerouslySetInnerHTML={{ __html: composed.htmlWithMount }} />
-      <QuizMount
-        host={host}
-        quiz={quiz}
-        quizCtx={quizCtx}
-        brand={brand}
-        surface={surface}
-        htmlKey={composed.htmlWithMount}
-      />
+      <div ref={host} dangerouslySetInnerHTML={{ __html: mounted ? composed.htmlWithMount : composed.html }} />
+      {mounted && (
+        <QuizMount
+          host={host}
+          quiz={quiz}
+          quizCtx={quizCtx}
+          brand={brand}
+          surface={surface}
+          htmlKey={composed.htmlWithMount}
+        />
+      )}
     </div>
   )
 }

@@ -1,7 +1,19 @@
 import { getPayload } from 'payload'
-import config from '@payload-config'
 
 import { domainEligibility, type DomainLike } from './domain-eligibility'
+
+/*
+ * `@payload-config` is imported lazily: `payload.config.ts` imports
+ * `collections/Domains.ts`, which imports this module for
+ * `invalidateHostCache`, so a static config import here is a circular ring
+ * that the production chunker can evaluate in a crashing order. Deferring to
+ * call time breaks the ring without changing behavior. Same incident as
+ * `lib/auth.ts` — see the note there.
+ */
+const payloadClient = async () => {
+  const { default: config } = await import('@payload-config')
+  return getPayload({ config })
+}
 
 /**
  * Whether an ineligible host is REFUSED or merely reported.
@@ -96,7 +108,7 @@ export const resolveSiteByHost = async (rawHost: string | null | undefined): Pro
     return { siteId: cached.siteId, primaryHost: cached.primaryHost, redirectTo: cached.redirectTo }
   }
 
-  const payload = await getPayload({ config })
+  const payload = await payloadClient()
 
   // 1. Direct host match on Domain.
   const direct = await payload.find({

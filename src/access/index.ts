@@ -1,6 +1,6 @@
 import type { Access, AccessArgs, FieldAccess } from 'payload'
 
-import { relationId } from '@/lib/authz'
+import { relationId } from '@/lib/relation-id'
 
 type UserLike = {
   id: string | number
