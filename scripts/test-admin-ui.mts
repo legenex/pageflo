@@ -619,24 +619,33 @@ const run = async (browser: Browser): Promise<void> => {
    */
   note('New-with-Claude fails without persisting (D1)')
   const aiBefore = (await rowIds()).length
-  await page.getByRole('button', { name: /New template with Claude/i }).first().click()
-  await settle(page)
-  await page.getByPlaceholder(/MVA Truck Urgency/i).fill('D1 Regression Probe')
-  for (let i = 0; i < 3; i++) {
-    await page.getByRole('button', { name: /Next/i }).first().click()
-    await settle(page)
+  // The wizard is a modal; `settle()` between steps is wrong here — it waits on
+  // networkidle and toast-clearing that the open modal never produces, and a
+  // step that never settled read as a click timeout that aborted the run. Walk
+  // it with short explicit waits, and wrap the walk so a harness hiccup records
+  // a FAIL rather than throwing out of the whole suite.
+  try {
+    await page.getByRole('button', { name: /New template with Claude/i }).first().click()
+    await page.getByPlaceholder(/MVA Truck Urgency/i).waitFor({ state: 'visible', timeout: 15_000 })
+    await page.getByPlaceholder(/MVA Truck Urgency/i).fill('D1 Regression Probe')
+    for (let i = 0; i < 3; i++) {
+      await page.getByRole('button', { name: /Next/i }).first().click()
+      await page.waitForTimeout(500)
+    }
+    await page.getByRole('button', { name: /Generate with Claude/i }).first().click()
+    const aiError = page.getByText(/could not write|nothing was created|failed|unavailable|try again/i).first()
+    await aiError.waitFor({ state: 'visible', timeout: 60_000 }).catch(() => {})
+    t(
+      (await aiError.count()) > 0,
+      'New-with-Claude surfaces an error when the model wrote nothing (D1) rather than silently creating a template',
+    )
+    // Close the wizard (it stays open on error) and confirm nothing was persisted.
+    await page.keyboard.press('Escape').catch(() => {})
+    await page.locator('body').click({ position: { x: 5, y: 5 } }).catch(() => {})
+    await page.waitForTimeout(500)
+  } catch (err) {
+    t(false, `New-with-Claude D1 walk errored: ${err instanceof Error ? err.message.split('\n')[0] : String(err)}`)
   }
-  await page.getByRole('button', { name: /Generate with Claude/i }).first().click()
-  const aiError = page.getByText(/could not write|nothing was created|failed|unavailable|try again/i).first()
-  await aiError.waitFor({ state: 'visible', timeout: 60_000 }).catch(() => {})
-  t(
-    (await aiError.count()) > 0,
-    'New-with-Claude surfaces an error when the model wrote nothing (D1) rather than silently creating a template',
-  )
-  // Close the wizard (it stays open on error) and confirm nothing was persisted.
-  await page.keyboard.press('Escape').catch(() => {})
-  await page.locator('body').click({ position: { x: 5, y: 5 } }).catch(() => {})
-  await settle(page)
   await page.reload({ waitUntil: 'domcontentloaded' })
   await settle(page)
   const aiAfter = (await rowIds()).length
