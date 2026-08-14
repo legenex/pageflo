@@ -121,9 +121,28 @@ undeletable** — audit_log.user_id was NOT NULL over an ON DELETE SET NULL
 FK, so deleting any user with history aborted; field made optional +
 migration 20260813_230000, proven by test:bootstrap (58).
 
-Now running: five adversarial reviewers (conformance, security, UX,
-migration, runtime) against the live app + scratch DBs, then a final
-original-requirement reviewer. Reports land in docs/agent-reports/review*.md.
+## Final adversarial phase — CORRECTED STATUS (resumed 2026-08-14)
+
+The prior session launched five reviewers in one batch and was interrupted;
+its background tasks were **stopped before any produced output** (no
+`docs/agent-reports/review*.md` existed on resume). The earlier claim that
+they were "running" is stale and void — **none of those five reviews may be
+treated as completed.**
+
+Resume plan (per owner): run reviewers in CONTROLLED WAVES to avoid another
+simultaneous-background-task failure.
+- WAVE 1: Reviewer A (requirement/conformance) + Reviewer B (security) →
+  reproduce, classify, fix, regress, checkpoint.
+- WAVE 2: Reviewer C (browser/UX/rendering) + Reviewer D (migration/release).
+- WAVE 3: Reviewer E (runtime/QuizRuntime/lead/webhook), then a single
+  FINAL requirement reviewer.
+After all repairs: a fresh full matrix (new assertion count, not the 3,313
+reused), then the final report.
+
+Environment on resume: container restarted; Postgres 16 `legalos` DB
+survived intact (20 quiz templates, 12 LP records, migrations current incl.
+audit_log_user_nullable), Redis up, `.env` + admin password intact, build
+present from 090c8b1 (5203d7b/e34adc0 are docs+screenshots only).
 
 ## Known open work (gates not yet run)
 
