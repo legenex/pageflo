@@ -35,7 +35,22 @@ remembering a step.
 | 6 | **migrate** | service down, so nothing is serving against a half-applied schema |
 | 7 | **verify** | `pnpm verify:schema` reads every collection and global — exactly what a boot does |
 | 8 | start | only now |
-| 9 | health | a real HTTP request to `/api/legalos/self-check`, 30 attempts |
+| 9 | health | a real HTTP request to `/api/legalos/health`, 30 attempts |
+
+## The health gate is a liveness route, not `self-check`
+
+`self-check` answers a different question — *did this request reach LegalOS for
+the right **tenant**?* — and returns **404** for a host with no `Domains` row.
+`os.legenex.com` is the control plane and deliberately has no such row, so
+pointing the gate there made a **successful** release exit 1 at its last stage,
+after the migrations had applied and the service was up and serving. The trap
+then printed the `payload migrate:down` guidance, urging an operator to reverse
+a release that had worked. Measured on production 2026-08-14.
+
+`/api/legalos/health` proves the two things a release actually asks about — the
+new build is serving, and it can reach the database it was just migrated
+against — and depends on no host mapping, so no future `Domains` change can turn
+the gate red again.
 
 ## The backup is size-checked, and that is not paranoia
 
@@ -125,6 +140,6 @@ Every value the script uses is overridable, and the defaults are production's.
 | `LEGALOS_PLESK_DOMAIN` | `os.legenex.com` |
 | `LEGALOS_PLESK_REPO` | `legalos.git` |
 | `LEGALOS_SERVICE` | `legalos-dev` |
-| `LEGALOS_HEALTH_URL` | `http://127.0.0.1:3000/api/legalos/self-check` |
+| `LEGALOS_HEALTH_URL` | `http://127.0.0.1:3000/api/legalos/health` |
 | `LEGALOS_BACKUP_DIR` | `/root/legalos-backups` |
 | `LEGALOS_PG_DUMP` | `docker exec molegenexcom-postgres-1 pg_dump` |

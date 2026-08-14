@@ -49,12 +49,43 @@ APP_DIR="${LEGALOS_APP_DIR:-/var/www/vhosts/legenex.com/os.legenex.com}"
 DOMAIN="${LEGALOS_PLESK_DOMAIN:-os.legenex.com}"
 REPO_NAME="${LEGALOS_PLESK_REPO:-legalos.git}"
 SERVICE="${LEGALOS_SERVICE:-legalos-dev}"
-HEALTH_URL="${LEGALOS_HEALTH_URL:-http://127.0.0.1:3000/api/legalos/self-check}"
+# A LIVENESS route, deliberately not `self-check`. `self-check` answers "did
+# this request reach LegalOS for the right TENANT?" and returns 404 for a host
+# with no Domains row — which `os.legenex.com`, the control-plane host, does not
+# have and should not have. Pointed here, the gate returned 404 on a release
+# that had SUCCEEDED, and the trap below then advised `migrate:down` on it.
+# Measured on production 2026-08-14. See src/app/api/legalos/health/route.ts.
+HEALTH_URL="${LEGALOS_HEALTH_URL:-http://127.0.0.1:3000/api/legalos/health}"
 BACKUP_DIR="${LEGALOS_BACKUP_DIR:-/root/legalos-backups}"
 # The system pg_dump is version 15 against a 16.x server and produces a 20-byte
 # empty file WITH A ZERO EXIT STATUS. Use the container's binary; that silent
 # success is why this is a variable and not an assumption.
 PG_DUMP="${LEGALOS_PG_DUMP:-docker exec molegenexcom-postgres-1 pg_dump}"
+
+# ---------------------------------------------------------------------------
+# Run from a copy, never from inside the deployment target.
+#
+# Stage 3 checks the new revision out over APP_DIR — including this file. Bash
+# does not read a script into memory; it reads it lazily by byte offset, so a
+# checkout that rewrites scripts/release.sh in place while it is executing can
+# hand bash the middle of the new file as its next command. The window is
+# between stage 3 and the end of the run, which is every stage that touches the
+# database.
+#
+# Copying to /tmp and re-exec'ing costs nothing and closes it for good, rather
+# than depending on whether git or rsync happened to write via rename this time.
+SELF="$(readlink -f "$0")"
+case "$SELF" in
+  "$APP_DIR"/*)
+    if [ "${LEGALOS_RELEASE_REEXEC:-0}" != "1" ]; then
+      COPY="$(mktemp /tmp/legalos-release.XXXXXXXX.sh)"
+      cat "$SELF" > "$COPY"
+      chmod +x "$COPY"
+      printf '   running from %s (a copy; stage 3 overwrites %s)\n' "$COPY" "$SELF"
+      LEGALOS_RELEASE_REEXEC=1 exec "$COPY" "$@"
+    fi
+    ;;
+esac
 
 DRY_RUN=0
 DO_BACKUP=1
