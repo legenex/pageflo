@@ -144,6 +144,50 @@ survived intact (20 quiz templates, 12 LP records, migrations current incl.
 audit_log_user_nullable), Redis up, `.env` + admin password intact, build
 present from 090c8b1 (5203d7b/e34adc0 are docs+screenshots only).
 
+### WAVE 1 — Reviewer A (conformance) + Reviewer B (security): COMPLETE
+
+Both returned. Every finding reproduced by the orchestrator before acting.
+
+Reviewer B (security), attacks A–P against the live app + local API +
+raw REST/cms + curl, with the tenancy hook's non-vacuity proven by
+runtime detachment. Verdict: no isolation break. One actionable finding:
+- **H (DEFECT, LOW / defense-in-depth):** `enforceDeploymentTenancy`
+  validated `deployment.site` but never the referenced `domain`'s tenant,
+  so a tenant could store another brand's `domain_id` via the raw
+  REST/local-API door (the server action already refused it; the public
+  resolvers filter by host-resolved site first, so the mis-bound ref is
+  inert — no isolation impact, but a real write gap). REPRODUCED
+  (site-8 user stored site-9's domain on their own deployment via the
+  local API). FIXED in the shared hook (commit a8deff5): an incoming
+  non-null domain must belong to the write's effective site, on all three
+  deployment collections; hook is now async to read the domain row.
+  Regression: test:tenant-isolation 44→49; negative control proven
+  (disabling the check makes exactly those 3 attacks succeed).
+  Everything else A–P BLOCKED (G N/A: quiz flows are brandless).
+
+Reviewer A (conformance), all 16 owner claims driven against the live app
+(Playwright over localhost, Host-header curl on public pages, psql, and
+test:identity/records/ui). Verdict: **all 16 CONFORMANT, zero product
+defects.** Three flags:
+- **Flag 1 (DEFECT, harness robustness):** `test:ui` defaulted its base
+  to `127.0.0.1:3000`, which in a production build is NOT in the CSRF
+  allowlist (only `NEXT_PUBLIC_SERVER_URL` = localhost:3000; the 127/
+  localhost dev origins are added only outside production). Run on the
+  default it emitted spurious "unauthenticated" fails on mutating actions.
+  Real product is fine (151/0 on the localhost base). FIXED: the suite
+  default is now `http://localhost:3000` so `pnpm test:ui` passes out of
+  the box; `fetchAs` sets its own Host header so public-page probes are
+  unaffected. Verified by running test:ui with NO env override.
+- **Flag 2 (NOT a defect):** `test:records` proves the code-registry
+  counts (12/20) but not claim-3's DB side — that's covered by
+  test:identity (33) + psql, which read funnel_landing_pages directly.
+  Coverage exists; attribution note only.
+- **Flag 3 (EXTERNAL BLOCKER):** the live Create-with-Claude LLM
+  round-trip is not exercised (no ANTHROPIC_API_KEY here). The schema/
+  adapter is fully exercised offline by test:ai (100, incl. refusals),
+  and blank/clone create real DB rows. Only the network hop is
+  unverifiable in this environment — same limit as all of test:ai.
+
 ## Known open work (gates not yet run)
 
 - **Gallery empty-box regression (R1, scouts 2+6):** release's

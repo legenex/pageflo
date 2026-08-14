@@ -65,7 +65,22 @@ import { asSlotted } from '../src/lib/lp-templates/index.ts'
 // reimplement luminance/ratio — page-lint owns it and is pure.
 import { contrastRatio } from '../src/lib/builder/page-lint.ts'
 
-const BASE = process.env.LEGALOS_UI_BASE ?? 'http://127.0.0.1:3000'
+/*
+ * Default to `localhost`, not `127.0.0.1`.
+ *
+ * `next start` runs in production mode, where the CSRF allowlist
+ * (payload.config.ts) is only `NEXT_PUBLIC_SERVER_URL` — the localhost/127
+ * dev origins are added ONLY outside production. `NEXT_PUBLIC_SERVER_URL`
+ * defaults to `http://localhost:3000`, so a browser navigating to
+ * `http://127.0.0.1:3000` sends an Origin the allowlist does not carry, and
+ * Payload's cookie auth returns `user = null` — every admin action then fails
+ * as a spurious "unauthenticated" while the app is perfectly fine. Defaulting
+ * to `localhost` makes `pnpm test:ui` pass out of the box against a stock
+ * server; override with LEGALOS_UI_BASE to point elsewhere. `fetchAs` below
+ * connects to this host/port but sets its own `Host` header, so the public-page
+ * probes are unaffected by the choice.
+ */
+const BASE = process.env.LEGALOS_UI_BASE ?? 'http://localhost:3000'
 const EMAIL = process.env.SUPER_ADMIN_EMAIL ?? 'team@legenex.com'
 const PASSWORD = process.env.SUPER_ADMIN_PASSWORD ?? 'local-dev-password-9c1f'
 const SHOTS = new URL('../docs/screenshots/', import.meta.url).pathname
