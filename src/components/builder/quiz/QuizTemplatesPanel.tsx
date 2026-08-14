@@ -17,8 +17,9 @@
  * choice. This surface exists to MANAGE, which is five actions per row plus
  * state that has to be legible at a glance - origin, enabled, which renderer
  * draws it, and whether that renderer still exists. Those are different jobs, so
- * this is a different presentation, but the picture is the same `TemplatePreview`
- * the gallery uses rather than a second preview implementation.
+ * this is a different presentation, but the picture is the same `QuizStill` the
+ * gallery uses - the public quiz surface, frozen - rather than a second preview
+ * implementation.
  */
 
 import { useMemo, useState } from 'react'
@@ -27,7 +28,7 @@ import {
 } from 'lucide-react'
 
 import { T, Btn, IconBtn, Input, Textarea, Select, Label, Pill, Modal, ConfirmDialog } from '../ui'
-import { TemplatePreview } from './TemplatePreview'
+import { QuizStillThumb } from './QuizStill'
 import { Section } from './section'
 import { resolveTemplate } from '@/lib/template-registry'
 import { PROGRESS_FORM_LABELS } from '@/lib/quiz-templates/model'
@@ -64,7 +65,7 @@ const ORIGIN_COLOR = { stock: T.info, clone: T.purple, blank: T.cyan, ai: T.pink
 
 /* ------------------------------------------------------------------ pieces */
 
-const Thumb = ({ template, brand, width = 210, height = 116, progress = null }) => {
+const Thumb = ({ template, brand, width = 210, height = 116, progress = null, scale = 0.34 }) => {
   if (template.rendererError) {
     return (
       <div
@@ -80,7 +81,13 @@ const Thumb = ({ template, brand, width = 210, height = 116, progress = null }) 
   }
   return (
     <div style={{ width, flexShrink: 0, borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.border}` }}>
-      <TemplatePreview spec={quizSpecForRecord(template)} brand={brand} progress={progress} height={height} />
+      <QuizStillThumb
+        templateId={template.rendererKey}
+        progressForm={progress}
+        brand={brand}
+        height={height}
+        scale={scale}
+      />
     </div>
   )
 }
@@ -129,10 +136,17 @@ const PreviewModal = ({ template, brand, onClose }) => (
       </div>
       {template.rendererError
         ? <div style={{ padding: 14, borderRadius: 8, border: `1px solid ${T.danger}`, color: T.danger, fontSize: 12.5 }}>{template.rendererError}</div>
-        : <Thumb template={template} brand={brand} width="100%" height={460} progress={defaultProgressFor(template).id} />}
+        : <Thumb template={template} brand={brand} width="100%" height={460} progress={defaultProgressFor(template).id} scale={0.72} />}
+      {/*
+        * This caption used to be half true, which is the expensive kind: the
+        * progress and answer forms WERE the deployed components, and everything
+        * around them - the card, the width, the header, the nav - was a swatch
+        * that no deployed quiz would draw. An operator read it as a guarantee
+        * about the design. It is now true of the whole picture.
+        */}
       <div style={{ fontSize: 11.5, color: T.textMute, lineHeight: 1.55 }}>
-        A real render, not a picture of one: the progress and answer forms below are the components the deployed
-        quiz mounts. The questions are samples and belong to no quiz.
+        A real render, not a picture of one: this is the surface the deployed quiz mounts, frozen at a sample
+        question. The questions and step names are samples and belong to no quiz.
       </div>
     </div>
   </Modal>
@@ -265,7 +279,13 @@ const EditorModal = ({ template, brands, brandId, rendererOptions, onBrandChange
           </div>
           {previewSpec
             ? <div style={{ borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.border}` }}>
-              <TemplatePreview spec={previewSpec} brand={brand} progress={draft.progressForm || null} height={300} />
+              <QuizStillThumb
+                templateId={draft.rendererKey}
+                progressForm={draft.progressForm || null}
+                brand={brand}
+                height={300}
+                scale={0.5}
+              />
             </div>
             : <div style={{ padding: 14, borderRadius: 8, border: `1px solid ${T.danger}`, color: T.danger, fontSize: 11.5 }}>
               No renderer named &quot;{draft.rendererKey}&quot; exists, so there is nothing to draw.
@@ -324,7 +344,7 @@ const CreateModal = ({ rendererOptions, onCreated, onError, onClose }) => {
         </div>
         {spec && (
           <div style={{ borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.border}` }}>
-            <TemplatePreview spec={spec} brand={null} height={190} />
+            <QuizStillThumb templateId={rendererKey} brand={null} height={190} scale={0.5} />
           </div>
         )}
       </div>

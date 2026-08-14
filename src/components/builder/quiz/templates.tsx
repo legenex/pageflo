@@ -81,7 +81,14 @@ const configFor = (templateId, progressOverride) => {
     },
     pageBg: (brand) => themeFor(brand).page.bg,
     textColorMuted: (brand) => themeFor(brand).page.muted,
-    cardBackdrop: () => 'none',
+
+    // `cardBackdrop` used to live here as `() => 'none'` and the card spread it
+    // straight into a style object: `backdropFilter: tc.cardBackdrop`. A
+    // function is truthy, so React was handed a function as a CSS value and
+    // dropped it - the knob had never worked in either direction, and could not
+    // have, because it was also the same constant for all twenty. Removed
+    // rather than corrected: the handoff draws no backdrop filter behind any of
+    // the twenty, so there is nothing for it to carry.
 
     // The handoff draws no page ornament behind any of the twenty. The six this
     // replaces each carried a gradient or a dot grid, and those were the
@@ -93,7 +100,16 @@ const configFor = (templateId, progressOverride) => {
     cardBorder: (brand) => `1px solid ${themeFor(brand).surface.line}`,
     cardRadius: squared ? 2 : 12,
     cardShadow: () => 'none',
-    cardMaxWidth: templateMaxWidth(spec) ?? 1120,
+    /**
+     * The template's OWN maximum, in px, or null when it runs full bleed.
+     *
+     * It used to coalesce full bleed to 1120 - a number that is neither the
+     * declared width nor full bleed - and the runtime then wrapped the whole
+     * card in a hard 760px column anyway, so the eight templates declaring
+     * 820-900 were clamped and `sq_fullscreen_focus` could not reach the edge
+     * of anything. Null is passed through to the renderer as "no maximum".
+     */
+    cardMaxWidth: templateMaxWidth(spec),
     cardPadding: 'clamp(22px, 4vw, 40px) clamp(18px, 3.5vw, 34px)',
 
     headlineSize: spec.answers === 'oversized_letters' ? 'clamp(28px, 6vw, 44px)' : 'clamp(21px, 4vw, 30px)',
@@ -144,12 +160,34 @@ export const renderAnswerButton = (a, idx, isSelected, onClick, tc, brand) => (
     index={idx}
     selected={Boolean(isSelected)}
     multi={Boolean(a?.multi)}
+    /*
+     * NO DATA SOURCE EXISTS FOR THIS, and saying so is the point.
+     *
+     * A quiz answer is `{ id, label, isDQ, fieldMappings, nextStepKey, setTier }`
+     * - `mkA` in seed-data.ts builds every one of them and there is no icon
+     * field anywhere in the model, the editor or the collection. So the entire
+     * fifteen-value `IconPolicy` axis is inert: `withIcon` is false for every
+     * answer of every template. The forms that draw an icon slot now fall back
+     * to something real (a letter) rather than an empty well; adding an icon
+     * per answer is a schema change and belongs in the stage that migrates.
+     */
     icon={a?.iconNode ?? null}
     onSelect={onClick}
   />
 )
 
-export const renderProgressIndicator = (stepIdx, totalSteps, tc, brand) => (
+/**
+ * @param labels  the authored label of each visible step, in order.
+ *
+ * Eight of the twenty progress forms name their milestones - `factor_rail`,
+ * `deadline_rail`, `route_breadcrumb`, `milestone_rail`, `tab_status`,
+ * `path_nodes`, `item_count` and the tab row - and NO caller in the repository
+ * ever passed them, so every one of them drew "Factor 1 / Step 2 / Incident"
+ * placeholders and Case Router, whose entire identity is its breadcrumb, drew a
+ * bare bar. The labels come from the quiz's own steps, filtered to the ones a
+ * visitor can actually see, so a webhook row is never named at a visitor.
+ */
+export const renderProgressIndicator = (stepIdx, totalSteps, tc, brand, labels = null) => (
   // The percentage is carried as an attribute as well as drawn, because a
   // progress bar is twenty different shapes across the library and "did it
   // move" should not depend on which one a deployment chose.
@@ -157,7 +195,13 @@ export const renderProgressIndicator = (stepIdx, totalSteps, tc, brand) => (
     data-quiz-progress={String(totalSteps > 1 ? Math.round((stepIdx / (totalSteps - 1)) * 100) : 0)}
     style={{ marginBottom: 'clamp(16px, 3vw, 24px)' }}
   >
-    <QuizProgress form={tc.spec.progress} theme={tc.theme(brand)} index={stepIdx} total={totalSteps} />
+    <QuizProgress
+      form={tc.spec.progress}
+      theme={tc.theme(brand)}
+      index={stepIdx}
+      total={totalSteps}
+      labels={Array.isArray(labels) ? labels : []}
+    />
   </div>
 )
 

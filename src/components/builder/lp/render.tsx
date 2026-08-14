@@ -31,6 +31,7 @@ import { resolveForRender, reportTemplateFallback } from '@/lib/template-registr
 import { PortedTemplateView } from './PortedTemplate'
 import { SectionNode } from './nodes/SectionNode'
 import { T } from '../ui'
+import { PREVIEW_BRAND_DEFAULT } from '../preview-brand'
 
 export { resolveTokens }
 export const fillPlaceholders = (str, brand) => resolveTokens(str, { brand })
@@ -160,24 +161,12 @@ export const ANGLES = [
   { id: 'community', label: 'Community', desc: 'You are not alone. Many people in your situation got help.' },
 ]
 
-export const PREVIEW_BRAND_DEFAULT = {
-  id: 'preview',
-  name: 'Preview',
-  displayName: 'Your Brand',
-  shortName: 'YB',
-  tagline: '',
-  primaryDomain: '',
-  logoUrl: '',
-  logoUrlDark: '',
-  faviconUrl: '',
-  // Deliberately colourless. "No brand" means the template identity shows
-  // through; inventing a slate palette here would make the brandless preview
-  // the one place in the product that renders in a colour nobody chose.
-  colors: {},
-  typography: { headlineFont: 'Inter', bodyFont: 'Inter', baseSize: 'md' },
-  contact: { callNumber: '', callCtaText: 'CLICK HERE TO CALL', callCtaStyle: 'pill' },
-  legal: { copyright: '(c) 2026 Your Brand', tcpaText: '', privacyUrl: '', termsUrl: '', defaultDisclaimer: 'Brand disclaimer goes here.' },
-}
+/*
+ * Moved to `builder/preview-brand.ts` and re-exported here so every existing
+ * import address keeps working. The quiz builder needs the same neutral brand
+ * and was otherwise importing this whole renderer to read one object literal.
+ */
+export { PREVIEW_BRAND_DEFAULT }
 
 // ============================================================================
 // LIVE PREVIEW

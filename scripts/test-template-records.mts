@@ -117,7 +117,6 @@ const code = (f: string): string =>
     ['src/components/builder/lp/render.tsx', 'maps renderer ids to their draw functions'],
     ['src/components/builder/quiz/config.tsx', 'exposes renderer option tables'],
     ['src/components/builder/quiz/templates.tsx', 'draws a renderer'],
-    ['src/components/builder/quiz/TemplatePreview.tsx', 'draws a renderer'],
     ['src/components/builder/templates/TemplateGallery.tsx', 'resolves a record to its renderer for preview'],
     ['src/components/builder/quiz/QuizTemplatesPanel.tsx', 'offers the RENDERER choice when creating or editing a template record'],
     ['src/lib/ai-content/quiz-template.ts', 'constrains the AI proposal to the closed set of code renderers — a renderer question, not "what may I deploy"'],

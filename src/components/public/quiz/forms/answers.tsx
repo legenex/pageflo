@@ -144,11 +144,14 @@ export const QuizAnswer = ({
       )
 
     // SQ-06 A large tile, icon above the label, in a grid.
+    // The icon slot is drawn only when there IS an icon. It used to be
+    // unconditional, and since no answer in the model carries one it added a
+    // phantom 12px gap above every label in the set.
     case 'icon_tiles':
       return btn(
         { ...base, flexDirection: 'column', gap: 12, alignItems: 'center', textAlign: 'center', padding: '26px 18px', borderRadius: 10, borderWidth: 2, minHeight: 132 },
         <>
-          <span style={{ display: 'inline-flex', color: selected ? s.onAccentFill : s.accent }}>{icon}</span>
+          {icon ? <span style={{ display: 'inline-flex', color: selected ? s.onAccentFill : s.accent }}>{icon}</span> : null}
           <span style={{ fontWeight: 600 }}>{label}</span>
         </>,
       )
@@ -215,11 +218,17 @@ export const QuizAnswer = ({
       )
 
     // SQ-14 A diagram tile. The picture is the answer, the label confirms it.
+    // The 64x44 tray is the one place an absent icon was VISIBLE: seven empty
+    // grey rectangles, which is what "seven simplified top-down collision
+    // diagrams" rendered as. Until answers can carry a diagram it holds the
+    // letter instead, matching what `pick_cards` already did.
     case 'diagram_tiles':
       return btn(
         { ...base, flexDirection: 'column', gap: 10, alignItems: 'center', textAlign: 'center', padding: '18px 14px', borderRadius: 8, borderWidth: 2, minHeight: 130 },
         <>
-          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 64, height: 44, borderRadius: 4, backgroundColor: selected ? s.onAccentFill : s.bg, color: selected ? s.accentFill : s.muted }}>{icon}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 64, height: 44, borderRadius: 4, backgroundColor: selected ? s.onAccentFill : s.bg, color: selected ? s.accentFill : s.muted }}>
+            {icon ?? <span style={{ fontFamily: fonts.utility, fontSize: 15, fontWeight: 700 }}>{LETTERS[index] ?? index + 1}</span>}
+          </span>
           <span style={{ fontSize: 13.5, fontWeight: 500 }}>{label}</span>
         </>,
       )
@@ -286,16 +295,34 @@ export const QuizAnswer = ({
  * from the shape: tiles and cards want a grid, chips want to wrap, rows want a
  * column. Deriving it here keeps the twenty template specs from each having to
  * restate something already implied.
+ *
+ * This was computed, exported, and then read by NOTHING except the gallery
+ * thumbnail, while the live card drew a uniform `repeat(cols, 1fr)` grid for
+ * all nineteen forms. So chips did not wrap, reply pills were not right-aligned,
+ * hairline rows carried a gap they are designed not to have, and the picture in
+ * the picker disagreed with the page it was advertising, by construction. The
+ * card now reads this too.
+ *
+ * @param columns  the author's column count, which governs ONLY the forms whose
+ *   own shape does not dictate an arrangement. A tile grid auto-fits to the
+ *   space it has; a row list stacks or splits as the author asked.
+ *
+ * Every auto-fit floor is `min(100%, Npx)` rather than a bare `Npx`, because a
+ * bare minimum wider than the container overflows it instead of collapsing -
+ * which is the difference between a tile grid reflowing at 320px and a page
+ * that scrolls sideways.
  */
-export const answerLayout = (form: AnswerForm): CSSProperties => {
+export const answerLayout = (form: AnswerForm, columns = 1): CSSProperties => {
   switch (form) {
     case 'icon_tiles':
     case 'diagram_tiles':
-      return { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }
+      return { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 150px), 1fr))', gap: 12 }
     case 'pick_cards':
-      return { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }
+      return { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 190px), 1fr))', gap: 14 }
     case 'reply_grid':
-      return { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10 }
+      return { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 160px), 1fr))', gap: 10 }
+    case 'router_cards':
+      return { display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: 12 }
     case 'pill_chips':
       return { display: 'flex', flexWrap: 'wrap', gap: 8 }
     case 'reply_pills':
@@ -304,6 +331,8 @@ export const answerLayout = (form: AnswerForm): CSSProperties => {
     case 'field_rows':
       return { display: 'flex', flexDirection: 'column', gap: 0 }
     default:
-      return { display: 'flex', flexDirection: 'column', gap: 10 }
+      return columns > 1
+        ? { display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: 'clamp(8px, 1.5vw, 12px)' }
+        : { display: 'flex', flexDirection: 'column', gap: 10 }
   }
 }

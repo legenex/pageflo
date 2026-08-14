@@ -29,9 +29,23 @@ export type ProgressProps = {
   /** Zero-based position of the current step. */
   index: number
   total: number
-  /** Labels for the forms that name their milestones. Supplied by the deployment. */
+  /**
+   * The authored label of each visible step, in order. Supplied by the caller
+   * from the quiz's own steps, filtered to the ones a visitor can actually see
+   * (see `visibleStepView`), so a webhook or decision row is never named at a
+   * visitor and `index`/`total` count the same journey these labels describe.
+   */
   labels?: string[]
-  /** Encouraging line for the forms that carry one. */
+  /**
+   * Encouraging line for the forms that carry one - SQ-02's "One step at a
+   * time", SQ-08's "why we ask".
+   *
+   * STILL UNFED, deliberately. Nothing in the quiz model carries per-step
+   * guidance copy: a node has a tagline, headline, question and subheadline,
+   * all of which are already drawn below this. Reusing one of them here would
+   * print the same sentence twice; inventing a sentence would put words on a
+   * page nobody wrote. It needs a node field and therefore a migration.
+   */
   note?: string
 }
 
@@ -122,12 +136,15 @@ export const QuizProgress = ({ form, theme, index, total, labels = [], note }: P
       )
 
     // SQ-07 Accident at one end, deadline at the other, you somewhere between.
+    // The two ends are the FIRST and LAST milestone, not the first two: reading
+    // `labels[1]` named step two as the deadline the moment labels started
+    // arriving, which is a rail that says the finish line is the next question.
     case 'deadline_rail':
       return (
         <div style={{ width: '100%' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
             <span style={capsLabel}>{labels[0] ?? 'Accident'}</span>
-            <span style={{ ...capsLabel, color: s.accent }}>{labels[1] ?? 'Filing deadline'}</span>
+            <span style={{ ...capsLabel, color: s.accent, textAlign: 'right' }}>{labels[labels.length - 1] ?? 'Filing deadline'}</span>
           </div>
           <div style={{ position: 'relative', height: 2, backgroundColor: s.line }}>
             <div style={{ position: 'absolute', inset: 0, width: `${percent}%`, backgroundColor: s.accentFill }} />
@@ -169,20 +186,35 @@ export const QuizProgress = ({ form, theme, index, total, labels = [], note }: P
         </div>
       )
 
-    // SQ-11 A bar, plus the route the first answer put you on.
-    case 'route_breadcrumb':
+    // SQ-11 A bar, plus the route the answers so far have put you on.
+    // The trail is the steps ALREADY TAKEN plus the current one, not the whole
+    // list: a breadcrumb that names every step ahead of you is a table of
+    // contents, and it would also announce where the flow is going, which the
+    // handoff rules out ("progress only - no hidden scoring shown").
+    case 'route_breadcrumb': {
+      const trail = labels.slice(0, index + 1)
       return (
         <div style={{ width: '100%' }}>
           {bar(4, 2)}
-          {labels.length ? (
+          {trail.length ? (
             <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginTop: 8, flexWrap: 'wrap' }}>
-              {labels.map((l, i) => (
-                <span key={i} style={{ ...capsLabel, fontSize: 9.5, padding: '2px 7px', border: `1px solid ${s.line}`, borderRadius: 3, color: s.accent }}>{l}</span>
+              {trail.map((l, i) => (
+                <span
+                  key={i}
+                  style={{
+                    ...capsLabel, fontSize: 9.5, padding: '2px 7px', borderRadius: 3,
+                    // The live step is the dashed chip; everything behind it is
+                    // settled. Two signals, so it does not rest on colour alone.
+                    border: i === trail.length - 1 ? `1px dashed ${s.accentFill}` : `1px solid ${s.line}`,
+                    color: i === trail.length - 1 ? s.text : s.accent,
+                  }}
+                >{l}</span>
               ))}
             </div>
           ) : null}
         </div>
       )
+    }
 
     // SQ-12 A mono counter above a hairline. Restrained on purpose.
     case 'mono_hairline':
@@ -230,8 +262,11 @@ export const QuizProgress = ({ form, theme, index, total, labels = [], note }: P
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', flexWrap: 'wrap' }}>
           {/* The tab row scrolls rather than pushing into the status chip
-              beside it, which is what it did at narrow widths. */}
-          <div style={{ display: 'flex', gap: 2, flex: 1, minWidth: 0, overflow: 'hidden' }}>
+              beside it, which is what it did at narrow widths. It was set to
+              `overflow: hidden`, which does not scroll - it CLIPS, so on a
+              quiz with more sections than fit, the current tab could be the
+              one cut off. */}
+          <div style={{ display: 'flex', gap: 2, flex: 1, minWidth: 0, overflowX: 'auto', overflowY: 'hidden' }}>
             {(labels.length ? labels : ['Incident', 'Medical', 'Legal', 'Contact']).map((l, i) => (
               <span key={i} style={{ padding: '6px 12px', fontFamily: fonts.utility, fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase', whiteSpace: 'nowrap', color: i === index ? s.text : s.muted, borderBottom: `2px solid ${i === index ? s.accentFill : 'transparent'}`, backgroundColor: i === index ? s.card : 'transparent' }}>{l}</span>
             ))}

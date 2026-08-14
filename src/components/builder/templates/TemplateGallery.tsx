@@ -21,13 +21,17 @@
  *     what makes this gallery and the Templates tab the same library rather
  *     than two views that can disagree.
  *
- *  2. EVERY PREVIEW IS A REAL RENDER, through the primitives the public page
- *     uses: `TemplatePreview` runs the actual progress and answer forms, and a
- *     landing page is mounted through `PortedTemplateView`, the same component the
- *     public page and the builder's own centre pane render.
+ *  2. EVERY PREVIEW IS A REAL RENDER, through the component the public page
+ *     mounts: a landing page through `LivePreview`, a quiz through `QuizStill`,
+ *     which is `QuizSurface` - the public quiz surface - driven by a scripted
+ *     position instead of a visitor.
  *     A gallery backed by screenshots goes stale first for the templates nobody
  *     has looked at recently, which are precisely the ones somebody is browsing
- *     to find.
+ *     to find. This rule USED TO BE TRUE ONLY OF THE LP BRANCH: the quiz branch
+ *     mounted `TemplatePreview`, a swatch of one hard-coded question and two
+ *     sample answers with no card, no width and no chrome, twenty lines below
+ *     the LP branch that mounted the real thing. That asymmetry is the reason
+ *     twenty structurally different quiz designs all looked alike in here.
  *
  *  3. EXACTLY TWO ACTIONS PER CARD: Preview and Select. Anything else on a card
  *     is a decision competing with the one the operator came here to make.
@@ -42,7 +46,7 @@
 
 import { useMemo, useState } from 'react'
 
-import { TemplatePreview } from '@/components/builder/quiz/TemplatePreview'
+import { QuizStill, QuizStillThumb } from '@/components/builder/quiz/QuizStill'
 import { LivePreview } from '@/components/builder/lp/render'
 import { PREVIEW_BRAND_DEFAULT } from '@/components/builder/lp/render'
 import { resolveTemplate } from '@/lib/template-registry'
@@ -220,8 +224,14 @@ const PreviewModal = ({ template, kind, brand, onClose }) => {
             />
           </div>
         ) : (
+          // The real surface at the chosen device width, not scaled: at 390 it
+          // is a genuine narrow render rather than a squeezed desktop one.
           <div style={{ width, maxWidth: '100%', border: `1px solid ${T.border}`, borderRadius: 6, overflow: 'hidden' }}>
-            <TemplatePreview spec={quizSpecFor(template)} brand={brand} height={640} />
+            <QuizStill
+              templateId={template.rendererKey}
+              progressForm={quizProgressFor(template)}
+              brand={brand}
+            />
           </div>
         )}
       </div>
@@ -230,22 +240,24 @@ const PreviewModal = ({ template, kind, brand, onClose }) => {
 }
 
 /**
- * The code renderer behind a quiz template record.
+ * The record's own progress override, so the picture shows the treatment this
+ * template actually deploys with rather than the renderer's default.
  *
- * Resolved through the registry from `rendererKey`, never from `templateId`:
- * a clone's `templateId` is its own and names no code renderer, which is the
- * point of the two fields.
+ * Note what is NOT resolved here any more: the quiz preview used to be handed a
+ * template SPEC, looked up from `rendererKey` in this file. It is handed the
+ * `rendererKey` itself now, and the surface resolves it through the same
+ * registry call the public page makes - so a gallery card and a live page
+ * cannot reach different answers about what an id draws.
  */
-const quizSpecFor = (t) => {
-  const res = resolveTemplate('quiz', t.rendererKey)
-  return res.ok && res.template.kind === 'quiz' ? res.template.template : null
+const quizProgressFor = (t) => {
+  const v = t?.configOverrides?.progressForm
+  return typeof v === 'string' && v ? v : null
 }
 
 /* -------------------------------------------------------------------- cards */
 
 const Card = ({ template, kind, brand, isSelected, onSelect, onPreview }) => {
   const blocked = blockedReason(template)
-  const spec = kind === 'quiz' ? quizSpecFor(template) : null
 
   return (
     <div
@@ -269,7 +281,13 @@ const Card = ({ template, kind, brand, isSelected, onSelect, onPreview }) => {
         </div>
       ) : kind === 'quiz' ? (
         <div style={{ flexShrink: 0, borderBottom: `1px solid ${T.border}` }}>
-          <TemplatePreview spec={spec} brand={brand} height={190} />
+          <QuizStillThumb
+            templateId={template.rendererKey}
+            progressForm={quizProgressFor(template)}
+            brand={brand}
+            height={190}
+            scale={0.5}
+          />
         </div>
       ) : (
         <LpThumb

@@ -19,7 +19,7 @@
  *    the same answers.
  *
  * 3. THE MODEL STILL MATCHES THE RUNTIME. The validator reproduces
- *    `QuizRuntime.advance()` by hand in one respect it cannot import (the
+ *    `useQuizMachine`'s advance by hand in one respect it cannot import (the
  *    runtime declares its non-visitor node types as a module local). The source
  *    of the runtime is read here and compared, so the day somebody adds a node
  *    type to one list this file says so instead of the validator quietly
@@ -167,7 +167,14 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
 // ---------------------------------------------------------------------------
 
 {
-  const runtime = read('components/public/quiz/QuizRuntime.tsx')
+  /*
+   * The runtime is TWO files now, and both are read because the split is the
+   * point: `machine.ts` decides the flow (one implementation, shared by the
+   * public page and the builder preview, which used to be two hand-written
+   * copies) and `QuizRuntime.tsx` supplies the live transport. Reading only
+   * one of them would let half of what this suite guards move away unnoticed.
+   */
+  const runtime = read('components/public/quiz/machine.ts') + '\n' + read('components/public/quiz/QuizRuntime.tsx')
 
   const declared = runtime.match(/INVISIBLE_NODE_TYPES\s*=\s*new Set\(\[([^\]]*)\]\)/)?.[1] ?? ''
   const runtimeTypes = declared
@@ -212,7 +219,7 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
 
   // Where consent actually lives. The consent check is built on this one line;
   // if it moves, the check is measuring the wrong thing.
-  const preview = read('components/builder/quiz/preview.tsx')
+  const preview = read('components/public/quiz/QuizCard.tsx')
   t(
     /node\.type === 'form' && <div[^>]*>\{interp\(brand\.legal\.tcpaText\)\}/.test(preview),
     'the consent (TCPA) text is still rendered by, and only by, a form node',
@@ -451,7 +458,7 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
 
   // A condition that MATCHES but names a step that no longer exists falls
   // through to the next condition rather than routing nowhere. That is what
-  // QuizRuntime.advance() does, and a validator that modelled it any other way
+  // useQuizMachine's advance does, and a validator that modelled it any other way
   // would clear a flow the runtime routes differently.
   const fallsThrough = decisionQuiz(
     [
