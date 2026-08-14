@@ -34,14 +34,12 @@
  *   redirect     BOTH T4 endpoints carry `redirect: null`. The `immediate` on
  *                this one is a stray edit, not authored intent.
  *
- * The FIFTH defect is different and is NOT derived from T4. The fault answer
- * "We Were Both At Fault / Not Sure" sets tier `t3`, which this flow does not
- * declare. T4 proves t3 is a real tier THERE; nothing establishes what it
- * collapses to in a two-tier world, and deciding that would be inventing an MVA
- * qualification rule. The owner chose: clear `setTier` so the tier stays whatever
- * the BigQuery tier lookup assigned from state + date. `fault: 'partial'` is
- * still captured by the answer's field mapping, so no data is lost — the answer
- * simply stops overriding a tier it cannot name.
+ * The FIFTH finding is REPORTED AND NEVER REPAIRED. The fault answer sets tier
+ * `t3`, which this flow does not declare. An earlier run cleared it to make the
+ * validator pass; that was wrong and has been reverted. `docs/external-blockers.md`
+ * states that the hand-set `t3` is deliberate — it is the one tier the BigQuery
+ * lookup does not assign. Changing qualification semantics to satisfy a graph
+ * checker is never authorised. It stays a blocker for a human.
  *
  * IDEMPOTENT. Every repair checks the current value first, so a second run
  * reports "already correct" and writes nothing.
@@ -124,16 +122,38 @@ for (const n of nodes) {
   }
 }
 
-/* 4 ── the undeclared tier. Owner's decision: clear it, keep the field mapping. */
+/*
+ * 4 ── the undeclared tier. REPORTED, NEVER REPAIRED. Do not add a fix here.
+ *
+ * An earlier run of this script cleared `setTier: 't3'` from the fault answer to
+ * make the graph validator pass. That was WRONG and it has been reverted in
+ * production. `docs/external-blockers.md` is the authoritative artifact and it
+ * says the opposite:
+ *
+ *     "The only tier assigned anywhere in the flow by hand is `t3`, set by the
+ *      answer 'We Were Both At Fault / Not Sure'. Every other tier comes from
+ *      this response."
+ *
+ * So the hand-set t3 is DELIBERATE DESIGN — it is the single tier the BigQuery
+ * lookup does not assign — and clearing it silently deleted the only qualification
+ * rule the funnel expresses in its own graph. It also deleted it to satisfy a
+ * validator, which is the one motive that must never be sufficient: a graph
+ * checker has no standing to change who qualifies for a legal claim.
+ *
+ * The real defect is the mirror image of what was "fixed": the two-tier quiz
+ * declares t1/t2 while its graph hand-assigns t3. Either the quiz should declare
+ * t3 (T4 does) or this variant should not carry that answer's tier at all.
+ * NOTHING in the T4 graph, the migrations, the seeds or the docs establishes
+ * which — so it stays a blocker for a human, not a repair for a script.
+ */
 const declared = new Set((Array.isArray(quiz.tiers) ? quiz.tiers : []).map((t) => String((t as { id: unknown }).id ?? '')))
 for (const n of nodes) {
   for (const a of n.answers ?? []) {
     if (!a.setTier || declared.has(a.setTier)) continue
-    const was = a.setTier
-    a.setTier = ''
-    noted(
-      `"${n.id}" answer "${a.label}" set undeclared tier "${was}" -> cleared; ` +
-        'the tier now stays whatever the tier-lookup webhook assigned',
+    console.log(
+      `  !!   "${n.id}" answer "${a.label}" sets undeclared tier "${a.setTier}" — ` +
+        'NOT repaired. This is a QUALIFICATION RULE and needs a human decision; ' +
+        'see docs/external-blockers.md.',
     )
   }
 }
