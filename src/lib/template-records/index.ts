@@ -127,6 +127,24 @@ export const toQuizRecord = (row: Record<string, unknown>): QuizTemplateRecord =
 export type ListOptions = {
   /** Include soft-deleted rows. Off by default: deleted means gone from lists. */
   includeArchived?: boolean
+  /**
+   * Include rows the sample retirement classified as `legacy`.
+   *
+   * Off by default, and that default is the point. A `legacy` row is a
+   * PRE-EXISTING PAGE that was seeded under the old model where a page and a
+   * template were different things — `MVA Pain First` and `Editorial Test` are
+   * the two in production. `retireSampleLandingPages` keeps them rather than
+   * deleting them, because it cannot prove nobody edited them and deleting
+   * somebody's content to tidy a list is the worse error. But keeping a row is
+   * not the same as OFFERING it: while they sat in this list the deployment
+   * gallery advertised 14 landing-page templates when the library has 12, and
+   * an operator could bind a live deployment to a sample record.
+   *
+   * So they are kept, and not offered. `origin: 'legacy'` is only ever set by
+   * the retirement, and only on a row whose slug and name match a known seeded
+   * sample, so nothing an operator built in the builder can land in here.
+   */
+  includeLegacy?: boolean
 }
 
 export const listLpTemplateRecords = async (
@@ -141,7 +159,8 @@ export const listLpTemplateRecords = async (
     overrideAccess: true,
   })
   const all = res.docs.map((d) => toLpRecord(d as Record<string, unknown>))
-  return opts.includeArchived ? all : all.filter((t) => !t.archivedAt)
+  const visible = opts.includeArchived ? all : all.filter((t) => !t.archivedAt)
+  return opts.includeLegacy ? visible : visible.filter((t) => t.origin !== 'legacy')
 }
 
 export const listQuizTemplateRecords = async (
@@ -390,7 +409,26 @@ export const ensureTemplateLibrary = async (payload: Payload): Promise<void> => 
   if (ensureInFlight) return ensureInFlight
   ensureInFlight = (async () => {
     try {
-      const report = await ensureTemplateRecords(payload)
+      /*
+       * The two halves are independent failures.
+       *
+       * They used to be one `await` chain, so when materialising the libraries
+       * threw, the sample retirement after it never ran — and in production that
+       * is exactly what happened, on every render, for hours. Materialising is
+       * also not a precondition for MOST of the retirement: it only needs the
+       * stock rows to exist, they already do, and the retirement reports
+       * "nothing to repoint to" by itself when they do not. Letting the second
+       * half run on the first half's failure is what makes a partial outage
+       * partial.
+       */
+      let report = emptyReport()
+      try {
+        report = await ensureTemplateRecords(payload)
+      } catch (err) {
+        report.problems.push(
+          `materialising the stock libraries failed: ${err instanceof Error ? err.message : 'unknown error'}`,
+        )
+      }
       const { retireSampleLandingPages } = await import('./samples')
       const samples = await retireSampleLandingPages(payload)
 
@@ -413,6 +451,17 @@ export const ensureTemplateLibrary = async (payload: Payload): Promise<void> => 
         // eslint-disable-next-line no-console
         console.warn(`[template-records] ${p}`)
       }
+      /*
+       * Latch even when a row reported a problem, and log the problem instead.
+       *
+       * Every failure this can now record is a PERSISTENT one — a row whose
+       * stored template id names nothing, a stock row that has no counterpart —
+       * so retrying it on the next render cannot fix it and did not: the
+       * unlatched retry ran twice per admin page render for hours and wrote the
+       * same line to the journal every time. That log flood was its own
+       * production defect and it buried the message that mattered. A restart
+       * still re-checks, because the latch is per-process and not persisted.
+       */
       libraryEnsured = true
     } catch (err) {
       // Never break the page that called us. Left unlatched so the next render

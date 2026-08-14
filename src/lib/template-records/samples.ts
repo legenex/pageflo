@@ -113,14 +113,45 @@ export const retireSampleLandingPages = async (payload: Payload): Promise<Sample
   }
 
   for (const raw of res.docs) {
-    const row = raw as Record<string, unknown>
+    /*
+     * ONE BAD ROW MUST NOT ABORT THE WHOLE RETIREMENT.
+     *
+     * This loop used to let an exception escape, and in production one did: the
+     * `editorial-test` row stored an unresolvable `template_id`, so stamping
+     * `origin: 'legacy'` on it failed field validation and threw. That killed
+     * the loop before `mva-pain-first` — the row after it — was ever examined,
+     * and killed the caller's whole reconcile with it. Both samples survived,
+     * and the library reported 14 templates instead of 12, for as long as the
+     * bad cell existed. A per-row boundary makes the blast radius one row.
+     */
+    try {
+      await retireOne(payload, raw as Record<string, unknown>, out)
+    } catch (err) {
+      out.problems.push(
+        `sample "${String((raw as Record<string, unknown>).slug ?? '?')}" could not be retired: ` +
+          `${err instanceof Error ? err.message : 'unknown error'}`,
+      )
+    }
+  }
+
+  await renameDeploymentsQuotingRetiredSamples(payload, out)
+  return out
+}
+
+/** One sample row's retirement. Extracted so the caller can bound its failures. */
+const retireOne = async (
+  payload: Payload,
+  row: Record<string, unknown>,
+  out: SampleReconcileResult,
+): Promise<void> => {
+  {
     const slug = String(row.slug ?? '')
     const sample = sampleBySlug.get(slug)
-    if (!sample) continue
+    if (!sample) return
 
     // Already adopted as a stock row by ensureTemplateRecords, or already
     // judged to be user content. Either way it is not a sample any more.
-    if (row.origin === 'stock' || row.origin === 'legacy') continue
+    if (row.origin === 'stock' || row.origin === 'legacy') return
 
     const looksLikeSample =
       String(row.name ?? '') === sample.name && String(row.template_id ?? '') === sample.template_id
@@ -138,7 +169,7 @@ export const retireSampleLandingPages = async (payload: Payload): Promise<Sample
           ? 'name or template no longer matches the seed — treated as authored content'
           : 'sections have been edited since seeding — treated as authored content',
       })
-      continue
+      return
     }
 
     /*
@@ -158,7 +189,7 @@ export const retireSampleLandingPages = async (payload: Payload): Promise<Sample
       out.problems.push(
         `sample "${slug}" was left in place: no stock template row for "${sample.template_id}" to repoint its deployments to`,
       )
-      continue
+      return
     }
 
     const deps = await payload.find({
@@ -208,9 +239,6 @@ export const retireSampleLandingPages = async (payload: Payload): Promise<Sample
       deployments: deps.docs.length,
     })
   }
-
-  await renameDeploymentsQuotingRetiredSamples(payload, out)
-  return out
 }
 
 /**

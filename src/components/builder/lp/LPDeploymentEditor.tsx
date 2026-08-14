@@ -41,6 +41,13 @@ import {
   isSafeDestinationUrl,
   resolveDestination,
 } from '@/lib/quiz-destinations'
+import { domainOptionLabel, isDomainSelectable } from '@/lib/domain-eligibility'
+import {
+  displayDeploymentUrl,
+  effectiveDeploymentUrl,
+  toDomainLike,
+  NO_SERVABLE_HOST_LABEL,
+} from '@/lib/deployment-url'
 
 const NEUTRAL = '__neutral__'
 
@@ -185,8 +192,19 @@ export const LPDeploymentEditor = ({
   const brand = brands.find((b) => b.id === draft.brandId) || null
   const template = templates.find((t) => t.id === draft.landingPageId) || null
 
-  const previewURL = `https://preview.legenex.com/lp/${draft.id || 'new'}`
-  const finalURL = draft.domain ? `https://${draft.domain}${draft.path || ''}` : previewURL
+  /*
+   * ONE calculation, shared with the list, the preview button and the public
+   * router. The header, the Final URL box and the link a visitor is given are
+   * three views of this object and can no longer disagree — which they did, on
+   * a saved deployment, in three different ways. See src/lib/deployment-url.ts.
+   */
+  const brandDomains = brand?.__domains ?? []
+  const effective = effectiveDeploymentUrl({
+    boundHost: draft.domain,
+    brandDomains,
+    path: draft.path,
+  })
+  const finalURL = displayDeploymentUrl(effective)
 
   // Pickers go through one helper so an archived record is never offered and a
   // saved reference to one is never silently dropped. See src/lib/selectable.ts.
@@ -196,19 +214,23 @@ export const LPDeploymentEditor = ({
     toRecord: (q) => ({ id: q.id, label: q.name, status: q.isArchived ? 'archived' : q.isPublished ? 'published' : 'draft' }),
   })
 
-  // Only a domain that is active AND holds an active certificate can serve a
-  // funnel. Anything else is offered disabled rather than hidden, so "why is my
-  // domain not in the list" has an answer on screen.
-  const brandDomains = brand?.__domains ?? []
+  /*
+   * Eligibility comes from the ONE contract, not a second opinion typed here.
+   *
+   * This picker used to require `status === 'active' && sslStatus === 'active'`
+   * inline. That rejected every PREVIEW host, because a preview row is created
+   * active with `ssl_status: 'unknown'` and no preview host has ever been
+   * through certificate issuance. So the editor reported "No domain ready for
+   * this brand" about a domain the public router serves, the publish preflight
+   * passes, and `domainEligibility` calls eligible — four surfaces, two answers.
+   * Ineligible domains are offered disabled with the reason, so "why is my
+   * domain not in the list" still has an answer on screen.
+   */
   const domainOptions = selectableOptions({
     records: brandDomains,
     selectedId: draft.domain,
-    toRecord: (d) => ({
-      id: d.host,
-      label: `${d.host}${d.primary ? '  (primary)' : ''}${d.status !== 'active' ? `  - ${d.status}` : d.sslStatus !== 'active' ? '  - certificate pending' : ''}`,
-      status: 'published',
-    }),
-    isEligible: (_rec, d) => d.status === 'active' && d.sslStatus === 'active',
+    toRecord: (d) => ({ id: d.host, label: domainOptionLabel(toDomainLike(d)), status: 'published' }),
+    isEligible: (_rec, d) => isDomainSelectable(toDomainLike(d)),
   })
 
   /*
@@ -270,7 +292,7 @@ export const LPDeploymentEditor = ({
         <div style={{ padding: '24px 40px', maxWidth: 1100, margin: '0 auto' }}>
           <div style={{ marginBottom: 22 }}>
             <div style={{ fontSize: 24, color: T.text, fontWeight: 700, letterSpacing: '-0.025em', fontFamily: '"JetBrains Mono", monospace' }}>
-              {draft.domain || 'preview.legenex.com'}{draft.path || ''}
+              {effective.host ? `${effective.host}${effective.path === '/' ? '' : effective.path}` : NO_SERVABLE_HOST_LABEL}
             </div>
             <div style={{ fontSize: 12.5, color: T.textMute, marginTop: 4 }}>
               {template?.name || 'no template'} {'·'} {brand?.displayName || 'no brand'} {'·'} {(draft.status || 'draft').toUpperCase()}
@@ -381,10 +403,18 @@ export const LPDeploymentEditor = ({
                     </div>
                     <div>
                       <Label>Final URL</Label>
-                      <div style={{ padding: '7px 10px', backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 12, fontFamily: '"JetBrains Mono", monospace', color: draft.domain ? T.text : T.warning, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <div style={{ padding: '7px 10px', backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 6, fontSize: 12, fontFamily: '"JetBrains Mono", monospace', color: effective.url ? T.text : T.warning, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {finalURL}
                       </div>
-                      {!draft.domain && <div style={{ marginTop: 5 }}><Pill color={T.info}>PREVIEW URL</Pill></div>}
+                      {/* What this URL IS, said plainly. The old badge read
+                          "PREVIEW URL" whenever no domain was bound, including
+                          when the URL shown was not a preview host at all. */}
+                      <div style={{ marginTop: 5, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                        {effective.hostSource === 'brand-preview' && <Pill color={T.info}>PREVIEW HOST</Pill>}
+                        {effective.hostSource === 'brand-primary' && !draft.domain && <Pill color={T.info}>BRAND PRIMARY</Pill>}
+                        {effective.certificateUnverified && <Pill color={T.warning}>CERTIFICATE UNVERIFIED</Pill>}
+                        {effective.problem ? <Pill color={T.danger}>{effective.problem.toUpperCase()}</Pill> : null}
+                      </div>
                     </div>
                   </div>
                 </div>

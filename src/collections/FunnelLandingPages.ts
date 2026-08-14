@@ -17,10 +17,39 @@ import { resolveTemplate } from '../lib/template-registry'
  * validator is the only check that covers every writer, which is what makes a
  * bad row unreachable rather than merely unlikely.
  */
-const validateLpTemplateId = (value: unknown): true | string => {
+const validateLpTemplateId = (
+  value: unknown,
+  options?: { previousValue?: unknown },
+): true | string => {
   if (value == null || value === '') return true
   const r = resolveTemplate('lp', value)
-  return r.ok ? true : r.error
+  if (r.ok) return true
+
+  /*
+   * A BAD VALUE ALREADY IN THE ROW MUST NOT MAKE THE ROW UNMANAGEABLE.
+   *
+   * Payload validates every field on every update, not just the ones being
+   * written. So a row that already stores an unresolvable `template_id` — and
+   * production had one, `editorial-test` storing `urgent_streamlined` — could
+   * not be updated AT ALL: not archived, not marked legacy, not repaired. Every
+   * write against it threw "The following field is invalid: Template_id".
+   *
+   * That turned a single bad cell into a platform-wide outage of the template
+   * library. `ensureTemplateLibrary` runs on admin page renders and calls
+   * `retireSampleLandingPages`, whose first act on an unrecognised sample is to
+   * stamp `origin: 'legacy'` on it. That write threw, the whole reconcile was
+   * caught and abandoned, and it never latched — so it re-threw on EVERY render
+   * (twice a page, ~every 5 minutes in the logs for hours) and the sample
+   * retirement never ran once. The two sample rows stayed in the library and the
+   * deployment picker offered 14 templates instead of 12.
+   *
+   * So: a value that is NOT CHANGING is let through, because refusing it blocks
+   * the very repair that would remove it. A value being SET is still refused,
+   * which is the check's actual job — no new bad row can be created by any door.
+   */
+  if (options && 'previousValue' in options && options.previousValue === value) return true
+
+  return r.error
 }
 
 /**

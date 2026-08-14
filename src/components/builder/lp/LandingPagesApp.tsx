@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 
 import { selectableOptions } from '@/lib/selectable'
+import { displayDeploymentUrl, effectiveDeploymentUrl } from '@/lib/deployment-url'
 import {
   T, Btn, Input, Textarea, Select, Label, Pill, IconBtn, ConfirmDialog, Toast,
   PageHeader, EmptyState, TopBar, brandShortName,
@@ -131,7 +132,10 @@ const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDep
         const refDomain = dep.domainId ? domains.find((d) => d.id === dep.domainId) : null
         const orphanedDomain = !!dep.domainId && !refDomain
         const domainStr = refDomain?.domain || dep.domain || ''
-        const url = domainStr ? `https://${domainStr}${dep.path || ''}` : `https://preview.legenex.com/lp/${dep.id}`
+        // Same calculation the editor and the router use. See deployment-url.ts.
+        const url = displayDeploymentUrl(
+          effectiveDeploymentUrl({ boundHost: domainStr, brandDomains: brand?.__domains ?? [], path: dep.path }),
+        )
         const depName = dep.name || (template ? `${template.name} · ${brand?.displayName || 'No brand'}` : 'Untitled deployment')
         const primary = brand?.colors?.primary
         const background = brand?.colors?.background
@@ -817,9 +821,20 @@ const LPPreviewModal = ({ previewState, templates, brands, deployments, quizzes,
   const slotOverrides = { ...(template.slotOverrides || {}), ...(deployment?.contentOverrides || {}) }
   const quiz = deployment ? quizzes.find((q) => q.id === deployment.quizId) || null : null
 
+  /*
+   * A DEPLOYMENT has a real URL; a bare TEMPLATE does not, and saying so is the
+   * point. The old code printed `preview.legenex.com/lp/<slug>` for a template,
+   * which reads as a live address for something that has never been placed.
+   */
   const url = deployment
-    ? (deployment.domain ? `https://${deployment.domain}${deployment.path || ''}` : `https://preview.legenex.com/lp/${deployment.id}`)
-    : `https://preview.legenex.com/lp/${template.slug}`
+    ? displayDeploymentUrl(
+        effectiveDeploymentUrl({
+          boundHost: deployment.domain,
+          brandDomains: brand?.__domains ?? [],
+          path: deployment.path,
+        }),
+      )
+    : 'Not deployed — this template has no URL until you place it'
 
   return (
     // Announced as a dialog, and addressable by the template it is showing. It
