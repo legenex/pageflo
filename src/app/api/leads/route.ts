@@ -29,6 +29,9 @@ const Body = z.object({
   funnel_id: z.string().optional(),
   funnel_path: z.string().optional(),
   source_entity_id: z.string().optional(),
+  // Idempotency key the client mints once per submission and resends on retry.
+  // Bounded so a hostile body cannot store an unbounded string.
+  client_submission_id: z.string().max(128).optional(),
   test_capture: z.boolean().optional(),
   contact: ContactSchema,
   // Arbitrary key/value blob for custom lead_form fields the page author added
@@ -113,6 +116,7 @@ export async function POST(req: NextRequest) {
     funnel_id: data.funnel_id,
     funnel_path: data.funnel_path,
     source_entity_id: data.source_entity_id,
+    client_submission_id: data.client_submission_id,
     test_capture: data.test_capture,
     contact: { ...data.contact, email: data.contact.email || undefined },
     quiz_answers: data.quiz_answers,

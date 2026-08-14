@@ -43,6 +43,7 @@ import * as migration_20260813_210000_locked_documents_funnel_rels from './20260
 import * as migration_20260813_213000_integration_config_sample_markers from './20260813_213000_integration_config_sample_markers'
 import * as migration_20260813_220000_template_records from './20260813_220000_template_records'
 import * as migration_20260813_230000_audit_log_user_nullable from './20260813_230000_audit_log_user_nullable'
+import * as migration_20260814_120000_leads_idempotency_key from './20260814_120000_leads_idempotency_key'
 
 export const migrations = [
   {
@@ -197,5 +198,10 @@ export const migrations = [
     up: migration_20260813_230000_audit_log_user_nullable.up,
     down: migration_20260813_230000_audit_log_user_nullable.down,
     name: '20260813_230000_audit_log_user_nullable',
+  },
+  {
+    up: migration_20260814_120000_leads_idempotency_key.up,
+    down: migration_20260814_120000_leads_idempotency_key.down,
+    name: '20260814_120000_leads_idempotency_key',
   },
 ];

@@ -72,6 +72,24 @@ export const Leads: CollectionConfig = {
     { name: 'attribution', type: 'json', admin: { description: 'utm_*, fbclid, gclid, ttclid, referrer, landing_path, session_id, ip, user_agent.' } },
     { name: 'trustedform_cert_url', type: 'text' },
     { name: 'jornaya_lead_id', type: 'text' },
+    {
+      // A stable key the client mints once per completed submission and sends on
+      // every retry. The pipeline returns the existing lead for a key it has
+      // already written rather than inserting a duplicate — see
+      // 20260814_120000_leads_idempotency_key and runLeadPipeline. Null for
+      // rows written before this existed and for callers that send no key.
+      //
+      // No `index: true` on purpose. The migration owns a PARTIAL UNIQUE index
+      // (site + key, where key is not null) that a field-level flag cannot
+      // express, and declaring `index: true` here would have Payload's dev
+      // auto-push replace that unique index with a plain one. Production is
+      // built by migrations and keeps the unique guarantee; the query below
+      // uses it. (Dev auto-push may drop it locally — the app-level dedupe in
+      // runLeadPipeline is env-agnostic and is what the regression proves.)
+      name: 'client_submission_id',
+      type: 'text',
+      admin: { readOnly: true, description: 'Idempotency key; dedupes retried submissions of the same lead.' },
+    },
     { name: 'hlr_result', type: 'json', admin: { description: 'Async-populated phone enrichment result.' } },
     { name: 'buyer_id', type: 'text' },
     { name: 'sold_at', type: 'date' },

@@ -31,7 +31,7 @@
     "test:release": "tsx scripts/test-release-ordering.mts",
     "test:e2e": "cross-env NODE_ENV=production tsx scripts/test-e2e-lead.mts",
     "verify:schema": "cross-env NODE_ENV=production tsx scripts/verify-schema.mts",
-    "test": "pnpm test:brand && pnpm test:authz && pnpm test:registry && pnpm test:records && pnpm test:slots && pnpm test:publish && pnpm test:ai && pnpm test:flow && pnpm test:webhook && pnpm test:observability && pnpm test:brand-identity",
+    "test": "pnpm test:brand && pnpm test:authz && pnpm test:registry && pnpm test:records && pnpm test:slots && pnpm test:publish && pnpm test:ai && pnpm test:flow && pnpm test:webhook && pnpm test:idempotency && pnpm test:observability && pnpm test:brand-identity",
     "test:all": "pnpm test && pnpm test:isolation && pnpm test:identity && pnpm test:bootstrap",
     "sweep:templates": "tsx scripts/sweep-templates.mts",
     "reconcile:lp-quiz": "tsx scripts/reconcile-lp-quiz-bindings.mts",
@@ -40,7 +40,8 @@
     "payload": "cross-env NODE_OPTIONS=--no-deprecation payload",
     "generate:types": "cross-env NODE_OPTIONS=--no-deprecation payload generate:types",
     "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
-    "seed": "cross-env NODE_OPTIONS=--no-deprecation tsx src/seed/index.ts"
+    "seed": "cross-env NODE_OPTIONS=--no-deprecation tsx src/seed/index.ts",
+    "test:idempotency": "tsx scripts/test-lead-idempotency.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",

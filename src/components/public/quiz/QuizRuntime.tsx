@@ -130,6 +130,18 @@ export function QuizRuntime({
   // endpoint cannot fire before the lead is persisted.
   const [submitState, setSubmitState] = useState('idle')
   const submittedRef = useRef(false)
+  // A stable idempotency key, minted ONCE per mounted runtime and never cleared
+  // — not even when submittedRef is released after a failure. The server dedupes
+  // on it, so a retry after a lost response, or a re-submit by a later endpoint,
+  // returns the same lead instead of writing a second one. Lazy-initialised so
+  // it exists before the first submit without depending on render timing.
+  const submissionIdRef = useRef(null)
+  if (!submissionIdRef.current) {
+    submissionIdRef.current =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `sub_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`
+  }
   const rootRef = useRef(null)
   const cardAreaRef = useRef(null)
   // Width of the space the card has, not the window. Drives how many answer
@@ -191,6 +203,7 @@ export function QuizRuntime({
       funnel_id: quiz.slug || String(quiz.id),
       funnel_path: typeof window !== 'undefined' ? window.location.pathname : undefined,
       source_entity_id: deployment?.id ? String(deployment.id) : undefined,
+      client_submission_id: submissionIdRef.current,
       contact,
       quiz_answers: quizAnswers,
       attribution: captureAttribution(),

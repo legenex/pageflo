@@ -99,6 +99,8 @@ export type LeadSubmitPayload = {
   funnel_id?: string
   funnel_path?: string
   source_entity_id?: string
+  /** Idempotency key, minted once per submission and resent on every retry. */
+  client_submission_id?: string
   contact: Record<string, string>
   extra?: Record<string, unknown>
   quiz_answers?: Record<string, unknown>

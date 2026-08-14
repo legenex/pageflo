@@ -24,6 +24,16 @@ export type LeadCaptureInput = {
   funnel_path?: string
   source_entity_id?: string
 
+  /**
+   * Idempotency key, minted once by the client per completed submission and
+   * resent on every retry. When present, a submission whose key already has a
+   * lead returns that lead instead of writing a second one — so a retry after a
+   * lost response, or a re-submit by a later endpoint in the flow, cannot
+   * duplicate the row or re-fire CAPI/webhooks. Absent for the test harness and
+   * legacy forms, which then behave exactly as before (always insert).
+   */
+  client_submission_id?: string
+
   test_capture?: boolean
 
   contact: {
@@ -76,6 +86,40 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
   const steps: PipelineStep[] = []
   let leadId: number | null = null
 
+  // ---------- 0. Idempotency ----------
+  //
+  // A submission that already has a lead returns that lead, so a retried or
+  // re-fired submit (a lost response, a later endpoint in the flow trying
+  // again) does not write a second row or re-fire CAPI/webhooks to a buyer.
+  // Only when the client sent a key: the test harness and legacy forms send
+  // none and keep their always-insert behaviour. The database's partial unique
+  // index is the real guarantee; this read makes the common (serial retry)
+  // case cheap and lets the pipeline short-circuit before any side effect.
+  const submissionKey =
+    typeof input.client_submission_id === 'string' && input.client_submission_id.trim()
+      ? input.client_submission_id.trim()
+      : null
+  if (submissionKey) {
+    const existing = await payload
+      .find({
+        collection: 'leads',
+        where: { and: [{ site: { equals: input.siteId } }, { client_submission_id: { equals: submissionKey } }] },
+        limit: 1,
+        depth: 0,
+        overrideAccess: true,
+      })
+      .catch(() => null)
+    const prior = existing?.docs?.[0] as { id: number | string; attribution?: { event_id?: string } } | undefined
+    if (prior) {
+      return {
+        ok: true,
+        lead_id: Number(prior.id),
+        event_id: prior.attribution?.event_id ?? event_id,
+        steps: [{ step: 'lead.deduplicated', ok: true, detail: `existing id=${prior.id}`, duration_ms: 0 }],
+      }
+    }
+  }
+
   // ---------- 1. Write Lead row ----------
   const writeStarted = Date.now()
   const attribution: Attribution = {
@@ -101,12 +145,38 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
         attribution: { ...attribution, event_id },
         trustedform_cert_url: input.trustedform_cert_url ?? null,
         jornaya_lead_id: input.jornaya_lead_id ?? null,
+        client_submission_id: submissionKey,
       } as never,
       overrideAccess: true,
     })) as { id: number }
     leadId = Number(lead.id)
     steps.push({ step: 'lead.created', ok: true, detail: `id=${leadId}`, duration_ms: t(writeStarted) })
   } catch (err) {
+    // A concurrent retry that lost the race to the partial unique index throws
+    // here. That is not a failure — the OTHER attempt wrote the lead — so
+    // return that row rather than telling the visitor their submission failed
+    // (which would send them into yet another retry). Only when we have a key
+    // to look it up by; any other write error is the real thing.
+    if (submissionKey && /unique|duplicate/i.test(err instanceof Error ? err.message : '')) {
+      const raced = await payload
+        .find({
+          collection: 'leads',
+          where: { and: [{ site: { equals: input.siteId } }, { client_submission_id: { equals: submissionKey } }] },
+          limit: 1,
+          depth: 0,
+          overrideAccess: true,
+        })
+        .catch(() => null)
+      const won = raced?.docs?.[0] as { id: number | string; attribution?: { event_id?: string } } | undefined
+      if (won) {
+        return {
+          ok: true,
+          lead_id: Number(won.id),
+          event_id: won.attribution?.event_id ?? event_id,
+          steps: [{ step: 'lead.deduplicated', ok: true, detail: `concurrent, existing id=${won.id}`, duration_ms: t(writeStarted) }],
+        }
+      }
+    }
     steps.push({
       step: 'lead.created',
       ok: false,
