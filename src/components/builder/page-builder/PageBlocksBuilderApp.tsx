@@ -35,6 +35,7 @@ import { rewriteSection } from '@/app/(app)/admin/sites/[slug]/pages/[id]/ai-rew
 import { saveAsSiteDefault } from '@/app/(app)/admin/sites/[slug]/pages/[id]/site-defaults-action'
 import { detectStructuredFromHtml } from '@/app/(app)/admin/sites/[slug]/pages/[id]/convert-action'
 import { lintBlocks, judgeContrast } from '@/lib/builder/page-lint'
+import { settleAction, failureMessage } from '../server-action'
 
 const genId = () => `b_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 
@@ -327,9 +328,9 @@ const AIRewritePanel = ({ block, onAccept }) => {
     setError(null)
     setResult(null)
     try {
-      const res = await rewriteSection({ block, instruction: text })
+      const res = await settleAction(rewriteSection({ block, instruction: text }))
       if (!res.ok) {
-        setError(res.error)
+        setError(failureMessage(res))
       } else {
         setResult(res.block)
       }
@@ -830,7 +831,7 @@ const SaveAsSiteDefaultRow = ({ block, siteSlug, siteId, onToast }) => {
       : 'Save as Site default footer (applies to every page)'
   const run = async () => {
     setBusy(true)
-    const res = await saveAsSiteDefault({ siteSlug, siteId, kind, block })
+    const res = await settleAction(saveAsSiteDefault({ siteSlug, siteId, kind, block }))
     setBusy(false)
     if (res.ok) {
       onToast({
@@ -841,7 +842,7 @@ const SaveAsSiteDefaultRow = ({ block, siteSlug, siteId, onToast }) => {
         type: 'success',
       })
     } else {
-      onToast({ message: res.error || 'Save failed', type: 'error' })
+      onToast({ message: failureMessage(res), type: 'error' })
     }
   }
   return (
@@ -1094,10 +1095,10 @@ const ConvertCustomHtmlPanel = ({ block, onConvert, onToast }) => {
     setBusy(true)
     setError(null)
     setDetected(null)
-    const res = await detectStructuredFromHtml({ html: String(block.html ?? '') })
+    const res = await settleAction(detectStructuredFromHtml({ html: String(block.html ?? '') }))
     setBusy(false)
     if (!res.ok) {
-      setError(res.error)
+      setError(failureMessage(res))
       return
     }
     setDetected({ type: res.detected, block: res.block })
@@ -2150,14 +2151,29 @@ export function PageBlocksBuilderApp({ pageId, siteSlug, siteId, primaryHost, si
 
   const selected = blocks.find((b) => b.id === selectedId)
 
+  /*
+   * Undo callbacks for state this screen flipped optimistically and the pending
+   * save has not confirmed yet. Only the PUBLISH status registers one: a save
+   * carries the whole page, so a failure invalidates the block edits too, but
+   * dropping those would throw the operator's work away — whereas a page still
+   * reading PUBLISHED after an unpublish that never landed is a lie about what
+   * visitors can see, which is the half that must not survive.
+   *
+   * A list rather than a single slot because the debounce coalesces writes: two
+   * flips before one save means two rollbacks, and they are applied newest-first
+   * so the value the server actually holds is the one restored.
+   */
+  const pendingRollbacks = useRef([])
+
   // Debounced auto-save. body_blocks IS the public render source, so any
   // successful save here is immediately visible to visitors on the next
   // page render — no iframe to refresh.
-  const persist = useCallback((next) => {
+  const persist = useCallback((next, rollback) => {
+    if (rollback) pendingRollbacks.current = [...pendingRollbacks.current, rollback]
     if (saveTimer.current) clearTimeout(saveTimer.current)
     saveTimer.current = setTimeout(async () => {
       setSaving(true)
-      const res = await savePageBodyBlocks({
+      const res = await settleAction(savePageBodyBlocks({
         pageId,
         siteSlug,
         title: next.title,
@@ -2171,19 +2187,23 @@ export function PageBlocksBuilderApp({ pageId, siteSlug, siteId, primaryHost, si
         block_meta: next.blockMeta,
         publish_at: next.publishAt || null,
         schema_json: next.schemaJson || null,
-      })
+      }))
       setSaving(false)
-      if (!res.ok) setToast({ message: res.error || 'Save failed', type: 'error' })
+      if (res.ok) { pendingRollbacks.current = []; return }
+      const undo = pendingRollbacks.current
+      pendingRollbacks.current = []
+      for (let i = undo.length - 1; i >= 0; i--) undo[i]()
+      setToast({ message: failureMessage(res), type: 'error' })
     }, 600)
   }, [pageId, siteSlug])
 
-  const bump = (patch = {}) => {
+  const bump = (patch = {}, rollback) => {
     persist({
       title, slug, status, metaTitle, metaDescription, ogImageUrl,
       blocks, hiddenBlocks, blockMeta,
       publishAt, schemaJson,
       ...patch,
-    })
+    }, rollback)
   }
 
   // Per-block meta helper: merge new flags into block_meta[blockId].
@@ -2220,7 +2240,10 @@ export function PageBlocksBuilderApp({ pageId, siteSlug, siteId, primaryHost, si
   // Wrap setters so any update fires a debounced save.
   const setTitleX = (v) => { setTitle(v); bump({ title: v }) }
   const setSlugX = (v) => { setSlug(v); bump({ slug: v }) }
-  const setStatusX = (v) => { setStatus(v); bump({ status: v }) }
+  // The status pill is the operator's answer to "is this page live", so the flip
+  // is registered for rollback: a save that never lands must not leave it
+  // claiming a page was published or taken down when it was not.
+  const setStatusX = (v) => { const previous = status; setStatus(v); bump({ status: v }, () => setStatus(previous)) }
   const setMetaTitleX = (v) => { setMetaTitle(v); bump({ metaTitle: v }) }
   const setMetaDescX = (v) => { setMetaDescription(v); bump({ metaDescription: v }) }
   const setOgUrlX = (v) => { setOgImageUrl(v); bump({ ogImageUrl: v }) }
@@ -2390,9 +2413,10 @@ export function PageBlocksBuilderApp({ pageId, siteSlug, siteId, primaryHost, si
     window.open(url, '_blank', 'noopener,noreferrer')
   }
   const handlePublishToggle = () => {
+    const previous = status
     const next = status === 'published' ? 'draft' : 'published'
     setStatus(next)
-    bump({ status: next })
+    bump({ status: next }, () => setStatus(previous))
   }
 
   const previewPath = slug.startsWith('/') ? slug : `/${slug}`

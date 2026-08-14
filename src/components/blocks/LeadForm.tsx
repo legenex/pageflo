@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import {
   CONTACT_KEYS,
   captureAttribution,
+  newClientSubmissionId,
   readTrustedFormCert,
   readJornayaLeadId,
   firePixelEvents,
@@ -48,6 +49,35 @@ export function LeadForm({ block, site }: { block: LeadFormBlock; site: Site }) 
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  /*
+   * The idempotency key, on the same contract QuizRuntime uses: minted ONCE per
+   * mounted form and deliberately NEVER cleared, so the retry a visitor makes
+   * after a failure carries the key the failed attempt carried.
+   *
+   * This form used to send none. `runLeadPipeline` only dedupes when a key is
+   * present, and the database's unique index is PARTIAL (`WHERE
+   * client_submission_id IS NOT NULL`), so a keyless submit opted out of the
+   * guarantee entirely — and `lead_form` ships on every seeded Site's home page.
+   * A submit whose write committed but whose response was lost came back as a
+   * failure, the visitor pressed the button again, and that wrote a second lead
+   * row, a second CAPI conversion and a second webhook to a buyer.
+   *
+   * Disabling the button is NOT the guarantee and cannot be: implicit form
+   * submission still fires while the default button is disabled, a second tab is
+   * a second component, and neither survives a lost response. The key is the
+   * guarantee; the disabling below is only there to stop the pointless request.
+   *
+   * `''` rather than `null` as the "not yet minted" sentinel purely so the value
+   * types as `string` at the call site; the lifetime is identical.
+   */
+  const submissionIdRef = useRef<string>('')
+  if (!submissionIdRef.current) submissionIdRef.current = newClientSubmissionId()
+
+  // Belt to the key's braces: a second submit while the first is still in flight
+  // is a wasted round trip even though the server would dedupe it. A ref, not
+  // `pending`, because two submits in the same tick both read the old state.
+  const inFlightRef = useRef(false)
+
   // Hydrate hidden attribution inputs once the form mounts client-side.
   useEffect(() => {
     if (!formRef.current) return
@@ -60,8 +90,10 @@ export function LeadForm({ block, site }: { block: LeadFormBlock; site: Site }) 
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    if (inFlightRef.current) return
     setError(null)
     if (!formRef.current) return
+    inFlightRef.current = true
     setPending(true)
 
     const fd = new FormData(formRef.current)
@@ -108,6 +140,7 @@ export function LeadForm({ block, site }: { block: LeadFormBlock; site: Site }) 
       funnel_type: (block.funnel_type ?? 'contact-form') as 'contact-form',
       funnel_id: block.funnel_id,
       funnel_path: typeof window !== 'undefined' ? window.location.pathname : undefined,
+      client_submission_id: submissionIdRef.current,
       contact,
       extra: Object.keys(extra).length > 0 ? extra : undefined,
       attribution,
@@ -118,6 +151,10 @@ export function LeadForm({ block, site }: { block: LeadFormBlock; site: Site }) 
     const result = await submitLead(payload)
     if (!result.ok) {
       setError(result.error ?? 'Submission failed. Please try again.')
+      // Re-armed so the visitor can try again — with the SAME key, which is what
+      // makes the retry safe. The ref is not reset on success: that path
+      // navigates away.
+      inFlightRef.current = false
       setPending(false)
       return
     }

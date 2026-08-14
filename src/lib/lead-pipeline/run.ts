@@ -6,6 +6,7 @@ import { verifyJornayaLead } from '@/lib/integrations/jornaya'
 import { sendMetaCAPIEvent } from '@/lib/integrations/meta-capi'
 import { resolveTrueCallCampaignId, pushTrueCallLead } from '@/lib/integrations/truecall'
 import { enrichPhone } from '@/lib/integrations/hlr'
+import { fetchWithTimeout } from '@/lib/net/outbound'
 import { dispatchWebhooks, type WebhookConfig } from './dispatch-webhooks'
 import { sendSlackNotification } from './slack'
 import { deriveFbc, type Attribution } from './attribution'
@@ -188,21 +189,40 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
     return { ok: false, lead_id: null, event_id, steps, error: 'lead write failed' }
   }
 
-  // ---------- 2. Load TrackingConfig ----------
-  const tcRes = await payload.find({
-    collection: 'tracking-configs',
-    where: { site: { equals: input.siteId } },
-    limit: 1,
-    overrideAccess: true,
-  })
-  const tc = tcRes.docs[0]
-
   // Snapshot of update payload — patched as integrations complete.
+  // Declared before the TrackingConfig read so that read's own failure can be
+  // recorded on the lead like any other step.
   const leadPatch: Record<string, unknown> = {}
   const deliveryLog: Array<{ at: string; step: string; ok: boolean; detail?: string }> = []
   const logDelivery = (step: string, ok: boolean, detail?: string) => {
     deliveryLog.push({ at: new Date().toISOString(), step, ok, detail })
   }
+
+  // ---------- 2. Load TrackingConfig ----------
+  //
+  // GUARDED, because everything from here on runs AFTER the lead row is
+  // committed. Unguarded, a database hiccup on this one read threw out of the
+  // pipeline and the route answered 500 with the lead already written: the
+  // visitor is told their submission failed and retries it, and the client never
+  // receives the `event_id`, so the browser pixel has nothing to dedupe the CAPI
+  // event against. Degrading costs this lead its integrations — every consumer
+  // below reads `tc?.…`, so they each report `skipped` — and keeps the row, the
+  // response and the trace, which is the right trade at this point in the run.
+  const tcStarted = Date.now()
+  const tcRes = await payload
+    .find({
+      collection: 'tracking-configs',
+      where: { site: { equals: input.siteId } },
+      limit: 1,
+      overrideAccess: true,
+    })
+    .catch((err: unknown) => {
+      const detail = err instanceof Error ? err.message : 'unknown'
+      steps.push({ step: 'tracking_config.load', ok: false, detail, duration_ms: t(tcStarted) })
+      logDelivery('tracking_config.load', false, detail)
+      return null
+    })
+  const tc = tcRes?.docs?.[0]
 
   // ---------- 3. Fan-out: synchronous integrations ----------
 
@@ -310,7 +330,9 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
       return
     }
     try {
-      const resp = await fetch('https://business-api.tiktok.com/open_api/v1.3/event/track/', {
+      // Bounded: this runs inside the visitor's lead POST, and the catch below
+      // turns a deadline into a failed step. See lib/net/outbound.
+      const resp = await fetchWithTimeout('https://business-api.tiktok.com/open_api/v1.3/event/track/', {
         method: 'POST',
         headers: {
           'Access-Token': tk.access_token,
@@ -357,7 +379,8 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
     }
     try {
       const url = `https://www.google-analytics.com/mp/collect?measurement_id=${encodeURIComponent(ga.measurement_id)}&api_secret=${encodeURIComponent(ga.api_secret)}`
-      const resp = await fetch(url, {
+      // Bounded, as above. See lib/net/outbound.
+      const resp = await fetchWithTimeout(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

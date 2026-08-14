@@ -1,6 +1,8 @@
 // HLR (Home Location Register) phone enrichment. Provider-agnostic interface so we can
 // swap Plivo / Twilio Lookup / Trestle behind one shape.
 
+import { fetchWithTimeout } from '@/lib/net/outbound'
+
 export type HLRResult = {
   ok: boolean
   provider: string
@@ -27,9 +29,14 @@ const lookupPlivo = async (phone: string): Promise<HLRResult> => {
   if (!authId || !authToken) return { ok: false, provider: 'plivo', error: 'missing plivo credentials' }
   const auth = Buffer.from(`${authId}:${authToken}`).toString('base64')
   try {
-    const resp = await fetch(`https://api.plivo.com/v1/Account/${authId}/Lookup/Number/${encodeURIComponent(phone)}/?type=carrier`, {
-      headers: { Authorization: `Basic ${auth}`, Accept: 'application/json' },
-    })
+    // Bounded even though the caller is fire-and-forget: an unbounded lookup
+    // does not block the response, but it does pin a socket and a pending
+    // `payload.update` for ~300s per lead, which under any real volume is a
+    // connection leak rather than a slow enrichment. See lib/net/outbound.
+    const resp = await fetchWithTimeout(
+      `https://api.plivo.com/v1/Account/${authId}/Lookup/Number/${encodeURIComponent(phone)}/?type=carrier`,
+      { headers: { Authorization: `Basic ${auth}`, Accept: 'application/json' } },
+    )
     const raw = await resp.json().catch(() => ({}))
     if (!resp.ok) return { ok: false, provider: 'plivo', raw, error: `plivo returned ${resp.status}` }
     const r = raw as {

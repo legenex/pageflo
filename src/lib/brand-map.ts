@@ -129,11 +129,131 @@ export function resolveDefaultChrome(
   }
 }
 
+/**
+ * The first of these values that is a non-blank string, trimmed. '' when none is.
+ *
+ * Trimmed because every caller's question is "did a human put something here",
+ * and a textarea that holds a single newline answers no.
+ */
+const first = (...vals: unknown[]): string => {
+  for (const v of vals) {
+    if (typeof v === 'string' && v.trim() !== '') return v.trim()
+  }
+  return ''
+}
+
+/** The brand's legal copy, in the artifact's shape. */
+export type BrandLegal = {
+  copyright: string
+  tcpaText: string
+  privacyUrl: string
+  termsUrl: string
+  defaultDisclaimer: string
+  /**
+   * Any other string a record's `brand_identity.legal` carried. The advertorial
+   * builder authors a `legal.disclaimer` of its own and reads it straight back
+   * off the brand, so dropping unknown keys here would silently empty its
+   * disclaimer sections.
+   */
+  [key: string]: string
+}
+
+/** The brand's call-to-action contact details, in the artifact's shape. */
+export type BrandContact = {
+  callNumber: string
+  callCtaText: string
+  callCtaStyle: string
+}
+
+/**
+ * THE answer to "what is this brand's disclaimer / TCPA text", for everybody.
+ *
+ * A brand's legal copy can physically sit in four places, all of them real and
+ * all of them present in production right now:
+ *
+ *   - the Site's `legal` group. A Payload doc spells it `legal.default_disclaimer`
+ *     and the column it maps to is `legal_default_disclaimer`, so a raw SQL row
+ *     and a `findByID` result carry the SAME value under different keys.
+ *   - `default_disclaimer_md`, the older site-wide field the public block
+ *     renderer still reads.
+ *   - `brand_identity.legal.*`, which is where the Brand Identity editor writes:
+ *     `updLegal({ defaultDisclaimer })` in `BrandModule.tsx`.
+ *   - a bare `brand_identity.*` scalar, which nothing writes today and is kept
+ *     only so a record written by an older shape still resolves.
+ *
+ * Anything that needs to know whether a brand HAS a disclaimer must ask here
+ * rather than reach into the jsonb itself. The publish preflight reached in and
+ * read `brand_identity.defaultDisclaimer` — one level too shallow — so it
+ * reported "no legal disclaimer" for every brand on the platform, and because
+ * `decideTransition` hard-blocks going live, unpublishing any live deployment
+ * was a one-way door.
+ *
+ * Precedence follows this file's merge rule: Site columns are the source of
+ * truth and the JSON fills only what they left empty.
+ */
+export function resolveBrandLegal(s: Record<string, unknown>): BrandLegal {
+  const legal = obj(s.legal)
+  const identity = obj(s.brand_identity)
+  const identityLegal = obj(identity.legal)
+
+  // A flat `legal_*` key is the same column read off a raw row rather than a
+  // Payload doc, so it sits beside its group twin and ahead of the JSON.
+  const resolve = (group: string, flat: string, camel: string, ...also: unknown[]): string =>
+    first(legal[group], s[flat], ...also, identityLegal[camel], identity[camel])
+
+  const out: BrandLegal = {
+    copyright: resolve('copyright', 'legal_copyright', 'copyright'),
+    tcpaText: resolve('tcpa_text', 'legal_tcpa_text', 'tcpaText'),
+    privacyUrl: resolve('privacy_url', 'legal_privacy_url', 'privacyUrl'),
+    termsUrl: resolve('terms_url', 'legal_terms_url', 'termsUrl'),
+    defaultDisclaimer: resolve(
+      'default_disclaimer',
+      'legal_default_disclaimer',
+      'defaultDisclaimer',
+      s.default_disclaimer_md,
+    ),
+  }
+
+  // Whatever else the JSON carried comes through untouched, so this resolver is
+  // a superset of the field-by-field merge it replaced rather than a narrowing.
+  for (const [k, v] of Object.entries(identityLegal)) {
+    if (k in out) continue
+    if (typeof v === 'string' && v.trim() !== '') out[k] = v.trim()
+  }
+  return out
+}
+
+/**
+ * The number a brand's funnels dial, and the copy on the button that dials it.
+ *
+ * `Site.default_phone` is the canonical store; `brand_identity.contact` fills in
+ * for a brand whose number was only ever typed into the funnel editor. The CTA
+ * text and style have no Site column at all, so the JSON is their only home.
+ */
+export function resolveBrandContact(s: Record<string, unknown>): BrandContact {
+  const contact = obj(obj(s.brand_identity).contact)
+  return {
+    callNumber: first(s.default_phone, contact.callNumber),
+    callCtaText: first(contact.callCtaText) || 'CLICK HERE TO CALL',
+    callCtaStyle: first(contact.callCtaStyle) || 'pill',
+  }
+}
+
+/**
+ * The name a visitor sees on this brand's pages.
+ *
+ * Falls back to the Site's own `name`, which is a required field, so this is
+ * empty only for a record that is not a saved Site.
+ */
+export function resolveBrandDisplayName(s: Record<string, unknown>): string {
+  const brand = obj(s.brand)
+  return first(brand.display_name, s.brand_display_name, obj(s.brand_identity).displayName, s.name)
+}
+
 export function siteToBrand(s: Record<string, unknown>, domainList: DomainLite[]) {
   const id = Number(s.id)
   const primaryDomain = domainList.find((d) => d.primary)?.host ?? domainList[0]?.host ?? ''
   const brand = (s.brand ?? {}) as Record<string, unknown>
-  const legal = (s.legal ?? {}) as Record<string, unknown>
   const typo = (s.typography ?? {}) as Record<string, unknown>
   const identity = (s.brand_identity && typeof s.brand_identity === 'object'
     ? (s.brand_identity as Record<string, unknown>)
@@ -257,26 +377,13 @@ export function siteToBrand(s: Record<string, unknown>, domainList: DomainLite[]
     baseSize: typography.baseSize || 'md',
   }
 
-  const contactFromSite: Record<string, string> = {
-    callNumber: str(s.default_phone),
-    callCtaText: '',
-    callCtaStyle: '',
-  }
-  const contact = mergeNested(contactFromSite, identity.contact as Record<string, unknown> | undefined)
-  const contactResolved = {
-    callNumber: contact.callNumber || '',
-    callCtaText: contact.callCtaText || 'CLICK HERE TO CALL',
-    callCtaStyle: contact.callCtaStyle || 'pill',
-  }
-
-  const legalFromSite: Record<string, string> = {
-    copyright: str(legal.copyright),
-    tcpaText: str(legal.tcpa_text),
-    privacyUrl: str(legal.privacy_url),
-    termsUrl: str(legal.terms_url),
-    defaultDisclaimer: str(legal.default_disclaimer) || str(s.default_disclaimer_md),
-  }
-  const legalResolved = mergeNested(legalFromSite, identity.legal as Record<string, unknown> | undefined)
+  // Contact and legal come from the exported resolvers above rather than being
+  // merged again here. One implementation is the whole point: the publish
+  // preflight asks the same question about the same brand, and the two answers
+  // disagreeing is precisely the defect that made every live deployment
+  // unpublishable.
+  const contactResolved = resolveBrandContact(s)
+  const legalResolved = resolveBrandLegal(s)
 
   // Destination URLs for this brand: where its quizzes and funnels send people
   // (thank you, did-not-qualify, partners, legal pages). Stored under
@@ -315,7 +422,7 @@ export function siteToBrand(s: Record<string, unknown>, domainList: DomainLite[]
     // a brand that was deliberately retired.
     status: str(s.status, 'active'),
     name: str(s.name),
-    displayName: pick(str(brand.display_name), 'displayName', str(s.name)),
+    displayName: resolveBrandDisplayName(s),
     shortName: pick(str(brand.short_name), 'shortName'),
     tagline: pick(str(brand.tagline_brand) || str(s.tagline), 'tagline'),
     logoUrl: pick(str(brand.logo_url), 'logoUrl'),

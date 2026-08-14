@@ -6,6 +6,7 @@ import { runLeadPipeline } from '@/lib/lead-pipeline/run'
 import { resolveSiteByHost } from '@/lib/site-resolver'
 import { pickAttributionFromObject } from '@/lib/lead-pipeline/attribution'
 import { getCurrentUser } from '@/lib/auth'
+import { trustedHost } from '@/lib/trusted-host'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,8 +60,15 @@ export async function POST(req: NextRequest) {
   }
   const data = parsed.data
 
-  // Resolve Site
-  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? ''
+  // Resolve Site.
+  //
+  // The tenant comes from the host this request was actually made to, never
+  // from a forwarding header. This route is public and unauthenticated, and
+  // `/api/*` is a middleware passthrough, so `x-forwarded-host` /
+  // `x-legalos-host` on this path are the CALLER's values — reading them let an
+  // anonymous POST choose which brand its lead was filed under, fired CAPI for
+  // and delivered to. See src/lib/trusted-host.ts.
+  const host = trustedHost(req)
   const payload = await getPayload({ config })
 
   let siteId: number | null = null

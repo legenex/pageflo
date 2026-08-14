@@ -24,6 +24,7 @@ import { Loader2, Sparkles } from 'lucide-react'
 
 import { T, Btn, Input, Textarea, Label, Modal } from '../ui'
 import { createQuizTemplateWithClaude } from '@/app/(app)/admin/(top)/template-actions'
+import { settleAction, failureMessage } from '../server-action'
 
 export const AINewQuizTemplateWizard = ({ open, onClose, onToast, onCreated }) => {
   const [name, setName] = useState('')
@@ -40,12 +41,12 @@ export const AINewQuizTemplateWizard = ({ open, onClose, onToast, onCreated }) =
   const generate = async () => {
     if (!instruction.trim()) { setError('Say what the template should feel like and where it will run.'); return }
     setBusy(true); setError(null)
-    const res = await createQuizTemplateWithClaude({
+    const res = await settleAction(createQuizTemplateWithClaude({
       instruction: instruction.trim(),
       name: name.trim() || undefined,
-    })
+    }))
     setBusy(false)
-    if (!res?.ok) { setError(res?.error || 'Generation failed.'); return }
+    if (!res.ok) { setError(failureMessage(res)); return }
     // A warning means the row EXISTS but its blurb/config write failed, so the
     // list refresh below still shows it and the toast says what is left to do.
     onToast({

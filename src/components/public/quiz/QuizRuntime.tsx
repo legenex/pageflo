@@ -45,7 +45,7 @@ import { PreviewQuestionCard, renderBodySection } from '@/components/builder/qui
 import { isNodeVisible, SEED_CUSTOM_FIELDS } from '@/components/builder/quiz/seed-data'
 import { getSafeTextColor, getSafeMutedColor, deriveBrandSurface, onPrimaryText } from '@/lib/builder/color-system'
 import {
-  captureAttribution, readTrustedFormCert, readJornayaLeadId, firePixelEvents, submitLead,
+  captureAttribution, newClientSubmissionId, readTrustedFormCert, readJornayaLeadId, firePixelEvents, submitLead,
 } from '@/lib/lead-capture-client'
 import { splitQuizAnswers, isDeliverableContact } from '@/lib/quiz-lead'
 import { withHostSurface } from '@/lib/quiz-theme'
@@ -135,13 +135,11 @@ export function QuizRuntime({
   // on it, so a retry after a lost response, or a re-submit by a later endpoint,
   // returns the same lead instead of writing a second one. Lazy-initialised so
   // it exists before the first submit without depending on render timing.
+  // Minted through the shared helper the block lead form also uses: two public
+  // surfaces spelling an idempotency key two ways is how one of them stops
+  // having one.
   const submissionIdRef = useRef(null)
-  if (!submissionIdRef.current) {
-    submissionIdRef.current =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `sub_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`
-  }
+  if (!submissionIdRef.current) submissionIdRef.current = newClientSubmissionId()
   const rootRef = useRef(null)
   const cardAreaRef = useRef(null)
   // Width of the space the card has, not the window. Drives how many answer

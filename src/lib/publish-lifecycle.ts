@@ -48,6 +48,7 @@ import { asSlotted } from '@/lib/lp-templates'
 import { validateOverrides } from '@/lib/lp-slots/model'
 import { domainEligibility } from '@/lib/domain-eligibility'
 import { getQuizTemplateRecordByTemplateId, getLpTemplateRecord } from '@/lib/template-records'
+import { resolveBrandContact, resolveBrandDisplayName, resolveBrandLegal } from '@/lib/brand-map'
 
 /* ------------------------------------------------------------------- states */
 
@@ -79,27 +80,51 @@ const str = (v: unknown): string => (typeof v === 'string' ? v : '')
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : [])
 
 /**
+ * "a, b, or c", for a sentence an operator reads at the moment they are blocked.
+ *
+ * The previous `missing.join(', no ')` ran over items that already carried their
+ * own article and produced "the brand has no a legal disclaimer". A refusal that
+ * reads like a bug is a refusal people believe is one.
+ */
+const orList = (items: string[]): string => {
+  if (items.length < 2) return items[0] ?? ''
+  if (items.length === 2) return `${items[0]} or ${items[1]}`
+  return `${items.slice(0, -1).join(', ')}, or ${items[items.length - 1]}`
+}
+
+/**
  * Brand completeness, in the sense that matters for a live page.
  *
  * Not "has the operator filled in every field" — most are optional and a page
- * renders without them. These four are the ones whose absence is visible or
+ * renders without them. These three are the ones whose absence is visible or
  * legally material: a page with no name says "Your Brand", one with no phone
  * renders a dead call button, and one with no disclaimer is an attorney
  * advertisement without the notice it needs.
+ *
+ * Every value is read through the CANONICAL BRAND MAPPER, never off the row.
+ * A brand's disclaimer physically lives in one of four places and the Brand
+ * Identity editor writes it to the deepest of them
+ * (`brand_identity.legal.defaultDisclaimer`); this check used to reach into the
+ * jsonb itself and read `brand_identity.defaultDisclaimer`, one level too
+ * shallow. Every brand in production had filled the field in and every one of
+ * them reported "no legal disclaimer", so all eight live deployments failed
+ * re-publish — and since `decideTransition` gates going live but never going
+ * down, unpublishing any of them was a one-way door. Asking the same resolver
+ * the renderer asks is what makes that class of divergence unreachable rather
+ * than merely fixed.
  */
 const checkBrand = (site: Record<string, unknown> | null): PreflightCheck => {
-  if (!site) return fail('brand', 'Brand is complete enough to publish', 'the site could not be loaded')
-  const identity = (site.brand_identity ?? {}) as Record<string, unknown>
-  const missing: string[] = []
-  const has = (...keys: string[]): boolean => keys.some((k) => str(site[k]).trim() !== '' || str(identity[k]).trim() !== '')
+  const label = 'Brand is complete enough to publish'
+  if (!site) return fail('brand', label, 'the site could not be loaded')
 
-  if (!has('brand_display_name', 'name', 'displayName')) missing.push('a display name')
-  if (!has('default_phone', 'callNumber')) missing.push('a phone number')
-  if (!has('legal_default_disclaimer', 'defaultDisclaimer')) missing.push('a legal disclaimer')
+  const missing: string[] = []
+  if (!resolveBrandDisplayName(site)) missing.push('display name')
+  if (!resolveBrandContact(site).callNumber) missing.push('phone number')
+  if (!resolveBrandLegal(site).defaultDisclaimer) missing.push('legal disclaimer')
 
   return missing.length === 0
-    ? pass('brand', 'Brand is complete enough to publish')
-    : fail('brand', 'Brand is complete enough to publish', `the brand has no ${missing.join(', no ')}`)
+    ? pass('brand', label)
+    : fail('brand', label, `the brand has no ${orList(missing)}`)
 }
 
 /**
@@ -165,23 +190,51 @@ const checkQuizGraph = (quiz: Record<string, unknown> | null): PreflightCheck[] 
 }
 
 /**
- * Consent has to be reachable, or the lead cannot lawfully be contacted.
+ * Consent has to be shown, or the lead cannot lawfully be contacted.
  *
- * The flow validator's own `reachable_consent` check is the authority and is
- * already included above. This adds the cheaper text-level question it cannot
- * answer — is there any consent language in this quiz AT ALL — because a flow
- * whose every path reaches a form still says nothing to the visitor if nobody
- * wrote the line.
+ * The flow validator's own `reachable_consent` check is the authority on the
+ * FLOW half — that every path submitting a lead passes through a form — and is
+ * already included above. This adds the text-level question it cannot answer:
+ * is there a consent line anywhere for that form to print.
+ *
+ * There are TWO places that line can come from, and the check must accept both
+ * because a visitor cannot tell them apart:
+ *
+ *   - the quiz's own copy, which older flows carry per node, and
+ *   - the BRAND's TCPA text. `PreviewQuestionCard` — the one card component the
+ *     builder preview and the public runtime both render through — prints
+ *     `brand.legal.tcpaText` on every form node, so a brand-supplied line is
+ *     what the visitor reads even when the flow itself says nothing. The flow
+ *     validator states this outright in `checkReachableConsent`.
+ *
+ * Scanning only the nodes therefore failed the platform's real configuration:
+ * one brandless quiz runs under three brands, each supplying its own TCPA text,
+ * and the quiz carries no consent wording of its own by design.
+ *
+ * NOT weakened to always-pass. With no node-level consent AND no brand TCPA
+ * text there is nothing for the form to print, and that still blocks.
  */
-const checkConsent = (quiz: Record<string, unknown> | null): PreflightCheck => {
+const checkConsent = (
+  quiz: Record<string, unknown> | null,
+  site: Record<string, unknown> | null,
+): PreflightCheck => {
+  const id = 'consent'
+  const label = 'The visitor is shown consent language'
+
   const nodes = arr(quiz?.nodes) as Array<Record<string, unknown>>
-  const hasConsent = nodes.some((n) => {
+  const inFlow = nodes.some((n) => {
     const blob = JSON.stringify(n).toLowerCase()
     return blob.includes('tcpa') || blob.includes('consent') || blob.includes('by clicking')
   })
-  return hasConsent
-    ? pass('consent', 'The flow carries consent language')
-    : fail('consent', 'The flow carries consent language', 'no node in this quiz mentions consent or TCPA')
+  if (inFlow) return pass(id, label)
+
+  if (site && resolveBrandLegal(site).tcpaText) return pass(id, label)
+
+  return fail(
+    id,
+    label,
+    'no node in this quiz mentions consent or TCPA and this brand has no TCPA text of its own, so the form would collect a lead with nothing shown',
+  )
 }
 
 /**
@@ -275,7 +328,7 @@ export const quizDeploymentPreflight = async (
   checks.push(checkBrand(site))
   checks.push(await checkQuizTemplateRecord(ctx.payload, deployment.template_id))
   checks.push(...checkQuizGraph(quiz))
-  checks.push(checkConsent(quiz))
+  checks.push(checkConsent(quiz, site))
 
   // Destinations: where a completed lead is sent. An override naming nothing is
   // a lead that finishes the funnel and goes nowhere.
@@ -435,7 +488,7 @@ export const lpDeploymentPreflight = async (
       checks.push({ ...check, id: 'embedded-quiz-template', label: 'Embedded quiz visual template is available' })
     }
     checks.push(...checkQuizGraph(quiz))
-    checks.push(checkConsent(quiz))
+    checks.push(checkConsent(quiz, site))
   } else if (str(deployment.quiz_deployment_id)) {
     checks.push(
       quizDeployment
@@ -475,7 +528,7 @@ export const lpDeploymentPreflight = async (
       const borrowed = await checkQuizTemplateRecord(ctx.payload, str(quizDeployment.template_id))
       checks.push({ ...borrowed, id: 'embedded-quiz-template', label: 'Embedded quiz visual template is available' })
       checks.push(...checkQuizGraph(quiz))
-      checks.push(checkConsent(quiz))
+      checks.push(checkConsent(quiz, site))
     }
   }
 

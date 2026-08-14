@@ -23,6 +23,7 @@ import {
   aiAdvertorial,
   aiBulkSimplify,
 } from '@/app/(app)/admin/(top)/advertorials/actions'
+import { settleAction, commitOptimistic, failureMessage } from '../server-action'
 
 const ADV_TEMPLATES = [
   {
@@ -1897,12 +1898,17 @@ const AdvertorialBuilderApp = ({
   useEffect(() => { setBrands(brandsProp) }, [brandsProp])
 
   // Debounced per-advertorial autosave so editing sections does not spam writes.
+  // The write is settled rather than fired and forgotten: an autosave that
+  // rejects used to be an unhandled rejection and nothing else, so the editor
+  // went on showing edits that were never stored.
   const saveTimers = useRef({})
   const scheduleSave = (ad) => {
     if (!ad || !ad.id) return
     if (saveTimers.current[ad.id]) clearTimeout(saveTimers.current[ad.id])
     saveTimers.current[ad.id] = setTimeout(() => {
-      svSaveAdvertorial({ id: ad.id, advertorial: ad })
+      void settleAction(svSaveAdvertorial({ id: ad.id, advertorial: ad })).then((res) => {
+        if (!res.ok) setToast({ message: `Autosave failed: ${failureMessage(res)}`, type: 'error' })
+      })
     }, 600)
   }
 
@@ -1940,8 +1946,8 @@ const AdvertorialBuilderApp = ({
         { id: genId('sec'), type: 'disclaimer', content: { useDefault: true } },
       ],
     }
-    const res = await svCreateAdvertorial({ advertorial: base })
-    if (!res?.ok) { setToast({ message: res?.error || 'Create failed', type: 'error' }); return }
+    const res = await settleAction(svCreateAdvertorial({ advertorial: base }))
+    if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return }
     const ad = { ...base, id: res.id, createdAt: Date.now(), updatedAt: Date.now() }
     setAdvertorials((prev) => [ad, ...prev])
     setCurrentAdvertorialId(res.id)
@@ -1961,8 +1967,8 @@ const AdvertorialBuilderApp = ({
       status: 'draft',
       sections: orig.sections.map((s) => ({ ...s, id: genId('sec') })),
     }
-    const res = await svCreateAdvertorial({ advertorial: base })
-    if (!res?.ok) { setToast({ message: res?.error || 'Clone failed', type: 'error' }); return }
+    const res = await settleAction(svCreateAdvertorial({ advertorial: base }))
+    if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return }
     setAdvertorials((prev) => [{ ...base, id: res.id, createdAt: Date.now(), updatedAt: Date.now() }, ...prev])
     setToast({ message: 'Advertorial duplicated.', type: 'success' })
   }
@@ -1974,8 +1980,8 @@ const AdvertorialBuilderApp = ({
       title: 'Archive advertorial?',
       message: `"${ad.title}" will be deleted. Any deployments using it are removed too.`,
       onConfirm: async () => {
-        const res = await svDeleteAdvertorial({ id })
-        if (!res?.ok) { setToast({ message: res?.error || 'Delete failed', type: 'error' }); setPendingDelete(null); return }
+        const res = await settleAction(svDeleteAdvertorial({ id }))
+        if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); setPendingDelete(null); return }
         setAdvertorials((prev) => prev.filter((a) => a.id !== id))
         setDeployments((prev) => prev.filter((d) => d.advertorialId !== id))
         setPendingDelete(null)
@@ -1985,20 +1991,42 @@ const AdvertorialBuilderApp = ({
 
   const togglePublishAdvertorial = () => {
     if (!currentAdvertorial) return
-    const status = currentAdvertorial.status === 'published' ? 'draft' : 'published'
-    const updated = { ...currentAdvertorial, status, updatedAt: Date.now() }
-    setAdvertorials((prev) => prev.map((a) => (a.id === currentAdvertorial.id ? updated : a)))
-    svSaveAdvertorial({ id: updated.id, advertorial: updated })
+    const previous = currentAdvertorial
+    const status = previous.status === 'published' ? 'draft' : 'published'
+    const updated = { ...previous, status, updatedAt: Date.now() }
+    setAdvertorials((prev) => prev.map((a) => (a.id === previous.id ? updated : a)))
+    /*
+     * Unpublishing is the direction that matters: the header pill flipping to
+     * DRAFT while the write never landed tells an operator an article is off the
+     * air when it is still being served.
+     *
+     * No `reconcile` here, unlike the quiz and landing-page builders. This
+     * screen has no refetch to call - it copies its props into state once and
+     * never resyncs - so a `router.refresh()` would re-render the server
+     * component while this one went on showing the same stale copy, which is a
+     * reconcile in name only. The rollback restores the last status the server
+     * is known to have acknowledged, and the message says to reload when the
+     * cause is a tab running an older build.
+     */
+    void commitOptimistic({
+      action: () => svSaveAdvertorial({ id: updated.id, advertorial: updated }),
+      rollback: () => setAdvertorials((prev) => prev.map((a) => (a.id === previous.id ? previous : a))),
+      onError: (message) => setToast({ message: `Could not ${status === 'published' ? 'publish' : 'unpublish'}: ${message}`, type: 'error' }),
+    })
   }
 
   const patchAdvertorial = (patch) => { if (currentAdvertorial) mutateCurrent((a) => ({ ...a, ...patch })) }
 
   const renameAdvertorial = (id, title) => {
-    const updated = advertorials.find((a) => a.id === id)
-    if (!updated) return
-    const next = { ...updated, title, updatedAt: Date.now() }
+    const previous = advertorials.find((a) => a.id === id)
+    if (!previous) return
+    const next = { ...previous, title, updatedAt: Date.now() }
     setAdvertorials((prev) => prev.map((a) => (a.id === id ? next : a)))
-    svSaveAdvertorial({ id, advertorial: next })
+    void commitOptimistic({
+      action: () => svSaveAdvertorial({ id, advertorial: next }),
+      rollback: () => setAdvertorials((prev) => prev.map((a) => (a.id === id ? previous : a))),
+      onError: (message) => setToast({ message, type: 'error' }),
+    })
   }
 
   const addSection = (type) => {
@@ -2028,8 +2056,8 @@ const AdvertorialBuilderApp = ({
       status: 'draft',
       sections: (generated.sections || []).map((s) => ({ ...s, id: genId('sec') })),
     }
-    const res = await svCreateAdvertorial({ advertorial: base })
-    if (!res?.ok) { setToast({ message: res?.error || 'Create failed', type: 'error' }); return }
+    const res = await settleAction(svCreateAdvertorial({ advertorial: base }))
+    if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return }
     setAdvertorials((prev) => [{ ...base, id: res.id, createdAt: Date.now(), updatedAt: Date.now() }, ...prev])
     setCurrentAdvertorialId(res.id)
     setView('advertorialEdit')
@@ -2085,8 +2113,8 @@ const AdvertorialBuilderApp = ({
 
   const saveDeployment = async (d) => {
     const wasDraft = !!draftDeployment
-    const res = await svSaveDeployment({ deployment: d })
-    if (!res?.ok) { setToast({ message: res?.error || 'Save failed', type: 'error' }); return }
+    const res = await settleAction(svSaveDeployment({ deployment: d }))
+    if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return }
     const saved = { ...d, id: res.id }
     setDeployments((prev) => (wasDraft ? [saved, ...prev] : prev.map((x) => (x.id === saved.id ? saved : x))))
     setDraftDeployment(null)
@@ -2097,8 +2125,8 @@ const AdvertorialBuilderApp = ({
     const orig = deployments.find((d) => d.id === id)
     if (!orig) return
     const copy = { ...orig, id: genId('addep'), status: 'draft', createdAt: Date.now(), path: (orig.path || '') + '-copy' }
-    const res = await svSaveDeployment({ deployment: copy })
-    if (!res?.ok) { setToast({ message: res?.error || 'Clone failed', type: 'error' }); return }
+    const res = await settleAction(svSaveDeployment({ deployment: copy }))
+    if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return }
     setDeployments((prev) => [{ ...copy, id: res.id }, ...prev])
     setToast({ message: 'Deployment duplicated.', type: 'success' })
   }
@@ -2110,8 +2138,8 @@ const AdvertorialBuilderApp = ({
       title: 'Delete deployment?',
       message: `Deployment at ${d.domain || 'preview'}${d.path || ''} will be permanently removed.`,
       onConfirm: async () => {
-        const res = await svDeleteDeployment({ id })
-        if (!res?.ok) { setToast({ message: res?.error || 'Delete failed', type: 'error' }); setPendingDelete(null); return }
+        const res = await settleAction(svDeleteDeployment({ id }))
+        if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); setPendingDelete(null); return }
         setDeployments((prev) => prev.filter((x) => x.id !== id))
         setPendingDelete(null)
       },
@@ -2123,7 +2151,15 @@ const AdvertorialBuilderApp = ({
     if (!d) return
     const updated = { ...d, status: d.status === 'live' ? 'paused' : 'live' }
     setDeployments((prev) => prev.map((x) => (x.id === id ? updated : x)))
-    svSaveDeployment({ deployment: updated })
+    // The pause path. This used to fire the write and forget it entirely - not
+    // even the server's own refusal was read - so the row showed PAUSED over a
+    // deployment that was still live, which is the compliance exposure rather
+    // than a cosmetic one.
+    void commitOptimistic({
+      action: () => svSaveDeployment({ deployment: updated }),
+      rollback: () => setDeployments((prev) => prev.map((x) => (x.id === id ? d : x))),
+      onError: (message) => setToast({ message: `Could not ${updated.status === 'live' ? 'publish' : 'pause'}: ${message}`, type: 'error' }),
+    })
   }
 
   const renameDeployment = (id, name) => {
@@ -2131,7 +2167,11 @@ const AdvertorialBuilderApp = ({
     if (!d) return
     const updated = { ...d, name }
     setDeployments((prev) => prev.map((x) => (x.id === id ? updated : x)))
-    svSaveDeployment({ deployment: updated })
+    void commitOptimistic({
+      action: () => svSaveDeployment({ deployment: updated }),
+      rollback: () => setDeployments((prev) => prev.map((x) => (x.id === id ? d : x))),
+      onError: (message) => setToast({ message, type: 'error' }),
+    })
   }
 
   const openPreviewFromList = (advertorialId) => { setPreviewAdvertorialId(advertorialId); setView('preview') }
@@ -2158,12 +2198,20 @@ const AdvertorialBuilderApp = ({
           const idxs = ad.sections.map((s, i) => (typeof s.content === 'string' && (s.type === 'paragraph' || s.type === 'lede') ? i : -1)).filter((i) => i >= 0)
           if (idxs.length) {
             const texts = idxs.map((i) => ad.sections[i].content)
-            const res = await aiBulkSimplify({ texts })
+            const res = await settleAction(aiBulkSimplify({ texts }))
             if (res?.ok && Array.isArray(res.texts) && res.texts.length === texts.length) {
               const sections = ad.sections.map((s, i) => { const k = idxs.indexOf(i); return k >= 0 ? { ...s, content: res.texts[k] } : s })
               const updated = { ...ad, sections, updatedAt: Date.now() }
               setAdvertorials((prev) => prev.map((a) => (a.id === ad.id ? updated : a)))
-              await svSaveAdvertorial({ id: ad.id, advertorial: updated })
+              const w = await settleAction(svSaveAdvertorial({ id: ad.id, advertorial: updated }))
+              if (!w.ok) {
+                // Put the original copy back and STOP. Carrying on would leave a
+                // run that reports "complete" over a list showing rewrites that
+                // were never stored.
+                setAdvertorials((prev) => prev.map((a) => (a.id === ad.id ? ad : a)))
+                setToast({ message: `Bulk simplify stopped at "${ad.title}": ${failureMessage(w)}`, type: 'error' })
+                return
+              }
             }
           }
           done++
@@ -2183,7 +2231,7 @@ const AdvertorialBuilderApp = ({
         view, title: currentAdvertorial.title, status: currentAdvertorial.status,
         onBack: () => setView('list'),
         onPreview: openPreviewFromEditor,
-        onSave: () => { const cur = advertorials.find((a) => a.id === currentAdvertorialId); if (cur) { svSaveAdvertorial({ id: cur.id, advertorial: cur }); setToast({ message: 'Saved.', type: 'success' }) } },
+        onSave: () => { const cur = advertorials.find((a) => a.id === currentAdvertorialId); if (cur) { void settleAction(svSaveAdvertorial({ id: cur.id, advertorial: cur })).then((res) => setToast(res.ok ? { message: 'Saved.', type: 'success' } : { message: failureMessage(res), type: 'error' })) } },
         onPublish: togglePublishAdvertorial,
       }
     }

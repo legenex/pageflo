@@ -53,6 +53,7 @@ import { saveDeployment, deleteDeployment, aiWriteSectionNodes } from '@/app/(ap
 import {
   createLpTemplate, cloneLpTemplate, saveLpTemplate, setLpTemplateEnabled, deleteLpTemplate,
 } from '@/app/(app)/admin/(top)/template-actions'
+import { settleAction, commitOptimistic, failureMessage } from '../server-action'
 import { elementSpec } from '@/lib/lp-nodes/model'
 
 // ============================================================================
@@ -135,7 +136,7 @@ const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDep
         const primary = brand?.colors?.primary
         const background = brand?.colors?.background
         return (
-          <div key={dep.id} data-lp-deployment={dep.id} style={{ padding: 14, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div key={dep.id} data-lp-deployment={dep.id} data-lp-deployment-status={dep.status || 'draft'} style={{ padding: 14, backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 10, display: 'flex', alignItems: 'center', gap: 14 }}>
             <div style={{ width: 42, height: 42, borderRadius: 9, background: primary ? `linear-gradient(135deg, ${primary}, ${background || primary})` : T.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 12, flexShrink: 0, overflow: 'hidden' }}>
               {brand?.faviconUrl ? <img loading="lazy" decoding="async" src={brand.faviconUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : brand ? brandShortName(brand) : <Rocket size={18} />}
             </div>
@@ -926,8 +927,8 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
     delete pendingSaves.current[key]
     clearTimeout(saveTimers.current[key])
     delete saveTimers.current[key]
-    return saveLpTemplate(job).then((res) => {
-      if (!res.ok) setToast({ message: res.error, type: 'error' })
+    return settleAction(saveLpTemplate(job)).then((res) => {
+      if (!res.ok) setToast({ message: failureMessage(res), type: 'error' })
       return res
     })
   }, [])
@@ -1000,8 +1001,8 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
   }
 
   const createBlankTemplate = () => {
-    createLpTemplate({ name: 'Untitled template' }).then((res) => {
-      if (!res.ok) { setToast({ message: res.error, type: 'error' }); return }
+    settleAction(createLpTemplate({ name: 'Untitled template' })).then((res) => {
+      if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return }
       setToast({ message: 'Template created.', type: 'success' })
       setPendingOpenId(res.id)
       router.refresh()
@@ -1009,26 +1010,26 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
   }
 
   const createFromWizard = async (lp) => {
-    const created = await createLpTemplate({ name: lp.name, rendererKey: lp.templateId })
-    if (!created.ok) { setToast({ message: created.error, type: 'error' }); return }
+    const created = await settleAction(createLpTemplate({ name: lp.name, rendererKey: lp.templateId }))
+    if (!created.ok) { setToast({ message: failureMessage(created), type: 'error' }); return }
     // Two calls because they answer two questions: `createLpTemplate` mints the
     // row and the design that draws it, and only `saveLpTemplate` carries copy.
     // The row's origin reads BLANK rather than CLAUDE: neither action accepts an
     // origin, and inventing one client side would be a value the server never
     // agreed to.
-    const saved = await saveLpTemplate({ id: created.id, patch: { slug: lp.slug, angle: lp.angle, sections: lp.sections } })
+    const saved = await settleAction(saveLpTemplate({ id: created.id, patch: { slug: lp.slug, angle: lp.angle, sections: lp.sections } }))
     setToast(
       saved.ok
         ? { message: 'Template written by Claude.', type: 'success' }
-        : { message: `Template created, but its copy did not save: ${saved.error}`, type: 'error' },
+        : { message: `Template created, but its copy did not save: ${failureMessage(saved)}`, type: 'error' },
     )
     setPendingOpenId(created.id)
     router.refresh()
   }
 
   const cloneTemplate = (t) => {
-    cloneLpTemplate({ id: t.id }).then((res) => {
-      if (!res.ok) { setToast({ message: res.error, type: 'error' }); return }
+    settleAction(cloneLpTemplate({ id: t.id })).then((res) => {
+      if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return }
       setToast({ message: `Cloned "${t.name}".`, type: 'success' })
       router.refresh()
     })
@@ -1039,26 +1040,27 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
     // Optimistic, and it mirrors the server rule exactly: enabling opens both
     // gates, disabling touches only selectability so live pages keep serving.
     setTemplates((arr) => arr.map((x) => (x.id === t.id ? { ...x, isEnabled: enabled, isPublished: enabled ? true : x.isPublished } : x)))
-    setLpTemplateEnabled({ id: t.id, enabled }).then((res) => {
-      if (!res.ok) {
-        setTemplates((arr) => arr.map((x) => (x.id === t.id ? t : x)))
-        setToast({ message: res.error, type: 'error' })
-        return
-      }
-      if (res.warning) {
-        setNotice({
-          title: `"${t.name}" is disabled for new deployments`,
-          message: res.warning,
-          actionText: 'See deployments',
-          onAction: showDeployments,
-        })
-      } else {
-        setToast({
-          message: enabled ? `"${t.name}" can be selected again.` : `"${t.name}" is disabled for new deployments.`,
-          type: 'success',
-        })
-      }
-      router.refresh()
+    void commitOptimistic({
+      action: () => setLpTemplateEnabled({ id: t.id, enabled }),
+      rollback: () => setTemplates((arr) => arr.map((x) => (x.id === t.id ? t : x))),
+      onError: (message) => setToast({ message, type: 'error' }),
+      reconcile: () => router.refresh(),
+      onSuccess: (res) => {
+        if (res.warning) {
+          setNotice({
+            title: `"${t.name}" is disabled for new deployments`,
+            message: res.warning,
+            actionText: 'See deployments',
+            onAction: showDeployments,
+          })
+        } else {
+          setToast({
+            message: enabled ? `"${t.name}" can be selected again.` : `"${t.name}" is disabled for new deployments.`,
+            type: 'success',
+          })
+        }
+        router.refresh()
+      },
     })
   }
 
@@ -1071,12 +1073,12 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
       confirmText: 'Delete',
       onConfirm: () => {
         setConfirm(null)
-        deleteLpTemplate({ id: t.id }).then((res) => {
+        settleAction(deleteLpTemplate({ id: t.id })).then((res) => {
           if (!res.ok) {
             // The refusal names the deployments in the way. It is shown verbatim
             // rather than summarised: "3 deployments use this" makes an operator
             // go looking, and the action already did the looking.
-            setNotice({ title: 'This template cannot be deleted', message: res.error, actionText: 'See deployments', onAction: showDeployments })
+            setNotice({ title: 'This template cannot be deleted', message: failureMessage(res), actionText: 'See deployments', onAction: showDeployments })
             return
           }
           setTemplates((arr) => arr.filter((x) => x.id !== t.id))
@@ -1090,8 +1092,12 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
   /* ----------------------------------------------------------- deployments */
 
   const persistDeployment = (dep) => {
-    saveDeployment({ deployment: dep }).then((res) => {
-      if (!res.ok) { setToast({ message: res.error, type: 'error' }); return }
+    settleAction(saveDeployment({ deployment: dep })).then((res) => {
+      // Stay in the editor and say why. The Status field is on this screen, so
+      // navigating back to the list on a failed write would show the operator a
+      // row carrying whatever the server still holds while they believe they
+      // just changed it.
+      if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return }
       setSubView('lp_list'); setLpTab('deployments'); setEditingDeployment(null)
       setToast({ message: dep.domain ? 'Deployment saved.' : 'Deployment saved as a preview URL.', type: 'success' })
       router.refresh()
@@ -1104,8 +1110,8 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
       message: 'The template itself remains. Only this placement goes away.',
       confirmText: 'Delete',
       onConfirm: () => {
-        deleteDeployment({ id }).then((res) => {
-          if (!res.ok) { setToast({ message: res.error, type: 'error' }); setConfirm(null); return }
+        settleAction(deleteDeployment({ id })).then((res) => {
+          if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); setConfirm(null); return }
           setLpDeployments((arr) => arr.filter((d) => d.id !== id))
           setConfirm(null); setSubView('lp_list'); setLpTab('deployments'); setEditingDeployment(null)
           router.refresh()
@@ -1119,13 +1125,16 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
     if (!dep) return
     const status = dep.status === 'live' ? 'paused' : 'live'
     setLpDeployments((arr) => arr.map((d) => (d.id === id ? { ...d, status } : d)))
-    saveDeployment({ deployment: { ...dep, status } }).then((res) => {
-      if (!res.ok) {
-        setLpDeployments((arr) => arr.map((d) => (d.id === id ? dep : d)))
-        setToast({ message: res.error, type: 'error' })
-        return
-      }
-      router.refresh()
+    // The compliance-critical direction is PAUSE: a row that keeps the
+    // optimistic "paused" after a write that never landed tells an operator a
+    // live page has been stopped while it goes on serving. Rollback puts the
+    // last known-good status back and the refetch settles which one is real.
+    void commitOptimistic({
+      action: () => saveDeployment({ deployment: { ...dep, status } }),
+      rollback: () => setLpDeployments((arr) => arr.map((d) => (d.id === id ? dep : d))),
+      onError: (message) => setToast({ message, type: 'error' }),
+      reconcile: () => router.refresh(),
+      onSuccess: () => router.refresh(),
     })
   }
 
@@ -1133,8 +1142,11 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
     const dep = lpDeployments.find((d) => d.id === id)
     if (!dep) return
     setLpDeployments((arr) => arr.map((d) => (d.id === id ? { ...d, name } : d)))
-    saveDeployment({ deployment: { ...dep, name } }).then((res) => {
-      if (!res.ok) setToast({ message: res.error, type: 'error' })
+    void commitOptimistic({
+      action: () => saveDeployment({ deployment: { ...dep, name } }),
+      rollback: () => setLpDeployments((arr) => arr.map((d) => (d.id === id ? dep : d))),
+      onError: (message) => setToast({ message, type: 'error' }),
+      reconcile: () => router.refresh(),
     })
   }
 

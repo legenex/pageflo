@@ -162,39 +162,68 @@ start capturing to the log; that is already on.
 
 ## EB-4 — Live deployments fail their own publish preflight
 
-**Status: OPEN. Not external — but it is a decision about content, not a bug to
-fix silently, so it is recorded here.**
+**Status: FIXED in the working tree, pending deploy. It was never external and it
+was never a content decision — both failures were the preflight reading the
+brand from the wrong place.**
+
+### What was reported
 
 Quiz deployment 17 (`SettlementAssist.co`, `/s/settlementassist-co`) is
 `status='live'` and **cannot be re-published through the sanctioned door**. Its
-preflight, run against production on 2026-08-14, returns two blocking failures:
+preflight, run against production on 2026-08-14, returned two blocking failures:
 
     FAIL  Brand is complete enough to publish — the brand has no a legal disclaimer
     FAIL  The flow carries consent language — no node in this quiz mentions consent or TCPA
 
-Nineteen other checks pass, including domain ownership, domain eligibility, path
-availability, flow reachability and tier reachability.
+Nineteen other checks passed, including domain ownership, domain eligibility,
+path availability, flow reachability and tier reachability.
 
-**Consequence: unpublishing any such deployment is a ONE-WAY DOOR.** It goes down
-through the UI and the UI cannot bring it back. This was discovered by doing
-exactly that during acceptance; the deployment was returned to its prior state.
+**Consequence: unpublishing any such deployment was a ONE-WAY DOOR.** It goes
+down through the UI and the UI could not bring it back — `decideTransition` gates
+going live and never going down. This was discovered by doing exactly that
+during acceptance; the deployment was returned to its prior state. It affected
+all eight live deployments (quiz 13, 14, 17 and lp 12, 13, 15, 16, 17), because
+`checkBrand` runs in both the quiz and the landing-page preflight.
 
-The consent failure may be a **false positive**. The visitor *does* see consent
-copy: the runtime renders `brand.legal.tcpaText` beneath the form node, and that
-was confirmed in a browser on the live page. `checkConsent` looks for a *node*
-whose text mentions consent/TCPA, which is a different place from where the copy
-actually comes from. Either the check should also accept brand-level TCPA text, or
-the flows should carry node-level consent — that is a compliance call, not a
-refactor, which is why it is not being changed here.
+### What was actually wrong
 
-The disclaimer failure is not a false positive: `Sites.legal_default_disclaimer`
-is genuinely empty for that brand.
+**Both failures were false positives.** The disclaimer one too — the earlier note
+here said otherwise, and it was reading the wrong column.
 
-Also, the message itself has a grammar bug — "the brand has no **a** legal
-disclaimer" — and it is user-facing.
+`checkBrand` reached into the jsonb and read `brand_identity.defaultDisclaimer`
+at the TOP level. The Brand Identity editor writes it one level deeper,
+`brand_identity.legal.defaultDisclaimer` (`BrandModule.tsx`, `updLegal({
+defaultDisclaimer })`), which is exactly where `brand-map.ts` has always read it.
+Production confirms the shape: sites 12, 13 and 15 all have
+`brand_identity->'legal'->>'defaultDisclaimer'` populated and
+`legal_default_disclaimer` NULL. The operator had filled the field in; the check
+was looking at a different store.
 
-To close: decide whether brand-level TCPA text satisfies consent, populate the
-brands' legal disclaimer, then re-run the preflight.
+`checkConsent` scanned only `quiz.nodes`. The line the visitor reads comes from
+the brand — `PreviewQuestionCard`, the one card the builder preview and the
+public runtime share, prints `brand.legal.tcpaText` on every form node, and the
+flow validator's own `checkReachableConsent` says so. One brandless quiz runs
+under three brands, each supplying its own TCPA text.
+
+### The fix
+
+`brand-map.ts` gained `resolveBrandLegal` / `resolveBrandContact` /
+`resolveBrandDisplayName` — one canonical answer to "what is this brand's
+disclaimer, TCPA text, phone and name", covering every place each can sit
+(`legal` group, flat `legal_*` column, `default_disclaimer_md`,
+`brand_identity.legal.*`). `siteToBrand` and the preflight both read through
+them, so the two cannot drift apart again. Nothing was copied between fields and
+no migration was needed.
+
+`checkConsent` now accepts brand-level TCPA text **and still fails** when there
+is neither node-level consent nor brand TCPA text. Display name and phone are
+unchanged in strictness — only in where they read from. The grammar bug is gone:
+the items no longer carry their own article and the list is joined properly, so
+it reads "the brand has no phone number or legal disclaimer".
+
+Covered by `pnpm test:publish` (every shape above, both directions). Prove it
+against the real rows after deploy with `pnpm check:live-preflight`, which runs
+the same preflight over every live deployment and writes nothing.
 
 ---
 

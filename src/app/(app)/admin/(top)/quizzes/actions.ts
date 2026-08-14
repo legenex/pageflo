@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { normalizeDeploymentPath } from '@/lib/quiz-deployment-path'
 import { invokeLLM } from '@/lib/ai/invoke'
 import { canonicalTemplateId } from '@/lib/template-registry'
 import { resolveQuizTemplateSelection } from '@/lib/template-records/select'
@@ -204,7 +205,12 @@ export async function saveQuizDeployment(args: { deployment: Record<string, unkn
     quiz: dep.quizId ? Number(dep.quizId) : null,
     site: gate.siteId,
     domain: domainId,
-    path: dep.path || '',
+    // Normalised on the way IN. Every read path already normalises
+    // ('/c/' -> '/c'), so a row stored raw is a row no request can ever
+    // resolve to: production carried two live deployments on '/c/' that
+    // pathVariantsFor('/c') = ['/c','c'] could never match, and they served
+    // nothing while looking healthy in the admin.
+    path: normalizeDeploymentPath(String(dep.path || '')),
     render_mode: dep.renderMode || 'standalone',
     // Canonical, so the alias table is consulted once here rather than on every
     // read for the rest of the row's life.

@@ -24,6 +24,7 @@ import { surfaceForSection } from '@/lib/lp-nodes/surface'
 import { contrastRatio } from '@/lib/builder/page-lint'
 import { ICON_NAMES, iconFor, treeIcon } from './nodes/icons'
 import { aiWriteSectionNodes } from '@/app/(app)/admin/(top)/landing-pages/actions'
+import { settleAction, failureMessage } from '../server-action'
 
 const Field = ({ field, value, onChange }) => {
   if (field.kind === 'textarea') {
@@ -199,8 +200,8 @@ const SectionWriter = ({ section, onApply }) => {
       })
       .filter(Boolean)
 
-    const res = await aiWriteSectionNodes({ sectionType: section.type, instruction, elements })
-    if (!res.ok) setError(res.error)
+    const res = await settleAction(aiWriteSectionNodes({ sectionType: section.type, instruction, elements }))
+    if (!res.ok) setError(failureMessage(res))
     else onApply(res.elements)
     setBusy(false)
   }

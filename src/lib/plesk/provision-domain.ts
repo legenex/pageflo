@@ -38,8 +38,35 @@ export type ProvisionResult = {
 }
 
 const TENANT_NGINX_DIR = '/etc/nginx/conf.d/legalos-tenants'
-const LE_CERT_DIR = '/opt/psa/var/modules/letsencrypt/etc/live'
 const ACME_WEBROOT = '/var/www/vhosts/default/htdocs'
+
+/**
+ * ONE certificate ownership model per hostname, and acme.sh owns it.
+ *
+ * This module used to write `ssl_certificate` lines pointing at Plesk's
+ * Let's Encrypt store, `/opt/psa/var/modules/letsencrypt/etc/live`. That store
+ * has no renewal owner for these hosts: they are not Plesk domains, so Plesk's
+ * own renewal never considers them, and nothing else did either — which is how
+ * crashclaim.co, the de-facto default vhost, was found five days from expiry.
+ *
+ * Every tenant certificate is now issued and installed by acme.sh into
+ * ACME_CERT_ROOT, and acme.sh records the install paths plus a validating
+ * reload hook, so an unattended renewal reinstalls into the exact file nginx
+ * reads. That is the whole point: renewal ownership travels with the
+ * certificate instead of being a thing somebody has to remember.
+ *
+ * Consequences enforced below:
+ *   - provisioning NEVER emits a path under the Plesk store;
+ *   - a host already managed by acme.sh is not rewritten;
+ *   - a host covered by an acme.sh WILDCARD gets no per-host vhost at all,
+ *     because an exact `server_name` outranks a wildcard one and would quietly
+ *     move that host onto a different certificate.
+ */
+const ACME_CERT_ROOT = '/etc/ssl/legalos'
+const ACME_SH = '/root/.acme.sh/acme.sh'
+const ACME_RELOAD_HOOK = '/root/legalos-reload-nginx-cert.sh'
+
+const acmeCertDir = (name: string): string => path.join(ACME_CERT_ROOT, name)
 
 const proxyTarget = (): string => process.env.PLESK_PROXY_TARGET ?? 'http://127.0.0.1:3000'
 const ownerEmail = (): string => process.env.PLESK_OWNER_EMAIL ?? 'team@legenex.com'
@@ -70,7 +97,100 @@ const isSafeHost = (host: string): boolean =>
 
 const tenantConfigPath = (host: string): string => path.join(TENANT_NGINX_DIR, `${host}.conf`)
 
-const renderTenantNginxConfig = (host: string): string => {
+/* -------------------------------------------------------------------------- */
+/*                    Certificate ownership — pure decision                    */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * What the filesystem says, gathered once and then reasoned about without
+ * touching it again. Split out so the decision is testable: the bug this
+ * replaces could only be found by reading, because the deciding code was
+ * interleaved with the writing code and could not be run without a server.
+ */
+export type CertFacts = {
+  /** Directory names under ACME_CERT_ROOT, e.g. ['preview.legenex.com', 'crashclaim.co']. */
+  acmeInstalls: string[]
+  /** Whether a per-host vhost file exists for the host being planned. */
+  tenantVhostExists: boolean
+  /** The `ssl_certificate` path that vhost currently references, if any. */
+  tenantVhostCertPath: string | null
+}
+
+export type ProvisionPlan =
+  /** An acme.sh wildcard already serves this host. Touch nothing. */
+  | { action: 'covered-by-wildcard'; wildcardBase: string; certDir: string; reason: string; strayVhost: boolean }
+  /** A per-host acme.sh cert exists and the vhost already points at it. Touch nothing. */
+  | { action: 'already-managed'; certDir: string; reason: string }
+  /** A per-host acme.sh cert exists but the vhost is missing or points elsewhere. */
+  | { action: 'repair-vhost'; certDir: string; reason: string }
+  /** No certificate yet. Issue one through acme.sh and write the vhost. */
+  | { action: 'issue'; certDir: string; reason: string }
+
+/**
+ * Is `host` a single label below one of the wildcard bases we hold?
+ *
+ * `*.preview.legenex.com` covers `a.preview.legenex.com` and NOT
+ * `a.b.preview.legenex.com` — an X.509 wildcard matches exactly one label, even
+ * though nginx's `server_name *.preview.legenex.com` matches more. Being
+ * stricter than nginx here is deliberate: the question is which certificate is
+ * VALID for the host, not which server block would answer.
+ */
+const wildcardBaseFor = (host: string, acmeInstalls: string[]): string | null => {
+  for (const base of acmeInstalls) {
+    if (!host.endsWith(`.${base}`)) continue
+    const label = host.slice(0, -(base.length + 1))
+    if (label.length > 0 && !label.includes('.')) return base
+  }
+  return null
+}
+
+/**
+ * Decide what provisioning may do to a host, given only facts.
+ *
+ * Order matters. An exact per-host certificate wins over wildcard coverage,
+ * because if somebody deliberately issued one for this host it is the more
+ * specific statement of intent.
+ */
+export const planProvisioning = (host: string, facts: CertFacts): ProvisionPlan => {
+  const exactDir = acmeCertDir(host)
+
+  if (facts.acmeInstalls.includes(host)) {
+    return facts.tenantVhostCertPath === `${exactDir}/fullchain.pem`
+      ? {
+          action: 'already-managed',
+          certDir: exactDir,
+          reason: `acme.sh manages ${host} and the vhost already points at it; nothing to do`,
+        }
+      : {
+          action: 'repair-vhost',
+          certDir: exactDir,
+          reason: facts.tenantVhostExists
+            ? `acme.sh manages ${host} but the vhost points at ${facts.tenantVhostCertPath ?? '(nothing)'}`
+            : `acme.sh manages ${host} but no vhost exists`,
+        }
+  }
+
+  const base = wildcardBaseFor(host, facts.acmeInstalls)
+  if (base) {
+    return {
+      action: 'covered-by-wildcard',
+      wildcardBase: base,
+      certDir: acmeCertDir(base),
+      // A per-host file here would win on exact server_name and move the host
+      // off the wildcard, so it is reported and never written.
+      strayVhost: facts.tenantVhostExists,
+      reason: `*.${base} already serves ${host}; a per-host vhost would override the wildcard`,
+    }
+  }
+
+  return {
+    action: 'issue',
+    certDir: exactDir,
+    reason: `no certificate for ${host} yet; issuing through acme.sh so renewal has an owner`,
+  }
+}
+
+const renderTenantNginxConfig = (host: string, certDir: string): string => {
   const ip = ipAddress()
   const listen80 = ip ? `${ip}:80` : '80'
   const listen443 = ip ? `${ip}:443` : '443'
@@ -80,7 +200,7 @@ const renderTenantNginxConfig = (host: string): string => {
 
 server {
     listen ${listen80};
-    server_name ${host} www.${host};
+    server_name ${host};
 
     location ^~ /.well-known/acme-challenge/ {
         root ${ACME_WEBROOT};
@@ -94,10 +214,10 @@ server {
 server {
     listen ${listen443} ssl;
     http2 on;
-    server_name ${host} www.${host};
+    server_name ${host};
 
-    ssl_certificate     ${LE_CERT_DIR}/${host}/fullchain.pem;
-    ssl_certificate_key ${LE_CERT_DIR}/${host}/privkey.pem;
+    ssl_certificate     ${certDir}/fullchain.pem;
+    ssl_certificate_key ${certDir}/privkey.pem;
 
     client_max_body_size 50m;
 
@@ -140,7 +260,7 @@ const renderAcmeBootstrapConfig = (host: string): string => {
 
 server {
     listen ${listen80};
-    server_name ${host} www.${host};
+    server_name ${host};
 
     location ^~ /.well-known/acme-challenge/ {
         root ${ACME_WEBROOT};
@@ -161,38 +281,91 @@ server {
 `
 }
 
-// Whether a per-host LE cert already exists on disk. Note this is the per-host
-// cert dir, so a domain currently falling back to the default vhost cert (the
-// bug) correctly reports false and takes the full bootstrap+issue path.
-const certExists = async (host: string): Promise<boolean> => {
+/**
+ * Gather the filesystem facts `planProvisioning` reasons about.
+ *
+ * Reads only. Everything that decides is pure and lives above.
+ */
+const gatherCertFacts = async (host: string): Promise<CertFacts> => {
+  let acmeInstalls: string[] = []
   try {
-    await fs.access(`${LE_CERT_DIR}/${host}/fullchain.pem`)
-    await fs.access(`${LE_CERT_DIR}/${host}/privkey.pem`)
-    return true
+    const entries = await fs.readdir(ACME_CERT_ROOT, { withFileTypes: true })
+    // A directory only counts as an install once it actually holds a chain —
+    // an empty dir left behind by a failed issue must not look like coverage.
+    acmeInstalls = (
+      await Promise.all(
+        entries
+          .filter((e) => e.isDirectory())
+          .map(async (e) =>
+            fs
+              .access(path.join(ACME_CERT_ROOT, e.name, 'fullchain.pem'))
+              .then(() => e.name)
+              .catch(() => null),
+          ),
+      )
+    ).filter((n): n is string => n !== null)
   } catch {
-    return false
+    acmeInstalls = []
   }
+
+  let tenantVhostExists = false
+  let tenantVhostCertPath: string | null = null
+  try {
+    const cfg = await fs.readFile(tenantConfigPath(host), 'utf8')
+    tenantVhostExists = true
+    const m = cfg.match(/^\s*ssl_certificate\s+(\S+?);/m)
+    tenantVhostCertPath = m ? m[1] : null
+  } catch {
+    tenantVhostExists = false
+  }
+
+  return { acmeInstalls, tenantVhostExists, tenantVhostCertPath }
 }
 
-const issueLetsEncryptCert = async (host: string): Promise<{ ok: boolean; detail: string }> => {
-  const args = [
-    'bin', 'extension', '--exec', 'letsencrypt', 'cli.php',
-    '-d', host,
-    '-m', ownerEmail(),
-    '-w', ACME_WEBROOT,
-  ]
-  const result = await shell('plesk', args, { timeoutMs: 180_000 })
-  if (result.code !== 0) {
-    const tail = (result.stderr || result.stdout || 'LE CLI failed').trim().split('\n').slice(-5).join(' | ')
+/**
+ * Issue and install through acme.sh, so the certificate is born with a renewal
+ * owner. `--install-cert` is what makes renewal self-installing: acme.sh
+ * records these paths and the reload hook and repeats them from cron.
+ *
+ * Deliberately NOT Plesk's LE CLI. That put the certificate somewhere nothing
+ * renews from, which is the defect this module exists to stop repeating.
+ */
+const issueAcmeCert = async (host: string, certDir: string): Promise<{ ok: boolean; detail: string }> => {
+  const issue = await shell(
+    ACME_SH,
+    ['--issue', '--server', 'letsencrypt', '-d', host, '--webroot', ACME_WEBROOT, '--accountemail', ownerEmail()],
+    { timeoutMs: 180_000 },
+  )
+  // acme.sh exits 2 when the certificate is already present and not due for
+  // renewal. That is success for our purposes: the install below still runs.
+  if (issue.code !== 0 && issue.code !== 2) {
+    const tail = (issue.stderr || issue.stdout || 'acme.sh issue failed').trim().split('\n').slice(-5).join(' | ')
     return { ok: false, detail: tail }
   }
-  try {
-    await fs.access(`${LE_CERT_DIR}/${host}/fullchain.pem`)
-    await fs.access(`${LE_CERT_DIR}/${host}/privkey.pem`)
-  } catch {
-    return { ok: false, detail: 'LE reported success but cert files missing on disk' }
+
+  await fs.mkdir(certDir, { recursive: true, mode: 0o700 }).catch(() => undefined)
+  const install = await shell(
+    ACME_SH,
+    [
+      '--install-cert', '-d', host,
+      '--key-file', path.join(certDir, 'privkey.pem'),
+      '--fullchain-file', path.join(certDir, 'fullchain.pem'),
+      '--reloadcmd', `${ACME_RELOAD_HOOK} ${certDir}`,
+    ],
+    { timeoutMs: 120_000 },
+  )
+  if (install.code !== 0) {
+    const tail = (install.stderr || install.stdout || 'acme.sh install failed').trim().split('\n').slice(-5).join(' | ')
+    return { ok: false, detail: tail }
   }
-  return { ok: true, detail: `cert at ${LE_CERT_DIR}/${host}/fullchain.pem` }
+
+  try {
+    await fs.access(path.join(certDir, 'fullchain.pem'))
+    await fs.access(path.join(certDir, 'privkey.pem'))
+  } catch {
+    return { ok: false, detail: 'acme.sh reported success but cert files are missing on disk' }
+  }
+  return { ok: true, detail: `cert installed at ${certDir}/fullchain.pem, renewal self-installing` }
 }
 
 // Write a tenant nginx config, validate it, and reload. On `nginx -t` failure we
@@ -233,63 +406,105 @@ export const provisionDomainInPlesk = async (args: { host: string }): Promise<Pr
     }
   }
 
-  // Re-provision of an already-working domain: the per-host cert is present, so
-  // keep TLS up — write the full config directly (no HTTP downgrade), then
-  // best-effort renew (the full config serves the ACME challenge on :80 too).
-  if (await certExists(host)) {
-    const nginx = await writeNginxConfig(host, renderTenantNginxConfig(host))
+  const facts = await gatherCertFacts(host)
+  const plan = planProvisioning(host, facts)
+  steps.push({ step: 'cert-ownership', ok: true, detail: `${plan.action}: ${plan.reason}` })
+
+  // A recheck of a host somebody else's certificate already serves must be a
+  // READ. Writing here is how a working host gets moved onto a certificate with
+  // no renewal owner, which is the failure this branch exists to prevent.
+  if (plan.action === 'covered-by-wildcard') {
+    if (plan.strayVhost) {
+      steps.push({
+        step: 'warning',
+        ok: true,
+        detail:
+          `a per-host vhost exists at ${tenantConfigPath(host)} and overrides the *.${plan.wildcardBase} ` +
+          `wildcard. Left in place rather than deleted; remove it by hand if that is not intended.`,
+      })
+    }
+    return { ok: true, plesk_domain_id: host, steps }
+  }
+
+  if (plan.action === 'already-managed') {
+    return { ok: true, plesk_domain_id: host, steps }
+  }
+
+  if (plan.action === 'repair-vhost') {
+    const nginx = await writeNginxConfig(host, renderTenantNginxConfig(host, plan.certDir))
     steps.push({ step: 'nginx-tls', ok: nginx.ok, detail: nginx.detail })
     if (!nginx.ok) return { ok: false, plesk_domain_id: host, steps, error: nginx.detail }
-    const renew = await issueLetsEncryptCert(host)
-    steps.push({ step: 'letsencrypt-renew', ok: renew.ok, detail: renew.detail })
     return { ok: true, plesk_domain_id: host, steps }
   }
 
   // First issue. ORDER MATTERS: stand up the :80 ACME-challenge route BEFORE
-  // requesting the cert, so HTTP-01 validation can actually resolve. (Requesting
-  // the cert first — the old bug — left LE with nowhere to validate, so it
-  // failed and the host fell back to the default vhost cert.)
+  // requesting the cert, so HTTP-01 validation can actually resolve. Requesting
+  // the cert first left LE with nowhere to validate.
   const bootstrap = renderAcmeBootstrapConfig(host)
   const boot = await writeNginxConfig(host, bootstrap)
   steps.push({ step: 'nginx-acme-bootstrap', ok: boot.ok, detail: boot.detail })
   if (!boot.ok) return { ok: false, plesk_domain_id: null, steps, error: boot.detail }
 
-  const cert = await issueLetsEncryptCert(host)
-  steps.push({ step: 'letsencrypt', ok: cert.ok, detail: cert.detail })
+  const cert = await issueAcmeCert(host, plan.certDir)
+  steps.push({ step: 'acme-issue', ok: cert.ok, detail: cert.detail })
   if (!cert.ok) {
     // Leave the bootstrap :80 config live: the site still serves over HTTP and
     // the next retry can validate without re-bootstrapping.
-    return { ok: false, plesk_domain_id: host, steps, error: `LE cert: ${cert.detail}` }
+    return { ok: false, plesk_domain_id: host, steps, error: `acme.sh: ${cert.detail}` }
   }
 
-  // Cert files now exist, so the SSL vhost passes `nginx -t`. Swap in the full
-  // config (:80 ACME + 301 → HTTPS, :443 SSL reverse-proxy). If it somehow fails
-  // validation, roll back to the working bootstrap config rather than 404-ing.
-  const nginx = await writeNginxConfig(host, renderTenantNginxConfig(host), { rollbackTo: bootstrap })
+  const nginx = await writeNginxConfig(host, renderTenantNginxConfig(host, plan.certDir), { rollbackTo: bootstrap })
   steps.push({ step: 'nginx-tls', ok: nginx.ok, detail: nginx.detail })
   if (!nginx.ok) return { ok: false, plesk_domain_id: host, steps, error: nginx.detail }
 
   return { ok: true, plesk_domain_id: host, steps }
 }
 
+/**
+ * Hosts whose vhost file must never be removed by unprovisioning a tenant.
+ *
+ * `crashclaim.co` is the FIRST `:443` server block and therefore the de-facto
+ * default vhost for every unmatched SNI — nginx has no `default_server` here,
+ * so the first block wins. Unlinking it silently promotes whichever file sorts
+ * next to answer for every unknown host. `preview.legenex.com` is the wildcard
+ * that serves every tenant preview host at once.
+ *
+ * Neither is a tenant domain, so no legitimate tenant teardown needs them gone.
+ */
+const PROTECTED_VHOSTS = new Set(['crashclaim.co', 'preview.legenex.com', 'test.checkmyclaim.co'])
+
 export const unprovisionDomainInPlesk = async (args: { pleskDomainId: string }): Promise<{ ok: boolean; error?: string }> => {
   const host = args.pleskDomainId.trim().toLowerCase()
   if (!isSafeHost(host)) return { ok: false, error: `unsafe hostname: ${host}` }
 
-  const cfgPath = tenantConfigPath(host)
+  if (PROTECTED_VHOSTS.has(host)) {
+    return { ok: false, error: `${host} is shared infrastructure (default vhost or wildcard) and is not tenant-removable` }
+  }
+
+  const facts = await gatherCertFacts(host)
+
+  // Covered by a wildcard: there is no per-host vhost and no per-host cert to
+  // remove, and the wildcard keeps serving its other hosts. Nothing to do.
+  const wildcard = wildcardBaseFor(host, facts.acmeInstalls)
+  if (wildcard && !facts.acmeInstalls.includes(host)) {
+    return { ok: true }
+  }
+
   try {
-    await fs.unlink(cfgPath)
+    await fs.unlink(tenantConfigPath(host))
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
       return { ok: false, error: `failed to remove nginx config: ${(err as Error).message}` }
     }
   }
 
-  await shell('plesk', [
-    'bin', 'extension', '--exec', 'letsencrypt', 'cli.php',
-    '-d', host,
-    '--revoke',
-  ], { timeoutMs: 60_000 }).catch(() => undefined)
+  // Stop RENEWING a certificate for a host we no longer serve. Deliberately
+  // `--remove` and not `--revoke`: revocation is irreversible and pointless
+  // here, and the old Plesk LE CLI call this replaces could revoke a
+  // certificate this module no longer owns.
+  if (facts.acmeInstalls.includes(host)) {
+    await shell(ACME_SH, ['--remove', '-d', host], { timeoutMs: 60_000 }).catch(() => undefined)
+  }
 
   const reload = await shell('systemctl', ['reload', 'nginx'])
   if (reload.code !== 0) {

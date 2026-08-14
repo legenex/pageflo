@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { normalizeDeploymentPath } from '@/lib/quiz-deployment-path'
 import { invokeLLM } from '@/lib/ai/invoke'
 import { canonicalTemplateId, resolveTemplate } from '@/lib/template-registry'
 import { resolveQuizTemplateSelection, resolveLpTemplateSelection } from '@/lib/template-records/select'
@@ -240,7 +241,12 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
     landing_page: lpId,
     site: gate.siteId,
     domain: domainId,
-    path: (dep.path as string) || '',
+    // Normalised on the way IN. Every read path already normalises
+    // ('/c/' -> '/c'), so a row stored raw is a row no request can ever
+    // resolve to: production carried two live deployments on '/c/' that
+    // pathVariantsFor('/c') = ['/c','c'] could never match, and they served
+    // nothing while looking healthy in the admin.
+    path: normalizeDeploymentPath((dep.path as string) || ''),
     quiz: quizId,
     embedded_quiz_template_id: embeddedTemplateId,
     embedded_progress_form: (dep.embeddedProgressForm as string) || null,

@@ -32,6 +32,7 @@ import {
   createQuiz, saveQuiz, cloneQuiz, deleteQuiz, setQuizArchived,
   saveQuizDeployment, deleteQuizDeployment,
 } from '@/app/(app)/admin/(top)/quizzes/actions'
+import { settleAction, commitOptimistic, failureMessage } from '../server-action'
 import { buildQuizEmbedSnippet, QUIZ_EMBED_INCOMPLETE } from '@/lib/quiz-embed'
 import { selectableOptions } from '@/lib/selectable'
 import { TemplateGallery } from '@/components/builder/templates/TemplateGallery'
@@ -186,7 +187,16 @@ const QuizListView = ({
         const quizDeployments = deployments.filter((d) => d.quizId === q.id)
         const liveDeployments = quizDeployments.filter((d) => d.status === 'live').length
         const usedBrandNames = [...new Set(quizDeployments.map((d) => brands.find((b) => b.id === d.brandId)?.displayName).filter(Boolean))]
-        return <div key={q.id} style={{ backgroundColor: T.bgElev, border: `1px solid ${q.isArchived ? T.border : T.border}`, borderRadius: 10, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 20, opacity: q.isArchived ? 0.75 : 1 }}>
+        return <div
+          key={q.id}
+          data-quiz-flow={q.id}
+          // What the row is asserting about this flow, for the same reason the
+          // deployment row exposes its status: a claim about whether something
+          // is serving traffic should be readable exactly, not inferred.
+          data-quiz-flow-published={q.isPublished ? 'true' : 'false'}
+          data-quiz-flow-archived={q.isArchived ? 'true' : 'false'}
+          style={{ backgroundColor: T.bgElev, border: `1px solid ${q.isArchived ? T.border : T.border}`, borderRadius: 10, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 20, opacity: q.isArchived ? 0.75 : 1 }}
+        >
           <div style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: q.isArchived ? T.bgElev2 : q.isPublished ? T.primarySoft : T.bgElev2, display: 'flex', alignItems: 'center', justifyContent: 'center', color: q.isArchived ? T.textLow : q.isPublished ? T.primary : T.textMute, flexShrink: 0 }}>
             {q.isArchived ? <Archive size={18} /> : <ListChecks size={18} />}
           </div>
@@ -249,6 +259,9 @@ const DeploymentListView = ({ deployments, quizzes, brands, templates, onOpen, o
         return <div
           key={d.id}
           data-quiz-deployment={d.id}
+          // The status the row is ASSERTING, exposed so a harness can read it
+          // exactly rather than regexing pill text out of the row.
+          data-quiz-deployment-status={d.status || 'draft'}
           // The whole row opens it. The guard is what keeps that from also
           // firing when the click was for one of the row's own controls - a
           // Delete that ALSO navigated into the editor behind its own confirm
@@ -453,8 +466,22 @@ const DeploymentEditor = ({ deployment, isDraft, quizzes, brands, templates, onB
   // Save STAYS. It used to call the same handler as Save & Exit, which returned
   // to the list either way - so the two buttons did the same thing and pressing
   // the one that says Save threw away where you were.
-  const handleSave = () => { onSave(draft, { exit: false }); setDirty(false) }
-  const handleSaveAndExit = () => { onSave(draft, { exit: true }); setDirty(false); onBack() }
+  //
+  // Both AWAIT the write. They used to clear UNSAVED and navigate in the same
+  // tick they fired it, so a save that failed left the editor - or the list -
+  // looking exactly like one that worked, with the Status the operator just
+  // chose still on screen. `!== false` keeps a handler that returns nothing
+  // behaving as it always did.
+  const handleSave = async () => {
+    const res = await onSave(draft, { exit: false })
+    if (res?.ok !== false) setDirty(false)
+  }
+  const handleSaveAndExit = async () => {
+    const res = await onSave(draft, { exit: true })
+    if (res?.ok === false) return
+    setDirty(false)
+    onBack()
+  }
 
   const embedCode = buildQuizEmbedSnippet({ deploymentId: draft.id, domain: draft.domain, path: draft.path })
 
@@ -811,10 +838,10 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
     const seq = dirtySeq.current
     if (seq === savedSeq.current) { setSaveState('saved'); return true }
     setSaveState('saving')
-    const res = await saveQuiz({ id: target.id, patch: quizPatch(target.quiz) })
-    if (!res?.ok) {
+    const res = await settleAction(saveQuiz({ id: target.id, patch: quizPatch(target.quiz) }))
+    if (!res.ok) {
       setSaveState('error')
-      setToast({ message: `Save failed: ${res?.error || 'unknown error'}`, type: 'error' })
+      setToast({ message: `Save failed: ${failureMessage(res)}`, type: 'error' })
       return false
     }
     savedSeq.current = seq
@@ -945,7 +972,7 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
     resetHistory()
     setView('builder')
   }
-  const cloneQuizHandler = (id) => { cloneQuiz({ id }).then((res) => { if (res.ok) router.refresh(); else setToast({ message: res.error, type: 'error' }) }) }
+  const cloneQuizHandler = (id) => { settleAction(cloneQuiz({ id })).then((res) => { if (res.ok) router.refresh(); else setToast({ message: failureMessage(res), type: 'error' }) }) }
   const deleteQuizHandler = (id) => setPendingDelete({ kind: 'quiz', id })
   const togglePublish = (id) => {
     const q = getQuiz(id)
@@ -955,15 +982,15 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
     if (q.isArchived) { setToast({ message: 'Restore this quiz before publishing it.', type: 'warning' }); return }
     const isPublished = !q.isPublished
     applyQuizzes(quizzesRef.current.map((x) => (x.id === id ? { ...x, isPublished } : x)))
-    saveQuiz({ id, patch: { is_published: isPublished } }).then((res) => {
-      if (!res?.ok) {
-        // Roll the optimistic flip back rather than showing a state the server
-        // did not accept.
-        applyQuizzes(quizzesRef.current.map((x) => (x.id === id ? { ...x, isPublished: !isPublished } : x)))
-        setToast({ message: `Could not ${isPublished ? 'publish' : 'unpublish'}: ${res?.error || 'unknown error'}`, type: 'error' })
-        return
-      }
-      router.refresh()
+    // Roll the optimistic flip back rather than showing a state the server did
+    // not accept - and re-read the row, because a call that never came back is
+    // not evidence that the flip failed to land.
+    void commitOptimistic({
+      action: () => saveQuiz({ id, patch: { is_published: isPublished } }),
+      rollback: () => applyQuizzes(quizzesRef.current.map((x) => (x.id === id ? { ...x, isPublished: !isPublished } : x))),
+      onError: (message) => setToast({ message: `Could not ${isPublished ? 'publish' : 'unpublish'}: ${message}`, type: 'error' }),
+      reconcile: () => router.refresh(),
+      onSuccess: () => router.refresh(),
     })
   }
   const archiveQuizHandler = (id, archived) => setPendingArchive({ id, archived })
@@ -978,20 +1005,27 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
     // After a restore the quiz leaves the Archived list, so follow it over to
     // Active rather than leaving the user looking at where it used to be.
     if (!archived) setQuizScope('active')
-    setQuizArchived({ id, archived }).then((res) => {
-      if (!res?.ok) {
+    void commitOptimistic({
+      action: () => setQuizArchived({ id, archived }),
+      rollback: () => {
         applyQuizzes(quizzesRef.current.map((x) => (x.id === id ? q : x)))
-        setToast({ message: `Could not ${archived ? 'archive' : 'restore'}: ${res?.error || 'unknown error'}`, type: 'error' })
-        return
-      }
-      setToast({ message: archived ? 'Quiz archived and unpublished.' : 'Quiz restored.', type: 'success' })
-      router.refresh()
+        // The scope followed the quiz over to Active; a refused restore has to
+        // bring the operator back with it, or they are looking at a list the
+        // quiz is not in and reading that as the restore having worked.
+        if (!archived) setQuizScope('archived')
+      },
+      onError: (message) => setToast({ message: `Could not ${archived ? 'archive' : 'restore'}: ${message}`, type: 'error' }),
+      reconcile: () => router.refresh(),
+      onSuccess: () => {
+        setToast({ message: archived ? 'Quiz archived and unpublished.' : 'Quiz restored.', type: 'success' })
+        router.refresh()
+      },
     })
   }
   const createQuizHandler = () => {
     const q = { name: 'New Quiz', slug: `quiz-${Date.now().toString(36)}`, isPublished: false, isArchived: false, tiers: [{ id: genId('t'), name: 'Tier 1', color: T.success }], steps: [{ key: 'welcome', label: 'Welcome' }], nodes: [], customFields: JSON.parse(JSON.stringify(currentQuiz?.customFields || [])) }
-    createQuiz({ quiz: q }).then((res) => {
-      if (!res.ok) { setToast({ message: res.error, type: 'error' }); return }
+    settleAction(createQuiz({ quiz: q })).then((res) => {
+      if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return }
       applyQuizzes([...quizzesRef.current, { ...q, id: res.id }])
       openQuiz(res.id)
     })
@@ -1005,16 +1039,25 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
     if (!d) return
     const status = d.status === 'live' ? 'paused' : 'live'
     setDeployments((ds) => ds.map((x) => x.id === id ? { ...x, status } : x))
-    // Going live runs the publish preflight server-side; a refusal must be
-    // SEEN, and the optimistic flip above must be rolled back or the list
-    // shows LIVE on a row the server just declined to publish.
-    saveQuizDeployment({ deployment: { ...d, status } }).then((res) => {
-      if (!res.ok) {
-        setDeployments((ds) => ds.map((x) => (x.id === id ? d : x)))
-        setToast({ message: res.error, type: 'error' })
-        return
-      }
-      router.refresh()
+    /*
+     * Both directions are load-bearing, and the pause direction is the one that
+     * carries compliance risk. Going live runs the publish preflight server
+     * side, so a refusal must be SEEN or the list shows LIVE on a row the server
+     * declined to publish. Pausing is worse in the other direction: if the write
+     * does not land and the row keeps the optimistic PAUSED, an operator who
+     * just stopped a non-compliant legal-advertising funnel has been told it is
+     * stopped while it goes on serving.
+     *
+     * So the failure path is rollback + a visible refusal + a re-read, and it
+     * now covers a REJECTED call as well as a refusal - which is the case that
+     * was silently skipping all three.
+     */
+    void commitOptimistic({
+      action: () => saveQuizDeployment({ deployment: { ...d, status } }),
+      rollback: () => setDeployments((ds) => ds.map((x) => (x.id === id ? d : x))),
+      onError: (message) => setToast({ message, type: 'error' }),
+      reconcile: () => router.refresh(),
+      onSuccess: () => router.refresh(),
     })
   }
   const createDeployment = () => {
@@ -1027,9 +1070,12 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
     const d = { id: '', name: '', quizId: quizzes[0]?.id || '', brandId: brands[0]?.id || '', domain: '', path: `/new-${Date.now().toString(36)}`, status: 'draft', renderMode: 'standalone', templateId: firstSelectable?.templateId ?? '', embedPreviewBg: '#0a1a3a', utm: { source: '', medium: '', campaign: '' }, pixels: {} }
     setDraftDeployment(d); setCurrentDeploymentId(null); setView('deploymentEdit')
   }
+  // Returns the settled result so the editor can hold its UNSAVED state and stay
+  // put when the write did not land. The Status field lives on this screen, so a
+  // save that silently did nothing is another way to show PAUSED over a live row.
   const persistDeployment = (d, opts = {}) => {
-    saveQuizDeployment({ deployment: d }).then((res) => {
-      if (!res.ok) { setToast({ message: res.error, type: 'error' }); return }
+    return settleAction(saveQuizDeployment({ deployment: d })).then((res) => {
+      if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); router.refresh(); return res }
       if (opts.exit === false) {
         /*
          * Stay put. A brand-new deployment has to adopt the id the server just
@@ -1044,9 +1090,10 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
         setCurrentDeploymentId(saved.id)
         setToast({ message: 'Deployment saved.', type: 'success' })
         router.refresh()
-        return
+        return res
       }
       setView('list'); setTab('deployments'); setDraftDeployment(null); setCurrentDeploymentId(null); router.refresh()
+      return res
     })
   }
 
@@ -1170,8 +1217,8 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
   const confirmDelete = () => {
     if (!pendingDelete) return
     const { kind, id } = pendingDelete
-    if (kind === 'quiz') { deleteQuiz({ id }).then((res) => { if (res.ok) { applyQuizzes(quizzesRef.current.filter((q) => q.id !== id)); router.refresh() } else setToast({ message: res.error, type: 'error' }) }) }
-    if (kind === 'deployment') { deleteQuizDeployment({ id }).then((res) => { if (res.ok) { setDeployments((ds) => ds.filter((d) => d.id !== id)); router.refresh() } else setToast({ message: res.error, type: 'error' }) }) }
+    if (kind === 'quiz') { settleAction(deleteQuiz({ id })).then((res) => { if (res.ok) { applyQuizzes(quizzesRef.current.filter((q) => q.id !== id)); router.refresh() } else setToast({ message: failureMessage(res), type: 'error' }) }) }
+    if (kind === 'deployment') { settleAction(deleteQuizDeployment({ id })).then((res) => { if (res.ok) { setDeployments((ds) => ds.filter((d) => d.id !== id)); router.refresh() } else setToast({ message: failureMessage(res), type: 'error' }) }) }
     setPendingDelete(null)
   }
 
@@ -1247,7 +1294,7 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
         onToast={setToast}
         onChanged={() => router.refresh()}
       />}
-      {tab === 'deployments' && <DeploymentListView deployments={deployments} quizzes={quizzes} brands={brands} templates={templates} onOpen={openDeployment} onClone={cloneDeploymentHandler} onDelete={deleteDeploymentHandler} onToggleStatus={toggleDeploymentStatus} onCopyEmbed={(id) => setShowEmbed(id)} onPreview={(id) => { const dep = deployments.find((d) => d.id === id); if (!dep) return; openQuiz(dep.quizId); setPreviewSource('list-deployments'); setPreviewDeploymentId(id); setView('preview') }} onRename={(id, name) => { const d = deployments.find((x) => x.id === id); setDeployments((ds) => ds.map((x) => x.id === id ? { ...x, name } : x)); if (d) saveQuizDeployment({ deployment: { ...d, name } }) }} />}
+      {tab === 'deployments' && <DeploymentListView deployments={deployments} quizzes={quizzes} brands={brands} templates={templates} onOpen={openDeployment} onClone={cloneDeploymentHandler} onDelete={deleteDeploymentHandler} onToggleStatus={toggleDeploymentStatus} onCopyEmbed={(id) => setShowEmbed(id)} onPreview={(id) => { const dep = deployments.find((d) => d.id === id); if (!dep) return; openQuiz(dep.quizId); setPreviewSource('list-deployments'); setPreviewDeploymentId(id); setView('preview') }} onRename={(id, name) => { const d = deployments.find((x) => x.id === id); if (!d) return; setDeployments((ds) => ds.map((x) => x.id === id ? { ...x, name } : x)); void commitOptimistic({ action: () => saveQuizDeployment({ deployment: { ...d, name } }), rollback: () => setDeployments((ds) => ds.map((x) => (x.id === id ? d : x))), onError: (message) => setToast({ message, type: 'error' }), reconcile: () => router.refresh() }) }} />}
     </ListShell>}
 
     {view === 'builder' && currentQuiz && <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>

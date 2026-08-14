@@ -31,7 +31,7 @@ import {
   DEPLOYMENT_TRANSITIONS,
   type DeploymentStatus,
 } from '../src/lib/publish-lifecycle.ts'
-import { summarize, pass, fail } from '../src/lib/publish-preflight.ts'
+import { summarize, pass, fail, type PreflightCheck, type PreflightResult } from '../src/lib/publish-preflight.ts'
 import { PORTED_TEMPLATES } from '../src/lib/lp-templates/index.ts'
 import { classifyLpQuizBinding, LOSSY_QUIZ_DEPLOYMENT_FIELDS, NEEDS_A_DECISION } from '../src/lib/lp-quiz-binding.ts'
 
@@ -363,6 +363,175 @@ const ACTIVE_DOMAIN = { id: 5, site: 1, host: 'acme.example', status: 'active', 
   const r = await quizDeploymentPreflight(CTX(), { deployment: { ...GOOD_DEP, domain: 6 }, quiz: GOOD_QUIZ, site: SITE, domain: preview })
   t(r.ok, 'a preview host with no certificate still publishes, because PREVIEW_REQUIRES_SSL is off')
   t(r.warnings.some((c) => c.id === 'domain-ssl'), 'but the operator is TOLD, rather than discovering it')
+}
+
+/* ------------------------------- brand legal copy: WHERE the check reads it */
+//
+// The release blocker, as fixtures.
+//
+// `checkBrand` reached into the jsonb itself and read
+// `brand_identity.defaultDisclaimer`. The Brand Identity editor writes
+// `brand_identity.legal.defaultDisclaimer` — one level deeper — and
+// `brand-map.ts` has always read it there, so the preflight and the renderer
+// disagreed about the same brand. Every brand in production had filled the
+// field in, every one of them reported "no legal disclaimer", and all eight
+// live deployments failed re-publish. Because `decideTransition` gates only the
+// way UP, unpublishing any of them would have been a one-way door.
+//
+// Confirmed against production on 2026-08-14: sites 12, 13 and 15 each have
+// `brand_identity->'legal'->>'defaultDisclaimer'` populated and
+// `legal_default_disclaimer` NULL.
+//
+// The fix routes the preflight through `brand-map`'s exported resolvers, so
+// these cases pin the CONTRACT (any place the mapper looks is accepted) rather
+// than one spelling of it.
+
+const SITE_BASE = { id: 1, name: 'Acme', default_phone: '(800) 000-0000' }
+
+const preflightWith = async (
+  site: Record<string, unknown> | null,
+  quiz: Record<string, unknown> = GOOD_QUIZ,
+): Promise<{ r: PreflightResult; brand: PreflightCheck; consent: PreflightCheck }> => {
+  const r = await quizDeploymentPreflight(CTX(), { deployment: GOOD_DEP, quiz, site, domain: null })
+  const find = (id: string): PreflightCheck =>
+    r.checks.find((c) => c.id === id) ?? fail(id, id, 'the check did not run at all')
+  return { r, brand: find('brand'), consent: find('consent') }
+}
+
+{
+  // THE production shape.
+  const { brand } = await preflightWith({ ...SITE_BASE, brand_identity: { legal: { defaultDisclaimer: 'Attorney advertising. Not a law firm.' } } })
+  t(brand.ok, `a disclaimer that exists ONLY at brand_identity.legal.defaultDisclaimer passes${brand.ok ? '' : ' — ' + brand.detail}`)
+}
+{
+  const { brand } = await preflightWith({ ...SITE_BASE, legal_default_disclaimer: 'Attorney advertising.' })
+  t(brand.ok, 'the flat legal_default_disclaimer column passes — that is the raw row shape')
+}
+{
+  const { brand } = await preflightWith({ ...SITE_BASE, legal: { default_disclaimer: 'Attorney advertising.' } })
+  t(brand.ok, "the legal group passes — that is the shape payload.findByID actually returns, and nothing read it before")
+}
+{
+  const { brand } = await preflightWith({ ...SITE_BASE, default_disclaimer_md: 'Attorney advertising.' })
+  t(brand.ok, 'the older site-wide default_disclaimer_md passes, because the public renderer prints it')
+}
+{
+  const { brand } = await preflightWith({ ...SITE_BASE, brand_identity: { legal: { defaultDisclaimer: '   \n  ' } } })
+  t(!brand.ok, 'a disclaimer of nothing but whitespace is not a disclaimer')
+}
+{
+  const { brand } = await preflightWith(SITE_BASE)
+  t(!brand.ok, 'a brand with the disclaimer in NONE of those places still FAILS — the check is corrected, not weakened')
+  t(brand.detail === 'the brand has no legal disclaimer', `and says exactly that: "${brand.detail}"`)
+}
+
+/* ------------------------------------------ the refusal has to read as English */
+
+{
+  const { brand } = await preflightWith(SITE_BASE)
+  t(!/\bno a\b/.test(brand.detail), 'the refusal never says "no a legal disclaimer" — the items no longer carry their own article')
+}
+{
+  const { brand } = await preflightWith({ id: 1, name: 'Acme' })
+  t(brand.detail === 'the brand has no phone number or legal disclaimer', `two missing things read as a pair: "${brand.detail}"`)
+}
+{
+  const { brand } = await preflightWith({ id: 1 })
+  t(
+    brand.detail === 'the brand has no display name, phone number, or legal disclaimer',
+    `three read as a list: "${brand.detail}"`,
+  )
+}
+{
+  // Display name and phone are NOT relaxed. They are only read from the right
+  // place — including brand_identity.contact.callNumber, which is where a brand
+  // whose number was typed into the funnel editor keeps it.
+  const { brand } = await preflightWith({ ...SITE_BASE, default_phone: '', legal_default_disclaimer: 'x', brand_identity: { contact: { callNumber: '(800) 111-2222' } } })
+  t(brand.ok, 'a phone number that only exists at brand_identity.contact.callNumber passes — it is the number the call button dials')
+  const bare = await preflightWith({ ...SITE_BASE, default_phone: '', legal_default_disclaimer: 'x' })
+  t(!bare.brand.ok && bare.brand.detail === 'the brand has no phone number', 'and a brand with no number anywhere still fails')
+}
+
+/* ------------------------------------- consent: the BRAND supplies the line */
+//
+// `PreviewQuestionCard` — the one card component the builder preview and the
+// public runtime both render through — prints `brand.legal.tcpaText` on every
+// form node. `checkReachableConsent` in the flow validator says so outright.
+// Scanning only `quiz.nodes` therefore refused the platform's actual
+// configuration: production quiz 2 carries no consent wording at all, runs under
+// three brands, and each brand supplies its own TCPA text. Verified in a live
+// browser — the visitor sees the line.
+//
+// `tcpaText` is removed from the form node rather than blanked, because the
+// scan stringifies the whole node and the KEY alone contains "tcpa".
+
+const SILENT_QUIZ = {
+  ...GOOD_QUIZ,
+  nodes: [
+    { id: 'n1', stepKey: 'a', type: 'question', tiers: [], answers: [{ id: 'x', label: 'Yes', nextStepKey: 'b' }] },
+    { id: 'n2', stepKey: 'b', type: 'form', tiers: [], answers: [{ id: 'y', label: 'Submit', nextStepKey: 'c' }] },
+    { id: 'n3', stepKey: 'c', type: 'endpoint', tiers: [], answers: [] },
+  ],
+}
+
+t(
+  !JSON.stringify(SILENT_QUIZ.nodes).toLowerCase().includes('tcpa') &&
+    !JSON.stringify(SILENT_QUIZ.nodes).toLowerCase().includes('consent'),
+  'the fixture really is silent — no node mentions consent or TCPA, key names included',
+)
+
+{
+  const site = { ...SITE_BASE, legal_default_disclaimer: 'Attorney advertising.', brand_identity: { legal: { tcpaText: 'By submitting this form, you consent to be contacted.' } } }
+  const { r, consent } = await preflightWith(site, SILENT_QUIZ)
+  t(consent.ok, `a flow with no consent wording of its own passes when the BRAND carries the TCPA text${consent.ok ? '' : ' — ' + consent.detail}`)
+  t(r.ok, `and the deployment publishes${r.ok ? '' : ' — ' + r.blocking.map((c) => c.id + ':' + c.detail).join(', ')}`)
+}
+{
+  const site = { ...SITE_BASE, legal_default_disclaimer: 'x', legal: { tcpa_text: 'By submitting this form, you consent to be contacted.' } }
+  t((await preflightWith(site, SILENT_QUIZ)).consent.ok, "the Site's own legal.tcpa_text satisfies consent too")
+}
+{
+  const site = { ...SITE_BASE, legal_default_disclaimer: 'x', legal_tcpa_text: 'By submitting this form, you consent to be contacted.' }
+  t((await preflightWith(site, SILENT_QUIZ)).consent.ok, 'and so does the flat legal_tcpa_text column')
+}
+{
+  const site = { ...SITE_BASE, legal_default_disclaimer: 'x' }
+  const { consent } = await preflightWith(site, SILENT_QUIZ)
+  t(!consent.ok, 'with NEITHER node-level consent nor brand TCPA text it still FAILS — nothing would be shown to anyone')
+  t(consent.detail.includes('this brand has no TCPA text'), 'and the refusal names both halves, so the operator knows where to fix it')
+}
+{
+  const { consent } = await preflightWith(null, SILENT_QUIZ)
+  t(!consent.ok, 'a deployment whose Site could not be loaded cannot borrow a brand line it has no way to read')
+}
+{
+  // Belt and braces: the node-level path is untouched. A quiz that writes its
+  // own consent copy still passes under a brand that has none.
+  const { consent } = await preflightWith({ ...SITE_BASE, legal_default_disclaimer: 'x' }, GOOD_QUIZ)
+  t(consent.ok, "a flow carrying its own consent line passes under a brand with no TCPA text")
+}
+
+/* ------------------------------------------------- the whole blocker, end to end */
+
+{
+  // Site 12 as production holds it: name set, brand_display_name NULL, phone
+  // set, every legal_* column NULL, all legal copy in brand_identity.legal —
+  // running the brandless quiz that carries no consent wording. Before the fix
+  // this failed both `brand` and `consent`, so re-publishing it was impossible.
+  const PROD_SITE = {
+    id: 12,
+    name: 'Auto Claim Eval',
+    default_phone: '4927464942',
+    brand_identity: {
+      legal: {
+        defaultDisclaimer: 'Auto Claim Eval is an attorney advertising and legal referral service.',
+        tcpaText: 'By submitting this form, you consent to be contacted by Auto Claim Eval.',
+      },
+    },
+  }
+  const { r } = await preflightWith(PROD_SITE, SILENT_QUIZ)
+  t(r.ok, `a production-shaped brand and its brandless quiz publish${r.ok ? '' : ' — ' + r.blocking.map((c) => c.id + ':' + c.detail).join(', ')}`)
+  t(decideTransition('live', 'draft', r).ok && decideTransition('draft', 'live', r).ok, 'so taking it down is no longer a one-way door')
 }
 
 /* ------------------------------------------- landing-page quiz binding */

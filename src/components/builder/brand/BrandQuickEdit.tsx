@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Palette, Check, X, Loader2, AlertTriangle } from 'lucide-react'
 import { T } from '../ui'
 import { saveBrandIdentity } from '@/app/(app)/admin/(top)/brands/brand-identities/actions'
+import { settleAction, failureMessage } from '../server-action'
 
 /**
  * Edit the brand without leaving the builder you are already in.
@@ -72,10 +73,10 @@ export function BrandQuickEdit({ brand, onSaved, align = 'left' }) {
       },
     }
 
-    const res = await saveBrandIdentity({ siteId: brand.siteId, brand: next })
+    const res = await settleAction(saveBrandIdentity({ siteId: brand.siteId, brand: next }))
     setSaving(false)
     if (!res.ok) {
-      setError(res.error || 'Could not save.')
+      setError(failureMessage(res))
       return
     }
     setOpen(false)

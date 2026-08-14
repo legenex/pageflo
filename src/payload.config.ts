@@ -118,6 +118,25 @@ export default buildConfig({
     limits: { fileSize: 10 * 1024 * 1024 },
   },
   graphQL: {
-    disable: false,
+    /**
+     * Disabled deliberately, and it was already effectively off.
+     *
+     * The schema could not build: Payload derives GraphQL enum members from
+     * select option VALUES, and `Pages.blocks.video.aspect_ratio` offers
+     * '16:9' — a colon is not legal in a GraphQL name. Every POST to
+     * /api/graphql therefore answered 500 with an empty body, logging
+     * `Names must only contain [_a-zA-Z0-9] but "_16:9" does not`.
+     *
+     * Nothing in this application uses GraphQL: the admin runs on the local
+     * API and the public surface on REST. What the endpoint DID offer was an
+     * unauthenticated door onto collections whose create access is `() => true`
+     * — `createLead` among them — behind `cors: '*'`.
+     *
+     * So this is not a workaround for the enum bug. An unauthenticated API
+     * nobody uses is surface, and the fix for surface is to remove it. If
+     * GraphQL is ever wanted, rename that option value (with a migration for
+     * the existing enum) and flip this back in the same change.
+     */
+    disable: true,
   },
 })

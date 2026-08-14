@@ -19,6 +19,7 @@ import {
   Btn, Input, Textarea, Select, Label, Pill, IconBtn, ConfirmDialog, Toast, PageHeader, EmptyState,
 } from '../ui'
 import { saveBrandIdentity, createBrandSite, deleteBrandSite, aiGenerateBrand, proposeBrandTokens } from '@/app/(app)/admin/(top)/brands/brand-identities/actions'
+import { settleAction, failureMessage } from '../server-action'
 import {
   DESTINATION_KEYS, DESTINATION_LABELS, DESTINATION_HINTS, DEFAULT_PATHS, isSafeDestinationUrl,
 } from '@/lib/quiz-destinations'
@@ -694,6 +695,13 @@ const BrandEditor = ({ brand, isDraft, onSave, onBack }) => {
   const handleSave = () => { onSave(draft); setDirty(false) }
   const handleSaveAndExit = () => { onSave(draft); setDirty(false); onBack() }
 
+  // "Default Body Sections" here is NOT the deployment-level "Body Sections"
+  // tab that was removed from the LP and Quiz deployment editors. It is where
+  // that concept MOVED TO: these are brand-level defaults, siblings of
+  // "Default Header & Footer", inherited by every deployment of the brand
+  // rather than authored per placement. The word "Default" is what carries the
+  // distinction, so keep it — a bare "Body Sections" label here would read as
+  // the surface that was deliberately retired.
   const tabs = [
     { id: 'identity', label: 'Identity' }, { id: 'colors', label: 'Colors' },
     { id: 'typography', label: 'Typography' }, { id: 'contact', label: 'Contact' },
@@ -1058,8 +1066,8 @@ export function BrandIdentitiesApp({ initialBrands }) {
   const saveBrand = (b) => {
     startTransition(async () => {
       if (b.siteId == null) {
-        const res = await createBrandSite({ brand: b })
-        if (!res.ok) { setToast({ message: res.error, type: 'error' }); return }
+        const res = await settleAction(createBrandSite({ brand: b }))
+        if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return }
         const newId = `site_${res.siteId}`
         setBrands((arr) => arr.map((x) => (x.id === b.id ? { ...b, id: newId, siteId: res.siteId, siteSlug: res.slug, primaryDomain: res.previewHost } : x)))
         setEditingBrandId((cur) => (cur === b.id ? newId : cur))
@@ -1081,8 +1089,8 @@ export function BrandIdentitiesApp({ initialBrands }) {
           setToast({ message: 'Brand created.', type: 'success' })
         }
       } else {
-        const res = await saveBrandIdentity({ siteId: b.siteId, brand: b })
-        if (!res.ok) { setToast({ message: res.error, type: 'error' }); return }
+        const res = await settleAction(saveBrandIdentity({ siteId: b.siteId, brand: b }))
+        if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return }
         setToast({ message: 'Saved.', type: 'success' })
       }
       router.refresh()
@@ -1101,8 +1109,8 @@ export function BrandIdentitiesApp({ initialBrands }) {
           return
         }
         startTransition(async () => {
-          const res = await deleteBrandSite({ siteId: b.siteId })
-          if (!res.ok) { setToast({ message: res.error, type: 'error' }); setConfirm(null); return }
+          const res = await settleAction(deleteBrandSite({ siteId: b.siteId }))
+          if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); setConfirm(null); return }
           setBrands((arr) => arr.filter((x) => x.id !== id))
           setConfirm(null)
           router.refresh()

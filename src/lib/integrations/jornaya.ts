@@ -1,6 +1,8 @@
 // Jornaya LeadiD verification. Captured client-side as `universal_leadid` hidden input,
 // verified server-side.
 
+import { fetchWithTimeout } from '@/lib/net/outbound'
+
 export type JornayaVerifyArgs = {
   accountId: string
   campaignId?: string
@@ -22,7 +24,10 @@ export const verifyJornayaLead = async (args: JornayaVerifyArgs): Promise<Jornay
   url.searchParams.set('lead_id', leadId)
   if (campaignId) url.searchParams.set('campaign_id', campaignId)
   try {
-    const resp = await fetch(url.toString(), { headers: { Accept: 'application/json' } })
+    // Bounded, and uncached: this runs inside the visitor's lead POST, and a
+    // per-lead verification must never be answered from a previous lead's
+    // response. See lib/net/outbound.
+    const resp = await fetchWithTimeout(url.toString(), { headers: { Accept: 'application/json' } })
     const raw = await resp.json().catch(() => ({}))
     if (!resp.ok) return { ok: false, raw, error: `jornaya returned ${resp.status}` }
     return { ok: true, audit_token: (raw as { audit_token?: string }).audit_token, raw }

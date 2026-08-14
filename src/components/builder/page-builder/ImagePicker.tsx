@@ -12,6 +12,7 @@ import { useState, useEffect, useRef } from 'react'
 import { Image as ImageIcon, Upload, X, Loader2, Check } from 'lucide-react'
 import { T, Btn, Input, IconBtn, Pill, Label } from '../ui'
 import { uploadMediaFromDataURL, listSiteMedia } from '@/app/(app)/admin/sites/[slug]/pages/[id]/media-actions'
+import { settleAction, failureMessage } from '../server-action'
 
 type MediaItem = { id: string | number; url: string; filename: string; alt: string }
 type Tab = 'upload' | 'library'
@@ -108,9 +109,9 @@ function ImagePickerModal({
     const load = async () => {
       setLoading(true)
       setError(null)
-      const res = await listSiteMedia({ siteId })
+      const res = await settleAction(listSiteMedia({ siteId }))
       if (cancelled) return
-      if (!res.ok) setError(res.error)
+      if (!res.ok) setError(failureMessage(res))
       else setItems(res.items)
       setLoading(false)
     }
@@ -127,14 +128,14 @@ function ImagePickerModal({
     try {
       for (const file of Array.from(files)) {
         const dataUrl = await fileToDataUrl(file)
-        const res = await uploadMediaFromDataURL({
+        const res = await settleAction(uploadMediaFromDataURL({
           siteSlug,
           siteId,
           dataUrl,
           filename: file.name,
-        })
+        }))
         if (!res.ok) {
-          setError(res.error)
+          setError(failureMessage(res))
           break
         }
         // Refresh library tab with the new item at the top.

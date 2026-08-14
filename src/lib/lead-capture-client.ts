@@ -93,6 +93,34 @@ export const firePixelEvents = (eventId: string, contentName: string): void => {
   } catch {}
 }
 
+/**
+ * Mint the idempotency key for ONE submission.
+ *
+ * Every public surface that can submit a lead must send one, and every surface
+ * must mint it the same way — which is why it is here rather than spelled out
+ * twice. The rules that make it work are about its LIFETIME, not its bytes, and
+ * they belong to the caller:
+ *
+ *   · minted ONCE, lazily, into a `useRef` — so it exists before the first
+ *     submit without depending on render timing;
+ *   · NEVER cleared, not even when a submit fails and the surface re-arms for a
+ *     retry. A retry that mints a new key is a second lead;
+ *   · sent on every attempt, including the automatic retry.
+ *
+ * `crypto.randomUUID` is unavailable outside a secure context (plain http on a
+ * non-localhost host), which is exactly where a fallback matters: without one,
+ * the surface that most needs idempotency is the one that silently sends none.
+ */
+export const newClientSubmissionId = (): string => {
+  // `typeof … === 'function'` rather than a truthiness check: the DOM types
+  // declare `randomUUID` as always present, so a truthiness test both reads as
+  // dead code to the compiler and misses the runtime case it exists for.
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `sub_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`
+}
+
 export type LeadSubmitPayload = {
   site_slug?: string
   funnel_type: 'quiz' | 'landing-page' | 'contact-form' | 'page' | 'advertorial'

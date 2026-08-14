@@ -34,6 +34,7 @@ import { PROGRESS_FORM_LABELS } from '@/lib/quiz-templates/model'
 import {
   createQuizTemplate, cloneQuizTemplate, saveQuizTemplate, setQuizTemplateEnabled, deleteQuizTemplate,
 } from '@/app/(app)/admin/(top)/template-actions'
+import { settleAction, failureMessage } from '../server-action'
 
 /* ------------------------------------------------------------------ helpers */
 
@@ -171,7 +172,7 @@ const EditorModal = ({ template, brands, brandId, rendererOptions, onBrandChange
     if (draft.progressForm) configOverrides.progressForm = draft.progressForm
     else delete configOverrides.progressForm
 
-    const res = await saveQuizTemplate({
+    const res = await settleAction(saveQuizTemplate({
       id: template.id,
       patch: {
         name: draft.name.trim(),
@@ -180,9 +181,9 @@ const EditorModal = ({ template, brands, brandId, rendererOptions, onBrandChange
         rendererKey: draft.rendererKey,
         configOverrides,
       },
-    })
+    }))
     setSaving(false)
-    if (!res?.ok) { onError(res?.error || 'save failed'); return }
+    if (!res.ok) { onError(failureMessage(res)); return }
     onSaved(`Saved "${draft.name.trim()}".`)
   }
 
@@ -286,9 +287,9 @@ const CreateModal = ({ rendererOptions, onCreated, onError, onClose }) => {
 
   const create = async () => {
     setBusy(true)
-    const res = await createQuizTemplate({ name: name.trim(), rendererKey: rendererKey || undefined })
+    const res = await settleAction(createQuizTemplate({ name: name.trim(), rendererKey: rendererKey || undefined }))
     setBusy(false)
-    if (!res?.ok) { onError(res?.error || 'create failed'); return }
+    if (!res.ok) { onError(failureMessage(res)); return }
     onCreated(`Created "${name.trim() || 'Untitled quiz template'}".`)
   }
 
@@ -369,7 +370,7 @@ export const QuizTemplatesPanel = ({
   const brokenCount = templates.filter((t) => t.rendererError).length
 
   const after = (res, okText) => {
-    if (!res?.ok) { setNotice({ tone: 'error', text: res?.error || 'that did not work' }); return false }
+    if (!res.ok) { setNotice({ tone: 'error', text: failureMessage(res) }); return false }
     if (okText) onToast({ message: okText, type: 'success' })
     onChanged()
     return true
@@ -377,7 +378,7 @@ export const QuizTemplatesPanel = ({
 
   const toggleEnabled = async (t) => {
     setBusyId(t.id)
-    const res = await setQuizTemplateEnabled({ id: t.id, enabled: !t.isEnabled })
+    const res = await settleAction(setQuizTemplateEnabled({ id: t.id, enabled: !t.isEnabled }))
     setBusyId(null)
     if (!after(res, `${t.name} ${t.isEnabled ? 'disabled' : 'enabled'}.`)) return
     // The warning is the whole point of disabling being survivable: it names the
@@ -387,7 +388,7 @@ export const QuizTemplatesPanel = ({
 
   const clone = async (t) => {
     setBusyId(t.id)
-    const res = await cloneQuizTemplate({ id: t.id })
+    const res = await settleAction(cloneQuizTemplate({ id: t.id }))
     setBusyId(null)
     after(res, `Cloned "${t.name}".`)
   }
@@ -397,12 +398,12 @@ export const QuizTemplatesPanel = ({
     setPendingDelete(null)
     if (!t) return
     setBusyId(t.id)
-    const res = await deleteQuizTemplate({ id: t.id })
+    const res = await settleAction(deleteQuizTemplate({ id: t.id }))
     setBusyId(null)
-    if (!res?.ok) {
+    if (!res.ok) {
       // Verbatim: the refusal names every deployment in the way, which is what
       // makes it actionable rather than something to escalate.
-      setNotice({ tone: 'error', text: res?.error || 'delete failed' })
+      setNotice({ tone: 'error', text: failureMessage(res) })
       return
     }
     setNotice({

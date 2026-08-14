@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 
 import { reportError } from '@/lib/observability/report'
+import { trustedHost } from '@/lib/trusted-host'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,7 +71,10 @@ export async function POST(req: NextRequest) {
     operation: 'client-error-boundary',
     extra: {
       digest: parsed.data.digest ?? null,
-      host: req.headers.get('x-legalos-host') ?? req.headers.get('host'),
+      // From the connection, not from a header the reporter set: an attributed
+      // host in an error stream is only worth having if it cannot be chosen by
+      // whoever filed the report. See src/lib/trusted-host.ts.
+      host: trustedHost(req) || null,
     },
   })
 

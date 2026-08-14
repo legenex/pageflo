@@ -1,5 +1,7 @@
 import crypto from 'crypto'
 
+import { fetchWithTimeout } from '@/lib/net/outbound'
+
 const sha256 = (input: string): string => crypto.createHash('sha256').update(input.toLowerCase().trim()).digest('hex')
 
 export type MetaUserData = {
@@ -67,7 +69,10 @@ export const sendMetaCAPIEvent = async (args: MetaCAPIArgs): Promise<{ ok: boole
   }
 
   try {
-    const resp = await fetch(`https://graph.facebook.com/v21.0/${pixelId}/events`, {
+    // Bounded: this runs inside the visitor's lead POST. A Graph API that stops
+    // answering must cost the submission six seconds and a failed step, not the
+    // ~300s undici would otherwise wait. See lib/net/outbound.
+    const resp = await fetchWithTimeout(`https://graph.facebook.com/v21.0/${pixelId}/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),

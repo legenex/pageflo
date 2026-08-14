@@ -1,6 +1,8 @@
 // TrueCall call-tracking integration. Resolves a campaign id from page path mapping
 // and pushes lead-events server-side. Mirrors the Ringba-style API shape.
 
+import { fetchWithTimeout } from '@/lib/net/outbound'
+
 export type TrueCallResolveArgs = {
   path: string
   mapping: Array<{ path: string; campaign_id: string }>
@@ -51,7 +53,8 @@ export const pushTrueCallLead = async (args: TrueCallPushArgs): Promise<TrueCall
     custom: customFields ?? {},
   }
   try {
-    const resp = await fetch('https://api.truecall.com/v1/leads', {
+    // Bounded: this runs inside the visitor's lead POST. See lib/net/outbound.
+    const resp = await fetchWithTimeout('https://api.truecall.com/v1/leads', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { resolveSiteByHost, resolveDomainForProvisioning } from '@/lib/site-resolver'
+import { trustedHost } from '@/lib/trusted-host'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -26,7 +27,12 @@ const APP_MARKER = 'legalos'
  * that one.
  */
 export async function GET(req: NextRequest) {
-  const host = (req.headers.get('x-legalos-host') ?? req.headers.get('host') ?? '').toLowerCase()
+  // The host comes from the connection, not from a header the caller sets. This
+  // endpoint is unauthenticated and its whole job is to say WHICH tenant a host
+  // reaches, so an accepted `x-legalos-host` made it a free host-to-site oracle
+  // — and the poller that reads it never sends one anyway (it opens a real
+  // HTTPS connection to the host it is verifying). See src/lib/trusted-host.ts.
+  const host = trustedHost(req)
 
   const resolved = await resolveSiteByHost(host)
   if (resolved) {
@@ -64,8 +70,12 @@ export async function GET(req: NextRequest) {
         host,
         site_id: String(probe.siteId),
         primary_host: null,
+        // `eligible` is the whole answer. The REASON ("provisioning failed",
+        // "certificate has not been issued yet") is internal provisioning state
+        // and this route is public and unauthenticated, so it is logged
+        // server-side for the operator instead of returned to whoever asked.
+        // ssl-poll.ts reads only `app`, `ok` and `site_id`, so nothing needs it.
         eligible: false,
-        eligibility: probe.reason,
         time: new Date().toISOString(),
       },
       { headers: { 'cache-control': 'no-store' } },

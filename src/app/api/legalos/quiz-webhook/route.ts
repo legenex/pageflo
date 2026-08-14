@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { executeWebhookNode, EXECUTABLE_NODE_TYPES, type WebhookNode } from '@/lib/quiz-webhook/execute'
 import { resolveSiteByHost } from '@/lib/site-resolver'
+import { trustedHost } from '@/lib/trusted-host'
 import { reportError } from '@/lib/observability/report'
 
 export const dynamic = 'force-dynamic'
@@ -123,7 +124,12 @@ export async function POST(req: NextRequest) {
   // anyone could walk the integers and make this server POST to another
   // tenant's buyer endpoint, carrying that tenant's configured headers, with a
   // body of the caller's choosing.
-  const host = (req.headers.get('x-legalos-host') ?? req.headers.get('host') ?? '').toLowerCase()
+  //
+  // That binding is only worth anything if the host cannot be asserted by the
+  // caller, and it used to be: this route read `x-legalos-host`, which
+  // middleware never stamps on `/api/*`, so the value was whatever the POST
+  // carried. Now the host comes from the connection. See src/lib/trusted-host.ts.
+  const host = trustedHost(req)
   const site = await resolveSiteByHost(host)
   const depSite = dep.site == null ? '' : typeof dep.site === 'object' ? String((dep.site as { id: unknown }).id) : String(dep.site)
   if (!site || !depSite || String(site.siteId) !== depSite) {

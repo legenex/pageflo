@@ -340,6 +340,14 @@ export const Toast = ({ message, type = 'info', onDismiss }) => {
   const c = colors[type] || T.info
   return (
     <div
+      // A refusal an operator must act on has to reach an operator who is not
+      // watching the bottom of the screen, so failures are announced assertively
+      // and everything else politely. `data-toast` is what the browser harnesses
+      // wait on - they were already written against it, and without the hook the
+      // wait silently matched nothing.
+      data-toast=""
+      data-toast-type={type}
+      role={type === 'error' || type === 'warning' ? 'alert' : 'status'}
       style={{
         position: 'fixed',
         bottom: 24,
