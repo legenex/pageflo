@@ -17,6 +17,20 @@ import { safeFetch } from './net/ssrf'
  * Plesk's default vhost, a wrong proxy target, or any other server would all
  * pass a HEAD check.
  *
+ * The handshake is still REQUIRED, though: `safeFetch` is an ordinary `fetch`
+ * with no TLS relaxation, so a host without a publicly-trusted certificate
+ * cannot reach the body at all. That is what keeps the CLAUDE.md hard rule —
+ * `ssl_status='active'` only after a real HTTPS handshake — true here.
+ *
+ * NOTE ON WHAT A NON-2xx MEANS. `safeFetch` collapses any non-2xx into
+ * `{ ok:false, code:'http_error' }` and discards the body, so a 404 from
+ * self-check is indistinguishable here from landing on somebody else's server.
+ * That is why self-check answers 200 for a domain that is merely not eligible
+ * YET, reporting `eligible:false` in the body instead: for most of this
+ * poller's life the row it is polling is `provisioning/pending`, which is by
+ * definition not servable, and refusing to identify it made this promotion
+ * unreachable — the loop that left production row 67 in error/error.
+ *
  * On timeout we set status='error' so the operator sees that connection has
  * not yet succeeded, with the last failure reason recorded in provisioning_error.
  */

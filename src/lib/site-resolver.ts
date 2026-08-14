@@ -175,6 +175,75 @@ export const resolveSiteByHost = async (rawHost: string | null | undefined): Pro
   return null
 }
 
+export type ProvisioningProbe = {
+  siteId: string | number
+  host: string
+  eligible: boolean
+  reason: string | null
+}
+
+/**
+ * Host -> Site for the PROVISIONING PROBE only. Deliberately ungated.
+ *
+ * `resolveSiteByHost` refuses an ineligible domain, which is right for public
+ * traffic and fatal for provisioning, because it closed a loop:
+ *
+ *   verifyAndPromoteDomain writes a custom domain as provisioning/pending
+ *     -> pollDomainSslStatus GETs /api/legalos/self-check
+ *       -> self-check called resolveSiteByHost
+ *         -> admit() refused it: a CUSTOM domain is eligible only at
+ *            status=active AND ssl_status=active
+ *           -> self-check answered ok:false
+ *             -> the poller failed all 12 attempts and wrote error/error
+ *
+ * and `ssl-poll.ts` is the ONLY writer of `ssl_status='active'` in the
+ * codebase. So the gate strangled the one probe that could open it, and NO
+ * custom domain could ever be provisioned while enforcement was on. Production
+ * row 67 (getwhatyoureowed.co) sat in error/error for exactly this reason.
+ *
+ * This lookup answers the question the probe actually asks — "does this host
+ * reach LegalOS, and does it map to the site I expect?" — which is true or
+ * false regardless of whether the row is servable yet. Eligibility is returned
+ * alongside rather than applied, so the caller reports it instead of being
+ * silently refused.
+ *
+ * It is NOT a way around the eligibility rule for public traffic: nothing that
+ * serves content calls this, and the promotion it enables still requires a real
+ * validated HTTPS handshake, because the poller reaches it over `safeFetch`.
+ *
+ * Uncached on purpose. HOST_CACHE holds entries for 60s, and a probe that may
+ * be reading a row written seconds ago must see the row, not a stale verdict.
+ * Direct host match only: an alias is not the thing being provisioned.
+ */
+export const resolveDomainForProvisioning = async (
+  rawHost: string | null | undefined,
+): Promise<ProvisioningProbe | null> => {
+  const host = normalizeHost(rawHost)
+  if (!host) return null
+
+  const payload = await payloadClient()
+  const direct = await payload.find({
+    collection: 'domains',
+    where: { host: { equals: host } },
+    limit: 1,
+    overrideAccess: true,
+  })
+
+  const domain = direct.docs[0]
+  // No row, or a pool row with no Site, is a genuine "this is not our host" —
+  // the answer that tells a poller it reached the wrong server.
+  if (!domain || !domain.site) return null
+
+  const siteId = typeof domain.site === 'object' ? domain.site.id : domain.site
+  const verdict = domainEligibility(domain as DomainLike)
+  return {
+    siteId,
+    host,
+    eligible: verdict.eligible,
+    reason: verdict.eligible ? null : verdict.reason,
+  }
+}
+
 export const isFallbackHost = (host: string | null | undefined): boolean => {
   const normalized = normalizeHost(host)
   const fallback = normalizeHost(process.env.LEGALOS_FALLBACK_HOST)
