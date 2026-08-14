@@ -11,14 +11,40 @@
  * whether a selection survives a save and a reload.
  *
  * So this drives the real admin with a real login, clicks the real controls,
- * and reads the DOM back. It also writes the four screenshots the brief asks
- * for into `docs/screenshots/`.
+ * and reads the DOM back. It also writes the screenshots the brief asks for
+ * into `docs/screenshots/`.
  *
  * It asserts on `data-*` hooks rather than on visible text wherever a hook
  * exists, because a test that matches on copy fails when somebody improves the
  * wording and passes when somebody breaks the behaviour. The exceptions are the
  * tab labels themselves — those ARE the requirement, so they are matched as
  * text on purpose.
+ *
+ * Beyond the desktop feature flow, the suite also covers what "verified in a
+ * browser" has to mean for requirement H:
+ *
+ *  - CONSOLE errors are collected per page alongside `pageerror`. A server
+ *    exception surfaces as a pageerror; a hydration mismatch, a failed
+ *    same-origin asset or a React error surfaces only on the console, and a
+ *    suite that ignores the console calls all of those a pass. The one
+ *    tolerated shape is a failed EXTERNAL resource load (this sandbox has no
+ *    outbound network, so Google Fonts stylesheets reset) — see
+ *    `isAllowedConsoleError` for exactly why that and nothing else.
+ *
+ *  - KEYBOARD: the Landing Pages tabs must be reachable by Tab alone, paint a
+ *    focus ring that is actually visible on the surface it sits on (contrast
+ *    measured, not presence-checked — Chromium's UA ring computes to a
+ *    near-black color here and was invisible on the dark admin), and activate
+ *    on Enter and on Space. Row and gallery actions must be real, accessibly
+ *    named <button>s.
+ *
+ *  - MOBILE (390x844): the two template lists, both deployment editors and a
+ *    live PUBLIC landing page must not overflow the viewport sideways, and
+ *    their controls must stay usable. The public page is reached through the
+ *    authenticated `?site=` preview channel because Chromium refuses a Host
+ *    header override on navigation (net::ERR_INVALID_ARGUMENT) — same
+ *    resolver, same renderer, same template as the Host-routed page the
+ *    node-level block above already proves.
  */
 import { chromium, type Browser, type Page } from 'playwright'
 import { mkdirSync, existsSync } from 'node:fs'
@@ -35,6 +61,9 @@ import { request as httpRequest } from 'node:http'
 
 import { resolveTemplate } from '../src/lib/template-registry.ts'
 import { asSlotted } from '../src/lib/lp-templates/index.ts'
+// The suite's own WCAG math is the app's WCAG math. CLAUDE.md: never
+// reimplement luminance/ratio — page-lint owns it and is pure.
+import { contrastRatio } from '../src/lib/builder/page-lint.ts'
 
 const BASE = process.env.LEGALOS_UI_BASE ?? 'http://127.0.0.1:3000'
 const EMAIL = process.env.SUPER_ADMIN_EMAIL ?? 'team@legenex.com'
@@ -48,6 +77,12 @@ const t = (cond: unknown, label: string): void => {
   else { fail++; console.log('  FAIL ' + label) }
 }
 
+/** Elapsed-stamped progress line, so a stalled run names its stalled section. */
+const startedAt = Date.now()
+const note = (msg: string): void => {
+  console.log(`  [${Math.round((Date.now() - startedAt) / 1000)}s] ${msg}`)
+}
+
 /** Visible text of everything matching a selector, trimmed. */
 const texts = async (page: Page, selector: string): Promise<string[]> =>
   (await page.locator(selector).allTextContents()).map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean)
@@ -56,7 +91,16 @@ const bodyText = async (page: Page): Promise<string> =>
   (await page.locator('body').innerText()).replace(/\s+/g, ' ')
 
 const settle = async (page: Page): Promise<void> => {
-  await page.waitForLoadState('networkidle').catch(() => {})
+  /*
+   * Capped at 8s, explicitly. With no timeout argument this call inherits the
+   * 180-SECOND navigation budget, so any page holding a socket open turns
+   * every settle into a three-minute stall — the suite once spent six minutes
+   * between two screenshots exactly this way. A healthy admin page reaches
+   * networkidle in ~0.5s; anything still busy after 8s is not going to get
+   * quieter, and the 400ms grace below plus the explicit waits at each
+   * assertion site are what correctness actually rests on.
+   */
+  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {})
   await page.waitForTimeout(400)
   /*
    * A confirm dialog left open swallows every later click, so one missed step
@@ -140,6 +184,134 @@ const shot = async (page: Page, name: string): Promise<void> => {
   console.log(`  shot docs/screenshots/${name}.png`)
 }
 
+/** Viewport-sized shot: what a phone user actually sees, not an unrolled page. */
+const shotViewport = async (page: Page, name: string): Promise<void> => {
+  await page.screenshot({ path: `${SHOTS}${name}.png`, fullPage: false })
+  console.log(`  shot docs/screenshots/${name}.png`)
+}
+
+/**
+ * The ONLY console errors the suite tolerates, and why.
+ *
+ * This sandbox has no outbound network, so the Google Fonts stylesheets the
+ * builder shell and the ported templates request come back
+ * `net::ERR_CONNECTION_RESET` (observed on fonts.googleapis.com/css2?family=…
+ * for the admin's Inter/Fredoka set and each template's own font set). In
+ * production those exact URLs load; the failure is the environment's, not the
+ * product's. The rule is deliberately narrow on BOTH axes: the message must be
+ * a resource-load report, AND the resource must live on a different origin
+ * than the app — so a 404'd same-origin chunk, image or API call still fails
+ * the run, and every scripting error (hydration mismatches included, which
+ * React reports via console.error) always fails regardless of origin.
+ */
+const isAllowedConsoleError = (text: string, url: string): boolean => {
+  if (!/Failed to load resource/i.test(text)) return false
+  try {
+    return new URL(url).origin !== new URL(BASE).origin
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Attach a console-error collector to a page and hand back the live array.
+ * `msg.location().url` names the failing resource for load failures — the
+ * message text alone says only "Failed to load resource", which is not enough
+ * to tell a blocked font from a broken chunk.
+ */
+const trackConsoleErrors = (page: Page): string[] => {
+  const errors: string[] = []
+  page.on('console', (msg) => {
+    if (msg.type() !== 'error') return
+    const url = msg.location().url ?? ''
+    if (isAllowedConsoleError(msg.text(), url)) return
+    errors.push(`${msg.text().slice(0, 200)}${url ? ` <${url}>` : ''} @ ${page.url()}`)
+  })
+  return errors
+}
+
+/** `rgb(a)()` from getComputedStyle → #rrggbb, or null for none/transparent. */
+const cssColorToHex = (css: string): string | null => {
+  const m = css.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)(?:\s*,\s*([\d.]+))?\s*\)/)
+  if (!m) return null
+  if (m[4] !== undefined && Number(m[4]) === 0) return null
+  const h = (n: string) => Number(n).toString(16).padStart(2, '0')
+  return `#${h(m[1])}${h(m[2])}${h(m[3])}`
+}
+
+/**
+ * A tab set must be real, focusable, accessibly named <button>s.
+ *
+ * Evaluated as a STRING, not a closure: tsx's esbuild pass decorates inner
+ * declarations with a `__name` helper that does not exist inside the page, so
+ * a multi-statement closure throws `__name is not defined` at runtime.
+ */
+const auditTabSet = async (page: Page, selector: string, expected: number, label: string): Promise<void> => {
+  const audit = (await page.evaluate(`(() => {
+    const els = Array.from(document.querySelectorAll('${selector}'))
+    return {
+      count: els.length,
+      buttons: els.filter((e) => e.tagName === 'BUTTON').length,
+      focusable: els.filter((e) => e.tabIndex >= 0 && !e.disabled).length,
+      named: els.filter((e) => ((e.getAttribute('aria-label') || e.textContent || '').trim().length > 0)).length,
+    }
+  })()`)) as { count: number; buttons: number; focusable: number; named: number }
+  t(
+    audit.count === expected && audit.buttons === expected,
+    `${label}: all ${expected} tabs are real <button>s (${audit.buttons} buttons of ${audit.count} found)`,
+  )
+  t(
+    audit.focusable === expected && audit.named === expected,
+    `${label}: every tab is keyboard-focusable with an accessible name (${audit.focusable} focusable, ${audit.named} named)`,
+  )
+}
+
+/**
+ * Every action control inside the matched containers must be a real <button>
+ * carrying an accessible name (aria-label or visible text), and nothing may
+ * fake buttonhood with role="button" on a div. `expectedControls` keeps the
+ * audit honest: an empty container would otherwise pass every `every()`.
+ */
+const auditActionControls = async (
+  page: Page,
+  containerSelector: string,
+  minContainers: number,
+  minButtonsPer: number,
+  label: string,
+): Promise<void> => {
+  const audit = (await page.evaluate(`(() => {
+    const boxes = Array.from(document.querySelectorAll('${containerSelector}'))
+    const buttons = boxes.flatMap((b) => Array.from(b.querySelectorAll('button')))
+    return {
+      boxes: boxes.length,
+      buttons: buttons.length,
+      unnamed: buttons.filter((b) => !((b.getAttribute('aria-label') || b.textContent || '').trim())).length,
+      fakes: boxes.flatMap((b) => Array.from(b.querySelectorAll('[role="button"]'))).filter((e) => e.tagName !== 'BUTTON').length,
+    }
+  })()`)) as { boxes: number; buttons: number; unnamed: number; fakes: number }
+  t(
+    audit.boxes >= minContainers && audit.buttons >= audit.boxes * minButtonsPer,
+    `${label}: present and carrying controls (${audit.boxes} rows/cards, ${audit.buttons} buttons)`,
+  )
+  t(
+    audit.unnamed === 0 && audit.fakes === 0,
+    `${label}: every control is a real <button> with an accessible name (${audit.unnamed} unnamed, ${audit.fakes} role="button" fakes)`,
+  )
+}
+
+/**
+ * The document itself must not scroll sideways at the current viewport.
+ * +1 forgives a rounding pixel and nothing more; a real overflow is tens of
+ * pixels, and a tolerance that hid one would hide them all.
+ */
+const assertNoHorizontalOverflow = async (page: Page, label: string): Promise<void> => {
+  const m = await page.evaluate(() => ({
+    scrollW: document.documentElement.scrollWidth,
+    innerW: window.innerWidth,
+  }))
+  t(m.scrollW <= m.innerW + 1, `${label}: no horizontal overflow (scrollWidth ${m.scrollW} vs viewport ${m.innerW})`)
+}
+
 const signIn = async (page: Page): Promise<void> => {
   await page.goto(`${BASE}/sign-in`, { waitUntil: 'domcontentloaded' })
   await page.fill('input[name="email"]', EMAIL)
@@ -164,11 +336,16 @@ const run = async (browser: Browser): Promise<void> => {
   // page. Collected and asserted per screen.
   const pageErrors: string[] = []
   page.on('pageerror', (e) => pageErrors.push(e.message))
+  // The console is the other half of "no client errors": hydration mismatches,
+  // React errors and broken same-origin assets report there, not as pageerror.
+  const consoleErrors = trackConsoleErrors(page)
 
   await signIn(page)
   t(!page.url().includes('sign-in'), 'signed in to the admin')
 
   /* ============================================ LANDING PAGES: the tabs */
+
+  note('section: Landing Pages templates')
 
   await page.goto(`${BASE}/admin/landing-pages`, { waitUntil: 'domcontentloaded' })
   await settle(page)
@@ -180,6 +357,89 @@ const run = async (browser: Browser): Promise<void> => {
   t(lpTabNames.some((s) => /^Templates$/i.test(s)), 'Landing Pages has a Templates tab')
   t(lpTabNames.some((s) => /^Deployments$/i.test(s)), 'Landing Pages has a Deployments tab')
   t(!lpTabNames.some((s) => /^Pages$/i.test(s)), 'the old Pages tab is GONE')
+
+  await auditTabSet(page, '[data-lp-tab]', 2, 'Landing Pages top-level tabs')
+
+  /* ------------------------------------ keyboard: reach, see, activate */
+
+  /*
+   * Blur programmatically rather than clicking a "safe" corner: the top-left
+   * corner of the viewport is the sidebar's logo link, and clicking it
+   * navigates away — which is how an earlier draft of this block measured a
+   * page with no tabs on it and reported the tabs unreachable.
+   */
+  await page.evaluate('document.activeElement && document.activeElement.blur()')
+  let tabPresses = 0
+  let reachedTab = false
+  // ~24 presses reach the tab bar today (sidebar links first). 40 is the
+  // bound: enough head-room for a new nav item, small enough that a focus
+  // trap or a skipped-over tab bar still fails rather than spinning.
+  for (let i = 1; i <= 40 && !reachedTab; i++) {
+    await page.keyboard.press('Tab')
+    tabPresses = i
+    reachedTab = Boolean(
+      await page.evaluate('document.activeElement !== null && document.activeElement.hasAttribute("data-lp-tab")'),
+    )
+  }
+  t(reachedTab, `the Templates/Deployments tabs are reachable by Tab alone (gave up after ${tabPresses} presses)`)
+
+  /*
+   * The focus indicator is measured for CONTRAST, not for presence. Chromium's
+   * UA ring (`outline: auto`) computes to near-black here and painted an
+   * invisible ring on the dark admin — outlineStyle was truthy the whole time.
+   * So the ring's color has to clear WCAG 2.2's 3:1 non-text minimum against
+   * the surface the tab actually sits on (the builder theme's T.bg, #252E39).
+   */
+  const focusIndicator = (await page.evaluate(`(() => {
+    const el = document.activeElement
+    if (!el) return null
+    const cs = getComputedStyle(el)
+    return { outlineStyle: cs.outlineStyle, outlineWidth: cs.outlineWidth, outlineColor: cs.outlineColor, boxShadow: cs.boxShadow }
+  })()`)) as { outlineStyle: string; outlineWidth: string; outlineColor: string; boxShadow: string } | null
+  const ringDrawn = Boolean(
+    focusIndicator &&
+      ((focusIndicator.outlineStyle !== 'none' && parseFloat(focusIndicator.outlineWidth) > 0) ||
+        (focusIndicator.boxShadow && focusIndicator.boxShadow !== 'none')),
+  )
+  t(ringDrawn, `the keyboard-focused tab draws a focus indicator (${JSON.stringify(focusIndicator)})`)
+  const ringHex =
+    focusIndicator && focusIndicator.outlineStyle !== 'none'
+      ? cssColorToHex(focusIndicator.outlineColor)
+      : focusIndicator
+        ? cssColorToHex(focusIndicator.boxShadow)
+        : null
+  const ringContrast = ringHex ? contrastRatio(ringHex, '#252E39') : null
+  t(
+    ringDrawn && ringHex !== null && ringContrast !== null && ringContrast >= 3,
+    `and the indicator is visible on the dark surface (${ringHex ?? 'no color'} vs #252E39 = ${ringContrast?.toFixed(2) ?? '?'}:1, needs 3:1)`,
+  )
+
+  // Enter and Space must both activate the focused tab. DOM order puts
+  // Templates first, so one more Tab lands on Deployments — the inactive one,
+  // which is the honest activation target.
+  const firstFocused = (await page.evaluate('document.activeElement && document.activeElement.getAttribute("data-lp-tab")')) as string | null
+  if (firstFocused === 'templates') await page.keyboard.press('Tab')
+  t(
+    (await page.evaluate('document.activeElement && document.activeElement.getAttribute("data-lp-tab")')) === 'deployments',
+    'Tab moves on to the Deployments tab',
+  )
+  await page.keyboard.press('Enter')
+  await page.waitForTimeout(500)
+  t(
+    (await page.evaluate('document.activeElement && document.activeElement.getAttribute("aria-current")')) === 'true',
+    'Enter activates the focused tab (aria-current flips to the Deployments tab)',
+  )
+  await page.keyboard.press('Shift+Tab')
+  await page.keyboard.press(' ')
+  await page.waitForTimeout(500)
+  const afterSpace = (await page.evaluate(`(() => {
+    const tpl = document.querySelector('[data-lp-tab="templates"]')
+    const dep = document.querySelector('[data-lp-tab="deployments"]')
+    return { tpl: tpl ? tpl.getAttribute('aria-current') : 'missing', dep: dep ? dep.getAttribute('aria-current') : 'missing' }
+  })()`)) as { tpl: string | null; dep: string | null }
+  t(afterSpace.tpl === 'true', 'Space activates the focused tab (back on Templates)')
+  t(afterSpace.dep === null, 'and exactly one tab is current at a time')
+  await settle(page)
 
   /* -------------------------------------- the library is the real templates */
 
@@ -224,6 +484,11 @@ const run = async (browser: Browser): Promise<void> => {
     'a template row offers Enable/Disable',
   )
 
+  // Not just the first row: EVERY control on EVERY row must be a real,
+  // accessibly named <button>. Five verbs per row (Preview / Edit /
+  // Enable-Disable / Clone / Delete) is the floor.
+  await auditActionControls(page, '[data-lp-template]', 12, 5, 'LP template rows')
+
   /*
    * Clone, then delete the clone, identified by ROW ID rather than by text.
    *
@@ -240,6 +505,7 @@ const run = async (browser: Browser): Promise<void> => {
         .evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.lpTemplate ?? ''))
     ).filter(Boolean)
 
+  note('clone/delete flow')
   const idsBefore = await rowIds()
   const beforeClone = idsBefore.length
 
@@ -328,8 +594,14 @@ const run = async (browser: Browser): Promise<void> => {
   await settle(page)
 
   t(pageErrors.length === 0, `the Templates screen raised no client exception (${pageErrors.join(' | ')})`)
+  t(
+    consoleErrors.length === 0,
+    `the Templates screen logged no unexpected console error (${consoleErrors.slice(0, 3).join(' | ')})`,
+  )
 
   /* ============================== LANDING PAGE DEPLOYMENT: General + gallery */
+
+  note('section: LP deployment editor')
 
   await page.goto(`${BASE}/admin/landing-pages`, { waitUntil: 'domcontentloaded' })
   await settle(page)
@@ -352,6 +624,8 @@ const run = async (browser: Browser): Promise<void> => {
   t(!depTabs.some((s) => /Render/i.test(s)), 'Render & Embed is GONE from the LP deployment editor')
   t(!depTabs.some((s) => /Header|Footer/i.test(s)), 'Header / Footer is GONE from the LP deployment editor')
   t(!depTabs.some((s) => /Body Section/i.test(s)), 'Body Sections is GONE from the LP deployment editor')
+
+  await auditTabSet(page, '[data-deployment-tab]', 3, 'LP deployment editor tabs')
 
   const genText = await bodyText(page)
   t(/Quiz Flow/i.test(genText), 'LP deployment General offers a Quiz Flow selector')
@@ -383,6 +657,10 @@ const run = async (browser: Browser): Promise<void> => {
   t(!/MVA Pain First/i.test(lpCardText), 'the LP gallery does NOT offer old Page records')
   t((await lpCards.first().getByRole('button', { name: /preview/i }).count()) > 0, 'each LP template card offers Preview')
   t((await lpCards.first().getByRole('button', { name: /select/i }).count()) > 0, 'each LP template card offers Select')
+
+  // Every card, not just the first: two real named <button>s (Preview, Select)
+  // per card, and no div pretending to be one.
+  await auditActionControls(page, '[data-template-gallery="lp"] [data-template-card]', 12, 2, 'LP gallery cards')
 
 
   /*
@@ -447,6 +725,8 @@ const run = async (browser: Browser): Promise<void> => {
 
   /* ======================================= QUIZZES: templates are manageable */
 
+  note('section: Quizzes')
+
   await page.goto(`${BASE}/admin/quizzes`, { waitUntil: 'domcontentloaded' })
   await settle(page)
 
@@ -455,6 +735,8 @@ const run = async (browser: Browser): Promise<void> => {
   t(quizTabs.some((s) => /Flow/i.test(s)), 'Quizzes keeps a Quiz Flows tab — flows and templates are NOT merged')
   t(quizTabs.some((s) => /^Templates$/i.test(s)), 'Quizzes has a Templates tab')
   t(quizTabs.some((s) => /^Deployments$/i.test(s)), 'Quizzes has a Deployments tab')
+
+  await auditTabSet(page, '[data-quiz-tab]', 3, 'Quizzes top-level tabs')
 
   await page.locator('[data-quiz-tab="templates"]').first().click()
   await settle(page)
@@ -476,9 +758,13 @@ const run = async (browser: Browser): Promise<void> => {
     'a quiz template row offers Enable/Disable',
   )
 
+  await auditActionControls(page, '[data-quiz-template]', 20, 4, 'quiz template rows')
+
   await shot(page, 'quiz-templates')
 
   /* =============================== QUIZ DEPLOYMENT: General + gallery */
+
+  note('section: quiz deployment editor')
 
   await page.locator('[data-quiz-tab="deployments"]').first().click()
   await settle(page)
@@ -498,6 +784,8 @@ const run = async (browser: Browser): Promise<void> => {
   t(!qDepTabs.some((s) => /Header|Footer/i.test(s)), 'Header / Footer is GONE from the quiz deployment editor')
   t(!qDepTabs.some((s) => /Body Section/i.test(s)), 'Body Sections is GONE from the quiz deployment editor')
 
+  await auditTabSet(page, '[data-deployment-tab]', 3, 'quiz deployment editor tabs')
+
   const qGenText = await bodyText(page)
   t(/Quiz Flow/i.test(qGenText), 'quiz deployment General offers a Quiz Flow selector')
   t(/Brand/i.test(qGenText), 'quiz deployment General offers a Brand selector')
@@ -510,6 +798,8 @@ const run = async (browser: Browser): Promise<void> => {
   t(qCardCount >= 20, `the quiz gallery shows the real template library (${qCardCount} cards)`)
   t((await qCards.first().getByRole('button', { name: /preview/i }).count()) > 0, 'each quiz template card offers Preview')
   t((await qCards.first().getByRole('button', { name: /select/i }).count()) > 0, 'each quiz template card offers Select')
+
+  await auditActionControls(page, '[data-template-gallery="quiz"] [data-template-card]', 20, 2, 'quiz gallery cards')
 
   await shot(page, 'quiz-deployment-general')
 
@@ -561,8 +851,14 @@ const run = async (browser: Browser): Promise<void> => {
   }
 
   t(pageErrors.length === 0, `no client exception across the whole run (${pageErrors.slice(0, 3).join(' | ')})`)
+  t(
+    consoleErrors.length === 0,
+    `no unexpected console error across the whole desktop run (${consoleErrors.slice(0, 3).join(' | ')})`,
+  )
 
   /* ================================ the PUBLIC page renders the chosen template */
+
+  note('section: public render comparison')
 
   /*
    * The admin can be entirely right and the visitor still get the wrong page,
@@ -619,6 +915,33 @@ const run = async (browser: Browser): Promise<void> => {
   const byHost = new Map<string, typeof live>()
   for (const d of live) byHost.set(d.host, [...(byHost.get(d.host) ?? []), d])
 
+  /*
+   * A template's own words, straight from the registry. Shared by the
+   * desktop comparison below and the mobile public check further down, so the
+   * two cannot pin "renders the chosen template" to different evidence.
+   *
+   * Headline-only was too narrow to be honest: `answer_first`'s headline is 24
+   * characters (“Do I even have a case?”), which silently disabled the whole
+   * marker comparison on the one host that actually has two live templates —
+   * the guard skipped and the summary still said pass. Prose slots are ranked
+   * by role instead, and slots carrying raw HTML (the svg CTAs, the logo div)
+   * or ASCII quote characters are excluded: those match the ESCAPER, not the
+   * template, because React rewrites ' and " on the way out. Typographic
+   * quotes pass through verbatim and are safe.
+   */
+  const markerFor = (slug: string): string => {
+    const res = resolveTemplate('lp', slug)
+    if (!res.ok || res.template.kind !== 'lp' || !res.template.template) return ''
+    const slots = asSlotted(res.template.template).slots
+    const prose = slots.filter((s) => {
+      const d = s.default.trim()
+      return d.length > 25 && !/[<>&"']/.test(d)
+    })
+    const byRole = (role: string) => prose.find((s) => s.role === role)
+    const chosen = byRole('headline') ?? byRole('subheadline') ?? byRole('trust_line') ?? prose[0]
+    return (chosen?.default ?? '').trim().slice(0, 60)
+  }
+
   let compared = false
   for (const [host, list] of byHost) {
     const distinct = [...new Map(list.map((d) => [d.template, d])).values()]
@@ -637,13 +960,6 @@ const run = async (browser: Browser): Promise<void> => {
      * every id with the same template, so a length comparison alone would not
      * have caught it — both pages would simply have been identical.
      */
-    const markerFor = (slug: string): string => {
-      const res = resolveTemplate('lp', slug)
-      if (!res.ok || res.template.kind !== 'lp' || !res.template.template) return ''
-      const slots = asSlotted(res.template.template).slots
-      const headline = slots.find((x) => x.role === 'headline' && x.default.trim().length > 25)
-      return (headline?.default ?? '').trim().slice(0, 60)
-    }
     const markerA = markerFor(one.template)
     const markerB = markerFor(two.template)
 
@@ -686,6 +1002,171 @@ const run = async (browser: Browser): Promise<void> => {
    */
   t(compared, 'the public render comparison actually ran (it needs one brand with two live deployments on different templates)')
 
+  /* ============================== MOBILE: the same claims at 390x844 */
+
+  note('section: mobile pass')
+
+  /*
+   * A fresh CONTEXT, not a resized page: a context carries its own cookies and
+   * its own device geometry, so this is a second, independent login the way a
+   * phone is — nothing leaks over from the desktop session's state.
+   */
+  const mobileCtx = await browser.newContext({ viewport: { width: 390, height: 844 } })
+  const mpage = await mobileCtx.newPage()
+  mpage.setDefaultTimeout(30_000)
+  mpage.setDefaultNavigationTimeout(180_000)
+  const mobilePageErrors: string[] = []
+  mpage.on('pageerror', (e) => mobilePageErrors.push(e.message))
+  const mobileConsoleErrors = trackConsoleErrors(mpage)
+
+  await signIn(mpage)
+  t(!mpage.url().includes('sign-in'), 'signed in to the admin at phone size')
+
+  /* ------------------------------------------- LP Templates list, 390px */
+
+  await mpage.goto(`${BASE}/admin/landing-pages`, { waitUntil: 'domcontentloaded' })
+  await settle(mpage)
+
+  // The 250px sidebar collapses to a rail below md; the drawer it opens is the
+  // phone's whole navigation, so it has to open, show real links, and close.
+  // Queries are SCOPED to the drawer dialog: the desktop aside holds the same
+  // links display:none'd, and an unscoped .first() finds those instead.
+  const hamburger = mpage.getByRole('button', { name: /open navigation/i })
+  t(await hamburger.isVisible(), 'the phone shell offers an Open-navigation control')
+  await hamburger.click()
+  const drawer = mpage.getByRole('dialog', { name: /navigation/i })
+  t(
+    await drawer.getByRole('link', { name: /landing pages/i }).first().isVisible().catch(() => false),
+    'the phone nav drawer opens and lists the real destinations',
+  )
+  await drawer.getByRole('button', { name: /close navigation/i }).click().catch(() => {})
+  await drawer.waitFor({ state: 'detached', timeout: 5_000 }).catch(() => {})
+  t((await drawer.count()) === 0, 'and the drawer closes again')
+
+  await assertNoHorizontalOverflow(mpage, 'LP Templates list at 390px')
+  t(await mpage.locator('[data-lp-tab="templates"]').isVisible(), 'the Templates tab is visible at 390px')
+  t(await mpage.locator('[data-lp-tab="deployments"]').isVisible(), 'the Deployments tab is visible at 390px')
+
+  // Clickable is proven by clicking: the tab must actually switch.
+  await mpage.locator('[data-lp-tab="deployments"]').click()
+  await settle(mpage)
+  t(
+    (await mpage.locator('[data-lp-tab="deployments"]').getAttribute('aria-current')) === 'true',
+    'the tab bar still works at 390px (Deployments activates)',
+  )
+  await mpage.locator('[data-lp-tab="templates"]').click()
+  await settle(mpage)
+
+  const mRows = await mpage.locator('[data-lp-template]').count()
+  t(mRows >= 12, `the template library renders at 390px (${mRows} rows)`)
+  const mFirstRow = mpage.locator('[data-lp-template]').first()
+  t(await mFirstRow.getByRole('button', { name: /preview/i }).first().isVisible(), 'a row still shows Preview at 390px')
+  t(await mFirstRow.getByRole('button', { name: /edit/i }).first().isVisible(), 'a row still shows Edit at 390px')
+
+  await shotViewport(mpage, 'landing-page-templates-mobile')
+
+  /* --------------------------------------- LP Deployment General, 390px */
+
+  await mpage.locator('[data-lp-tab="deployments"]').first().click()
+  await settle(mpage)
+  t((await mpage.locator('[data-lp-deployment]').count()) > 0, 'a saved LP deployment exists to open at 390px')
+  await openFirstDeployment(mpage, '[data-lp-deployment]')
+
+  const mDepTabs = mpage.locator('[data-deployment-tab]')
+  t((await mDepTabs.count()) === 3, 'the LP deployment editor keeps its three tabs at 390px')
+  t(await mDepTabs.first().isVisible(), 'and the editor tab bar is visible at 390px')
+  await assertNoHorizontalOverflow(mpage, 'LP Deployment General at 390px')
+
+  const mLpCards = mpage.locator('[data-template-gallery="lp"] [data-template-card]')
+  t((await mLpCards.count()) >= 12, `the LP template gallery renders at 390px (${await mLpCards.count()} cards)`)
+  t(await mLpCards.first().getByRole('button', { name: /preview/i }).isVisible(), 'a gallery card shows Preview at 390px')
+  t(await mLpCards.first().getByRole('button', { name: /select/i }).isVisible(), 'a gallery card shows Select at 390px')
+
+  // Clickable, proven: Preview opens the real modal and Close dismisses it.
+  await mLpCards.first().getByRole('button', { name: /preview/i }).click()
+  const mPreview = mpage.locator('[data-preview-modal]')
+  await mPreview.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => {})
+  t((await mPreview.count()) > 0, 'a card Preview opens at 390px')
+  await mPreview.getByRole('button', { name: /close/i }).first().click().catch(() => {})
+  await mPreview.waitFor({ state: 'detached', timeout: 10_000 }).catch(() => {})
+  await settle(mpage)
+
+  /* ------------------------------------------ quiz Templates list, 390px */
+
+  await mpage.goto(`${BASE}/admin/quizzes`, { waitUntil: 'domcontentloaded' })
+  await settle(mpage)
+  await mpage.locator('[data-quiz-tab="templates"]').first().click()
+  await settle(mpage)
+  const mQuizRows = await mpage.locator('[data-quiz-template]').count()
+  t(mQuizRows >= 20, `the quiz template library renders at 390px (${mQuizRows} rows)`)
+  await assertNoHorizontalOverflow(mpage, 'Quiz Templates list at 390px')
+
+  /* --------------------------------------- quiz Deployment General, 390px */
+
+  await mpage.locator('[data-quiz-tab="deployments"]').first().click()
+  await settle(mpage)
+  t((await mpage.locator('[data-quiz-deployment]').count()) > 0, 'a saved quiz deployment exists to open at 390px')
+  await openFirstDeployment(mpage, '[data-quiz-deployment]')
+
+  const mQDepTabs = mpage.locator('[data-deployment-tab]')
+  t((await mQDepTabs.count()) === 3, 'the quiz deployment editor keeps its three tabs at 390px')
+  t(await mQDepTabs.first().isVisible(), 'and its tab bar is visible at 390px')
+  await assertNoHorizontalOverflow(mpage, 'Quiz Deployment General at 390px')
+
+  const mQCards = mpage.locator('[data-template-gallery="quiz"] [data-template-card]')
+  t((await mQCards.count()) >= 20, `the quiz gallery renders at 390px (${await mQCards.count()} cards)`)
+  t(await mQCards.first().getByRole('button', { name: /preview/i }).isVisible(), 'a quiz card shows Preview at 390px')
+  t(await mQCards.first().getByRole('button', { name: /select/i }).isVisible(), 'a quiz card shows Select at 390px')
+
+  note('mobile: public LP')
+
+  /* ------------------------------------------------ PUBLIC LP, 390px */
+
+  /*
+   * The real public page in a real phone-sized browser. The Host header cannot
+   * be overridden on a Chromium navigation (net::ERR_INVALID_ARGUMENT), so
+   * this uses the authenticated `?site=<slug>` preview channel the middleware
+   * provides — which resolves the SAME deployment through the SAME resolver
+   * and renderer as the Host-routed request the node-level block above already
+   * proved. The template marker pins that it drew the chosen template, not a
+   * fallback and not the marketing page.
+   */
+  t(live.length > 0, 'a live LP deployment exists for the mobile public check')
+  const mTarget = live.find((d) => d.host.includes('check-a-case')) ?? live[0]
+  const siteSlugById = (await mpage.evaluate(async () => {
+    const res = await fetch('/api/sites?limit=100&depth=0', { credentials: 'include' })
+    if (!res.ok) return {}
+    const json = await res.json()
+    return Object.fromEntries((json.docs ?? []).map((d: Record<string, unknown>) => [String(d.id), String(d.slug ?? '')]))
+  })) as Record<string, string>
+  const mSiteSlug = mTarget ? (siteSlugById[String(mTarget.site)] ?? '') : ''
+  t(Boolean(mSiteSlug), `the live deployment's Site resolves to a slug (site ${mTarget?.site})`)
+
+  const mResp = mTarget
+    ? await mpage.goto(`${BASE}${mTarget.path}?site=${encodeURIComponent(mSiteSlug)}`, { waitUntil: 'domcontentloaded' })
+    : null
+  await settle(mpage)
+  t(mResp !== null && mResp.status() === 200, `the public LP serves at phone size (${mTarget?.path} -> ${mResp?.status() ?? 'no fetch'})`)
+
+  const mMarker = mTarget ? markerFor(mTarget.template).replace(/\s+/g, ' ') : ''
+  t(mMarker.length > 0, `the deployed template exposes a headline to pin the render on (${mTarget?.template})`)
+  const mBody = await bodyText(mpage)
+  t(mMarker.length > 0 && mBody.includes(mMarker), `the phone-sized public page renders ${mTarget?.template}'s own copy`)
+  await assertNoHorizontalOverflow(mpage, `public LP ${mTarget?.path ?? ''} at 390px`)
+  t(
+    await mpage.locator('a[href^="tel:"], button').first().isVisible().catch(() => false),
+    'the public LP keeps an interactive control (CTA/phone) visible at 390px',
+  )
+
+  await shotViewport(mpage, 'lp-public-mobile')
+
+  t(mobilePageErrors.length === 0, `no client exception across the mobile pass (${mobilePageErrors.slice(0, 3).join(' | ')})`)
+  t(
+    mobileConsoleErrors.length === 0,
+    `no unexpected console error across the mobile pass (${mobileConsoleErrors.slice(0, 3).join(' | ')})`,
+  )
+
+  await mobileCtx.close()
   await page.close()
 }
 
@@ -698,9 +1179,11 @@ mkdirSync(SHOTS, { recursive: true })
  * the download, so a version bump in `package.json` makes Playwright look for a
  * revision that is not there. Pointing at the one that IS there beats skipping
  * the browser suite, which is the only place several of these claims can be
- * checked at all. `LEGALOS_CHROMIUM` overrides it.
+ * checked at all. `LEGALOS_CHROMIUM_PATH` (or the older `LEGALOS_CHROMIUM`)
+ * overrides it.
  */
 const CHROMIUM =
+  process.env.LEGALOS_CHROMIUM_PATH ??
   process.env.LEGALOS_CHROMIUM ??
   (existsSync('/opt/pw-browsers/chromium-1194/chrome-linux/chrome')
     ? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'

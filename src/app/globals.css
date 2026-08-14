@@ -37,6 +37,21 @@ html, body {
 
 * { box-sizing: border-box; }
 
+/* Keyboard focus must be visible. Chromium's UA ring (`outline: auto`) computes
+   to a near-black color in this build — measured at ~1.1:1 against the admin's
+   #252E39 surfaces, i.e. keyboard users get no focus indicator at all — and
+   several ported builder primitives set `outline: none` inline, which no plain
+   author rule can override. `:focus-visible` + `!important` fixes both at once:
+   the ring paints only for keyboard/AT focus (mouse clicks stay ring-free), and
+   the inline `outline: none` on inputs/selects can no longer erase it. The
+   color is the app's own --color-info, chosen because it clears WCAG 2.2's
+   3:1 non-text contrast on BOTH the dark admin surfaces (3.8:1 vs #252E39) and
+   the white public/template surfaces (3.6:1 vs #fff) this stylesheet reaches. */
+:focus-visible {
+  outline: 2px solid var(--color-info, #4F86E1) !important;
+  outline-offset: 2px;
+}
+
 ::selection { background: rgba(255, 92, 117, 0.25); color: white; }
 
 /* Subtle scrollbars matching dark theme */

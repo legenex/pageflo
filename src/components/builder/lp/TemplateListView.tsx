@@ -94,6 +94,11 @@ export const TemplateListView = ({
               display: 'flex',
               alignItems: 'center',
               gap: 14,
+              // Wrap rather than overflow: at phone widths the fixed-width
+              // action cluster is wider than the row, and without wrapping it
+              // forces the whole list into a sideways scroll. Desktop never
+              // wraps — there is room — so nothing changes there.
+              flexWrap: 'wrap',
               opacity: t.isEnabled ? 1 : 0.72,
             }}
           >
@@ -153,7 +158,10 @@ export const TemplateListView = ({
               )}
             </div>
 
-            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+            {/* flexWrap here too: the cluster is wider than a phone-width row,
+                and a cluster that cannot wrap re-creates the sideways scroll
+                the row's own wrap just removed. */}
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0, flexWrap: 'wrap' }}>
               {/* A broken row has nothing to preview, and drawing another
                   template in its place is the failure the badge exists to
                   report. */}

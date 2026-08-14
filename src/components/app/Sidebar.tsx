@@ -25,6 +25,7 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
+  Menu,
 } from 'lucide-react'
 
 type NavItem = {
@@ -68,6 +69,12 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
   const [funnelsOpen, setFunnelsOpen] = useState(true)
   const [settingsOpen, setSettingsOpen] = useState(true)
 
+  // Below md the 250px sidebar would leave a 390px phone with ~140px of
+  // content, so it collapses to a 48px rail whose only control opens the full
+  // nav as an overlay drawer. Closed on navigation (the pathname effect below),
+  // on the scrim, and on Escape.
+  const [mobileOpen, setMobileOpen] = useState(false)
+
   // Navigation lock: set when a nav link is clicked, cleared once the route
   // commits (pathname changes). While locked the nav is made inert so a second
   // click can't fire a competing navigation. The per-link spinner
@@ -75,12 +82,24 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
   const [navigating, setNavigating] = useState(false)
   useEffect(() => {
     setNavigating(false)
+    setMobileOpen(false)
   }, [pathname])
+
+  useEffect(() => {
+    if (!mobileOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [mobileOpen])
 
   const shared: SharedNav = { pathname, navigating, onNavStart: () => setNavigating(true) }
 
-  return (
-    <aside className="w-[250px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-surface-1)] flex flex-col">
+  // One nav body, rendered by the desktop aside and the mobile drawer alike so
+  // the two can never drift. No ids inside, so the duplicate mount is safe.
+  const content = (
+    <>
       <Link href="/admin/overview" className="px-6 py-6 border-b border-[var(--color-border)] block hover:opacity-80 transition-opacity">
         <div className="flex items-baseline gap-1.5">
           <span className="brand-text-gradient text-[18px] font-bold tracking-tight">Legenex</span>
@@ -133,7 +152,45 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
       </div>
 
       <SignOutButton userEmail={userEmail} />
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      <aside className="hidden md:flex w-[250px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-surface-1)] flex-col">
+        {content}
+      </aside>
+
+      {/* Mobile rail: keeps the shell's flex-row layout intact while giving the
+          content back ~340 of 390px. The hamburger is the only control. */}
+      <div className="md:hidden w-12 shrink-0 border-r border-[var(--color-border)] bg-[var(--color-surface-1)] flex flex-col items-center py-3">
+        <button
+          type="button"
+          aria-label="Open navigation"
+          aria-expanded={mobileOpen}
+          onClick={() => setMobileOpen(true)}
+          className="p-2 rounded-md text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-[var(--color-surface-2)] transition-colors"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      </div>
+
+      {mobileOpen ? (
+        <div className="md:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Navigation">
+          <aside className="w-[250px] max-w-[80vw] h-full border-r border-[var(--color-border)] bg-[var(--color-surface-1)] flex flex-col">
+            {content}
+          </aside>
+          {/* The scrim is a real button so closing the drawer is reachable by
+              keyboard and announced, not just a click target. */}
+          <button
+            type="button"
+            aria-label="Close navigation"
+            onClick={() => setMobileOpen(false)}
+            className="flex-1 bg-black/60 cursor-default"
+          />
+        </div>
+      ) : null}
+    </>
   )
 }
 

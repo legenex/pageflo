@@ -363,12 +363,14 @@ export const Toast = ({ message, type = 'info', onDismiss }) => {
 }
 
 export const PageHeader = ({ title, subtitle, primaryAction, secondaryAction }) => (
-  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18 }}>
+  // Wraps at narrow widths so the action buttons drop under the title instead
+  // of running off the right edge of a phone. Desktop has room and never wraps.
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
     <div>
       <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: T.text, letterSpacing: '-0.02em' }}>{title}</h1>
       {subtitle && <div style={{ fontSize: 13, color: T.textMute, marginTop: 4 }}>{subtitle}</div>}
     </div>
-    <div style={{ display: 'flex', gap: 8 }}>
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
       {secondaryAction}
       {primaryAction}
     </div>
@@ -423,14 +425,21 @@ export const TopBar = ({ crumbs, title, isPublished, onBack, onPreview, onPublis
       position: 'sticky',
       top: 0,
       zIndex: 30,
-      height: 56,
+      // minHeight + wrap rather than a fixed 56px single line: the action
+      // cluster cannot shrink (nowrap buttons), so at phone widths a fixed
+      // row pushed the whole document 78px past the viewport. Wrapping drops
+      // the actions onto a second line instead; on desktop nothing wraps and
+      // the bar renders exactly as before.
+      minHeight: 56,
       backgroundColor: 'rgba(37,46,57,0.92)',
       backdropFilter: 'blur(12px)',
       borderBottom: `1px solid ${T.border}`,
-      padding: '0 20px',
+      padding: '6px 20px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: 8,
     }}
   >
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
@@ -445,7 +454,10 @@ export const TopBar = ({ crumbs, title, isPublished, onBack, onPreview, onPublis
         )}
       </div>
     </div>
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    {/* flexWrap here too: four buttons at phone width exceed the line on
+        their own, and a cluster that cannot break re-creates the overflow
+        the bar's own wrap just removed. */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
       {actions}
       {onPreview && <Btn variant="ghost" size="sm" icon={Eye} onClick={onPreview}>Preview</Btn>}
       {onPublish && <Btn variant={isPublished ? 'secondary' : 'primary'} size="sm" icon={isPublished ? PowerOff : Power} onClick={onPublish}>{isPublished ? 'Unpublish' : 'Publish'}</Btn>}
