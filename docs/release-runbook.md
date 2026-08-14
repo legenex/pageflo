@@ -59,6 +59,33 @@ The system `pg_dump` is version 15 against a 16.x server and produces a
 release. Override the binary with `LEGALOS_PG_DUMP` if the container name
 changes.
 
+## The migrate stage answers a prompt, and that is deliberate
+
+`payload migrate` asks a question. `@payloadcms/drizzle`'s `migrate()` prompts —
+
+> you've run Payload in dev mode … data loss will occur. Would you like to
+> proceed? (y/N)
+
+— whenever any `payload_migrations` row carries `batch = -1`, the marker a
+dev-mode auto-push leaves behind. Production has exactly one such row and always
+will: it is a record of history, not a thing to clean up. **No flag suppresses
+it.** `--force-accept-warning` is wired only to `migrate:create` and
+`migrate:fresh`.
+
+Unanswered, it blocks forever **with the service already stopped**, and prints
+nothing to say why. That happened on 2026-08-14 and cost ~25 minutes of downtime
+before the cause was found; the database was untouched, because it blocks before
+any DDL.
+
+So the script pipes `y` into it, and bounds the stage with `timeout 900`. That
+is safe here rather than merely convenient: every migration in `src/migrations/`
+is hand-written idempotent (`IF NOT EXISTS` house style), the size-checked
+backup is taken *before* this stage, and `verify:schema` on the next line
+refuses to start the service if the outcome disagrees with the code.
+
+`printf`, not `yes` — `yes` dies of SIGPIPE and, under `pipefail`, its 141 would
+fail the stage even when the migration succeeded.
+
 ## Rollback
 
 The script prints the rollback for the stage it failed at, so it is never

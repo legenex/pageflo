@@ -219,7 +219,38 @@ note "the build touches no database; a failure here leaves the schema untouched"
 log "Migrate"
 STAGE="migrate"
 if [ "$DRY_RUN" = 0 ]; then MIGRATIONS_BEFORE="$(migration_count)"; fi
-run "pnpm payload migrate"
+# `payload migrate` PROMPTS, and a release is not interactive.
+#
+# @payloadcms/drizzle/dist/migrate.js asks "you've run Payload in dev mode ...
+# data loss will occur. Would you like to proceed? (y/N)" whenever ANY row in
+# payload_migrations has batch = -1 -- the marker a dev-mode auto-push leaves
+# behind. This database has exactly one such row and always will: it records
+# history, not intent. There is no flag and no env var that suppresses it;
+# `--force-accept-warning` is wired only to migrate:create and migrate:fresh,
+# not to migrate.
+#
+# Unanswered, the prompt blocks FOREVER with the service already stopped. That
+# is what it did on 2026-08-14: a release sat at this stage with the site down
+# and nothing in the log to say why, because the question was waiting on a
+# stdin nobody was attached to.
+#
+# Answering it is correct rather than merely expedient: every migration in this
+# repository is written idempotent by hand (house style, CLAUDE.md), the
+# backup above is taken and size-checked before this line, and `verify:schema`
+# on the next line refuses to start the service if the result disagrees with
+# the code. The warning is about dev-push having already applied some of this
+# schema, which IF NOT EXISTS handles.
+#
+# `printf`, not `yes`: `yes` is killed by SIGPIPE and, under `pipefail`, its
+# 141 would fail this stage even when the migration succeeded.
+#
+# The timeout bounds the class rather than this one instance. Whatever the next
+# thing to block here turns out to be, an outage that ends with a stated
+# failure and the trap's rollback guidance beats one that hangs silently with
+# the service stopped. 15 minutes is far beyond any migration this schema has
+# ever needed; each migration runs in its own transaction, so a kill rolls the
+# in-flight one back rather than tearing it in half.
+run "printf 'y\n' | timeout 900 pnpm payload migrate"
 if [ "$DRY_RUN" = 0 ]; then
   MIGRATIONS_AFTER="$(migration_count)"
   MIGRATIONS_APPLIED=$(( MIGRATIONS_AFTER - MIGRATIONS_BEFORE ))
