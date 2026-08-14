@@ -289,6 +289,40 @@ Two findings:
   disclosed and enforced; artifact capture is an external-credential matter.
   No code change; documented.
 
+## FRESH FINAL MATRIX (after all five waves + repairs) — GREEN
+
+On HEAD 2ca259a, one clean run (install --frozen-lockfile → typecheck →
+build, then every suite + sweep against that bundle):
+install/typecheck/build exit 0 · unit chain (11 suites incl. test:idempotency)
+green · isolation 49 · identity 33 · release 31 · bootstrap 58 · dom 357 ·
+ui 153 · **e2e 34/0** · sweep at its documented baseline (200 ui-kind 3:1 /
+25 fixture / 24 dead-var / **0 import breaches** — zero TEXT-contrast
+failures). New assertion total this run (not the earlier 3,313): brand 37 +
+authz 69 + registry 126 + records 86 + slots 906 + publish 184 + ai 100 +
+flow 202 + webhook 133 + idempotency 9 + observability 44 + brand-identity
+721 + isolation 49 + identity 33 + release 31 + bootstrap 58 + dom 357 +
+ui 153 + e2e 34 = **3,432 assertions, 0 failures.**
+
+One caveat, resolved: an earlier matrix run reported e2e 33/1 — the
+"destination renders after submitting" wait timed out because THREE leftover
+next-server processes (from repeated start cycles) starved the 4-core box and
+the synchronous lead pipeline (which awaits integrations to unreachable hosts)
+returned past the 15s wait. Not a product failure (leads stayed at 0, the
+lead posted). With the environment cleaned to one server, e2e is 34/0,
+confirmed 3×. (Aside: the server-start failures were a self-inflicted
+`pkill -f "next-server"` matching its OWN command line — cleaned up.)
+
+## FINAL REQUIREMENT REVIEWER: RUNNING
+
+Single reviewer against the live app + DB + a throwaway migrate DB, given
+the 15 owner disproof items (Pages+Templates duplication, sample-as-library,
+wrong quiz/LP selection, dropdown-not-gallery, missing Preview/Select, saved
+≠ rendered identity, clones can't render, disabled selectable, static/fake
+LP quiz, LP not exactly-one-lead, site pages broken, raw REST/cms bypass,
+manual migration, tests skip). Report →
+docs/agent-reports/final-requirement-review.md. If it reproduces any local
+defect, fix + re-loop before the final report.
+
 ## Known open work (gates not yet run)
 
 - **Gallery empty-box regression (R1, scouts 2+6):** release's
