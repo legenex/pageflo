@@ -220,6 +220,57 @@ export function resolveBrandLegal(s: Record<string, unknown>): BrandLegal {
     if (k in out) continue
     if (typeof v === 'string' && v.trim() !== '') out[k] = v.trim()
   }
+
+  /*
+   * SUBSTITUTE HERE, WHERE THE VALUE ENTERS.
+   *
+   * A live public page was serving this, in the TCPA consent under a lead form:
+   *
+   *   "By submitting this form, I agree to be contacted by {{brand.displayName}}
+   *    and its partner attorneys via phone, SMS, and email..."
+   *
+   * The quiz card interpolates copy with `/\{\{(\w+)\}\}/`, and `\w` does not
+   * match a dot — so `{{brand.displayName}}` never matched and went to the page
+   * verbatim, while `{{year}}` matched, found no quiz answer of that name, and
+   * deliberately re-emitted itself. Consent naming no company is a compliance
+   * defect, not a cosmetic one, and a browser walk of the real funnel is what
+   * found it.
+   *
+   * Fixed at the resolver rather than in the card because the card is not the
+   * only consumer — the footer, the disclaimer and the preflight read these same
+   * strings. This file's own rule for the XSS escapes applies equally: a sink
+   * that trusts its input and a caller that substitutes is a pair that drifts.
+   */
+  return renderBrandTokens(out, s)
+}
+
+/**
+ * Resolve `{{brand.*}}` and `{{year}}` in already-resolved brand copy.
+ *
+ * An UNKNOWN token resolves to an empty string rather than being left visible.
+ * On an attorney-advertising page the choice is between a missing word and
+ * template syntax shown to a claimant, and the missing word is the lesser
+ * failure — the publish preflight already blocks a brand with no display name,
+ * so the case that matters cannot reach a published page.
+ */
+export const renderBrandTokens = <T extends Record<string, string>>(
+  copy: T,
+  site: Record<string, unknown>,
+): T => {
+  const values: Record<string, string> = {
+    'brand.displayName': resolveBrandDisplayName(site),
+    'brand.name': resolveBrandDisplayName(site),
+    'brand.privacyUrl': copy.privacyUrl ?? '',
+    'brand.termsUrl': copy.termsUrl ?? '',
+    year: String(new Date().getFullYear()),
+  }
+  const render = (text: string): string =>
+    text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key: string) => values[key] ?? '')
+
+  const out = { ...copy }
+  for (const [k, v] of Object.entries(out)) {
+    if (typeof v === 'string' && v.includes('{{')) (out as Record<string, string>)[k] = render(v)
+  }
   return out
 }
 
