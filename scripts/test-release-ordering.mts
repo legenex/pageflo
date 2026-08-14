@@ -244,6 +244,34 @@ try {
     'and records it exactly once, so a re-run did not double-write it',
   )
 
+  /* --- 7. release.sh's applied-migration counter reads the ledger ---------- */
+  //
+  // `migration_count()` in release.sh drives the failure handler: with a
+  // non-zero count on_failure prints the migrate:down rollback, with zero it
+  // says the database is untouched. `migrate:status` renders its table with
+  // box-drawing separators (│) and ANSI colour, and an earlier grep for an
+  // ASCII `|` matched nothing, so the count was ALWAYS zero and the rollback
+  // guidance was withheld even after a batch had applied. These pin the parse:
+  // the fixed pipeline counts every applied row, and the old ASCII pattern is
+  // shown to count zero against the real output, so a revert to it is caught.
+  const ledgerCount = names.length
+  const countFixed = sh('bash', ['-c',
+    `pnpm --silent payload migrate:status 2>/dev/null | sed -E 's/\\x1b\\[[0-9;]*m//g' | awk '{ for (i=1;i<=NF;i++) if ($i=="Yes") { c++; break } } END { print c+0 }'`,
+  ], { DATABASE_URI: scratchUri, NODE_ENV: 'production' })
+  const fixedN = parseInt(countFixed.out.trim().split('\n').pop() ?? '0', 10)
+  t(
+    fixedN === ledgerCount && ledgerCount > 0,
+    `release.sh's migration_count reads ${ledgerCount} applied migrations from the ledger (got ${fixedN})`,
+  )
+  const countOldPattern = sh('bash', ['-c',
+    `pnpm --silent payload migrate:status 2>/dev/null | grep -c ' | *Yes' || true`,
+  ], { DATABASE_URI: scratchUri, NODE_ENV: 'production' })
+  const oldN = parseInt(countOldPattern.out.trim().split('\n').pop() ?? '0', 10)
+  t(
+    oldN === 0,
+    `the old ASCII-pipe pattern counts zero against the box-drawing output (got ${oldN}) - which is the defect, so this guards the fix`,
+  )
+
   await client.end()
 } catch (err) {
   fail++

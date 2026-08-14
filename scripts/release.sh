@@ -87,7 +87,20 @@ SERVICE_WAS_RUNNING=0
 migration_count() {
   # Read from the ledger the migrator itself writes. Never edited by hand, here
   # or anywhere else - that is the practice this script exists to end.
-  ( cd "$APP_DIR" && pnpm --silent payload migrate:status 2>/dev/null | grep -c ' | *Yes' ) || echo 0
+  #
+  # `migrate:status` renders its table with box-drawing separators (│, U+2502)
+  # and ANSI colour, NOT the ASCII `|` an earlier version grepped for - so that
+  # grep matched zero rows on every database and MIGRATIONS_APPLIED was always
+  # 0. The cost was hidden until a failure: on_failure then printed "no
+  # migration was applied, the database is untouched" and withheld the
+  # migrate:down guidance even when a batch HAD been applied - the opposite of
+  # what this script exists to tell an operator. Strip the colour, then count
+  # rows whose Ran column is exactly "Yes" as a whitespace-delimited field, so
+  # the count depends on neither the separator glyph nor the locale. Migration
+  # names are timestamped and never equal "Yes".
+  ( cd "$APP_DIR" && pnpm --silent payload migrate:status 2>/dev/null \
+      | sed -E 's/\x1b\[[0-9;]*m//g' \
+      | awk '{ for (i = 1; i <= NF; i++) if ($i == "Yes") { c++; break } } END { print c + 0 }' ) || echo 0
 }
 
 on_failure() {
