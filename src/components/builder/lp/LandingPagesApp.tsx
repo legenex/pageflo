@@ -1106,7 +1106,16 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
 
   /* ----------------------------------------------------------- deployments */
 
-  const persistDeployment = (dep) => {
+  /*
+   * Returns the promise so the editor can hold its Save button until the write
+   * settles. Without that, two clicks are two CREATES: the server only treats an
+   * all-digit id as an existing row (`actions.ts:66`), so the client-minted
+   * `ldep_*` id is ignored and a second submit inserts a second deployment
+   * rather than updating the first. Production has exactly that pair -- rows 19
+   * and 20, identical in every field, created eight seconds apart by the same
+   * user.
+   */
+  const persistDeployment = (dep) =>
     settleAction(saveDeployment({ deployment: dep })).then((res) => {
       // Stay in the editor and say why. The Status field is on this screen, so
       // navigating back to the list on a failed write would show the operator a
@@ -1117,7 +1126,6 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
       setToast({ message: dep.domain ? 'Deployment saved.' : 'Deployment saved as a preview URL.', type: 'success' })
       router.refresh()
     })
-  }
 
   const deleteDeploymentHandler = (id) => {
     setConfirm({

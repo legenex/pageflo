@@ -184,7 +184,15 @@ export const LPDeploymentEditor = ({
 }) => {
   const [draft, setDraft] = useState(deployment)
   const [tab, setTab] = useState('general')
-  useEffect(() => { setDraft(deployment); setTab('general') }, [deployment?.id])
+  /*
+   * A save in flight. Not cosmetic: the server treats only an all-digit id as an
+   * existing row, so the client-minted `ldep_*` id on a NEW deployment is
+   * ignored and every submit INSERTS. A second click before the first settles is
+   * therefore a second deployment, not a no-op — production rows 19 and 20 are
+   * that pair, identical in every field, eight seconds apart, same operator.
+   */
+  const [saving, setSaving] = useState(false)
+  useEffect(() => { setDraft(deployment); setTab('general'); setSaving(false) }, [deployment?.id])
   if (!draft) return null
 
   const update = (p) => setDraft((d) => ({ ...d, ...p }))
@@ -261,6 +269,7 @@ export const LPDeploymentEditor = ({
   ]
 
   const handleSave = () => {
+    if (saving) return
     if (!draft.landingPageId) { onToast?.({ message: 'Pick a landing page template first.', type: 'error' }); setTab('general'); return }
     if (!draft.brandId) { onToast?.({ message: 'Pick a brand first.', type: 'error' }); setTab('general'); return }
     // A deployment with no path normalizes to '/', which the public resolver
@@ -269,7 +278,12 @@ export const LPDeploymentEditor = ({
     const bad = Object.entries(draft.destinationOverrides || {}).find(([, v]) => v && !isSafeDestinationUrl(v))
     if (bad) { onToast?.({ message: `${DESTINATION_LABELS[bad[0]] || bad[0]} is not a usable link.`, type: 'error' }); setTab('destinations'); return }
 
-    onSave({ ...draft, id: draft.id || genId('ldep'), status: draft.status || 'draft', path: draft.path || '' })
+    setSaving(true)
+    const result = onSave({ ...draft, id: draft.id || genId('ldep'), status: draft.status || 'draft', path: draft.path || '' })
+    // The caller returns a promise on the real save path. Guarding on `then`
+    // rather than assuming keeps this correct for any caller that does not.
+    if (result && typeof result.then === 'function') result.then(() => setSaving(false), () => setSaving(false))
+    else setSaving(false)
   }
 
   return (
@@ -283,7 +297,9 @@ export const LPDeploymentEditor = ({
             {draft.id && <Btn variant="ghost" size="sm" icon={Eye} onClick={() => onPreview?.(draft)}>Preview</Btn>}
             {draft.id && <Btn variant="danger" size="sm" icon={Trash2} onClick={() => onDelete(draft.id)}>Delete</Btn>}
             <Btn variant="ghost" size="sm" onClick={onCancel}>Cancel</Btn>
-            <Btn variant="primary" size="sm" icon={Save} onClick={handleSave}>Save Deployment</Btn>
+            <Btn variant="primary" size="sm" icon={Save} onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving…' : 'Save Deployment'}
+            </Btn>
           </>
         }
       />
