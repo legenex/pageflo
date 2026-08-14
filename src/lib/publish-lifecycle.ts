@@ -260,7 +260,39 @@ const checkQuizTemplateRecord = async (
   const stored = typeof rawId === 'string' ? rawId.trim() : ''
   if (!stored) return fail(id, label, 'no quiz template has been selected')
 
-  const record = await getQuizTemplateRecordByTemplateId(payload, stored).catch(() => null)
+  // Resolve the alias FIRST, the way the renderer does. `template_id` on the
+  // live rows is often a legacy alias — `default` is the stored value on two
+  // production quiz deployments and maps to `sq_quiz_first` through
+  // LEGACY_TEMPLATE_IDS, which `template-registry` owns and
+  // `template-records/select.ts` already goes through.
+  //
+  // Looking the RAW value up meant preflight and render disagreed about the
+  // same row: the page served fine while publishing it reported "matches no
+  // quiz template", so a live deployment could be taken down and not put back.
+  // That is the same shape as the brand-identity defect above — a check reading
+  // a different source from the thing it is checking. The LP branch of this
+  // file already canonicalises; the quiz branch did not.
+  // Raw id FIRST. Records are the source of truth and their ids are not all
+  // known to the code registry: a clone is `sq_case_dossier_copy_x1`, and an
+  // AI-authored template has an id no module exports. Canonicalising first
+  // would reject exactly those.
+  let record = await getQuizTemplateRecordByTemplateId(payload, stored).catch(() => null)
+
+  // Only then the legacy alias, the way the renderer resolves it.
+  // `default` is the stored value on two live production quiz deployments and
+  // maps to `sq_quiz_first` through LEGACY_TEMPLATE_IDS. Looking up only the
+  // raw value meant preflight and render disagreed about the same row — the
+  // page served fine while publishing it reported "matches no quiz template",
+  // so a healthy live deployment could be taken down and not put back. Same
+  // shape as the brand-identity defect: a check reading a different source from
+  // the thing it checks. This ordering is additive — nothing that resolved
+  // before can now fail.
+  if (!record) {
+    const canonical = canonicalTemplateId('quiz', stored)
+    if (canonical.ok && canonical.id !== stored) {
+      record = await getQuizTemplateRecordByTemplateId(payload, canonical.id).catch(() => null)
+    }
+  }
   if (!record) return fail(id, label, `template id "${stored}" matches no quiz template`)
   if (record.rendererError) return fail(id, label, record.rendererError)
   if (record.archivedAt) return fail(id, label, `"${record.name}" has been deleted`)

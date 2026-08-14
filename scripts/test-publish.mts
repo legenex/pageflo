@@ -35,6 +35,8 @@ import { summarize, pass, fail, type PreflightCheck, type PreflightResult } from
 import { PORTED_TEMPLATES } from '../src/lib/lp-templates/index.ts'
 import { classifyLpQuizBinding, LOSSY_QUIZ_DEPLOYMENT_FIELDS, NEEDS_A_DECISION } from '../src/lib/lp-quiz-binding.ts'
 
+import { canonicalTemplateId } from '../src/lib/template-registry.ts'
+
 let passed = 0
 let failed = 0
 const t = (cond: unknown, label: string): void => {
@@ -985,6 +987,24 @@ const BOUND_LP_DEP = { ...GOOD_LP_DEP, quiz: 70 }
     })
     t(!r.ok && r.blocking.some((c) => c.id === 'embedded-quiz-template'), 'an embedded skin that names no template is refused')
   }
+}
+
+/* --- the preflight must resolve a legacy template alias the way the renderer does --- */
+{
+  // Production stores `default` as template_id on two live quiz deployments.
+  // The renderer maps it through LEGACY_TEMPLATE_IDS; the preflight looked the
+  // RAW value up and reported "matches no quiz template", so a page that served
+  // fine could not be re-published — a one-way door on a healthy row.
+  const c = canonicalTemplateId('quiz', 'default')
+  t(c.ok === true, 'legacy quiz alias "default" canonicalises')
+  t(c.ok && c.id === 'sq_quiz_first', 'legacy alias resolves to sq_quiz_first')
+
+  const src = readFileSync(new URL('../src/lib/publish-lifecycle.ts', import.meta.url), 'utf8')
+  const fn = src.slice(src.indexOf('const checkQuizTemplateRecord'), src.indexOf('const checkLpTemplateRecord'))
+  t(fn.indexOf('getQuizTemplateRecordByTemplateId(payload, stored)') < fn.indexOf("canonicalTemplateId('quiz'"),
+    'checkQuizTemplateRecord tries the RAW id first (clones and AI ids are records, not registry entries)')
+  t(fn.includes('getQuizTemplateRecordByTemplateId(payload, canonical.id)'),
+    'and falls back to the canonical alias when the raw id misses')
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)
