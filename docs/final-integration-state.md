@@ -236,6 +236,26 @@ typecheck — all clean, no manual SQL ever. Two findings:
   inherent to Payload resolving migrate:down targets by local filename.
   Documented, not fixed.
 
+WAVE 2 CLOSED: after both fixes, `test:ui` reruns 153/0 (the two D1
+assertions pass — error shown + library count unchanged) and `test:release`
+30/0 (the two migration_count assertions). All Wave-2 fixes committed:
+D1 product fix c77daf1, D1 regression a2f846a + 6e34b20, release.sh
+f14304a, docs ec6baed.
+
+### WAVE 3 — Reviewer E (runtime/QuizRuntime/lead/webhook): RUNNING
+
+Launched against the live runtime + pipeline: normal/conditional/backtrack
+answer flows, stale-downstream cleanup, tier boundary (answer setTier
+outranks webhook; undeclared tier does not route), webhook failure modes
+(timeout / non-JSON / provider error / SSRF-blocked → degrade, never drop),
+double-submit dedupe (event_id), refresh mid-quiz, embed/standalone
+isolation, consent/TCPA, destination behavior, and exactly-one-lead for
+BOTH standalone quiz and LP-embedded quiz (DB row delta +1, one POST).
+Report → docs/agent-reports/reviewE-runtime.md.
+
+After E: reproduce/fix its findings, then the FINAL requirement reviewer
+against the live app, then a fresh full matrix (new count), then the report.
+
 ## Known open work (gates not yet run)
 
 - **Gallery empty-box regression (R1, scouts 2+6):** release's
