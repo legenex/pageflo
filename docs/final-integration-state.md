@@ -99,6 +99,32 @@ here.
   requirement-H browser checks incl. mobile/keyboard/console (B-F),
   security G1/G2/G3 + raw-door publish context gate + negative controls (B-E).
 
+## FINAL MATRIX — 090c8b1, then e34adc0 (2026-08-14)
+
+One fresh production build (install --frozen-lockfile → typecheck → build),
+then every suite against that bundle: **3,313 assertions, 0 failures.**
+brand 37 · authz 69 · registry 126 · records 86 · slots 906 · publish 184 ·
+ai 100 · flow 202 · webhook 133 · observability 44 · brand-identity 721 ·
+isolation 44 · identity 33 · release 28 · bootstrap 58 · dom 357 · ui 151 ·
+e2e 34. Sweep: 36 templates × 13 fixtures at its documented baseline
+(200 ui-kind 3:1 violations, 25 fixture, 24 dead vars, 0 import breaches —
+zero TEXT-contrast failures; see docs/template-sweep-baseline.md).
+
+All three builder streams merged and re-verified by the orchestrator:
+quiz "Create with Claude" (closed schema), deployment-tenancy hooks on all
+three deployment collections with negative controls, requirement-H browser
+conformance (151, incl. mobile + keyboard + measured focus contrast).
+
+Two more production-only defects found and fixed after the first checkpoint:
+the sign-in circular import (see above) and **audited users were
+undeletable** — audit_log.user_id was NOT NULL over an ON DELETE SET NULL
+FK, so deleting any user with history aborted; field made optional +
+migration 20260813_230000, proven by test:bootstrap (58).
+
+Now running: five adversarial reviewers (conformance, security, UX,
+migration, runtime) against the live app + scratch DBs, then a final
+original-requirement reviewer. Reports land in docs/agent-reports/review*.md.
+
 ## Known open work (gates not yet run)
 
 - **Gallery empty-box regression (R1, scouts 2+6):** release's
