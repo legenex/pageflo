@@ -27,7 +27,7 @@ import * as case_type_router from './case_type_router'
 import * as sixty_second_check from './sixty_second_check'
 import * as answer_first from './answer_first'
 
-import type { LpSlot, LpSlottedTemplate, LpUnsupportedRegion } from '@/lib/lp-slots/model'
+import type { LpSlot, LpSlottedTemplate, LpSupplyGroup, LpUnsupportedRegion } from '@/lib/lp-slots/model'
 import type { LpQuizMount } from '@/lib/lp-slots/quiz-mount'
 
 export type PortedTemplate = {
@@ -68,6 +68,15 @@ export type PortedTemplate = {
    * the wrong place is worse than one that fails to build.
    */
   quizMount: LpQuizMount
+  /**
+   * Blocks that go live COMPLETE or not at all.
+   *
+   * Empty for ten of the twelve. `authority_network` and `case_value_dossier`
+   * each draw case-result cards the handoff had no results to put in, so the
+   * block is omitted from the page until a brand supplies them. See
+   * `LpSupplyGroup` in `@/lib/lp-slots/model`.
+   */
+  supplyGroups: LpSupplyGroup[]
 }
 
 const meta = [
@@ -117,6 +126,7 @@ type GeneratedModule = {
   slots: LpSlot[]
   unsupported: LpUnsupportedRegion[]
   quizMount: LpQuizMount
+  supplyGroups?: LpSupplyGroup[]
 }
 
 export const PORTED_TEMPLATES: PortedTemplate[] = meta.map(
@@ -131,6 +141,10 @@ export const PORTED_TEMPLATES: PortedTemplate[] = meta.map(
       slots: m.slots,
       unsupported: m.unsupported,
       quizMount: m.quizMount,
+      // Optional on the generated module so a module written before this field
+      // existed still loads; a template with no groups omits nothing, which is
+      // exactly how the other ten behave.
+      supplyGroups: m.supplyGroups ?? [],
     }
   },
 )
@@ -143,6 +157,7 @@ export const asSlotted = (t: PortedTemplate): LpSlottedTemplate => ({
   slots: t.slots,
   unsupported: t.unsupported,
   quizMount: t.quizMount,
+  supplyGroups: t.supplyGroups,
 })
 
 export const PORTED_BY_SLUG: Record<string, PortedTemplate> =

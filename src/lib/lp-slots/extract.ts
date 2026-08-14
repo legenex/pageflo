@@ -28,7 +28,8 @@
  * designer probably meant.
  */
 import { scan, walk, inner, textOf, attr, styleProp, openTagOf, opaqueBackgroundAt, type ScannedNode } from './scan'
-import type { LpSlot, LpSlottedTemplate, LpUnsupportedRegion, SlotRole } from './model'
+import type { LpSlot, LpSlottedTemplate, LpSupplyGroup, LpUnsupportedRegion, SlotRole } from './model'
+import { mountToPartCoordinates } from './quiz-mount'
 import { stripPlaceholderLabels, remainingPlaceholderLabels } from './strip-annotations'
 
 /* ------------------------------------------------------------ what is text */
@@ -62,6 +63,17 @@ const ONLY_PLACEHOLDER = /^\{\{\s*[\w.]+\s*\}\}$/
  * `[CASE RESULT PLACEHOLDER]` are drawn in the same dashed box and are text,
  * so a rule keyed only on the box would turn a legal notice into an image well.
  */
+/**
+ * The prefix every supply-or-omit failure carries.
+ *
+ * `scripts/extract-lp-templates.mjs` refuses to WRITE a template whose block it
+ * could not locate, for the same reason it refuses one whose quiz card it could
+ * not locate: shipping the module anyway would leave the placeholder cards on
+ * the page with nothing able to remove them, which is the defect this pass
+ * exists to close.
+ */
+export const SUPPLY_PROBLEM = 'supply-or-omit'
+
 const BRACKET_LABEL = /\[([A-Z0-9 ·/_-]{3,})\]/
 const IMAGE_WORD = /\b(IMAGE|VISUAL|LOGO|MARK|PHOTO|PORTRAIT|HEADSHOT|VIDEO|MAP|BADGE|SEAL|ICON)\b/
 const NOT_IMAGE_WORD = /\b(DISCLOSURE|DISCLAIMER|LEGAL|RESULT|COPY|TEXT)\b/
@@ -146,6 +158,18 @@ const inRepeatedGroup = (n: ScannedNode): boolean => {
   }
   return false
 }
+
+/**
+ * The handoff's drawing of an ABSENCE: a dashed frame.
+ *
+ * The design uses one shape for everything it had no content for — the image
+ * wells (`[LOGO SLOT]`), and the case-result cards holding `$ ———`. So the same
+ * predicate that finds a well finds a placeholder card, which is what makes
+ * "every slot inside this box is a placeholder" derivable instead of a list of
+ * strings somebody has to keep up to date.
+ */
+const isDashedFrame = (n: ScannedNode): boolean =>
+  /dashed/i.test(styleProp(n, 'border') + styleProp(n, 'border-top') + styleProp(n, 'border-bottom'))
 
 const inFooterish = (n: ScannedNode): boolean =>
   n.tag === 'footer' || hasAncestor(n, (a) => a.tag === 'footer')
@@ -292,9 +316,7 @@ export const extractSlots = (slug: string, html: string, opts: ExtractOptions = 
     if (deeper) return
 
     let box: ScannedNode | null = n
-    while (box && !/dashed/i.test(styleProp(box, 'border') + styleProp(box, 'border-top') + styleProp(box, 'border-bottom'))) {
-      box = box.parent
-    }
+    while (box && !isDashedFrame(box)) box = box.parent
     // No dashed frame means the label is a caption beside a drawn graphic, not
     // a well waiting for an asset. Skipping is correct: there is nothing there
     // an operator could fill.
@@ -393,6 +415,8 @@ export const extractSlots = (slug: string, html: string, opts: ExtractOptions = 
     escaping: 'text' | 'attr' | 'image'
     value: string
     node: ScannedNode
+    /** The slot id this cut became. Filled in pass 3, once ordinals are known. */
+    id?: string
     /** Alt text to pair with, for an image box. */
     altDefault?: string
     assetKind?: 'logo' | 'image'
@@ -547,6 +571,7 @@ export const extractSlots = (slug: string, html: string, opts: ExtractOptions = 
     const ordinal = (ordinals.get(key) ?? 0) + 1
     ordinals.set(key, ordinal)
     const id = `${key}_${ordinal}`
+    c.id = id
 
     parts.push(html.slice(cursor, c.start))
     slotIds.push(id)
@@ -629,6 +654,140 @@ export const extractSlots = (slug: string, html: string, opts: ExtractOptions = 
     }
   }
 
+  /* --- pass 4: supply-or-omit blocks -------------------------------------- */
+  //
+  // WHY THIS EXISTS. Pass 3 flagged `[CASE RESULT PLACEHOLDER]` and stopped
+  // there, because bracketing is what it keys on. In the SAME dashed card sit
+  // `$ ———` and `Case type · jurisdiction · year` - placeholders by any reading,
+  // bracketed by none - so publish was blocked on four eyebrows while eight
+  // sibling slots of stand-in copy went live on an attorney-advertising page
+  // under every brand. Half-applied validation is worse than none: it made the
+  // page look checked.
+  //
+  // THE DERIVATION. The design draws every absence the same way: a dashed frame.
+  // Pass 0 already took the dashed frames whose label names a PICTURE, so a
+  // dashed frame still holding text slots is a card the handoff had no content
+  // for, and EVERYTHING inside one is placeholder copy. No string list to
+  // maintain, and a new results card in a future reference is caught the day it
+  // lands.
+
+  // A `meta` slot is never a cut — it is written into a tag another slot emits —
+  // so the cut stream is already only the regions that occupy markup.
+  const cutsWithId = cuts.filter((c) => c.id !== undefined)
+  const placeholderCards: ScannedNode[] = []
+  for (const slot of slots) {
+    if (!slot.mustSupply) continue
+    const node = cutsWithId.find((c) => c.id === slot.id)?.node
+    if (!node) continue
+    let card: ScannedNode | null = node
+    while (card && !isDashedFrame(card)) card = card.parent
+    // No dashed frame means the design did not draw this as an empty box, so
+    // there is no card to group. The slot keeps the per-slot `mustSupply` rule.
+    if (card && !placeholderCards.includes(card)) placeholderCards.push(card)
+  }
+
+  const inPlaceholderCard = (c: (typeof cuts)[number]): boolean =>
+    placeholderCards.some((card) => c.start >= card.start && c.end <= card.end)
+
+  const slotById = new Map(slots.map((s) => [s.id, s]))
+  for (const c of cutsWithId) {
+    if (!inPlaceholderCard(c)) continue
+    const slot = slotById.get(c.id ?? '')
+    if (!slot || slot.escaping === 'image') continue
+    slot.mustSupply = true
+    slot.required = true
+    // Nothing the design put here may reach a visitor, so the live default is
+    // EMPTY - the same treatment pass 3 gives a bracketed label. A part-written
+    // block therefore renders blanks rather than `$ ———` beside a real figure,
+    // which is what makes the placeholder unreachable rather than merely gated.
+    slot.liveDefault = ''
+    // A placeholder is shorter than the thing it stands in for: "$ ———" sizes
+    // the editor's field at 40 characters, and "$1.4M · trucking · Cook County"
+    // does not fit in it.
+    slot.maxChars = Math.max(slot.maxChars, 80)
+  }
+
+  /*
+   * THE OMITTED REGION.
+   *
+   * Not the cards themselves: a heading reading "Outcomes secured by network
+   * attorneys" above four holes is the same lie in miniature. So the region
+   * grows from the cards' common ancestor up through any ancestor that adds
+   * only the block's own lead-in, and stops the moment adopting one would take
+   * content that FOLLOWS the last card - which is what keeps
+   * `case_value_dossier`'s "From file to review" steps, drawn as the sibling
+   * card in the same flex row, on the page.
+   */
+  const supplyGroups: LpSupplyGroup[] = []
+  const bySection = new Map<number, ScannedNode[]>()
+  for (const card of placeholderCards) {
+    const { index } = sectionOf(card.start)
+    bySection.set(index, [...(bySection.get(index) ?? []), card])
+  }
+
+  for (const [section, cards] of [...bySection.entries()].sort((a, b) => a[0] - b[0])) {
+    const lo = Math.min(...cards.map((c) => c.start))
+    const hi = Math.max(...cards.map((c) => c.end))
+
+    // The tightest element containing every card. A one-element holder rather
+    // than a closed-over `let`, so the narrowing after the walk is real.
+    const tightest: ScannedNode[] = []
+    walk(roots, (n) => {
+      if (n.start > lo || n.end < hi) return
+      if (tightest.length === 0 || n.end - n.start < tightest[0].end - tightest[0].start) tightest[0] = n
+    })
+    if (tightest.length === 0) {
+      problems.push(`${SUPPLY_PROBLEM}: section ${section}: placeholder cards span no single element, so the block has no region to omit`)
+      continue
+    }
+
+    let grown: ScannedNode = tightest[0]
+    for (let p: ScannedNode | null = grown.parent; p; p = p.parent) {
+      const box = p
+      const within = cutsWithId.filter((c) => c.start >= box.start && c.end <= box.end)
+      // Content after the last card is a different block sharing a container.
+      // This is what keeps `case_value_dossier`'s "From file to review" steps -
+      // the sibling card in the same flex row - on the page.
+      if (within.some((c) => c.start >= hi)) break
+      // The page's own headline or a call to action is never part of a results
+      // block, and omitting one would take the page down with the section.
+      if (within.some((c) => c.role === 'headline' || c.role === 'cta_label')) break
+      grown = box
+    }
+
+    const coords = mountToPartCoordinates(
+      { start: grown.start, end: grown.end },
+      parts,
+      slotIds,
+      slotIds.map((id) => slotById.get(id)?.default ?? ''),
+      'supply-or-omit block',
+    )
+    for (const p of coords.problems) problems.push(`${SUPPLY_PROBLEM}: section ${section}: ${p}`)
+    if (!coords.mount) {
+      problems.push(`${SUPPLY_PROBLEM}: section ${section}: the block is not addressable in the part stream`)
+      continue
+    }
+
+    const regionSlotIds = coords.mount.slotIds
+    const required = regionSlotIds.filter((id) => slotById.get(id)?.mustSupply)
+    if (required.length === 0) {
+      problems.push(`${SUPPLY_PROBLEM}: section ${section}: the block contains no slot an operator can supply`)
+      continue
+    }
+
+    supplyGroups.push({
+      id: `s${String(section).padStart(2, '0')}_supply`,
+      section,
+      label: sectionOf(grown.start).label,
+      requiredSlotIds: required,
+      slotIds: regionSlotIds,
+      startPart: coords.mount.startPart,
+      startOffset: coords.mount.startOffset,
+      endPart: coords.mount.endPart,
+      endOffset: coords.mount.endOffset,
+    })
+  }
+
   const leftoverLabels = remainingPlaceholderLabels(slots)
   if (leftoverLabels.length > 0) {
     problems.push(`bracketed placeholder labels survive outside an image well: ${[...new Set(leftoverLabels)].join(', ')}`)
@@ -649,5 +808,5 @@ export const extractSlots = (slug: string, html: string, opts: ExtractOptions = 
     })
   }
 
-  return { slug, parts, slotIds, slots, unsupported, problems }
+  return { slug, parts, slotIds, slots, unsupported, supplyGroups, problems }
 }

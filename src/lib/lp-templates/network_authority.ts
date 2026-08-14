@@ -10,7 +10,7 @@
 // writes. A deployment stores OVERRIDES against these ids and never a copy of
 // the template, so a corrected template reaches every deployment at once.
 
-import type { LpSlot, LpUnsupportedRegion } from '@/lib/lp-slots/model'
+import type { LpSlot, LpSupplyGroup, LpUnsupportedRegion } from '@/lib/lp-slots/model'
 import type { LpQuizMount } from '@/lib/lp-slots/quiz-mount'
 
 export const slug = "network_authority"
@@ -885,6 +885,20 @@ export const slots: LpSlot[] = [
 
 /** Regions the markup alone cannot carry. Empty means the template is complete. */
 export const unsupported: LpUnsupportedRegion[] = []
+
+/**
+ * Blocks the design drew as empty dashed cards, which go live COMPLETE or not
+ * at all.
+ *
+ * Empty for ten of the twelve. Where it is not, the reference drew case-result
+ * cards holding `[CASE RESULT PLACEHOLDER]`, `$ ———` and
+ * `Case type · jurisdiction · year` - stand-in copy for content the handoff did
+ * not have. Only the bracketed line was ever flagged, so the other two shipped
+ * to live attorney-advertising pages. With nothing supplied the region below is
+ * cut out of the part stream and the page closes up; with anything supplied the
+ * publish preflight requires the rest. See src/lib/lp-slots/model.ts.
+ */
+export const supplyGroups: LpSupplyGroup[] = []
 
 /**
  * Where the live quiz replaces the reference's drawing of one.

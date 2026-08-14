@@ -549,12 +549,18 @@ const liveRender = async (browser: Browser): Promise<void> => {
         visible: box ? box.width > 0 : false,
         overflow: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
         placeholders: (document.body.innerText.match(/\\[[A-Z0-9 ·/_-]{3,}\\]/g) || []).length,
+        // The design's UNBRACKETED stand-ins. The bracket rule above never saw
+        // these, which is how "$ ———" and "Case type · jurisdiction · year"
+        // reached live attorney-advertising pages while publishing was blocked
+        // on the bracketed eyebrow in the same card.
+        stubs: ['$ \u2014\u2014\u2014', 'Case type · jurisdiction · year']
+          .filter((s) => document.body.innerText.includes(s)).length,
         buttons: document.querySelectorAll('button').length,
         text: document.body.innerText.trim().length,
       }
     })()`) as {
       mounts: number; width: number; height: number; visible: boolean
-      overflow: number; placeholders: number; buttons: number; text: number
+      overflow: number; placeholders: number; stubs: number; buttons: number; text: number
     }
 
     t(probe.mounts === 1, `${tpl.slug}: the live page has exactly one quiz mount (${probe.mounts})`)
@@ -564,6 +570,7 @@ const liveRender = async (browser: Browser): Promise<void> => {
     // empty.
     t(probe.width >= 200, `${tpl.slug}: and it is the width of a card rather than a sliver (${probe.width}px)`)
     t(probe.placeholders === 0, `${tpl.slug}: and no bracketed placeholder label is visible`)
+    t(probe.stubs === 0, `${tpl.slug}: and no unbracketed case-result stand-in either`)
     t(probe.overflow === 0, `${tpl.slug}: and the page does not scroll sideways with the card removed (${probe.overflow}px)`)
     t(probe.text > 500, `${tpl.slug}: and the page still has its own copy (${probe.text} chars)`)
   }

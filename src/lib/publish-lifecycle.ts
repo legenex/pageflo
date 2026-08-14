@@ -45,7 +45,7 @@ import {
 import { validateQuizFlow } from '@/lib/quiz-flow'
 import { canonicalTemplateId, resolveTemplate } from '@/lib/template-registry'
 import { asSlotted } from '@/lib/lp-templates'
-import { validateOverrides } from '@/lib/lp-slots/model'
+import { supplyGroupStates, validateOverrides } from '@/lib/lp-slots/model'
 import { domainEligibility } from '@/lib/domain-eligibility'
 import { getQuizTemplateRecordByTemplateId, getLpTemplateRecord } from '@/lib/template-records'
 import { resolveBrandContact, resolveBrandDisplayName, resolveBrandLegal } from '@/lib/brand-map'
@@ -448,12 +448,43 @@ export const lpDeploymentPreflight = async (
       ...((deployment.content_overrides ?? {}) as Record<string, string>),
     }
     if (ported) {
-      const v = validateOverrides(asSlotted(ported), overrides)
+      const slotted = asSlotted(ported)
+      const v = validateOverrides(slotted, overrides)
       checks.push(
         v.ok
           ? pass('overrides', "This deployment's copy fits its template")
           : fail('overrides', "This deployment's copy fits its template", v.problems.map((p) => p.detail).join('; ')),
       )
+
+      /*
+       * SUPPLY-OR-OMIT BLOCKS, as a WARNING and not a gate.
+       *
+       * `authority_network` and `case_value_dossier` draw case-result cards the
+       * handoff had no results for. With nothing supplied the renderer cuts the
+       * block out entirely — a brand with no publishable results is entitled to
+       * ship the template without it, and blocking there is what made the old
+       * rule something to route around while `$ ———` went live beside it. But
+       * the page then goes out a section shorter than the design, so an operator
+       * who did not intend that hears it here rather than noticing it live. A
+       * PART-written block is a different thing and is blocked above.
+       */
+      const emptyBlocks = supplyGroupStates(slotted, overrides).filter((s) => s.untouched)
+      if (emptyBlocks.length > 0) {
+        checks.push(
+          fail(
+            'supply_blocks',
+            'Every block of this template has content',
+            `${emptyBlocks.map((s) => `"${s.group.label}"`).join(', ')} ` +
+              `${emptyBlocks.length === 1 ? 'is' : 'are'} empty, so ` +
+              `${emptyBlocks.length === 1 ? 'that section' : 'those sections'} will not appear on the page. ` +
+              'Fill in the case results if the section should be there.',
+            'warn',
+          ),
+        )
+      } else if ((ported.supplyGroups ?? []).length > 0) {
+        checks.push(pass('supply_blocks', 'Every block of this template has content', 'warn'))
+      }
+
       // Renderer hydration: composing must actually produce a page.
       checks.push(
         ported.parts.length === ported.slotIds.length + 1 && ported.slots.length > 0

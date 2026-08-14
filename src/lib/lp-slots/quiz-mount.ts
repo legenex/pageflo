@@ -348,12 +348,19 @@ export type LpQuizMount = {
  * search, and a boundary that lands inside a SLOT rather than a literal part is
  * reported instead of rounded: it would mean the card starts in the middle of a
  * piece of editable copy, which is not a card boundary.
+ *
+ * Takes a bare `{ start, end }` rather than a `QuizMountRegion` because the quiz
+ * card is no longer the only region recorded this way: a supply-or-omit block
+ * (see `LpSupplyGroup`) is cut out of the same stream by the same arithmetic,
+ * and a second copy of this mapping is the one place an off-by-one would delete
+ * the wrong half of a live page. `what` only names the region in the messages.
  */
 export const mountToPartCoordinates = (
-  region: QuizMountRegion,
+  region: { start: number; end: number },
   parts: string[],
   slotIds: string[],
   slotDefaults: string[],
+  what = 'quiz mount',
 ): { mount: Omit<LpQuizMount, 'evidence' | 'tag' | 'openTag' | 'surface'> | null; problems: string[] } => {
   const problems: string[] = []
   const partStart: number[] = []
@@ -372,7 +379,7 @@ export const mountToPartCoordinates = (
       // part and the slot that follows it belongs to the part.
       if (offset >= lo && offset <= hi) return { part: i, inner: offset - lo }
     }
-    problems.push(`the quiz mount's ${label} offset ${offset} falls inside a slot, not a literal part`)
+    problems.push(`the ${what}'s ${label} offset ${offset} falls inside a slot, not a literal part`)
     return null
   }
 

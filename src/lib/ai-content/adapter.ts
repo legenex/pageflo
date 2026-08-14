@@ -406,6 +406,19 @@ export const targetsFromSlots = (
     // An image URL is not copy and must never be written by a language model:
     // it would invent a plausible-looking asset path that resolves to nothing.
     .filter((s) => s.role !== 'image_src')
+    /*
+     * Neither is a case result, and for a much worse reason.
+     *
+     * A `mustSupply` slot is one the design left EMPTY because the handoff had
+     * no honest content for it — the case-result cards in `authority_network`
+     * and `case_value_dossier`. Asked to write one, a model produces
+     * "$1.4M · trucking · Cook County · 2023", which is a fabricated legal
+     * outcome on an attorney-advertising page. Only the firm can say what
+     * belongs there, which is the whole reason those slots ship blank. Excluded
+     * unconditionally, including when an operator names the id, for the same
+     * reason `image_src` is: "the caller asked for it" is not a defence.
+     */
+    .filter((s) => !s.mustSupply)
     .map((s) => ({
       id: s.id,
       role: s.role,

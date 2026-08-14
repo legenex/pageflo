@@ -7,6 +7,7 @@
     "slots": 92,
     "loopsExpanded": 0,
     "valid": true,
+    "supplyGroups": [],
     "quizMount": {
       "tag": "div",
       "bytes": 7851,
@@ -28,6 +29,7 @@
     "slots": 97,
     "loopsExpanded": 0,
     "valid": true,
+    "supplyGroups": [],
     "quizMount": {
       "tag": "div",
       "bytes": 6981,
@@ -49,6 +51,14 @@
     "slots": 148,
     "loopsExpanded": 0,
     "valid": true,
+    "supplyGroups": [
+      {
+        "id": "s10_supply",
+        "label": "results placeholders",
+        "required": 12,
+        "inRegion": 15
+      }
+    ],
     "quizMount": {
       "tag": "div",
       "bytes": 6925,
@@ -70,6 +80,14 @@
     "slots": 145,
     "loopsExpanded": 0,
     "valid": true,
+    "supplyGroups": [
+      {
+        "id": "s07_supply",
+        "label": "example outcomes + process",
+        "required": 6,
+        "inRegion": 8
+      }
+    ],
     "quizMount": {
       "tag": "div",
       "bytes": 7326,
@@ -91,6 +109,7 @@
     "slots": 61,
     "loopsExpanded": 0,
     "valid": true,
+    "supplyGroups": [],
     "quizMount": {
       "tag": "div",
       "bytes": 6327,
@@ -112,6 +131,7 @@
     "slots": 43,
     "loopsExpanded": 0,
     "valid": true,
+    "supplyGroups": [],
     "quizMount": {
       "tag": "div",
       "bytes": 6858,
@@ -133,6 +153,7 @@
     "slots": 63,
     "loopsExpanded": 0,
     "valid": true,
+    "supplyGroups": [],
     "quizMount": {
       "tag": "div",
       "bytes": 6649,
@@ -154,6 +175,7 @@
     "slots": 68,
     "loopsExpanded": 0,
     "valid": true,
+    "supplyGroups": [],
     "quizMount": {
       "tag": "div",
       "bytes": 5413,
@@ -175,6 +197,7 @@
     "slots": 26,
     "loopsExpanded": 0,
     "valid": true,
+    "supplyGroups": [],
     "quizMount": {
       "tag": "div",
       "bytes": 6890,
@@ -196,6 +219,7 @@
     "slots": 33,
     "loopsExpanded": 0,
     "valid": true,
+    "supplyGroups": [],
     "quizMount": {
       "tag": "div",
       "bytes": 6174,
@@ -217,6 +241,7 @@
     "slots": 74,
     "loopsExpanded": 2,
     "valid": true,
+    "supplyGroups": [],
     "quizMount": {
       "tag": "div",
       "bytes": 5213,
@@ -238,6 +263,7 @@
     "slots": 79,
     "loopsExpanded": 0,
     "valid": true,
+    "supplyGroups": [],
     "quizMount": {
       "tag": "div",
       "bytes": 5931,

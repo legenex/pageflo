@@ -10,7 +10,7 @@
 // writes. A deployment stores OVERRIDES against these ids and never a copy of
 // the template, so a corrected template reaches every deployment at once.
 
-import type { LpSlot, LpUnsupportedRegion } from '@/lib/lp-slots/model'
+import type { LpSlot, LpSupplyGroup, LpUnsupportedRegion } from '@/lib/lp-slots/model'
 import type { LpQuizMount } from '@/lib/lp-slots/quiz-mount'
 
 export const slug = "authority_network"
@@ -1079,8 +1079,10 @@ export const slots: LpSlot[] = [
     "section": 10,
     "sectionLabel": "results placeholders",
     "default": "$ ———",
-    "required": false,
-    "maxChars": 40
+    "required": true,
+    "maxChars": 80,
+    "mustSupply": true,
+    "liveDefault": ""
   },
   {
     "id": "s10_card_body_1",
@@ -1089,8 +1091,10 @@ export const slots: LpSlot[] = [
     "section": 10,
     "sectionLabel": "results placeholders",
     "default": "Case type · jurisdiction · year",
-    "required": false,
-    "maxChars": 50
+    "required": true,
+    "maxChars": 80,
+    "mustSupply": true,
+    "liveDefault": ""
   },
   {
     "id": "s10_eyebrow_3",
@@ -1111,8 +1115,10 @@ export const slots: LpSlot[] = [
     "section": 10,
     "sectionLabel": "results placeholders",
     "default": "$ ———",
-    "required": false,
-    "maxChars": 40
+    "required": true,
+    "maxChars": 80,
+    "mustSupply": true,
+    "liveDefault": ""
   },
   {
     "id": "s10_card_body_2",
@@ -1121,8 +1127,10 @@ export const slots: LpSlot[] = [
     "section": 10,
     "sectionLabel": "results placeholders",
     "default": "Case type · jurisdiction · year",
-    "required": false,
-    "maxChars": 50
+    "required": true,
+    "maxChars": 80,
+    "mustSupply": true,
+    "liveDefault": ""
   },
   {
     "id": "s10_eyebrow_4",
@@ -1143,8 +1151,10 @@ export const slots: LpSlot[] = [
     "section": 10,
     "sectionLabel": "results placeholders",
     "default": "$ ———",
-    "required": false,
-    "maxChars": 40
+    "required": true,
+    "maxChars": 80,
+    "mustSupply": true,
+    "liveDefault": ""
   },
   {
     "id": "s10_card_body_3",
@@ -1153,8 +1163,10 @@ export const slots: LpSlot[] = [
     "section": 10,
     "sectionLabel": "results placeholders",
     "default": "Case type · jurisdiction · year",
-    "required": false,
-    "maxChars": 50
+    "required": true,
+    "maxChars": 80,
+    "mustSupply": true,
+    "liveDefault": ""
   },
   {
     "id": "s10_eyebrow_5",
@@ -1175,8 +1187,10 @@ export const slots: LpSlot[] = [
     "section": 10,
     "sectionLabel": "results placeholders",
     "default": "$ ———",
-    "required": false,
-    "maxChars": 40
+    "required": true,
+    "maxChars": 80,
+    "mustSupply": true,
+    "liveDefault": ""
   },
   {
     "id": "s10_card_body_4",
@@ -1185,8 +1199,10 @@ export const slots: LpSlot[] = [
     "section": 10,
     "sectionLabel": "results placeholders",
     "default": "Case type · jurisdiction · year",
-    "required": false,
-    "maxChars": 50
+    "required": true,
+    "maxChars": 80,
+    "mustSupply": true,
+    "liveDefault": ""
   },
   {
     "id": "s11_eyebrow_1",
@@ -1621,6 +1637,61 @@ export const slots: LpSlot[] = [
 
 /** Regions the markup alone cannot carry. Empty means the template is complete. */
 export const unsupported: LpUnsupportedRegion[] = []
+
+/**
+ * Blocks the design drew as empty dashed cards, which go live COMPLETE or not
+ * at all.
+ *
+ * Empty for ten of the twelve. Where it is not, the reference drew case-result
+ * cards holding `[CASE RESULT PLACEHOLDER]`, `$ ———` and
+ * `Case type · jurisdiction · year` - stand-in copy for content the handoff did
+ * not have. Only the bracketed line was ever flagged, so the other two shipped
+ * to live attorney-advertising pages. With nothing supplied the region below is
+ * cut out of the part stream and the page closes up; with anything supplied the
+ * publish preflight requires the rest. See src/lib/lp-slots/model.ts.
+ */
+export const supplyGroups: LpSupplyGroup[] = [
+  {
+    "id": "s10_supply",
+    "section": 10,
+    "label": "results placeholders",
+    "requiredSlotIds": [
+      "s10_eyebrow_2",
+      "s10_card_title_1",
+      "s10_card_body_1",
+      "s10_eyebrow_3",
+      "s10_card_title_2",
+      "s10_card_body_2",
+      "s10_eyebrow_4",
+      "s10_card_title_3",
+      "s10_card_body_3",
+      "s10_eyebrow_5",
+      "s10_card_title_4",
+      "s10_card_body_4"
+    ],
+    "slotIds": [
+      "s10_eyebrow_1",
+      "s10_section_headline_1",
+      "s10_disclaimer_1",
+      "s10_eyebrow_2",
+      "s10_card_title_1",
+      "s10_card_body_1",
+      "s10_eyebrow_3",
+      "s10_card_title_2",
+      "s10_card_body_2",
+      "s10_eyebrow_4",
+      "s10_card_title_3",
+      "s10_card_body_3",
+      "s10_eyebrow_5",
+      "s10_card_title_4",
+      "s10_card_body_4"
+    ],
+    "startPart": 84,
+    "startOffset": 82,
+    "endPart": 99,
+    "endOffset": 44
+  }
+]
 
 /**
  * Where the live quiz replaces the reference's drawing of one.

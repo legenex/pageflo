@@ -219,6 +219,66 @@ export type LpUnsupportedRegion = {
 }
 
 /**
+ * A block of the design that goes live COMPLETE or does not go live at all.
+ *
+ * WHAT WENT WRONG. `authority_network` draws four case-result cards and
+ * `case_value_dossier` three. Each card is a dashed box holding an eyebrow
+ * (`[CASE RESULT PLACEHOLDER]`), an amount (`$ ———`) and a descriptor
+ * (`Case type · jurisdiction · year`) — the handoff drawing the SHAPE of a case
+ * result because it had no case results to put there. Only the bracketed
+ * eyebrow was ever flagged, because only it was bracketed, so publishing was
+ * BLOCKED on four eyebrows while `$ ———` and `Case type · jurisdiction · year`
+ * shipped to a live attorney-advertising page under every brand. Half-applied
+ * validation is worse than none: it made the page look checked.
+ *
+ * WHY A GROUP AND NOT MORE REQUIRED SLOTS. A case-results block is one claim.
+ * Two filled cards beside two dashed rectangles is not a partially-correct
+ * page, it is a page that says the firm has two results and cannot describe
+ * them. And a brand with no publishable results must still be able to ship the
+ * template — a rule that can only be satisfied by inventing case results is a
+ * rule operators route around. So the unit is the block:
+ *
+ *  - nothing supplied -> the whole region is OMITTED from the markup, and
+ *    publishing is allowed. The template's other twelve sections are the page.
+ *  - anything supplied -> every slot the block needs must be supplied, and
+ *    publishing BLOCKS naming the ones that are not.
+ *
+ * The region is recorded in PART-STREAM coordinates, the same way `LpQuizMount`
+ * is, because omitting a section means cutting the `parts`/`slotIds` stream and
+ * that has to be decided at extraction time — the generated modules are the
+ * pre-derived artifact and `asSlotted` only reshapes them.
+ */
+export type LpSupplyGroup = {
+  /** Stable within a template. Derived: `s<section>_supply`. */
+  id: string
+  /** 1-based index of the top-level element the group lives in. */
+  section: number
+  /** The section's own label, from the reference's comment. Used in messages. */
+  label: string
+  /**
+   * The slots an operator must fill for the block to render.
+   *
+   * Every slot inside one of the design's placeholder cards, not just the ones
+   * whose default happened to be bracketed. That difference is the defect.
+   */
+  requiredSlotIds: string[]
+  /**
+   * Every slot inside the omitted region, the block's own heading and
+   * disclaimer included. Touching any of them means the operator intends the
+   * block to appear, so the block must then be complete.
+   */
+  slotIds: string[]
+  /** Index into `parts` where the omitted region starts. */
+  startPart: number
+  /** Offset inside `parts[startPart]` of the region's first byte. */
+  startOffset: number
+  /** Index into `parts` where the omitted region ends. */
+  endPart: number
+  /** Offset inside `parts[endPart]` just past the region's last byte. */
+  endOffset: number
+}
+
+/**
  * A template as the renderer consumes it.
  *
  * `parts.length === slotIds.length + 1` always. That invariant is what makes
@@ -240,6 +300,15 @@ export type LpSlottedTemplate = {
    * rather than being unrepresentable.
    */
   quizMount?: LpQuizMount | null
+  /**
+   * Blocks that go live complete or not at all. See `LpSupplyGroup`.
+   *
+   * Empty for ten of the twelve. Optional in the TYPE so a synthetic template
+   * in a test composes whole, and so a template record written before groups
+   * existed still renders — it renders exactly as it did, which is the honest
+   * degradation for a field that only ever REMOVES markup.
+   */
+  supplyGroups?: LpSupplyGroup[] | null
 }
 
 export type LpSlotOverrides = Record<string, string>
@@ -451,43 +520,240 @@ export type ComposeResult = {
   refused: Array<{ id: string; reason: string }>
   /** Slot ids that took an override, in template order. */
   applied: string[]
+  /** Supply groups this composition left out entirely. See `LpSupplyGroup`. */
+  omittedGroupIds: string[]
+}
+
+/* --------------------------------------------------- part-stream geometry */
+
+/**
+ * A position in the part stream: which literal part, and where inside it.
+ *
+ * Every cut this module makes — the quiz mount's two boundaries, a supply
+ * group's two boundaries — is expressed this way rather than as a byte offset
+ * into the output, so it cannot drift when an override changes a slot's length.
+ */
+type PartCoord = { part: number; offset: number }
+
+/**
+ * A region of the part stream, in the shape the extractor records.
+ *
+ * `LpQuizMount` and `LpSupplyGroup` both satisfy it structurally, which is the
+ * point: one geometry, one cutting implementation, two callers.
+ */
+type PartRange = { startPart: number; startOffset: number; endPart: number; endOffset: number }
+
+/**
+ * Whether a recorded range actually addresses this part stream.
+ *
+ * The extractor writes the coordinates and the parts in one pass and refuses to
+ * write a template whose region it could not locate, so they cannot disagree
+ * today. The failure mode if they ever did is content vanishing silently from a
+ * live landing page, so an unaddressable range is treated as no range at all —
+ * the page renders whole and the caller sees the region was not applied.
+ */
+const isAddressableRange = (r: PartRange, parts: string[]): boolean =>
+  Number.isInteger(r.startPart) &&
+  Number.isInteger(r.endPart) &&
+  r.startPart >= 0 &&
+  r.startPart <= r.endPart &&
+  r.endPart < parts.length &&
+  r.startOffset >= 0 &&
+  r.startOffset <= parts[r.startPart].length &&
+  r.endOffset >= 0 &&
+  r.endOffset <= parts[r.endPart].length &&
+  (r.startPart !== r.endPart || r.startOffset <= r.endOffset)
+
+/**
+ * The composed markup between two coordinates, minus any omitted region.
+ *
+ * The ONE piece of range surgery in this module. `composeTemplate` calls it once
+ * over the whole stream; `composeTemplateWithQuizMount` calls it three times to
+ * get the halves either side of the quiz card. Because the slot values are
+ * composed once and passed in, the three calls cannot escape an override
+ * differently from the one call — which is what a second implementation of
+ * "cut the stream" would eventually do, at the boundary between operator copy
+ * and markup.
+ *
+ * Additive by construction: `slice(a,b) + slice(b,c) === slice(a,c)`. Each
+ * literal part contributes the bytes in `[lo,hi)` that no omitted region covers,
+ * and slot `i` is emitted exactly once, by whichever call has `i < to.part`.
+ */
+const sliceStream = (
+  parts: string[],
+  values: string[],
+  from: PartCoord,
+  to: PartCoord,
+  omit: readonly PartRange[],
+): string => {
+  if (from.part > to.part || (from.part === to.part && from.offset >= to.offset)) return ''
+
+  /** The sub-intervals of `parts[i]` that an omitted region covers, merged. */
+  const omittedIn = (i: number): Array<[number, number]> => {
+    const spans: Array<[number, number]> = []
+    for (const r of omit) {
+      if (i < r.startPart || i > r.endPart) continue
+      const lo = i === r.startPart ? r.startOffset : 0
+      const hi = i === r.endPart ? r.endOffset : parts[i].length
+      if (hi > lo) spans.push([lo, hi])
+    }
+    spans.sort((a, b) => a[0] - b[0])
+    const merged: Array<[number, number]> = []
+    for (const span of spans) {
+      const last = merged[merged.length - 1]
+      if (last && span[0] <= last[1]) last[1] = Math.max(last[1], span[1])
+      else merged.push([...span])
+    }
+    return merged
+  }
+
+  /** A slot sits between two parts, so it is inside a region iff both are. */
+  const slotOmitted = (i: number): boolean => omit.some((r) => r.startPart <= i && i < r.endPart)
+
+  const out: string[] = []
+  for (let i = from.part; i <= to.part; i++) {
+    const part = parts[i]
+    const hi = i === to.part ? to.offset : part.length
+    let cursor = i === from.part ? from.offset : 0
+    for (const [cutStart, cutEnd] of omittedIn(i)) {
+      if (cutEnd <= cursor) continue
+      if (cutStart >= hi) break
+      if (cutStart > cursor) out.push(part.slice(cursor, cutStart))
+      cursor = cutEnd
+      if (cursor >= hi) break
+    }
+    if (cursor < hi) out.push(part.slice(cursor, hi))
+    if (i < to.part && !slotOmitted(i)) out.push(values[i] ?? '')
+  }
+  return out.join('')
+}
+
+/* ------------------------------------------------------ supply-or-omit groups */
+
+/**
+ * Whether an override puts the OPERATOR'S OWN words in a slot.
+ *
+ * Not merely "a key is present". A stored empty string is what the editor
+ * writes when somebody clears a field, and a stored copy of the slot's own
+ * default is a no-op the deployment happens to carry. Neither is a case result,
+ * and counting either as one would let a block render with the design's
+ * placeholders still in it — the exact outcome the group exists to prevent.
+ * Retyping the placeholder verbatim does not count for the same reason.
+ */
+const hasOperatorContent = (slot: LpSlot | undefined, overrides: LpSlotOverrides): boolean => {
+  if (!slot) return false
+  if (!Object.prototype.hasOwnProperty.call(overrides, slot.id)) return false
+  const raw = overrides[slot.id]
+  if (typeof raw !== 'string') return false
+  const value = raw.trim()
+  if (value === '') return false
+  return value !== slot.default.trim() && value !== (slot.liveDefault ?? '').trim()
+}
+
+/** What one supply group's copy currently amounts to. */
+export type SupplyGroupState = {
+  group: LpSupplyGroup
+  /**
+   * The operator has put nothing of their own anywhere in the block.
+   *
+   * The block is then omitted from the page and publishing is allowed: a brand
+   * with no publishable case results ships the template without that section.
+   */
+  untouched: boolean
+  /** Slots the block needs that are still unfilled. Empty means it can render. */
+  missing: string[]
 }
 
 /**
- * Build a template's HTML from its parts and a set of overrides.
+ * Every supply group in a template, with the state its overrides put it in.
  *
- * The ONE composition path. The builder preview, the public render, the
- * thumbnail document and the AI adapter's before/after all call this, so a page
- * cannot look one way in the builder and another way live — which is the class
- * of bug the twelve were already prone to, being one string with no seam.
- *
- * An unknown override is REPORTED, not applied and not ignored: it means the
- * template changed under a saved deployment, and the operator needs to know
- * that a line they wrote is no longer on the page.
+ * The single source of truth for both questions that must agree: what the
+ * renderer emits, and what the publish preflight allows. Deriving them
+ * separately is how a page passes preflight and then renders something else.
  */
-export const composeTemplate = (
+export const supplyGroupStates = (
   template: LpSlottedTemplate,
-  overrides: LpSlotOverrides = {},
-  opts: ComposeOptions = {},
-): ComposeResult => {
+  overrides: LpSlotOverrides,
+): SupplyGroupState[] => {
   const byId = new Map(template.slots.map((s) => [s.id, s]))
-  const unknownOverrides = Object.keys(overrides).filter((k) => !byId.has(k))
+  return (template.supplyGroups ?? [])
+    .filter((g) => isAddressableRange(g, template.parts))
+    .map((group) => ({
+      group,
+      untouched: !group.slotIds.some((id) => hasOperatorContent(byId.get(id), overrides)),
+      missing: group.requiredSlotIds.filter((id) => !hasOperatorContent(byId.get(id), overrides)),
+    }))
+}
+
+/** Whether a slot belongs to a supply group, and so is governed by its rule. */
+export const supplyGroupFor = (
+  template: LpSlottedTemplate,
+  slotId: string,
+): LpSupplyGroup | null =>
+  (template.supplyGroups ?? []).find((g) => g.slotIds.includes(slotId)) ?? null
+
+/**
+ * The regions this composition must leave out.
+ *
+ * A group renders only when it is COMPLETE, and the "partly filled" half of
+ * that is the deliberate part. The preflight already blocks publishing a
+ * part-written block, but a deployment PUBLISHED BEFORE this rule existed can
+ * be in that state right now — the old check passed once the four bracketed
+ * eyebrows were filled and never looked at the amounts beside them. Rendering
+ * such a row would put a card reading "TRUCKING VERDICT" above a blank line on
+ * a live attorney-advertising page. Omitting it makes the page one section
+ * shorter, which is recoverable and true.
+ *
+ * The cost, stated: a part-written block is invisible in the builder preview
+ * too, so an operator filling it in sees nothing until the last field is
+ * written. The preflight names the outstanding slots, which is where that
+ * feedback belongs, and the alternative trades a confusing preview for a
+ * broken live page.
+ */
+const omittedRanges = (
+  template: LpSlottedTemplate,
+  overrides: LpSlotOverrides,
+  opts: ComposeOptions,
+): { ranges: PartRange[]; ids: string[] } => {
+  // The parity target keeps the reference exactly as drawn, placeholder cards
+  // included — the same opt-in that keeps `[LOGO SLOT]` in an image well. It is
+  // the only path that can put a placeholder in the output, and no render path
+  // sets it.
+  if (opts.keepReferencePlaceholders) return { ranges: [], ids: [] }
+  const omitted = supplyGroupStates(template, overrides).filter((s) => s.missing.length > 0)
+  return { ranges: omitted.map((s) => s.group), ids: omitted.map((s) => s.group.id) }
+}
+
+/* -------------------------------------------------------------- composition */
+
+/**
+ * Compose every slot ONCE, into a stream parallel to `parts`.
+ *
+ * Separated from the join so the quiz-mount split and the whole-page render
+ * share one set of escaped values rather than re-composing per slot.
+ */
+const renderSlotValues = (
+  template: LpSlottedTemplate,
+  overrides: LpSlotOverrides,
+  opts: ComposeOptions,
+): { values: string[]; refused: Array<{ id: string; reason: string }>; applied: string[] } => {
+  const byId = new Map(template.slots.map((s) => [s.id, s]))
   const refused: Array<{ id: string; reason: string }> = []
   const applied: string[] = []
+  const values: string[] = []
 
-  const out: string[] = []
   for (let i = 0; i < template.parts.length; i++) {
-    out.push(template.parts[i])
     const id = template.slotIds[i]
-    if (id === undefined) continue
+    if (id === undefined) { values.push(''); continue }
 
     const slot = byId.get(id)
     if (!slot) {
       // A slot id in the stream with no metadata is a corrupt template. Emitting
       // nothing would delete content; emitting the id would print it on the
-      // page. Neither is acceptable, so this is reported and the part is left
+      // page. Neither is acceptable, so this is reported and the gap is left
       // empty, and validateTemplateSlots refuses the template outright.
       refused.push({ id, reason: 'slot id appears in the markup but has no definition' })
+      values.push('')
       continue
     }
 
@@ -514,37 +780,77 @@ export const composeTemplate = (
         if (isSafeImageUrl(url)) safe = url
         else refused.push({ id, reason: `"${url.slice(0, 60)}" is not an allowed image URL` })
       }
-      if (opts.keepReferencePlaceholders && safe === '') { out.push(slot.default); continue }
+      if (opts.keepReferencePlaceholders && safe === '') { values.push(slot.default); continue }
 
       const altSlot = slot.pairedWith ? byId.get(slot.pairedWith) : undefined
       const alt = altSlot
         ? (Object.prototype.hasOwnProperty.call(overrides, altSlot.id) ? overrides[altSlot.id] : altSlot.default)
         : ''
       if (safe !== '') applied.push(id)
-      out.push(renderImageWell(slot, safe, alt, opts.assets))
+      values.push(renderImageWell(slot, safe, alt, opts.assets))
       continue
     }
 
     // What this slot says with nothing overriding it. The reference's own copy,
-    // except where that copy was an annotation the design was making to itself.
+    // except where that copy was an annotation the design was making to itself,
+    // or a placeholder inside a supply group's card — both clean to nothing, so
+    // an unfilled one is BLANK rather than the design's stand-in for content.
     const stock = opts.keepReferencePlaceholders ? slot.default : slot.liveDefault ?? slot.default
 
     if (raw === undefined || raw === slot.default || raw === stock) {
-      out.push(stock)
+      values.push(stock)
       continue
     }
 
     if (URL_ROLES.has(slot.role) && !isSafeImageUrl(raw)) {
       refused.push({ id, reason: `"${raw.slice(0, 60)}" is not an allowed image URL` })
-      out.push(stock)
+      values.push(stock)
       continue
     }
 
     applied.push(id)
-    out.push(escapeHtmlText(raw))
+    values.push(escapeHtmlText(raw))
   }
 
-  return { html: out.join(''), unknownOverrides, refused, applied }
+  return { values, refused, applied }
+}
+
+/**
+ * Build a template's HTML from its parts and a set of overrides.
+ *
+ * The ONE composition path. The builder preview, the public render, the
+ * thumbnail document and the AI adapter's before/after all call this, so a page
+ * cannot look one way in the builder and another way live — which is the class
+ * of bug the twelve were already prone to, being one string with no seam.
+ *
+ * An unknown override is REPORTED, not applied and not ignored: it means the
+ * template changed under a saved deployment, and the operator needs to know
+ * that a line they wrote is no longer on the page.
+ *
+ * A supply group with nothing in it is cut out of the stream here rather than
+ * hidden with CSS or blanked slot by slot, so the section's own background band
+ * and padding go with it and the page closes up. See `LpSupplyGroup`.
+ */
+export const composeTemplate = (
+  template: LpSlottedTemplate,
+  overrides: LpSlotOverrides = {},
+  opts: ComposeOptions = {},
+): ComposeResult => {
+  const byId = new Map(template.slots.map((s) => [s.id, s]))
+  const unknownOverrides = Object.keys(overrides).filter((k) => !byId.has(k))
+  const { values, refused, applied } = renderSlotValues(template, overrides, opts)
+  const { ranges, ids } = omittedRanges(template, overrides, opts)
+
+  const last = template.parts.length - 1
+  const html = sliceStream(
+    template.parts,
+    values,
+    { part: 0, offset: 0 },
+    { part: last, offset: template.parts[last]?.length ?? 0 },
+    ranges,
+  )
+
+  return { html, unknownOverrides, refused, applied, omittedGroupIds: ids }
 }
 
 /**
@@ -637,8 +943,13 @@ export const composeTemplateWithQuizMount = (
   overrides: LpSlotOverrides = {},
   opts: ComposeOptions = {},
 ): ComposeWithMountResult => {
-  const rawMount = template.quizMount
-  const base = composeTemplate(template, overrides, opts)
+  const byId = new Map(template.slots.map((s) => [s.id, s]))
+  const unknownOverrides = Object.keys(overrides).filter((k) => !byId.has(k))
+  const { values, refused, applied } = renderSlotValues(template, overrides, opts)
+  const { ranges, ids } = omittedRanges(template, overrides, opts)
+  const lastPart = template.parts.length - 1
+  const start: PartCoord = { part: 0, offset: 0 }
+  const finish: PartCoord = { part: lastPart, offset: template.parts[lastPart]?.length ?? 0 }
 
   /*
    * A mount whose coordinates do not address this part stream is treated as no
@@ -650,20 +961,17 @@ export const composeTemplateWithQuizMount = (
    * landing page. Composing WHOLE is the honest degradation: the visitor gets
    * the page, and the caller sees there is nowhere to put a quiz.
    */
-  const addressable =
-    rawMount != null &&
-    Number.isInteger(rawMount.startPart) &&
-    Number.isInteger(rawMount.endPart) &&
-    rawMount.startPart >= 0 &&
-    rawMount.startPart <= rawMount.endPart &&
-    rawMount.endPart < template.parts.length &&
-    rawMount.startOffset >= 0 &&
-    rawMount.startOffset <= template.parts[rawMount.startPart].length &&
-    rawMount.endOffset >= 0 &&
-    rawMount.endOffset <= template.parts[rawMount.endPart].length &&
-    (rawMount.startPart !== rawMount.endPart || rawMount.startOffset <= rawMount.endOffset)
+  const rawMount = template.quizMount
+  const mount = rawMount != null && isAddressableRange(rawMount, template.parts) ? rawMount : null
 
-  const mount = addressable ? rawMount : null
+  const base: ComposeResult = {
+    html: sliceStream(template.parts, values, start, finish, ranges),
+    unknownOverrides,
+    refused,
+    applied,
+    omittedGroupIds: ids,
+  }
+
   if (!mount) {
     return {
       ...base,
@@ -676,55 +984,14 @@ export const composeTemplateWithQuizMount = (
     }
   }
 
-  /**
-   * The composed value of ONE slot in the stream.
-   *
-   * Deliberately delegates to `composeTemplate` on a one-slot template rather
-   * than repeating its escaping rules. A second implementation of "escape an
-   * override" is precisely the drift this module's header warns about, and the
-   * one that would matter most: it is the boundary between operator copy and
-   * markup. An image slot's paired alt override travels with it, because the
-   * alt is written into the `<img>` the src slot emits and dropping it here
-   * would make an image lose its alt text only on landing pages.
-   */
-  const slotAt = (index: number): string => {
-    const id = template.slotIds[index]
-    if (id === undefined) return ''
-    const slot = template.slots.find((s) => s.id === id)
-    const keys = [id, ...(slot?.pairedWith ? [slot.pairedWith] : [])]
-    const scoped: LpSlotOverrides = {}
-    for (const k of keys) {
-      if (Object.prototype.hasOwnProperty.call(overrides, k)) scoped[k] = overrides[k]
-    }
-    return composeTemplate({ ...template, parts: ['', ''], slotIds: [id], quizMount: null }, scoped, opts).html
-  }
+  const cutStart: PartCoord = { part: mount.startPart, offset: mount.startOffset }
+  const cutEnd: PartCoord = { part: mount.endPart, offset: mount.endOffset }
 
-  /**
-   * The stream from `parts[from]` up to but NOT including `parts[to]`:
-   * `parts[from] slot[from] parts[from+1] … slot[to-1]`. Empty when `to <= from`.
-   */
-  const run = (from: number, to: number): string => {
-    const out: string[] = []
-    for (let i = from; i < to; i++) out.push(template.parts[i], slotAt(i))
-    return out.join('')
-  }
-
-  const lastPart = template.parts.length - 1
-  const { startPart, startOffset, endPart, endOffset } = mount
-
-  const before = run(0, startPart) + template.parts[startPart].slice(0, startOffset)
-
-  const after =
-    template.parts[endPart].slice(endOffset) +
-    (endPart === lastPart ? '' : slotAt(endPart) + run(endPart + 1, lastPart) + template.parts[lastPart])
-
-  const reference =
-    startPart === endPart
-      ? template.parts[startPart].slice(startOffset, endOffset)
-      : template.parts[startPart].slice(startOffset) +
-        slotAt(startPart) +
-        run(startPart + 1, endPart) +
-        template.parts[endPart].slice(0, endOffset)
+  // Three slices of the same stream, so `before + reference + after` is `html`
+  // by construction rather than by two implementations agreeing.
+  const before = sliceStream(template.parts, values, start, cutStart, ranges)
+  const reference = sliceStream(template.parts, values, cutStart, cutEnd, ranges)
+  const after = sliceStream(template.parts, values, cutEnd, finish, ranges)
 
   const closeTag = `</${mount.tag}>`
   const mountHtml = `${markMountTag(mount.openTag)}${closeTag}`
@@ -755,6 +1022,13 @@ export type SlotProblem = {
     | 'unsafe_override'
     /** Copy written into the region the live quiz replaces. It would never render. */
     | 'override_inside_quiz_mount'
+    /**
+     * A supply-or-omit block was started and not finished.
+     *
+     * Distinct from `missing_required_role` because the remedy is a choice, not
+     * a field: fill the rest of the block, or clear it and it will not render.
+     */
+    | 'incomplete_supply_group'
   detail: string
 }
 
@@ -911,9 +1185,35 @@ export const validateOverrides = (
   // over the overrides, because the failure here is an override that is absent
   // — the one thing a loop over what was supplied can never see.
   if (opts.requireComplete !== false) {
+    /*
+     * SUPPLY-OR-OMIT BLOCKS, before the per-slot rule.
+     *
+     * An untouched block is NOT an error: it is omitted from the page, and a
+     * brand with no publishable case results is entitled to ship the template
+     * without that section. Blocking there was the old behaviour, and it was
+     * blocking on four bracketed eyebrows while the `$ ———` and
+     * `Case type · jurisdiction · year` beside them went live unchallenged.
+     *
+     * A block somebody has started is held to completeness, naming the slots
+     * still empty and the way out that is not "invent a case result".
+     */
+    for (const { group, untouched, missing } of supplyGroupStates(template, overrides)) {
+      if (untouched || missing.length === 0) continue
+      problems.push({
+        code: 'incomplete_supply_group',
+        detail:
+          `the "${group.label}" block is part-written: ${missing.join(', ')} ${missing.length === 1 ? 'is' : 'are'} still empty. ` +
+          'A results block goes live complete or not at all, so either fill those in or clear every field in the block and the section will not render.',
+      })
+    }
+
     for (const slot of template.slots) {
       if (!slot.mustSupply) continue
       if (isInsideQuizMount(template, slot.id)) continue
+      // A slot inside a supply group answers to the group. Its own emptiness is
+      // the legitimate "no results to show" state, and reporting it here would
+      // re-introduce exactly the block this change removes.
+      if (supplyGroupFor(template, slot.id)) continue
       const value = Object.prototype.hasOwnProperty.call(overrides, slot.id) ? overrides[slot.id] : ''
       if (typeof value !== 'string' || value.trim() === '') {
         problems.push({
@@ -948,7 +1248,10 @@ export const validateOverrides = (
     if (URL_ROLES.has(slot.role) && !isSafeImageUrl(value)) {
       problems.push({ code: 'unsafe_override', detail: `"${id}" is not an allowed image URL` })
     }
-    if (slot.required && value.trim() === '') {
+    // "Required" means must not be BLANKED — but inside a supply group, blanking
+    // every field is how an operator says "I have no results", which is a
+    // supported outcome and not an error. The group's own rule decides.
+    if (slot.required && value.trim() === '' && !supplyGroupFor(template, id)) {
       problems.push({ code: 'missing_required_role', detail: `"${id}" is required and was overridden with nothing` })
     }
   }

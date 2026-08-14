@@ -32,7 +32,7 @@ import { readFileSync, writeFileSync, mkdirSync, readdirSync } from 'node:fs'
 import { join, basename } from 'node:path'
 
 import { runReferenceComponent, expandReference } from './lp-reference-runtime.mjs'
-import { extractSlots } from '../src/lib/lp-slots/extract.ts'
+import { extractSlots, SUPPLY_PROBLEM } from '../src/lib/lp-slots/extract.ts'
 import { stripAnnotationChips, remainingAnnotationTokens } from '../src/lib/lp-slots/strip-annotations.ts'
 import { defaultHtml, validateTemplateSlots } from '../src/lib/lp-slots/model.ts'
 import { findQuizMount, mountToPartCoordinates } from '../src/lib/lp-slots/quiz-mount.ts'
@@ -179,6 +179,22 @@ for (const file of files) {
   for (const p of slotted.problems) console.error(`  ${slug}: ${p}`)
 
   /*
+   * A block the design drew as empty dashed cards, which could not be turned
+   * into a region, is NOT written.
+   *
+   * Same rule as the quiz mount and for the same reason: the module would ship
+   * with `$ ———` and `[CASE RESULT PLACEHOLDER]` in it and nothing able to take
+   * them off the page. A template that fails to build is recoverable; a live
+   * attorney-advertising page carrying the handoff's stand-in case results is
+   * what this pass exists to make unreachable.
+   */
+  if (slotted.problems.some((p) => p.startsWith(SUPPLY_PROBLEM))) {
+    console.error(`  ${slug}: SUPPLY-OR-OMIT BLOCK NOT ADDRESSABLE. Refusing to write.`)
+    process.exitCode = 1
+    continue
+  }
+
+  /*
    * Where the real quiz runtime mounts.
    *
    * Located from the reference's own structure rather than marked by hand, for
@@ -229,7 +245,7 @@ for (const file of files) {
 // writes. A deployment stores OVERRIDES against these ids and never a copy of
 // the template, so a corrected template reaches every deployment at once.
 
-import type { LpSlot, LpUnsupportedRegion } from '@/lib/lp-slots/model'
+import type { LpSlot, LpSupplyGroup, LpUnsupportedRegion } from '@/lib/lp-slots/model'
 import type { LpQuizMount } from '@/lib/lp-slots/quiz-mount'
 
 export const slug = ${JSON.stringify(slug)}
@@ -254,6 +270,20 @@ export const slots: LpSlot[] = ${JSON.stringify(slotted.slots, null, 2)}
 export const unsupported: LpUnsupportedRegion[] = ${JSON.stringify(slotted.unsupported, null, 2)}
 
 /**
+ * Blocks the design drew as empty dashed cards, which go live COMPLETE or not
+ * at all.
+ *
+ * Empty for ten of the twelve. Where it is not, the reference drew case-result
+ * cards holding \`[CASE RESULT PLACEHOLDER]\`, \`$ ———\` and
+ * \`Case type · jurisdiction · year\` - stand-in copy for content the handoff did
+ * not have. Only the bracketed line was ever flagged, so the other two shipped
+ * to live attorney-advertising pages. With nothing supplied the region below is
+ * cut out of the part stream and the page closes up; with anything supplied the
+ * publish preflight requires the rest. See src/lib/lp-slots/model.ts.
+ */
+export const supplyGroups: LpSupplyGroup[] = ${JSON.stringify(slotted.supplyGroups ?? [], null, 2)}
+
+/**
  * Where the live quiz replaces the reference's drawing of one.
  *
  * The card in the markup above is a PICTURE of a quiz: it has answer buttons
@@ -273,6 +303,12 @@ export const quizMount: LpQuizMount = ${JSON.stringify(quizMount, null, 2)}
     slots: slotted.slots.length,
     loopsExpanded: loops,
     valid: validation.ok,
+    supplyGroups: (slotted.supplyGroups ?? []).map((g) => ({
+      id: g.id,
+      label: g.label,
+      required: g.requiredSlotIds.length,
+      inRegion: g.slotIds.length,
+    })),
     quizMount: {
       tag: quizMount.tag,
       bytes: mountRes.region.end - mountRes.region.start,
@@ -286,8 +322,15 @@ export const quizMount: LpQuizMount = ${JSON.stringify(quizMount, null, 2)}
     `${String(slotted.slots.length).padStart(3)} slots  ${loops ? `${loops} loop(s)  ` : ''}` +
     `quiz ${String(mountRes.region.end - mountRes.region.start).padStart(5)}b  ` +
     `${stripped.chipsRemoved + stripped.containersRemoved ? `-${stripped.chipsRemoved + stripped.containersRemoved} anno  ` : ''}` +
+    `${(slotted.supplyGroups ?? []).length ? `${slotted.supplyGroups.length} supply-group  ` : ''}` +
     `${validation.ok ? 'valid' : `INVALID (${validation.problems.length})`}${note ? `  [${note}]` : ''}`,
   )
+  for (const g of slotted.supplyGroups ?? []) {
+    console.log(
+      `      supply-or-omit "${g.label}" (${g.id}): ${g.requiredSlotIds.length} slots must be supplied, ` +
+      `${g.slotIds.length} omitted with the block`,
+    )
+  }
   for (const p of validation.problems) console.log(`      ${p.code}: ${p.detail}`)
 }
 
