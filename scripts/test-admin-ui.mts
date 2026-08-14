@@ -618,6 +618,13 @@ const run = async (browser: Browser): Promise<void> => {
    * and no error is shown.
    */
   note('New-with-Claude fails without persisting (D1)')
+  // Start from a CLEAN templates tab. By this point the screen has opened and
+  // closed a preview modal, confirm dialogs and toasts, and a leftover overlay
+  // intercepts the wizard's first click (a standalone run from a fresh page
+  // does not hit this). A reload clears all of it — the same clean state the
+  // rest of the suite's sections rely on `goto` for.
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await settle(page)
   const aiBefore = (await rowIds()).length
   // The wizard is a modal; `settle()` between steps is wrong here — it waits on
   // networkidle and toast-clearing that the open modal never produces, and a
