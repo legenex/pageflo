@@ -103,7 +103,8 @@ merged in.
 | R8.1 | New-with-Claude creates real records (LP + quiz) | LP wizard (merged) + quiz wizard; `test:ai` 100 incl. refusal cases | PASS |
 | R8.2 | LP AI output conforms to section/content/mount schema; quiz AI to visual-config schema | zod schemas via invokeLLM forced tool_use | PASS |
 | R8.3 | No arbitrary executable code; unsafe HTML/unknown slot/missing mount refused | validateOverrides + schema closure; `test:ai` negative cases | PASS |
-| R8.4 | AI unavailable / invalid schema / partial acceptance / human edit / reset / clone-after-AI / selection / preview / render identity | `test:ai` 58 + records/identity suites | PASS |
+| R8.4 | AI unavailable / invalid schema / partial acceptance / human edit / reset / clone-after-AI / selection / preview / render identity | `test:ai` 100 + records/identity suites; LP New-with-Claude now FAILS VISIBLY and creates no row when the model wrote nothing (Reviewer C D1 fix), regressed in `test:ui` | PASS |
+| R8.5 | New-with-Claude does not persist a template on total model failure (Reviewer C D1) | AINewLPWizard counts AI attempts vs failures, throws before onCreate when all failed (matches the quiz path); `test:ui` D1 regression: error shown + library count unchanged; negative control = C's pre-fix 12→13 reproduction | PASS |
 
 ## 9 · Publishing, paths, domains (section 14)
 
@@ -136,7 +137,7 @@ merged in.
 |---|---|---|---|
 | R11.1 | Deterministic sequence, no duplicate prefixes | renamed 220000; directory==index asserted | PASS |
 | R11.2 | Empty-DB chain, boot, types, CRUD, materialization, prior-schema upgrade, both source upgrades, locked-document deletes, rollback, no manual SQL/ledger edits | test:release 27 + test:bootstrap 55 + upg_ui/upg_rel runs + down() migrations idempotent | PASS |
-| R11.3 | release.sh: verify source, size-checked backup, fetch/deploy, stop, install, build, migrate-before-start, verify schema, start, health, staged rollback | scripts/release.sh (release branch, reviewed); ordering proven by test:release against prior-schema scratch DB | PASS |
+| R11.3 | release.sh: verify source, size-checked backup, fetch/deploy, stop, install, build, migrate-before-start, verify schema, start, health, staged rollback | scripts/release.sh (reviewed by Reviewer D, 10/11 pass); ordering proven by test:release against prior-schema scratch DB; migration_count() parse bug fixed so the failure handler prints the correct rollback (Finding A, regressed in test:release 30) | PASS |
 
 ## 12 · Test matrix & UX checks (section 17)
 
