@@ -146,10 +146,42 @@ for (const n of nodes) {
  * NOTHING in the T4 graph, the migrations, the seeds or the docs establishes
  * which — so it stays a blocker for a human, not a repair for a script.
  */
-const declared = new Set((Array.isArray(quiz.tiers) ? quiz.tiers : []).map((t) => String((t as { id: unknown }).id ?? '')))
+const tiers = (Array.isArray(quiz.tiers) ? quiz.tiers : []).map((t) => ({ ...(t as Record<string, unknown>) }))
+const declared = new Set(tiers.map((t) => String(t.id ?? '')))
+
+/**
+ * The tier definitions the authoritative T4 graph carries, so a tier restored
+ * here is the SAME tier T4 means and not a new one with a matching id.
+ */
+const T4_TIERS: Record<string, { id: string; name: string; color: string }> = {
+  t3: { id: 't3', name: 'Tier 3', color: '#f59e0b' },
+  t4: { id: 't4', name: 'Tier 4', color: '#f43f5e' },
+}
+
 for (const n of nodes) {
   for (const a of n.answers ?? []) {
     if (!a.setTier || declared.has(a.setTier)) continue
+    const def = T4_TIERS[a.setTier]
+    if (def) {
+      /*
+       * REPAIR THE DECLARATION, NEVER THE ASSIGNMENT.
+       *
+       * The direction matters and is the whole lesson of the earlier mistake.
+       * Clearing `setTier` would have changed WHO QUALIFIES; adding the missing
+       * tier declaration changes nothing about routing or qualification and
+       * makes the quiz say what its own graph already does. The definition is
+       * copied from T4 so this is the same Tier 3 that flow means, and
+       * `docs/external-blockers.md` records that the webhook contract already
+       * accepts t1-t4.
+       */
+      tiers.push({ ...def })
+      declared.add(def.id)
+      noted(
+        `"${n.id}" answer "${a.label}" assigns tier "${a.setTier}" which the quiz did not declare -> ` +
+          `declared it as "${def.name}" (from T4). The assignment is UNCHANGED.`,
+      )
+      continue
+    }
     console.log(
       `  !!   "${n.id}" answer "${a.label}" sets undeclared tier "${a.setTier}" — ` +
         'NOT repaired. This is a QUALIFICATION RULE and needs a human decision; ' +
@@ -171,7 +203,7 @@ if (!apply) {
 await payload.update({
   collection: 'funnel-quizzes',
   id: quizId,
-  data: { steps, nodes },
+  data: { steps, nodes, tiers },
   overrideAccess: true,
 })
 console.log(`\napplied ${changes.length} repair(s) to quiz ${quizId}.`)
