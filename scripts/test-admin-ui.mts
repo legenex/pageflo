@@ -608,6 +608,40 @@ const run = async (browser: Browser): Promise<void> => {
   await page.locator('body').click({ position: { x: 5, y: 5 } }).catch(() => {})
   await settle(page)
 
+  /*
+   * "New template with Claude" must not persist a template when the model wrote
+   * NOTHING. This environment has no ANTHROPIC key, so every section write
+   * fails — exactly the AI-unavailable case — and the wizard used to create a
+   * published, enabled record from its skeleton defaults while reporting
+   * success (Reviewer C's D1). The library count must not move, and the wizard
+   * must say why. Against the broken build both halves fail: a 13th row appears
+   * and no error is shown.
+   */
+  note('New-with-Claude fails without persisting (D1)')
+  const aiBefore = (await rowIds()).length
+  await page.getByRole('button', { name: /New template with Claude/i }).first().click()
+  await settle(page)
+  await page.getByPlaceholder(/MVA Truck Urgency/i).fill('D1 Regression Probe')
+  for (let i = 0; i < 3; i++) {
+    await page.getByRole('button', { name: /Next/i }).first().click()
+    await settle(page)
+  }
+  await page.getByRole('button', { name: /Generate with Claude/i }).first().click()
+  const aiError = page.getByText(/could not write|nothing was created|failed|unavailable|try again/i).first()
+  await aiError.waitFor({ state: 'visible', timeout: 60_000 }).catch(() => {})
+  t(
+    (await aiError.count()) > 0,
+    'New-with-Claude surfaces an error when the model wrote nothing (D1) rather than silently creating a template',
+  )
+  // Close the wizard (it stays open on error) and confirm nothing was persisted.
+  await page.keyboard.press('Escape').catch(() => {})
+  await page.locator('body').click({ position: { x: 5, y: 5 } }).catch(() => {})
+  await settle(page)
+  await page.reload({ waitUntil: 'domcontentloaded' })
+  await settle(page)
+  const aiAfter = (await rowIds()).length
+  t(aiAfter === aiBefore, `New-with-Claude created no template on model failure (${aiBefore} -> ${aiAfter})`)
+
   t(pageErrors.length === 0, `the Templates screen raised no client exception (${pageErrors.join(' | ')})`)
   t(
     consoleErrors.length === 0,

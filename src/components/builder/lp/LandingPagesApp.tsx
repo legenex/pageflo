@@ -331,7 +331,11 @@ const AINewLPWizard = ({ open, onClose, onCreate }) => {
         'This is one section of a longer page, so do not restate the whole offer in it.',
       ].filter(Boolean).join('\n')
 
+      // Count the sections we actually ASKED Claude to write, and how many of
+      // those requests failed. A section with no writable elements is neither.
       let done = 0
+      let aiAttempts = 0
+      let aiFailures = 0
       const written = await Promise.all(
         sections.map(async (section) => {
           const elements = section.elements
@@ -343,13 +347,26 @@ const AINewLPWizard = ({ open, onClose, onCreate }) => {
             })
             .filter(Boolean)
           if (elements.length === 0) { done += 1; setProgress(done); return section }
+          aiAttempts += 1
           const res = await aiWriteSectionNodes({ sectionType: section.type, instruction: brief, elements })
           done += 1; setProgress(done)
-          if (!res.ok) return section
+          if (!res.ok) { aiFailures += 1; return section }
           const patch = new Map(res.elements.map((e) => [e.id, e.fields]))
           return { ...section, elements: section.elements.map((el) => (patch.has(el.id) ? { ...el, ...patch.get(el.id) } : el)) }
         }),
       )
+
+      // Claude wrote NOTHING — the model was unavailable or refused every
+      // section. Creating the template anyway persisted a published, enabled
+      // record with only its skeleton defaults while telling the operator
+      // Claude had written it, which is a silent failure on a control whose
+      // entire purpose is the writing. Surface the error and create no row, the
+      // way the quiz "Create with Claude" path already does. A partial failure
+      // (some sections written) is left to proceed: those defaults are the
+      // documented partial-acceptance behaviour, not a silent total failure.
+      if (aiAttempts > 0 && aiFailures === aiAttempts) {
+        throw new Error('Claude could not write this template just now, so nothing was created. Try again in a moment, or start from a blank template.')
+      }
 
       await onCreate({
         name: name || `${angleLabel} template`,

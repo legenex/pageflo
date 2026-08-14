@@ -188,6 +188,54 @@ defects.** Three flags:
   and blank/clone create real DB rows. Only the network hop is
   unverifiable in this environment — same limit as all of test:ai.
 
+### WAVE 2 — Reviewer C (browser/UX) + Reviewer D (migration/release): COMPLETE
+
+Reviewer C, live browser desktop+mobile. Release-critical LP QuizRuntime
+PASSES (14/15): all 12 stock LP templates portal the REAL shared
+QuizRuntime into [data-legalos-quiz-mount] — 3 materially different ones
+(human_recovery_story, answer_first, authority_network) proven to advance
+on click with 0 static tiles acting as the quiz and the surrounding
+hero/editorial intact; source-proof over all 12 (each empties its quiz
+hole, exactly one mount marker; case_type_router's 8 cards correctly stay
+outside). No empty boxes. Everything else (galleries, editors, clone,
+enable/disable, referenced-delete-refused + stock-archive, deployment
+General persistence, Destination/Tracking, keyboard/focus, no overflow,
+no console errors, renderer identity == DB) WORKING. One defect:
+- **D1 (DEFECT, MEDIUM):** LP "New template with Claude" persisted a
+  published+enabled template even when EVERY section write failed (AI
+  unavailable), reporting success with no error — a silent failure on a
+  control whose purpose is the writing. The quiz path already errored
+  cleanly with no row. REPRODUCED by C (funnel_landing_pages 12→13, no
+  error). FIXED (LandingPagesApp AINewLPWizard.generate): the wizard now
+  counts AI attempts vs failures and, when every attempt failed, throws
+  before onCreate — so no row is minted and the error is shown, matching
+  the quiz path; a partial failure still proceeds (documented
+  partial-acceptance). Regression added to test:ui (open wizard →
+  Generate with no key → assert an error is shown AND the library count is
+  unchanged); negative control is Reviewer C's live 12→13 reproduction on
+  the pre-fix build. Requires a rebuild (client component) — done before
+  the verifying test:ui run.
+
+Reviewer D, migration/release against isolated scratch DBs: 10 PASS,
+1 PASS-with-caveat, no outright FAIL. Fresh PG16 bootstrap, prod-equivalent
++ both source-era upgrades, partial/repeat/rollback, locked-document
+deletes across collections, audited-user deletion, generated types +
+typecheck — all clean, no manual SQL ever. Two findings:
+- **Finding A (DEFECT, MEDIUM):** release.sh migration_count() grepped an
+  ASCII `|` but migrate:status renders box-drawing `│` + ANSI, so the count
+  was always 0 → on a failure after a successful migrate, on_failure
+  withheld the migrate:down rollback guidance and told the operator the DB
+  was untouched. FIXED (commit f14304a): strip ANSI, count the exact "Yes"
+  field with awk (separator/locale-agnostic). Regression: test:release
+  28→30 (fixed pipeline reads the full ledger count; old ASCII pattern
+  shown to count 0 — guards the fix).
+- **Finding B (LATENT, no action):** a SECOND migrate:down reaching a
+  hand-inserted old-name orphan ledger row fails. No trigger in any real
+  release path (the 210000→220000 rename preceded every migrate, so no real
+  ledger carries the old name; the real legalos ledger has none), and it is
+  inherent to Payload resolving migrate:down targets by local filename.
+  Documented, not fixed.
+
 ## Known open work (gates not yet run)
 
 - **Gallery empty-box regression (R1, scouts 2+6):** release's
