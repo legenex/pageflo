@@ -25,9 +25,15 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Eye, Save, Trash2 } from 'lucide-react'
+import { Eye, Save, ShieldCheck, Trash2 } from 'lucide-react'
 
 import { T, Btn, Input, Select, Label, Pill, TopBar, genId } from '../ui'
+import {
+  PublishFailurePanel,
+  blockingCountsByTab,
+  publishStateLine,
+  publishStatePill,
+} from '../PublishFailures'
 import { SectionHeading } from './SectionHeading'
 import { TemplateGallery } from '@/components/builder/templates/TemplateGallery'
 import { BrandQuickEdit } from '../brand/BrandQuickEdit'
@@ -48,6 +54,7 @@ import {
   toDomainLike,
   NO_SERVABLE_HOST_LABEL,
 } from '@/lib/deployment-url'
+import { previewLpDeploymentPublish } from '@/app/(app)/admin/(top)/publish-actions'
 
 const NEUTRAL = '__neutral__'
 
@@ -192,7 +199,21 @@ export const LPDeploymentEditor = ({
    * that pair, identical in every field, eight seconds apart, same operator.
    */
   const [saving, setSaving] = useState(false)
-  useEffect(() => { setDraft(deployment); setTab('general'); setSaving(false) }, [deployment?.id])
+  /*
+   * The last publish attempt that was REFUSED, held until the next attempt.
+   *
+   * Not a toast. A toast for this was actively harmful: it truncated a list of
+   * six problems, took itself away after three seconds, and left the editor
+   * still showing the status the operator had asked for — so the screen read
+   * LIVE for a deployment the server had refused to publish. This state is what
+   * the panel below draws, and clearing `draft.status` back to the server's
+   * answer is what stops the screen asserting the publish took.
+   */
+  const [publishBlock, setPublishBlock] = useState(null)
+  const [checking, setChecking] = useState(false)
+  useEffect(() => {
+    setDraft(deployment); setTab('general'); setSaving(false); setChecking(false); setPublishBlock(null)
+  }, [deployment?.id])
   if (!draft) return null
 
   const update = (p) => setDraft((d) => ({ ...d, ...p }))
@@ -262,11 +283,39 @@ export const LPDeploymentEditor = ({
 
   const destinationCount = Object.keys(draft.destinationOverrides || {}).length
 
+  // Badged from the server's own grouping, so a count can never disagree with
+  // the panel it summarises.
+  const failureCounts = publishBlock ? blockingCountsByTab(publishBlock.groups) : {}
+  const statePill = publishStatePill(draft.status || 'draft', draft.publishState)
+
   const tabs = [
     { id: 'general', label: 'General' },
     { id: 'destinations', label: `Destination URL's${destinationCount ? ' · OVERRIDE' : ''}` },
     { id: 'tracking', label: 'Tracking & Pixels' },
   ]
+
+  /**
+   * Adopt whatever the server says is true of this row.
+   *
+   * Three fields, and each one prevents a specific wrong screen:
+   *
+   *   `status`       a rejected publish leaves the editor showing the value the
+   *                  operator picked. Snapping it back is the difference between
+   *                  "not published" and a header that goes on reading LIVE.
+   *   `id`           the save CREATED the row even though the publish failed.
+   *                  Without the real id the next Save inserts a second
+   *                  deployment — production rows 19 and 20 are that pair.
+   *   `publishState` so the line under Status describes the last version that
+   *                  genuinely passed, not the one just refused.
+   */
+  const adoptServerState = (res) => {
+    setDraft((d) => ({
+      ...d,
+      ...(res.id ? { id: String(res.id) } : {}),
+      ...(res.status ? { status: res.status } : {}),
+      ...(res.publishState ? { publishState: res.publishState } : {}),
+    }))
+  }
 
   const handleSave = () => {
     if (saving) return
@@ -279,11 +328,78 @@ export const LPDeploymentEditor = ({
     if (bad) { onToast?.({ message: `${DESTINATION_LABELS[bad[0]] || bad[0]} is not a usable link.`, type: 'error' }); setTab('destinations'); return }
 
     setSaving(true)
+    // A fresh attempt owns the screen: leaving the previous refusal up while a
+    // new one is in flight would let an operator fix everything and still be
+    // looking at the old list.
+    setPublishBlock(null)
     const result = onSave({ ...draft, id: draft.id || genId('ldep'), status: draft.status || 'draft', path: draft.path || '' })
+
+    /*
+     * SAVED and PUBLISHED are settled separately.
+     *
+     * `res.saved` is the case this whole panel exists for: the write landed and
+     * the publish was refused. The editor stays open, adopts the row's real
+     * state, and draws the grouped failures. Every other failure is an ordinary
+     * refusal the caller has already reported.
+     */
+    const settle = (res) => {
+      setSaving(false)
+      if (res && res.ok === false && res.saved) {
+        adoptServerState(res)
+        setPublishBlock({
+          summary: res.summary || res.error,
+          groups: res.groups || [],
+          preflight: res.preflight,
+          at: new Date().toISOString(),
+        })
+        // The first failing area, so the operator lands on the tab that fixes
+        // something rather than wherever they happened to be.
+        const first = (res.groups || []).find((g) => g.blocking?.length > 0)
+        if (first) setTab(first.group.tab)
+      }
+    }
+
     // The caller returns a promise on the real save path. Guarding on `then`
     // rather than assuming keeps this correct for any caller that does not.
-    if (result && typeof result.then === 'function') result.then(() => setSaving(false), () => setSaving(false))
+    if (result && typeof result.then === 'function') result.then(settle, () => setSaving(false))
     else setSaving(false)
+  }
+
+  /*
+   * The same checks, run against the SAVED row, changing nothing.
+   *
+   * Two situations need this and neither has any other answer. A row that is
+   * live and carries edits which never went through a preflight — the state the
+   * pill calls "unchecked edits are live" — has no way to ask whether those
+   * edits are actually fine, because live→live is refused as a no-op. And "why
+   * can I not publish this" should not require attempting a publish to find out.
+   *
+   * The dry run is the SAME function the real transition uses, so a clean run
+   * here and a refusal on publish cannot disagree about anything except what
+   * changed in between.
+   */
+  const savedId = /^\d+$/.test(String(draft.id || '')) ? String(draft.id) : ''
+  const runChecks = () => {
+    if (!savedId || checking) return
+    setChecking(true)
+    previewLpDeploymentPublish({ id: savedId })
+      .then((res) => {
+        if (!res.ok) { onToast?.({ message: res.error, type: 'error' }); return }
+        const blocking = (res.groups || []).reduce((n, g) => n + (g.blocking?.length || 0), 0)
+        setPublishBlock({
+          mode: 'checks',
+          tone: blocking > 0 ? 'block' : 'ok',
+          summary: res.summary,
+          groups: res.groups || [],
+          preflight: res.preflight,
+          at: new Date().toISOString(),
+        })
+        const first = (res.groups || []).find((g) => g.blocking?.length > 0)
+        if (first) setTab(first.group.tab)
+      })
+      // A dry run that never returns must not look like a clean one.
+      .catch(() => onToast?.({ message: 'Could not reach the server to run the publish checks.', type: 'error' }))
+      .finally(() => setChecking(false))
   }
 
   return (
@@ -295,6 +411,11 @@ export const LPDeploymentEditor = ({
         actions={
           <>
             {draft.id && <Btn variant="ghost" size="sm" icon={Eye} onClick={() => onPreview?.(draft)}>Preview</Btn>}
+            {savedId && (
+              <Btn variant="ghost" size="sm" icon={ShieldCheck} onClick={runChecks} disabled={checking}>
+                {checking ? 'Checking…' : 'Publish checks'}
+              </Btn>
+            )}
             {draft.id && <Btn variant="danger" size="sm" icon={Trash2} onClick={() => onDelete(draft.id)}>Delete</Btn>}
             <Btn variant="ghost" size="sm" onClick={onCancel}>Cancel</Btn>
             <Btn variant="primary" size="sm" icon={Save} onClick={handleSave} disabled={saving}>
@@ -310,23 +431,63 @@ export const LPDeploymentEditor = ({
             <div style={{ fontSize: 24, color: T.text, fontWeight: 700, letterSpacing: '-0.025em', fontFamily: '"JetBrains Mono", monospace' }}>
               {effective.host ? `${effective.host}${effective.path === '/' ? '' : effective.path}` : NO_SERVABLE_HOST_LABEL}
             </div>
-            <div style={{ fontSize: 12.5, color: T.textMute, marginTop: 4 }}>
-              {template?.name || 'no template'} {'·'} {brand?.displayName || 'no brand'} {'·'} {(draft.status || 'draft').toUpperCase()}
+            {/* The status shown here is the row's, never the operator's pending
+                wish: `handleSave` snaps `draft.status` back to what the server
+                actually holds when a publish is refused. */}
+            <div style={{ fontSize: 12.5, color: T.textMute, marginTop: 4, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span>
+                {template?.name || 'no template'} {'·'} {brand?.displayName || 'no brand'} {'·'} {(draft.status || 'draft').toUpperCase()}
+              </span>
+              {statePill && <Pill color={statePill.color}>{statePill.label}</Pill>}
             </div>
           </div>
 
+          {publishBlock && (
+            <PublishFailurePanel
+              tone={publishBlock.tone || 'block'}
+              title={
+                publishBlock.mode === 'checks'
+                  ? publishBlock.tone === 'ok' ? 'Every publish check passed' : 'Publish checks on the saved version'
+                  : 'Saved. Not published.'
+              }
+              body={
+                // A dry run makes no claim about what was saved. Reusing the
+                // refusal's wording here would tell an operator their edits had
+                // just been stored when nothing was written at all.
+                publishBlock.mode === 'checks'
+                  ? publishBlock.tone === 'ok'
+                    ? 'Run against the version currently saved. Unsaved edits on this screen were not checked.'
+                    : 'Run against the version currently saved, and nothing was changed. Unsaved edits on this screen were not checked.'
+                  : undefined
+              }
+              summary={publishBlock.summary}
+              statusLine={publishStateLine(draft.status || 'draft', draft.publishState)}
+              groups={publishBlock.groups}
+              preflight={publishBlock.preflight}
+              attemptedAt={publishBlock.at}
+              onGoToTab={setTab}
+            />
+          )}
+
           <div style={{ display: 'flex', gap: 4, borderBottom: `1px solid ${T.border}`, marginBottom: 22, overflowX: 'auto' }}>
-            {tabs.map((t) => (
-              <button
-                key={t.id}
-                data-deployment-tab={t.id}
-                aria-current={tab === t.id ? 'true' : undefined}
-                onClick={() => setTab(t.id)}
-                style={{ padding: '11px 14px', backgroundColor: 'transparent', border: 'none', borderBottom: `2px solid ${tab === t.id ? T.primary : 'transparent'}`, color: tab === t.id ? T.text : T.textMute, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', marginBottom: -1, whiteSpace: 'nowrap' }}
-              >
-                {t.label}
-              </button>
-            ))}
+            {tabs.map((t) => {
+              const failures = failureCounts[t.id] || 0
+              return (
+                <button
+                  key={t.id}
+                  data-deployment-tab={t.id}
+                  data-deployment-tab-failures={failures || undefined}
+                  aria-current={tab === t.id ? 'true' : undefined}
+                  onClick={() => setTab(t.id)}
+                  style={{ padding: '11px 14px', backgroundColor: 'transparent', border: 'none', borderBottom: `2px solid ${tab === t.id ? T.primary : 'transparent'}`, color: tab === t.id ? T.text : T.textMute, fontSize: 12.5, fontWeight: 500, cursor: 'pointer', marginBottom: -1, whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  {t.label}
+                  {/* The count comes from the server's own grouping, so a badge
+                      can never point at a tab whose panel lists nothing. */}
+                  {failures > 0 && <Pill color={T.danger}>{failures}</Pill>}
+                </button>
+              )
+            })}
           </div>
 
           {tab === 'general' && (
@@ -416,6 +577,18 @@ export const LPDeploymentEditor = ({
                         <option value="live">Live</option>
                         <option value="paused">Paused</option>
                       </Select>
+                      {/* SAVING IS NOT PUBLISHING, and this is where the two
+                          are told apart. Choosing Live and saving is a publish
+                          REQUEST: the content is stored either way, and going
+                          live happens only if the server's preflight passes.
+                          Without this line an operator reads the dropdown as
+                          the state rather than as the ask. */}
+                      <div style={{ fontSize: 11, color: T.textMute, marginTop: 5, lineHeight: 1.5 }}>
+                        {publishStateLine(draft.status || 'draft', draft.publishState)}
+                      </div>
+                      <div style={{ fontSize: 10.5, color: T.textLow, marginTop: 4, lineHeight: 1.5 }}>
+                        Saving always stores your changes. Setting this to Live also asks to publish, which the server checks first.
+                      </div>
                     </div>
                     <div>
                       <Label>Final URL</Label>

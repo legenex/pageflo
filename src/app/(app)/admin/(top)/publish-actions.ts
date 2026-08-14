@@ -35,7 +35,13 @@ import {
   type DeploymentStatus,
   type PublishOutcome,
 } from '@/lib/publish-lifecycle'
-import type { PreflightResult } from '@/lib/publish-preflight'
+import {
+  groupPreflight,
+  preflightSummary,
+  type PreflightGroupResult,
+  type PreflightResult,
+} from '@/lib/publish-preflight'
+import { lpDeploymentFingerprint, lpPublishState, type PublishState } from '@/lib/publish-state'
 
 const QUIZ_PATH = '/admin/quizzes'
 const LP_PATH = '/admin/landing-pages'
@@ -51,9 +57,47 @@ const statusOf = (row): DeploymentStatus => {
   return s === 'live' || s === 'paused' ? s : 'draft'
 }
 
+/**
+ * What a publish attempt hands back.
+ *
+ * A refusal carries FOUR things and they are not interchangeable:
+ *
+ *   `groups`   the operator's answer — failed checks filed under the area and
+ *              the editor tab that fixes each one. A UI must lead with this.
+ *   `summary`  one line, for a toast or a log prefix.
+ *   `error`    the flat join. Engineer-facing and the fallback for callers that
+ *              predate the structure; never the primary thing on screen.
+ *   `status`   what the row ACTUALLY holds now, which is the state it was in
+ *              before the attempt. Without it a client that optimistically
+ *              showed LIVE has nothing truthful to snap back to, which is how a
+ *              rejected publish leaves a screen reading LIVE.
+ */
+export type PublishRefusalResult = {
+  ok: false
+  error: string
+  summary: string
+  groups: PreflightGroupResult[]
+  preflight?: PreflightResult
+  status?: DeploymentStatus
+}
+
 export type PublishResult =
-  | { ok: true; status: DeploymentStatus; preflight: PreflightResult }
-  | { ok: false; error: string; preflight?: PreflightResult }
+  | { ok: true; status: DeploymentStatus; preflight: PreflightResult; publishState?: PublishState }
+  | PublishRefusalResult
+
+/**
+ * A refusal that never reached a preflight — unauthenticated, missing row.
+ *
+ * Spelled out rather than left to callers so no door can return a bare
+ * `{ ok: false, error }` that a grouped UI then has to special-case.
+ */
+const refusal = (error: string, status?: DeploymentStatus): PublishRefusalResult => ({
+  ok: false,
+  error,
+  summary: error,
+  groups: [],
+  status,
+})
 
 /* ------------------------------------------------------------------- quizzes */
 
@@ -69,11 +113,11 @@ export async function setQuizDeploymentStatus(args: {
   to: DeploymentStatus
 }): Promise<PublishResult> {
   const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
+  if (!user) return refusal('unauthenticated')
   const payload = await getPayload({ config })
 
   const deployment = await load(payload, 'funnel-quiz-deployments', args.id)
-  if (!deployment) return { ok: false, error: 'deployment not found' }
+  if (!deployment) return refusal('deployment not found')
 
   const siteId = relationId(deployment.site)
   const [quiz, site, domain] = await Promise.all([
@@ -89,8 +133,12 @@ export async function setQuizDeploymentStatus(args: {
 
   // A preflight is only REQUIRED to go live, but it is always RUN: an operator
   // pausing something wants to know why, and the checks are the answer.
-  const verdict: PublishOutcome = decideTransition(statusOf(deployment), args.to, preflight)
-  if (!verdict.ok) return { ok: false, error: verdict.error, preflight }
+  const current = statusOf(deployment)
+  const verdict: PublishOutcome = decideTransition(current, args.to, preflight)
+  // `status: current` is the load-bearing part of a refusal: the row did not
+  // move, and a caller that showed the hoped-for state needs the real one to
+  // put back rather than a guess.
+  if (!verdict.ok) return { ...verdict, preflight, status: current }
 
   await payload.update({
     collection: 'funnel-quiz-deployments',
@@ -117,14 +165,14 @@ export async function setQuizDeploymentStatus(args: {
  */
 export async function setQuizPublished(args: { id: string; published: boolean }): Promise<PublishResult> {
   const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
+  if (!user) return refusal('unauthenticated')
   const payload = await getPayload({ config })
 
   const quiz = await load(payload, 'funnel-quizzes', args.id)
-  if (!quiz) return { ok: false, error: 'quiz not found' }
+  if (!quiz) return refusal('quiz not found')
 
   if (args.published && quiz.is_archived) {
-    return { ok: false, error: 'this quiz is archived; restore it before publishing' }
+    return refusal('this quiz is archived; restore it before publishing')
   }
 
   // A brandless quiz has no Site of its own, so the gate is its deployments':
@@ -161,6 +209,8 @@ export async function setQuizPublished(args: { id: string; published: boolean })
       return {
         ok: false,
         error: `publishing this quiz would put ${merged.blocking.length} failing check(s) live: ${merged.blocking.map((c) => `${c.label}: ${c.detail}`).join('; ')}`,
+        summary: `Publishing this quiz would put failing deployments live. ${preflightSummary(merged)}`,
+        groups: groupPreflight(merged),
         preflight: merged,
       }
     }
@@ -184,11 +234,11 @@ export async function setLpDeploymentStatus(args: {
   to: DeploymentStatus
 }): Promise<PublishResult> {
   const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
+  if (!user) return refusal('unauthenticated')
   const payload = await getPayload({ config })
 
   const deployment = await load(payload, 'funnel-lp-deployments', args.id)
-  if (!deployment) return { ok: false, error: 'deployment not found' }
+  if (!deployment) return refusal('deployment not found')
 
   const siteId = relationId(deployment.site)
   const [landingPage, site, domain] = await Promise.all([
@@ -215,13 +265,30 @@ export async function setLpDeploymentStatus(args: {
     { deployment, landingPage, site, domain, quizDeployment, quiz },
   )
 
-  const verdict = decideTransition(statusOf(deployment), args.to, preflight)
-  if (!verdict.ok) return { ok: false, error: verdict.error, preflight }
+  const current = statusOf(deployment)
+  const verdict = decideTransition(current, args.to, preflight)
+  if (!verdict.ok) return { ...verdict, preflight, status: current }
+
+  /*
+   * A GENUINE PUBLISH IS STAMPED; going down is not.
+   *
+   * The stamp is the digest of the row AS IT IS NOW — the state that just
+   * passed the checks — so a later edit is detectable as unverified rather than
+   * quietly inheriting this verdict. Pausing and unpublishing leave both columns
+   * alone on purpose: they preserve the last state that genuinely passed, which
+   * is what lets a paused row say "last published Tuesday" instead of losing
+   * the fact that it ever was.
+   */
+  const data: Record<string, unknown> = { status: verdict.status }
+  if (verdict.status === 'live') {
+    data.last_published_at = new Date().toISOString()
+    data.published_fingerprint = lpDeploymentFingerprint(deployment)
+  }
 
   await payload.update({
     collection: 'funnel-lp-deployments',
     id: deployment.id,
-    data: { status: verdict.status },
+    data,
     user,
     overrideAccess: false,
     // The deployment-tenancy hook refuses a userful go-live that skipped the
@@ -229,16 +296,21 @@ export async function setLpDeploymentStatus(args: {
     context: { legalosPreflighted: true },
   })
   revalidatePath(LP_PATH)
-  return { ok: true, status: verdict.status, preflight }
+  return {
+    ok: true,
+    status: verdict.status,
+    preflight,
+    publishState: lpPublishState({ ...deployment, ...data }),
+  }
 }
 
 export async function setLandingPagePublished(args: { id: string; published: boolean }): Promise<PublishResult> {
   const user = await getCurrentUser()
-  if (!user) return { ok: false, error: 'unauthenticated' }
+  if (!user) return refusal('unauthenticated')
   const payload = await getPayload({ config })
 
   const lp = await load(payload, 'funnel-landing-pages', args.id)
-  if (!lp) return { ok: false, error: 'landing page not found' }
+  if (!lp) return refusal('landing page not found')
 
   const empty: PreflightResult = { ok: true, checks: [], blocking: [], warnings: [] }
   await payload.update({
@@ -262,9 +334,17 @@ export async function setLandingPagePublished(args: { id: string; published: boo
  * require attempting it. The same function the real transition uses, because a
  * dry run that ran different checks would be a different question.
  */
-export async function previewQuizDeploymentPublish(args: { id: string }): Promise<
-  { ok: true; preflight: PreflightResult } | { ok: false; error: string }
-> {
+export type PreflightPreview =
+  | {
+      ok: true
+      preflight: PreflightResult
+      /** The same failures, filed under the area and tab that fixes each. */
+      groups: PreflightGroupResult[]
+      summary: string
+    }
+  | { ok: false; error: string }
+
+export async function previewQuizDeploymentPublish(args: { id: string }): Promise<PreflightPreview> {
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: 'unauthenticated' }
   const payload = await getPayload({ config })
@@ -276,12 +356,11 @@ export async function previewQuizDeploymentPublish(args: { id: string }): Promis
     load(payload, 'sites', siteId),
     deployment.domain ? load(payload, 'domains', deployment.domain) : Promise.resolve(null),
   ])
-  return { ok: true, preflight: await quizDeploymentPreflight({ payload, user, siteId }, { deployment, quiz, site, domain }) }
+  const preflight = await quizDeploymentPreflight({ payload, user, siteId }, { deployment, quiz, site, domain })
+  return { ok: true, preflight, groups: groupPreflight(preflight), summary: preflightSummary(preflight) }
 }
 
-export async function previewLpDeploymentPublish(args: { id: string }): Promise<
-  { ok: true; preflight: PreflightResult } | { ok: false; error: string }
-> {
+export async function previewLpDeploymentPublish(args: { id: string }): Promise<PreflightPreview> {
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: 'unauthenticated' }
   const payload = await getPayload({ config })
@@ -302,8 +381,9 @@ export async function previewLpDeploymentPublish(args: { id: string }): Promise<
     : quizDeployment
       ? await load(payload, 'funnel-quizzes', quizDeployment.quiz)
       : null
-  return {
-    ok: true,
-    preflight: await lpDeploymentPreflight({ payload, user, siteId }, { deployment, landingPage, site, domain, quizDeployment, quiz }),
-  }
+  const preflight = await lpDeploymentPreflight(
+    { payload, user, siteId },
+    { deployment, landingPage, site, domain, quizDeployment, quiz },
+  )
+  return { ok: true, preflight, groups: groupPreflight(preflight), summary: preflightSummary(preflight) }
 }

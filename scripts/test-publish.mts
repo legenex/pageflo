@@ -31,7 +31,17 @@ import {
   DEPLOYMENT_TRANSITIONS,
   type DeploymentStatus,
 } from '../src/lib/publish-lifecycle.ts'
-import { summarize, pass, fail, type PreflightCheck, type PreflightResult } from '../src/lib/publish-preflight.ts'
+import {
+  summarize,
+  pass,
+  fail,
+  groupPreflight,
+  preflightGroupFor,
+  PREFLIGHT_GROUPS,
+  type PreflightCheck,
+  type PreflightResult,
+} from '../src/lib/publish-preflight.ts'
+import { lpDeploymentFingerprint, lpPublishState } from '../src/lib/publish-state.ts'
 import { PORTED_TEMPLATES } from '../src/lib/lp-templates/index.ts'
 import { classifyLpQuizBinding, LOSSY_QUIZ_DEPLOYMENT_FIELDS, NEEDS_A_DECISION } from '../src/lib/lp-quiz-binding.ts'
 
@@ -259,6 +269,107 @@ t(decideTransition('live', 'draft', badPre).ok, 'unpublishing is never gated eit
 t(!decideTransition('paused', 'live', badPre).ok, 'RESUME is gated, because the world moved while it was paused')
 t(!decideTransition('paused', 'live', null).ok, 'and going live with no preflight at all is refused')
 t(!decideTransition('live', 'live', okPre).ok, 'a no-op transition is refused rather than silently succeeding')
+
+/* ------------------------------------------------------------ grouped refusals */
+
+/*
+ * A refusal must arrive as STRUCTURE, not as one joined paragraph.
+ *
+ * `decideTransition` used to end with `blocking.map(c => label + ': ' + detail).join('; ')`
+ * and hand that to the operator: six unrelated problems in server-run order,
+ * with nothing saying which tab any of them was on. The checks already carried
+ * a stable id, a label, a severity and a detail; the last step flattened all of
+ * it away. These assertions are the gate on that not happening again.
+ */
+{
+  const every = summarize([
+    fail('authz', 'authorization', 'no'),
+    fail('brand', 'brand', 'no phone'),
+    fail('lp-template-record', 'template', 'disabled'),
+    fail('flow-reachable_consent', 'consent reachable', 'dead end'),
+    fail('embedded-quiz-live', 'embedded quiz live', 'it is paused'),
+    fail('destinations', 'destinations', 'not an object'),
+    fail('pixels', 'pixels', 'not an object'),
+    fail('domain-eligibility', 'domain', 'pending'),
+    fail('path', 'path', 'taken'),
+    fail('domain-ssl', 'certificate', 'not issued', 'warn'),
+  ])
+  const groups = groupPreflight(every)
+  const byId = new Map(groups.map((g) => [g.group.id, g]))
+
+  t(byId.get('general')?.blocking[0]?.id === 'authz', 'authorization is General')
+  t(byId.get('brand')?.blocking[0]?.id === 'brand', 'brand completeness is Brand')
+  t(byId.get('content')?.blocking[0]?.id === 'lp-template-record', 'the template record is Template & content')
+  t(byId.get('quiz')?.blocking.length === 2, 'flow-* and embedded-* both land in Quiz flow — a computed id family must not need enumerating')
+  t(byId.get('destinations')?.blocking[0]?.id === 'destinations', 'destinations are their own area')
+  t(byId.get('tracking')?.blocking[0]?.id === 'pixels', 'pixels are Tracking, not General — a badge that points at the wrong tab is worse than no badge')
+  t(byId.get('domain')?.blocking.length === 2, 'domain eligibility and the path are one area, because they are one URL')
+  t(byId.get('domain')?.warnings[0]?.id === 'domain-ssl', 'a warning is grouped too, and kept apart from the blockers')
+
+  const grouped = groups.reduce((n, g) => n + g.blocking.length + g.warnings.length, 0)
+  t(grouped === every.blocking.length + every.warnings.length, 'EVERY failed check reaches a group — a check that blocks and appears nowhere refuses with no reason to act on')
+
+  t(preflightGroupFor('an-id-nobody-mapped').id === 'general', 'an unmapped id falls back to General rather than being dropped')
+  t(
+    groups.map((g) => g.group.id).join(',') === PREFLIGHT_GROUPS.filter((m) => byId.has(m.id)).map((m) => m.id).join(','),
+    'groups come back in repair order, not in the order the server happened to run the checks',
+  )
+  t(PREFLIGHT_GROUPS.every((g) => g.tab === 'general' || g.tab === 'destinations' || g.tab === 'tracking'), 'every group names a real editor tab, so a deep link cannot point at nothing')
+
+  const verdict = decideTransition('draft', 'live', every)
+  t(!verdict.ok && verdict.groups.length === byId.size, 'the refusal carries the groups, not just the joined string')
+  t(!verdict.ok && verdict.summary.includes('Brand') && !verdict.summary.includes('no phone'), 'the summary names the AREAS and stops — restating every detail would rebuild the paragraph this replaced')
+  t(!verdict.ok && verdict.error.includes('no phone'), 'the flat string is still there for the engineer-facing report and the audit trail')
+
+  const legal = decideTransition('draft', 'paused', null)
+  t(!legal.ok && Array.isArray(legal.groups) && legal.groups.length === 0, 'a refusal with no preflight behind it still carries an (empty) group list, so no caller has to special-case its shape')
+}
+
+/* --------------------------------------------------- saved is not published */
+
+/*
+ * The fingerprint is what makes "saved" and "published" two states on a table
+ * that only stores one. A timestamp comparison cannot: publishing is itself an
+ * UPDATE, so `updatedAt` and a `published_at` land microseconds apart.
+ */
+{
+  const row = {
+    id: 7,
+    name: 'internal label',
+    status: 'live',
+    landing_page: 30,
+    site: 1,
+    domain: 4,
+    path: '/c/mva',
+    quiz: 9,
+    content_overrides: { hero_headline: 'One', hero_sub: 'Two' },
+    destination_overrides: null,
+    utm: {},
+    pixels: {},
+  }
+  const base = lpDeploymentFingerprint(row)
+
+  t(lpDeploymentFingerprint({ ...row }) === base, 'the same row fingerprints the same')
+  t(lpDeploymentFingerprint({ ...row, name: 'renamed' }) === base, 'an internal rename is not a content change')
+  t(lpDeploymentFingerprint({ ...row, status: 'paused' }) === base, 'status is the OTHER axis and must not move the fingerprint, or pausing would read as an edit')
+  t(lpDeploymentFingerprint({ ...row, updatedAt: 'later' }) === base, 'timestamps are not content')
+  t(lpDeploymentFingerprint({ ...row, path: '/c/mva-2' }) !== base, 'the path is')
+  t(lpDeploymentFingerprint({ ...row, content_overrides: { hero_headline: 'Changed', hero_sub: 'Two' } }) !== base, 'so is the copy')
+  t(
+    lpDeploymentFingerprint({ ...row, content_overrides: { hero_sub: 'Two', hero_headline: 'One' } }) === base,
+    'key ORDER in a jsonb bag is not an edit — JSON.stringify preserves insertion order and Postgres does not',
+  )
+  t(lpDeploymentFingerprint({ ...row, domain: { id: 4 } }) === base, 'a populated relationship and a bare id are one row, so depth must not move the fingerprint')
+  t(lpDeploymentFingerprint({ ...row, quiz_deployment_id: '' }) === base, "an empty text column and an absent one both mean 'not set'")
+
+  t(lpPublishState({ ...row }).everPublished === false, 'a row with no stamp has never been published')
+  t(lpPublishState({ ...row }).unverifiedChanges === false, 'and is NOT reported as edited-since-publish, or every new draft would carry the warning')
+  const published = { ...row, last_published_at: '2026-08-14T10:00:00.000Z', published_fingerprint: base }
+  t(lpPublishState(published).everPublished === true, 'a stamped row has been published')
+  t(lpPublishState(published).unverifiedChanges === false, 'and matches what passed')
+  t(lpPublishState({ ...published, path: '/c/moved' }).unverifiedChanges === true, 'an edit after publishing is unverified — this is the LIVE row serving something no check ever saw')
+  t(lpPublishState({ ...published, status: 'draft' }).lastPublishedAt === '2026-08-14T10:00:00.000Z', 'unpublishing PRESERVES the last state that genuinely passed, which is the whole point of recording it')
+}
 
 /* --------------------------------------------------------------- preflight */
 

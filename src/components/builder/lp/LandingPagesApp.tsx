@@ -51,6 +51,8 @@ import {
 import { toNodeSections } from '@/lib/lp-nodes/from-legacy'
 import { instantiateSkeleton } from '@/lib/lp-skeletons'
 import { saveDeployment, deleteDeployment, aiWriteSectionNodes } from '@/app/(app)/admin/(top)/landing-pages/actions'
+import { setLpDeploymentStatus } from '@/app/(app)/admin/(top)/publish-actions'
+import { publishStateLine, publishStatePill } from '../PublishFailures'
 import {
   createLpTemplate, cloneLpTemplate, saveLpTemplate, setLpTemplateEnabled, deleteLpTemplate,
 } from '@/app/(app)/admin/(top)/template-actions'
@@ -101,7 +103,7 @@ const LpTabBar = ({ active, onChange, tabs }) => (
 // ============================================================================
 // LP DEPLOYMENT LIST VIEW
 // ============================================================================
-const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDeployments, domains, onOpen, onDelete, onToggleStatus, onPreview, onRename }) => {
+const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDeployments, domains, publishFailures = {}, onOpen, onDelete, onToggleStatus, onPreview, onRename }) => {
   const [renamingId, setRenamingId] = useState(null)
   const [renameDraft, setRenameDraft] = useState('')
   if (deployments.length === 0) {
@@ -137,6 +139,15 @@ const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDep
           effectiveDeploymentUrl({ boundHost: domainStr, brandDomains: brand?.__domains ?? [], path: dep.path }),
         )
         const depName = dep.name || (template ? `${template.name} · ${brand?.displayName || 'No brand'}` : 'Untitled deployment')
+        /*
+         * LIVE is a claim about what visitors are getting, so it is never shown
+         * on its own when it would be misleading. Two things qualify it:
+         * a publish attempt this session that was REFUSED, and saved content
+         * that has not been through a preflight (`publishState`, derived on the
+         * server from the row's published fingerprint).
+         */
+        const failedPublish = publishFailures[dep.id] || null
+        const statePill = publishStatePill(dep.status || 'draft', dep.publishState)
         const primary = brand?.colors?.primary
         const background = brand?.colors?.background
         return (
@@ -152,6 +163,8 @@ const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDep
                   <span onClick={(e) => { e.stopPropagation(); startRename(dep) }} style={{ fontSize: 13, fontWeight: 600, color: T.text, cursor: 'text' }} title="Click to rename">{depName}</span>
                 )}
                 <Pill color={dep.status === 'live' ? T.success : dep.status === 'paused' ? T.warning : T.textLow}>{(dep.status || 'draft').toUpperCase()}</Pill>
+                {failedPublish && <Pill color={T.danger}>PUBLISH REFUSED</Pill>}
+                {statePill && <Pill color={statePill.color}>{statePill.label}</Pill>}
                 {!domainStr && <Pill color={T.info}>PREVIEW URL</Pill>}
                 {!template && <Pill color={T.danger}>Template missing, pick one to fix</Pill>}
                 {template?.rendererError && <Pill color={T.danger}>Template renderer broken</Pill>}
@@ -169,6 +182,16 @@ const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDep
                 <span>Quiz: {quiz?.name || 'none'}</span>
                 {dep.quizDeploymentId && !dep.quizId ? <><span>{'·'}</span><span style={{ color: T.warning }}>legacy binding</span></> : null}
               </div>
+              {/* The refusal, and then what IS published. Two lines because they
+                  are two facts: what just failed, and what visitors have. */}
+              {failedPublish && (
+                <div style={{ fontSize: 10.5, color: T.danger, marginTop: 4, lineHeight: 1.5 }}>{failedPublish.summary}</div>
+              )}
+              {(failedPublish || statePill) && (
+                <div style={{ fontSize: 10.5, color: T.textMute, marginTop: 2, lineHeight: 1.5 }}>
+                  {publishStateLine(dep.status || 'draft', dep.publishState)}
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
               <Btn variant="ghost" size="sm" icon={Eye} onClick={() => onPreview(dep)} aria-label="Preview deployment">Preview</Btn>
@@ -924,6 +947,19 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
   const [notice, setNotice] = useState(null)
   const [toast, setToast] = useState(null)
   const [pendingOpenId, setPendingOpenId] = useState(null)
+  /*
+   * Deployments whose LAST publish attempt was refused, by id.
+   *
+   * Session-scoped on purpose. The row's own columns record what genuinely
+   * published; this records what was just attempted and declined, which is a
+   * fact about this operator's last action rather than about the row — the next
+   * page load re-derives everything durable from `publishState`. It exists so a
+   * refused publish leaves a visible mark on the list instead of a pill that
+   * silently rolls back and looks like nothing was clicked.
+   */
+  const [publishFailures, setPublishFailures] = useState({})
+  /** The current rows, readable from a callback that outlived its render. */
+  const deploymentsRef = useRef(lpDeployments)
 
   /*
    * Debounced saves, keyed by WHICH FIELDS they carry.
@@ -959,6 +995,8 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
     () => Promise.all(Object.keys(pendingSaves.current).map(runSave)),
     [runSave],
   )
+
+  useEffect(() => { deploymentsRef.current = lpDeployments }, [lpDeployments])
 
   // Only resync from the server when sitting on the list, so a refresh triggered
   // by one action cannot clobber an editor somebody is typing into.
@@ -1117,14 +1155,37 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
    */
   const persistDeployment = (dep) =>
     settleAction(saveDeployment({ deployment: dep })).then((res) => {
+      /*
+       * THREE outcomes, not two, and collapsing the middle one is the bug.
+       *
+       *   saved + published     back to the list.
+       *   SAVED, NOT PUBLISHED  the write landed and the preflight refused it.
+       *                         The editor owns this: it adopts the row's real
+       *                         status, draws the failures grouped by tab, and
+       *                         stays open. Toasting the joined validator
+       *                         string here is what used to leave a screen
+       *                         reading LIVE for a deployment the server had
+       *                         declined to publish.
+       *   not saved             an ordinary refusal, reported as one.
+       *
+       * The result is returned either way so the editor can settle on it.
+       */
+      if (res.ok === false && res.saved) {
+        // Refresh so the LIST behind the editor stops describing the row as
+        // whatever the operator hoped. The open editor is untouched: the resync
+        // effect only runs while sitting on the list.
+        router.refresh()
+        return res
+      }
       // Stay in the editor and say why. The Status field is on this screen, so
       // navigating back to the list on a failed write would show the operator a
       // row carrying whatever the server still holds while they believe they
       // just changed it.
-      if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return }
+      if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return res }
       setSubView('lp_list'); setLpTab('deployments'); setEditingDeployment(null)
       setToast({ message: dep.domain ? 'Deployment saved.' : 'Deployment saved as a preview URL.', type: 'success' })
       router.refresh()
+      return res
     })
 
   const deleteDeploymentHandler = (id) => {
@@ -1143,6 +1204,16 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
     })
   }
 
+  /*
+   * Publish and pause from the list, through the PUBLISH door.
+   *
+   * It used to go through `saveDeployment`, which re-wrote every content column
+   * on its way to flipping one field — so a pause could fail on a validation
+   * error about copy nobody had touched, and a publish rewrote the row before
+   * deciding whether to publish it. `setLpDeploymentStatus` changes the status
+   * and nothing else, runs the preflight on the way up, and is never gated on
+   * the way down.
+   */
   const toggleDepStatus = (id) => {
     const dep = lpDeployments.find((d) => d.id === id)
     if (!dep) return
@@ -1153,11 +1224,45 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
     // live page has been stopped while it goes on serving. Rollback puts the
     // last known-good status back and the refetch settles which one is real.
     void commitOptimistic({
-      action: () => saveDeployment({ deployment: { ...dep, status } }),
+      action: () => setLpDeploymentStatus({ id, to: status }),
       rollback: () => setLpDeployments((arr) => arr.map((d) => (d.id === id ? dep : d))),
-      onError: (message) => setToast({ message, type: 'error' }),
+      // A failed PAUSE is reported here as it always was — it is one fact and a
+      // toast carries it. A failed PUBLISH is handled below instead, because a
+      // refusal is grouped and needs the whole result, which `onError` is only
+      // handed a string of. Rollback and reconcile run either way, so the row
+      // stops asserting the hoped-for status before anything is drawn about why.
+      onError: (message) => { if (status !== 'live') setToast({ message, type: 'error' }) },
       reconcile: () => router.refresh(),
-      onSuccess: () => router.refresh(),
+      onSuccess: (res) => {
+        setPublishFailures((m) => { const next = { ...m }; delete next[id]; return next })
+        setLpDeployments((arr) => arr.map((d) => (d.id === id ? { ...d, status: res.status, publishState: res.publishState ?? d.publishState } : d)))
+        router.refresh()
+      },
+    }).then((res) => {
+      // Only the PUBLISH direction. A pause that failed is not "not published",
+      // and saying so would send an operator hunting for checks that were never
+      // the reason — going down is never gated on one.
+      if (res.ok || status !== 'live') return
+      /*
+       * A REFUSED PUBLISH IS REMEMBERED, so the row cannot go on reading as if
+       * nothing happened. `commitOptimistic` has already rolled the pill back to
+       * the real status; this adds the reason, grouped, with a way into the
+       * editor. A toast carrying the joined validator string was the old
+       * answer, and it disappeared before an operator finished reading it.
+       */
+      setPublishFailures((m) => ({ ...m, [id]: { summary: res.summary || failureMessage(res), groups: res.groups || [], preflight: res.preflight } }))
+      setNotice({
+        title: 'This deployment was not published',
+        message: `${res.summary || failureMessage(res)} Open it to see each problem beside the field that fixes it.`,
+        actionText: 'Open deployment',
+        // Through the ref, not the closure: `reconcile` refetched between the
+        // refusal and this click, and opening the editor on the row as it was
+        // BEFORE that refetch would edit a stale copy back over the fresh one.
+        onAction: () => {
+          const row = deploymentsRef.current.find((d) => d.id === id)
+          if (row) { setEditingDeployment(row); setSubView('lp_deployment_edit') }
+        },
+      })
     })
   }
 
@@ -1261,6 +1366,7 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
               quizzes={quizzes}
               quizDeployments={quizDeployments}
               domains={domains}
+              publishFailures={publishFailures}
               onOpen={(dep) => { setEditingDeployment(dep); setSubView('lp_deployment_edit') }}
               onDelete={deleteDeploymentHandler}
               onToggleStatus={toggleDepStatus}

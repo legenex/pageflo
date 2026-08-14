@@ -44,6 +44,7 @@ import * as migration_20260813_213000_integration_config_sample_markers from './
 import * as migration_20260813_220000_template_records from './20260813_220000_template_records'
 import * as migration_20260813_230000_audit_log_user_nullable from './20260813_230000_audit_log_user_nullable'
 import * as migration_20260814_120000_leads_idempotency_key from './20260814_120000_leads_idempotency_key'
+import * as migration_20260814_160000_lp_deployment_publish_state from './20260814_160000_lp_deployment_publish_state'
 
 export const migrations = [
   {
@@ -203,5 +204,10 @@ export const migrations = [
     up: migration_20260814_120000_leads_idempotency_key.up,
     down: migration_20260814_120000_leads_idempotency_key.down,
     name: '20260814_120000_leads_idempotency_key',
+  },
+  {
+    up: migration_20260814_160000_lp_deployment_publish_state.up,
+    down: migration_20260814_160000_lp_deployment_publish_state.down,
+    name: '20260814_160000_lp_deployment_publish_state',
   },
 ];

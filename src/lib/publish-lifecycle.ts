@@ -36,9 +36,12 @@ import { checkPathAvailable, type ClaimKind } from '@/lib/path-claims'
 import {
   checkTemplateResolves,
   fail,
+  groupPreflight,
   pass,
+  preflightSummary,
   summarize,
   type PreflightCheck,
+  type PreflightGroupResult,
   type PreflightResult,
   type PreflightSeverity,
 } from '@/lib/publish-preflight'
@@ -663,9 +666,30 @@ const domainAndPathChecks = async (
 
 /* ------------------------------------------------------------- the verdict */
 
+/**
+ * A refusal, in the three shapes its readers need.
+ *
+ * `groups` is the OPERATOR'S view and the one a UI must lead with: the failed
+ * checks filed under the area and the editor tab that fixes each of them.
+ * `summary` is one line for a toast or a log prefix. `error` is the flat join
+ * that used to be the whole answer, kept because every existing caller and the
+ * `check:live-preflight` report read it — it is the ENGINEER'S line now, not
+ * the thing an operator is handed.
+ */
+export type PublishRefusal = AuthzFailure & {
+  summary: string
+  groups: PreflightGroupResult[]
+  preflight?: PreflightResult
+}
+
 export type PublishOutcome =
   | { ok: true; status: DeploymentStatus; preflight: PreflightResult }
-  | (AuthzFailure & { preflight?: PreflightResult })
+  | PublishRefusal
+
+const EMPTY_PREFLIGHT: PreflightResult = { ok: true, checks: [], blocking: [], warnings: [] }
+
+/** A refusal that no preflight produced — an illegal or missing transition. */
+const refuse = (error: string): PublishRefusal => ({ ok: false, error, summary: error, groups: [] })
 
 /**
  * Decide a transition, given a preflight.
@@ -680,16 +704,20 @@ export const decideTransition = (
   to: DeploymentStatus,
   preflight: PreflightResult | null,
 ): PublishOutcome => {
-  if (from === to) return { ok: false, error: `already ${to}` }
-  if (!canTransition(from, to)) return { ok: false, error: `cannot go from ${from} to ${to}` }
+  if (from === to) return refuse(`already ${to}`)
+  if (!canTransition(from, to)) return refuse(`cannot go from ${from} to ${to}`)
 
-  if (!GOES_LIVE.has(to)) return { ok: true, status: to, preflight: preflight ?? { ok: true, checks: [], blocking: [], warnings: [] } }
+  if (!GOES_LIVE.has(to)) return { ok: true, status: to, preflight: preflight ?? EMPTY_PREFLIGHT }
 
-  if (!preflight) return { ok: false, error: 'publishing requires a preflight' }
+  if (!preflight) return refuse('publishing requires a preflight')
   if (!preflight.ok) {
     return {
       ok: false,
+      // Kept verbatim: `check:live-preflight` and the audit trail read it, and
+      // a refusal that stops carrying its reason is a refusal nobody can debug.
       error: preflight.blocking.map((c) => `${c.label}: ${c.detail}`).join('; '),
+      summary: preflightSummary(preflight),
+      groups: groupPreflight(preflight),
       preflight,
     }
   }

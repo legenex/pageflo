@@ -124,5 +124,40 @@ export const FunnelLpDeployments: CollectionConfig = {
         { label: 'Paused', value: 'paused' },
       ],
     },
+    /*
+     * SAVED IS NOT PUBLISHED, and `status` alone cannot tell them apart.
+     *
+     * A refused publish still saves the operator's edits, and a live row keeps
+     * serving through content edits — so "draft" and "live" both describe rows
+     * whose saved content has never passed a check. These two columns record
+     * what did pass and when, which is what lets the admin say "not live" about
+     * refused edits and "serving unverified changes" about a live row that was
+     * edited afterwards.
+     *
+     * Written ONLY by `setLpDeploymentStatus`, the one door that runs the
+     * preflight. `readOnly` keeps the raw /cms admin from asserting a publish
+     * that never happened; it is an admin-UI flag, not access control, and the
+     * real guarantee is that no other writer sets these fields.
+     *
+     * See `src/lib/publish-state.ts` for why the second column is a digest
+     * rather than a timestamp comparison, and migration
+     * `20260814_160000_lp_deployment_publish_state`.
+     */
+    {
+      name: 'last_published_at',
+      type: 'date',
+      admin: {
+        readOnly: true,
+        description: 'When this deployment last passed the publish preflight. Set only by the publish action.',
+      },
+    },
+    {
+      name: 'published_fingerprint',
+      type: 'text',
+      admin: {
+        readOnly: true,
+        description: 'Digest of the publish-relevant fields at that moment. Unequal to the row today means the saved changes have not been through a preflight.',
+      },
+    },
   ],
 }

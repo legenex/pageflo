@@ -6,6 +6,7 @@ import { LandingPagesApp } from '@/components/builder/lp/LandingPagesApp'
 import { buildBrandsFromSites } from '@/lib/brand-map'
 import { ensureFunnelSamples, ensureStarterFunnelsForAllBrands } from '@/lib/funnel-samples'
 import { ensureBrandTokensSyncedForAllBrands } from '@/app/(app)/admin/(top)/brands/brand-identities/actions'
+import { lpPublishState } from '@/lib/publish-state'
 import {
   ensureTemplateLibrary,
   listLpTemplateRecords,
@@ -102,6 +103,17 @@ export default async function LandingPagesPage() {
       utm: asObject(r.utm),
       pixels: asObject(r.pixels),
       status: r.status ?? 'draft',
+      /*
+       * SAVED vs PUBLISHED, derived once on the server.
+       *
+       * `status` says whether the row is serving; it cannot say whether the
+       * content in it is the content that passed a preflight. The comparison
+       * needs the stored digest and the hasher, so it is done here — against
+       * the raw row, the one shape it is defined on — and the client is handed
+       * booleans. A second implementation over the mapped object below is
+       * exactly the drift `src/lib/publish-state.ts` exists to prevent.
+       */
+      publishState: lpPublishState(r as unknown as Record<string, unknown>),
     }
   })
 

@@ -13,6 +13,7 @@ import { canonicalTemplateId, resolveTemplate } from '@/lib/template-registry'
 import { resolveQuizTemplateSelection, resolveLpTemplateSelection } from '@/lib/template-records/select'
 import { relationId, requireDeploymentSiteAdmin } from '@/lib/authz'
 import { setLpDeploymentStatus } from '@/app/(app)/admin/(top)/publish-actions'
+import type { PreflightGroupResult, PreflightResult } from '@/lib/publish-preflight'
 import { asSlotted } from '@/lib/lp-templates'
 import { validateOverrides } from '@/lib/lp-slots/model'
 import { DESTINATION_KEYS, DESTINATION_LABELS, isSafeDestinationUrl, type DestinationKey } from '@/lib/quiz-destinations'
@@ -56,7 +57,38 @@ const asConfigObject = (v: unknown): Record<string, unknown> =>
 // ---------------------------------------------------------------------------
 // Deployments
 // ---------------------------------------------------------------------------
-export async function saveDeployment(args: { deployment: Record<string, unknown> }): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+/**
+ * What a save hands back when the row was WRITTEN but the publish was REFUSED.
+ *
+ * `ok: false`, because the operator asked to go live and it did not — reporting
+ * success there is the failure mode the whole issue is about. But the write did
+ * land, and every field below exists so the editor can say so truthfully rather
+ * than leaving a screen that reads LIVE:
+ *
+ *   `saved`   the content is stored; nothing was lost.
+ *   `id`      the row's REAL id. A new deployment is created by this call, and
+ *             an editor still holding its client-minted `ldep_*` id would INSERT
+ *             a second row on the next Save — the duplicate-deployment bug that
+ *             produced production rows 19 and 20.
+ *   `status`  what the row actually holds now, so the Status control can snap
+ *             back to the truth instead of showing the rejected value.
+ *   `groups`  the failures, by area and editor tab.
+ */
+export type DeploymentSaveResult =
+  | { ok: true; id: string }
+  | { ok: false; error: string }
+  | {
+      ok: false
+      saved: true
+      id: string
+      status: string
+      error: string
+      summary: string
+      groups: PreflightGroupResult[]
+      preflight?: PreflightResult
+    }
+
+export async function saveDeployment(args: { deployment: Record<string, unknown> }): Promise<DeploymentSaveResult> {
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: 'unauthenticated' }
   const dep = args.deployment || {}
@@ -292,7 +324,26 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
       const flip = await setLpDeploymentStatus({ id, to: 'live' })
       if (!flip.ok) {
         revalidatePath(PATH)
-        return { ok: false, error: `Saved, but not published: ${flip.error}` }
+        /*
+         * SAVED, NOT PUBLISHED — and the two are reported as separate facts.
+         *
+         * This used to collapse to one string: `Saved, but not published:` with
+         * every blocking check joined onto it. The editor toasted it and kept
+         * its local `status: 'live'`, so a rejected publish left a screen
+         * reading LIVE above a paragraph naming six problems. The structure
+         * below is what lets the editor snap the status back to `flip.status`
+         * and draw the failures beside the tabs that fix them.
+         */
+        return {
+          ok: false,
+          saved: true,
+          id,
+          status: flip.status ?? currentStatus,
+          error: `Saved, but not published: ${flip.error}`,
+          summary: flip.summary,
+          groups: flip.groups,
+          preflight: flip.preflight,
+        }
       }
     }
     revalidatePath(PATH)

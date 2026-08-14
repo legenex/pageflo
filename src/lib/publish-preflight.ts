@@ -16,6 +16,10 @@
  *    this". A warning that blocks is a warning nobody reports; a block that
  *    warns is an outage.
  *
+ * And one derived shape, `groupPreflight`, which files each failed check under
+ * the AREA that fixes it. See the group table below for why that mapping lives
+ * here and not in each surface that draws it.
+ *
  * This file starts as the template half. The remaining checks — authorization,
  * parent publication state, graph validation, consent, destinations, domain
  * eligibility, path claims, renderer hydration — attach to the same list rather
@@ -72,6 +76,172 @@ export const summarize = (checks: PreflightCheck[]): PreflightResult => {
     blocking,
     warnings: failed.filter((c) => c.severity === 'warn'),
   }
+}
+
+/* ------------------------------------------------------------------ groups */
+
+/**
+ * WHERE a failed check lives, so a refusal points at a control instead of a wall
+ * of text.
+ *
+ * Every check already carries a stable `id`, a `label` and a `detail`. The last
+ * step threw all of that away: `decideTransition` joined `label: detail` with
+ * semicolons and handed the operator one paragraph naming six unrelated
+ * problems, in the order the server happened to run them, with no indication
+ * which tab any of them was on. Four fixable problems read as one catastrophe,
+ * and the usual response to a paragraph like that is to ask for the gate to be
+ * turned off.
+ *
+ * ONE MAPPING, HERE. The alternative — each surface deciding which of its tabs a
+ * check belongs to — is the same defect the template registry and
+ * `domainEligibility` exist to remove: two readers of one fact, drifting. The
+ * editor, the list and any future surface all read this table.
+ */
+export type PreflightGroupId =
+  | 'general'
+  | 'content'
+  | 'quiz'
+  | 'destinations'
+  | 'tracking'
+  | 'brand'
+  | 'domain'
+
+/**
+ * The tabs a deployment editor has, and what a deep link switches to.
+ *
+ * These three ids are shared by BOTH deployment editors — `LPDeploymentEditor`
+ * and the quiz builder's deployment tab bar use the same `data-deployment-tab`
+ * values — so one table serves both. A future editor with a different tab set
+ * needs its own mapping rather than a silent reinterpretation of these names.
+ */
+export type DeploymentEditorTab = 'general' | 'destinations' | 'tracking'
+
+export type PreflightGroupMeta = {
+  id: PreflightGroupId
+  /** The area, in the operator's words. */
+  label: string
+  /** The editor tab whose controls fix this group. */
+  tab: DeploymentEditorTab
+  /** Where on that tab to look. Named controls, not a category. */
+  where: string
+}
+
+/**
+ * Display order, chosen as a repair order rather than alphabetically: a brand
+ * with no phone number breaks three checks downstream of it, and a path
+ * conflict is worth seeing last because it is usually a one-character fix.
+ */
+export const PREFLIGHT_GROUPS: readonly PreflightGroupMeta[] = [
+  { id: 'general', label: 'General', tab: 'general', where: 'this deployment and who may publish it' },
+  { id: 'brand', label: 'Brand', tab: 'general', where: 'the Brand picker, and Edit brand beside it' },
+  { id: 'content', label: 'Template & content', tab: 'general', where: 'the landing page template gallery and its copy' },
+  { id: 'quiz', label: 'Quiz flow', tab: 'general', where: 'the Quiz flow picker and the embedded quiz appearance' },
+  { id: 'destinations', label: 'Destinations', tab: 'destinations', where: "the Destination URL's fields" },
+  { id: 'tracking', label: 'Tracking & pixels', tab: 'tracking', where: 'the UTM defaults and pixel providers' },
+  { id: 'domain', label: 'Domain & path', tab: 'general', where: 'the Domain picker and the Path field' },
+]
+
+const GROUP_BY_ID = new Map(PREFLIGHT_GROUPS.map((g) => [g.id, g]))
+
+/** Exact check ids. Kept beside the checks that mint them in publish-lifecycle. */
+const CHECK_GROUPS: Readonly<Record<string, PreflightGroupId>> = {
+  authz: 'general',
+  parent: 'content',
+  'lp-template': 'content',
+  'lp-template-record': 'content',
+  'quiz-template': 'content',
+  overrides: 'content',
+  supply_blocks: 'content',
+  hydration: 'content',
+  brand: 'brand',
+  consent: 'quiz',
+  graph: 'quiz',
+  'graph-nonempty': 'quiz',
+  'quiz-bound': 'quiz',
+  destinations: 'destinations',
+  utm: 'tracking',
+  pixels: 'tracking',
+  'domain-ownership': 'domain',
+  'domain-eligibility': 'domain',
+  'domain-ssl': 'domain',
+  path: 'domain',
+}
+
+/**
+ * Families minted with a computed id, so the table above cannot enumerate them:
+ * `flow-*` is one line per check the quiz-flow validator ran, and `embedded-*`
+ * is the landing page's view of the quiz it runs.
+ */
+const CHECK_GROUP_PREFIXES: ReadonlyArray<readonly [string, PreflightGroupId]> = [
+  ['flow-', 'quiz'],
+  ['embedded-', 'quiz'],
+]
+
+/**
+ * The group a check belongs to. Total by construction.
+ *
+ * An id nobody mapped lands in General rather than being dropped: a check that
+ * blocks publication and appears nowhere on screen is strictly worse than one
+ * filed under the wrong heading, because the operator is refused with no reason
+ * they can act on. The fallback is deliberately the tab the editor opens on.
+ */
+export const preflightGroupFor = (checkId: string): PreflightGroupMeta => {
+  const exact = CHECK_GROUPS[checkId]
+  if (exact) return GROUP_BY_ID.get(exact)!
+  for (const [prefix, group] of CHECK_GROUP_PREFIXES) {
+    if (checkId.startsWith(prefix)) return GROUP_BY_ID.get(group)!
+  }
+  return GROUP_BY_ID.get('general')!
+}
+
+export type PreflightGroupResult = {
+  group: PreflightGroupMeta
+  /** Failed checks that refuse publication. */
+  blocking: PreflightCheck[]
+  /** Failed checks worth seeing that do not refuse it. */
+  warnings: PreflightCheck[]
+}
+
+/**
+ * A preflight, grouped by area, keeping only the groups with something to say.
+ *
+ * Passed checks are deliberately absent: they belong in the diagnostics view,
+ * not in the panel an operator reads at the moment they are blocked. The full
+ * `PreflightResult` travels alongside so nothing is lost.
+ */
+export const groupPreflight = (result: PreflightResult): PreflightGroupResult[] => {
+  const byGroup = new Map<PreflightGroupId, PreflightGroupResult>()
+  const bucket = (check: PreflightCheck): PreflightGroupResult => {
+    const group = preflightGroupFor(check.id)
+    let entry = byGroup.get(group.id)
+    if (!entry) {
+      entry = { group, blocking: [], warnings: [] }
+      byGroup.set(group.id, entry)
+    }
+    return entry
+  }
+
+  for (const check of result.blocking) bucket(check).blocking.push(check)
+  for (const check of result.warnings) bucket(check).warnings.push(check)
+
+  // PREFLIGHT_GROUPS order, not insertion order: the repair order is a property
+  // of the areas, not of whichever check the server happened to run first.
+  return PREFLIGHT_GROUPS.map((g) => byGroup.get(g.id)).filter((e): e is PreflightGroupResult => e !== undefined)
+}
+
+/**
+ * One line an operator can read at a glance. NOT the error itself.
+ *
+ * Names the areas and the count, and stops. The details are the grouped list;
+ * restating them here would rebuild the paragraph this replaced.
+ */
+export const preflightSummary = (result: PreflightResult): string => {
+  if (result.blocking.length === 0) return 'Every publish check passed.'
+  const areas = groupPreflight(result)
+    .filter((g) => g.blocking.length > 0)
+    .map((g) => g.group.label)
+  const n = result.blocking.length
+  return `${n} publish check${n === 1 ? '' : 's'} failed in ${areas.join(', ')}.`
 }
 
 /**
