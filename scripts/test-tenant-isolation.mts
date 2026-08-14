@@ -328,6 +328,31 @@ try {
   await refused('ATTACK: move my own LP deployment onto another tenant\'s site - both ends of a move need the binding', () =>
     payload.update({ collection: 'funnel-lp-deployments', id: lpDepA.id, data: { site: siteB.id } as never, ...asUser }))
 
+  // The referenced DOMAIN must belong to the deployment's Site. The server
+  // action refused a cross-brand domain; the raw door did not, so a tenant
+  // could store another brand's domain_id on their OWN deployment. Inert today
+  // (the resolver filters by host-resolved Site) but a real write gap.
+  const domainA = track('domains', await payload.create({
+    collection: 'domains',
+    data: { site: siteA.id, host: `${RUN}-a.example.test`, kind: 'custom', primary: false, status: 'active' } as never,
+    overrideAccess: true,
+  }))
+  const domainB = track('domains', await payload.create({
+    collection: 'domains',
+    data: { site: siteB.id, host: `${RUN}-b.example.test`, kind: 'custom', primary: false, status: 'active' } as never,
+    overrideAccess: true,
+  }))
+  await refused('ATTACK: bind another tenant\'s DOMAIN onto my own LP deployment via the raw door', () =>
+    payload.update({ collection: 'funnel-lp-deployments', id: lpDepA.id, data: { domain: domainB.id } as never, ...asUser }))
+  await refused('ATTACK: bind another tenant\'s domain onto my own QUIZ deployment via the raw door', () =>
+    payload.update({ collection: 'funnel-quiz-deployments', id: quizDepA.id, data: { domain: domainB.id } as never, ...asUser }))
+  await refused('ATTACK: bind another tenant\'s domain onto my own ADVERTORIAL deployment via the raw door', () =>
+    payload.update({ collection: 'funnel-advertorial-deployments', id: advDepA.id, data: { domain: domainB.id } as never, ...asUser }))
+  await allowed('a site admin can bind their OWN brand\'s domain to their own LP deployment', () =>
+    payload.update({ collection: 'funnel-lp-deployments', id: lpDepA.id, data: { domain: domainA.id } as never, ...asUser }))
+  await allowed('a site admin can clear the domain (fall back to the preview URL)', () =>
+    payload.update({ collection: 'funnel-lp-deployments', id: lpDepA.id, data: { domain: null } as never, ...asUser }))
+
   // Going live. Cross-tenant flips are tenancy violations; an OWN-brand flip
   // through the raw door must still be refused, because going live is a
   // publish and a publish runs the preflight — `setLpDeploymentStatus` /

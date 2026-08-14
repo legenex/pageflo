@@ -76,12 +76,16 @@ const asRecord = (v: unknown): Record<string, unknown> =>
  */
 export const enforceDeploymentTenancy =
   ({ publishRequiresPreflight }: { publishRequiresPreflight: boolean }): CollectionBeforeChangeHook =>
-  ({ data, req, operation, originalDoc }) => {
+  async ({ data, req, operation, originalDoc }) => {
     const user = req.user as UserLike | null | undefined
     if (!user) return data
     if (user.super_admin) return data
 
     const incomingData = asRecord(data)
+
+    // The Site this write leaves the row on: the incoming Site when the write
+    // sets one, else the row's current Site. The domain check below reads it.
+    let effectiveSite: number | null
 
     if (operation === 'create') {
       const incoming = relationId(incomingData.site)
@@ -90,6 +94,7 @@ export const enforceDeploymentTenancy =
       // it, rather than storing a row only a super admin can touch again.
       if (incoming === null) throw new APIError('no site specified', 400)
       if (!isBound(user, incoming)) throw new APIError('not authorized for this brand', 403)
+      effectiveSite = incoming
     } else {
       // UPDATE: the row's CURRENT Site is the subject even when the write does
       // not touch `site` — editing another tenant's deployment in place is
@@ -99,6 +104,7 @@ export const enforceDeploymentTenancy =
       // ids exist on other tenants.
       const current = relationId(asRecord(originalDoc).site)
       if (current === null || !isBound(user, current)) throw new APIError('deployment not found', 404)
+      effectiveSite = current
 
       if ('site' in incomingData) {
         const incoming = relationId(incomingData.site)
@@ -108,6 +114,34 @@ export const enforceDeploymentTenancy =
         // Moving BETWEEN tenants needs the binding on both ends — the current
         // Site was checked above, the destination is checked here.
         if (!isBound(user, incoming)) throw new APIError('not authorized for this brand', 403)
+        effectiveSite = incoming
+      }
+    }
+
+    // The referenced DOMAIN must belong to the row's Site.
+    //
+    // The server action (`landing-pages/actions.ts`, quiz + advertorial twins)
+    // already refuses "that domain belongs to a different brand", but the raw
+    // `/api` and `/cms` doors walked past it: the hook checked `site` and never
+    // looked at `domain`, so a tenant could store another brand's `domain_id`
+    // on their own deployment. The public resolver maps host → Domain → Site and
+    // filters deployments by the host-resolved Site, so the mis-bound reference
+    // renders nothing today — but "renders nothing today" is not an access
+    // control, and this closes the write rather than relying on a downstream
+    // filter staying exactly as it is. Only a non-null incoming domain is
+    // checked; clearing it (preview URL) is always allowed.
+    if ('domain' in incomingData) {
+      const domainId = relationId(incomingData.domain)
+      if (domainId !== null) {
+        const domain = (await req.payload
+          .findByID({ collection: 'domains', id: domainId, depth: 0, overrideAccess: true })
+          .catch(() => null)) as { site?: unknown } | null
+        // A domain that does not exist, or one on another Site, is refused the
+        // same way — one message, so the door is not an oracle for which domain
+        // ids or tenants exist.
+        if (!domain || relationId(domain.site) !== effectiveSite) {
+          throw new APIError('that domain belongs to a different brand', 403)
+        }
       }
     }
 
