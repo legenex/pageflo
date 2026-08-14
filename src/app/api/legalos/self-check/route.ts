@@ -63,6 +63,11 @@ export async function GET(req: NextRequest) {
   // wrong field.
   const probe = await resolveDomainForProvisioning(host)
   if (probe) {
+    // The operator running a provisioning check needs the reason; the public
+    // caller does not get it. Logged here so the sentence below is true —
+    // an earlier version of this comment described a log that did not exist.
+    // eslint-disable-next-line no-console
+    console.warn(`[self-check] ${host} maps to site ${probe.siteId} but is not eligible yet: ${probe.reason}`)
     return NextResponse.json(
       {
         ok: true,
@@ -70,11 +75,10 @@ export async function GET(req: NextRequest) {
         host,
         site_id: String(probe.siteId),
         primary_host: null,
-        // `eligible` is the whole answer. The REASON ("provisioning failed",
-        // "certificate has not been issued yet") is internal provisioning state
-        // and this route is public and unauthenticated, so it is logged
-        // server-side for the operator instead of returned to whoever asked.
-        // ssl-poll.ts reads only `app`, `ok` and `site_id`, so nothing needs it.
+        // `eligible` is the whole answer. The REASON is internal provisioning
+        // state and this route is public, so it goes to the log (above) rather
+        // than to whoever asked. ssl-poll.ts reads only `app`, `ok` and
+        // `site_id`, so nothing downstream needs it.
         eligible: false,
         time: new Date().toISOString(),
       },

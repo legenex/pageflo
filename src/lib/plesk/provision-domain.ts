@@ -63,7 +63,8 @@ const ACME_WEBROOT = '/var/www/vhosts/default/htdocs'
  *     move that host onto a different certificate.
  */
 const ACME_CERT_ROOT = '/etc/ssl/legalos'
-const ACME_SH = '/root/.acme.sh/acme.sh'
+const ACME_SH_HOME = '/root/.acme.sh'
+const ACME_SH = `${ACME_SH_HOME}/acme.sh`
 const ACME_RELOAD_HOOK = '/root/legalos-reload-nginx-cert.sh'
 
 const acmeCertDir = (name: string): string => path.join(ACME_CERT_ROOT, name)
@@ -110,6 +111,18 @@ const tenantConfigPath = (host: string): string => path.join(TENANT_NGINX_DIR, `
 export type CertFacts = {
   /** Directory names under ACME_CERT_ROOT, e.g. ['preview.legenex.com', 'crashclaim.co']. */
   acmeInstalls: string[]
+  /**
+   * Of those, the ones whose certificate is actually a WILDCARD, by base name
+   * (`preview.legenex.com` for `*.preview.legenex.com`).
+   *
+   * This is a separate fact because the install directory name does not carry
+   * it: the wildcard is installed to `/etc/ssl/legalos/preview.legenex.com/`,
+   * which looks exactly like a single-name install. Treating every install as a
+   * wildcard base made `www.getwhatyoureowed.co` resolve to the
+   * `getwhatyoureowed.co` certificate, which does not cover it — provisioning
+   * would then report success having issued nothing.
+   */
+  wildcardBases: string[]
   /** Whether a per-host vhost file exists for the host being planned. */
   tenantVhostExists: boolean
   /** The `ssl_certificate` path that vhost currently references, if any. */
@@ -135,8 +148,8 @@ export type ProvisionPlan =
  * stricter than nginx here is deliberate: the question is which certificate is
  * VALID for the host, not which server block would answer.
  */
-const wildcardBaseFor = (host: string, acmeInstalls: string[]): string | null => {
-  for (const base of acmeInstalls) {
+const wildcardBaseFor = (host: string, wildcardBases: string[]): string | null => {
+  for (const base of wildcardBases) {
     if (!host.endsWith(`.${base}`)) continue
     const label = host.slice(0, -(base.length + 1))
     if (label.length > 0 && !label.includes('.')) return base
@@ -170,7 +183,7 @@ export const planProvisioning = (host: string, facts: CertFacts): ProvisionPlan 
         }
   }
 
-  const base = wildcardBaseFor(host, facts.acmeInstalls)
+  const base = wildcardBaseFor(host, facts.wildcardBases)
   if (base) {
     return {
       action: 'covered-by-wildcard',
@@ -319,7 +332,22 @@ const gatherCertFacts = async (host: string): Promise<CertFacts> => {
     tenantVhostExists = false
   }
 
-  return { acmeInstalls, tenantVhostExists, tenantVhostCertPath }
+  // acme.sh names a certificate's store after its MAIN domain, so a wildcard
+  // lands in `*.preview.legenex.com_ecc`. That leading `*.` is the only
+  // reliable on-disk statement that the cert is a wildcard — the install
+  // directory we chose in ACME_CERT_ROOT does not carry it.
+  let wildcardBases: string[] = []
+  try {
+    const entries = await fs.readdir(ACME_SH_HOME, { withFileTypes: true })
+    wildcardBases = entries
+      .filter((e) => e.isDirectory() && e.name.startsWith('*.'))
+      .map((e) => e.name.replace(/^\*\./, '').replace(/_(ecc|rsa)$/, ''))
+      .filter((base) => acmeInstalls.includes(base))
+  } catch {
+    wildcardBases = []
+  }
+
+  return { acmeInstalls, wildcardBases, tenantVhostExists, tenantVhostCertPath }
 }
 
 /**
@@ -485,7 +513,7 @@ export const unprovisionDomainInPlesk = async (args: { pleskDomainId: string }):
 
   // Covered by a wildcard: there is no per-host vhost and no per-host cert to
   // remove, and the wildcard keeps serving its other hosts. Nothing to do.
-  const wildcard = wildcardBaseFor(host, facts.acmeInstalls)
+  const wildcard = wildcardBaseFor(host, facts.wildcardBases)
   if (wildcard && !facts.acmeInstalls.includes(host)) {
     return { ok: true }
   }

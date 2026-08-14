@@ -32,8 +32,12 @@ const ok = (name: string, cond: boolean, detail = '') => {
 /** Production's install set, as it actually is on disk. */
 const INSTALLS = ['crashclaim.co', 'getwhatyoureowed.co', 'preview.legenex.com', 'test.checkmyclaim.co']
 
+/** Only one of production's four certificates is a wildcard. */
+const WILDCARDS = ['preview.legenex.com']
+
 const facts = (over: Partial<CertFacts> = {}): CertFacts => ({
   acmeInstalls: INSTALLS,
+  wildcardBases: WILDCARDS,
   tenantVhostExists: false,
   tenantVhostCertPath: null,
   ...over,
@@ -107,9 +111,27 @@ console.log('\n— wildcard depth: one label only, as X.509 requires —')
   ok('the wildcard base itself is already-managed', base.action === 'already-managed', base.action)
 }
 
+console.log('\n— a SINGLE-NAME certificate is not a wildcard base —')
+{
+  // The defect an adversarial pass found: every acme install directory was
+  // treated as a wildcard base, so `www.getwhatyoureowed.co` resolved to the
+  // `getwhatyoureowed.co` certificate — which has one SAN and does not cover
+  // it. Provisioning then reported success having issued nothing, and the
+  // domain sat in `provisioning` until the poller timed it out to `error`.
+  for (const host of ['www.getwhatyoureowed.co', 'mail.crashclaim.co', 'a.test.checkmyclaim.co']) {
+    const plan = planProvisioning(host, facts())
+    ok(`${host}: NOT treated as wildcard-covered`, plan.action === 'issue', plan.action)
+    ok(`${host}: gets its own certificate`,
+      plan.action === 'issue' && plan.certDir === `/etc/ssl/legalos/${host}`, 'certDir')
+  }
+  // And the real wildcard still works.
+  const covered = planProvisioning('x.preview.legenex.com', facts())
+  ok('the genuine wildcard still covers its children', covered.action === 'covered-by-wildcard', covered.action)
+}
+
 console.log('\n— an empty install dir must not look like coverage —')
 {
-  const plan = planProvisioning('x.preview.legenex.com', facts({ acmeInstalls: [] }))
+  const plan = planProvisioning('x.preview.legenex.com', facts({ acmeInstalls: [], wildcardBases: [] }))
   ok('no installs means no wildcard coverage', plan.action === 'issue', plan.action)
 }
 

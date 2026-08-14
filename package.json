@@ -37,7 +37,7 @@
     "test:certs": "tsx scripts/test-cert-ownership.mts",
     "check:live-preflight": "cross-env NODE_ENV=production tsx scripts/check-live-preflight.mts",
     "verify:schema": "cross-env NODE_ENV=production tsx scripts/verify-schema.mts",
-    "test": "pnpm test:brand && pnpm test:authz && pnpm test:registry && pnpm test:records && pnpm test:slots && pnpm test:publish && pnpm test:ai && pnpm test:flow && pnpm test:webhook && pnpm test:idempotency && pnpm test:timeouts && pnpm test:trusted-host && pnpm test:observability && pnpm test:brand-identity",
+    "test": "pnpm test:certs && pnpm test:brand && pnpm test:authz && pnpm test:registry && pnpm test:records && pnpm test:slots && pnpm test:publish && pnpm test:ai && pnpm test:flow && pnpm test:webhook && pnpm test:idempotency && pnpm test:timeouts && pnpm test:trusted-host && pnpm test:observability && pnpm test:brand-identity",
     "test:all": "pnpm test && pnpm test:isolation && pnpm test:identity && pnpm test:bootstrap",
     "sweep:templates": "tsx scripts/sweep-templates.mts",
     "reconcile:lp-quiz": "tsx scripts/reconcile-lp-quiz-bindings.mts",
