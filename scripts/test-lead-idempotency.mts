@@ -197,6 +197,21 @@ try {
   }
 }
 
+/* --- a Payload block field arrives as NULL, and the schema must take it --- */
+{
+  const src = readFileSync(new URL('../src/app/api/leads/route.ts', import.meta.url), 'utf8')
+  t(/funnel_id:\s*z\.string\(\)\.nullish\(\)/.test(src),
+    'funnel_id accepts null (an unset Payload text field is null, not undefined)')
+  t(/funnel_path:\s*z\.string\(\)\.nullish\(\)/.test(src), 'funnel_path accepts null')
+  t(/source_entity_id:\s*z\.string\(\)\.nullish\(\)/.test(src), 'source_entity_id accepts null')
+  t(src.includes('funnel_id: data.funnel_id ?? undefined'),
+    'null is normalised to undefined before the pipeline sees it')
+
+  const lf = readFileSync(new URL('../src/components/blocks/LeadForm.tsx', import.meta.url), 'utf8')
+  t(lf.includes('funnel_id: block.funnel_id ?? undefined'),
+    'LeadForm does not send null in the first place')
+}
+
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
 if (pass === 0) { console.log('no assertions ran'); process.exit(2) }

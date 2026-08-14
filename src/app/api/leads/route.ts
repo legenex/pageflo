@@ -27,9 +27,16 @@ const Body = z.object({
   // Server resolves site from host header by default. site_slug is allowed for preview/test.
   site_slug: z.string().optional(),
   funnel_type: z.enum(['quiz', 'landing-page', 'contact-form', 'page', 'advertorial']),
-  funnel_id: z.string().optional(),
-  funnel_path: z.string().optional(),
-  source_entity_id: z.string().optional(),
+  // `.nullish()`, not `.optional()`. These arrive from Payload block fields, and
+  // an unset optional text field in Payload is NULL, not undefined — which
+  // `.optional()` rejects. The Site LeadForm block leaves `funnel_id` unset on
+  // every seeded home page, so every submission from it answered
+  //   400 invalid payload: funnel_id — Expected string, received null
+  // and that surface had never captured a lead. Normalised to undefined below
+  // so the pipeline still sees one shape.
+  funnel_id: z.string().nullish(),
+  funnel_path: z.string().nullish(),
+  source_entity_id: z.string().nullish(),
   // Idempotency key the client mints once per submission and resends on retry.
   // Bounded so a hostile body cannot store an unbounded string.
   client_submission_id: z.string().max(128).optional(),
@@ -121,9 +128,9 @@ export async function POST(req: NextRequest) {
     siteName,
     primaryHost,
     funnel_type: data.funnel_type,
-    funnel_id: data.funnel_id,
-    funnel_path: data.funnel_path,
-    source_entity_id: data.source_entity_id,
+    funnel_id: data.funnel_id ?? undefined,
+    funnel_path: data.funnel_path ?? undefined,
+    source_entity_id: data.source_entity_id ?? undefined,
     client_submission_id: data.client_submission_id,
     test_capture: data.test_capture,
     contact: { ...data.contact, email: data.contact.email || undefined },

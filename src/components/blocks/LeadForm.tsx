@@ -138,7 +138,10 @@ export function LeadForm({ block, site }: { block: LeadFormBlock; site: Site }) 
     const payload = {
       site_slug: site.slug,
       funnel_type: (block.funnel_type ?? 'contact-form') as 'contact-form',
-      funnel_id: block.funnel_id,
+      // `?? undefined` because an unset Payload text field is null, and the
+      // route's schema takes strings. Belt and braces with the `.nullish()`
+      // there: neither side can break the other again.
+      funnel_id: block.funnel_id ?? undefined,
       funnel_path: typeof window !== 'undefined' ? window.location.pathname : undefined,
       client_submission_id: submissionIdRef.current,
       contact,
