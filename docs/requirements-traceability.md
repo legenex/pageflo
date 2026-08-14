@@ -84,7 +84,8 @@ merged in.
 | R6.4 | Runtime = shared QuizRuntime + hydration + selected flow/template/brand + shared consent/destinations/lead submission | QuizMount portal → QuizRuntime; `test:e2e` | PASS |
 | R6.5 | AI/cloned templates that support a quiz carry explicit mount; publish fails visibly without one | extract pipeline + `quiz-bound` preflight; `test:publish` | PASS |
 | R6.6 | Browser E2E: ≥3 materially different LP templates, same flow: mount region, content survives, advance, branching, progress, backtrack clears state, lead form, consent, exactly one POST, exactly one row, mobile+desktop usable, static buttons inert | `test:e2e` 34 (production build) + `test:ui` 151 public/marker proofs + mobile pass at 390×844 | PASS |
-| R6.7 | Exactly one standalone quiz lead | `test:e2e` standalone path | PASS |
+| R6.7 | Exactly one standalone quiz lead | `test:e2e` standalone path; Reviewer E live proof (standalone /s/mva → 1 POST / 1 row) | PASS |
+| R6.8 | A retried/re-fired submit is still ONE lead (Reviewer E F-E1) | client mints stable client_submission_id (never cleared on retry); runLeadPipeline dedupes before any side effect; partial UNIQUE index (site+key) verified to enforce on a fresh production migrate; `test:idempotency` 9/9 + negative control | PASS |
 
 ## 7 · Brand Identity + Site Builder (section 12)
 
@@ -157,6 +158,7 @@ merged in.
 | X1 | Namecheap DNS + production TLS for tenant domains (EB-2) | EXTERNAL BLOCKER |
 | X2 | Authoritative MVA tier business rules / production tier service 405 (EB-1) | EXTERNAL BLOCKER |
 | X3 | Production error-reporting destination decision (EB-3) | EXTERNAL BLOCKER |
+| X4 | Machine-readable consent ARTIFACT (TrustedForm/Jornaya) needs credentials — Reviewer E F-E2. Consent DISCLOSURE (TCPA text on the form) is enforced by the flow validator + publish preflight; the artifact capture is external config, and the live LLM Create-with-Claude round-trip (Reviewer A flag 3) is the same class (no ANTHROPIC_API_KEY here). | EXTERNAL BLOCKER |
 
 Nothing in this matrix is marked PASS on the strength of a source branch's
 run: every count above was produced by suites executed on the integrated

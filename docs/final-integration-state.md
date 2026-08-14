@@ -256,6 +256,39 @@ Report → docs/agent-reports/reviewE-runtime.md.
 After E: reproduce/fix its findings, then the FINAL requirement reviewer
 against the live app, then a fresh full matrix (new count), then the report.
 
+WAVE 3 RESULT — Reviewer E COMPLETE. Items 1–14 all correct against the
+live runtime: exactly-one-lead proven for BOTH paths (standalone /s/mva →
+1 POST / 1 row; LP-embedded /c/check-a-case → 1 POST / 1 row), backtracking
+discards the abandoned branch's answers (ABANDONMARK in 0 lead rows),
+webhook failure degrades (funnel still completes untiered), double-click →
+1 row, tier boundary correct (answer setTier outranks webhook; undeclared
+tier does not route). Suites re-verified real: test:flow 202, test:webhook
+133, test:e2e 34 (leadPosts===1 per path, one row per path — not vacuous).
+Two findings:
+- **F-E1 (DEFECT, medium):** no server-side lead idempotency. event_id is
+  minted per request (the Meta dedup id, not a submission key), the pipeline
+  always INSERTs, and the client retries on failure / releases its guard —
+  so a lost-response retry (or a later-endpoint re-submit) creates a
+  DUPLICATE lead, re-firing CAPI/webhooks to a buyer. The normal path is one
+  lead (E proved it); this is the retry edge behind it. FIXED (commit
+  f35f068): client mints a stable client_submission_id once per submission
+  (never cleared on retry) and resends it; the pipeline returns the existing
+  lead for a key it already wrote, before any side effect; a partial UNIQUE
+  index (site+key) is the DB guarantee for the concurrent case, verified to
+  exist+enforce on a fresh PRODUCTION migrate. Regression:
+  scripts/test-lead-idempotency.mts (9/9, wired into `pnpm test`), negative
+  control proven (disabling the pre-check → duplicate rows). flow/webhook/
+  idempotency re-run green.
+- **F-E2 (NOT a code defect — intentional design + EXTERNAL):** consent is
+  implied-consent by design — the flow validator's `reachable_consent`
+  requires every lead-submitting path to pass a form node that renders the
+  brand's TCPA text (quiz-flow/validate.ts:1039), and the publish preflight's
+  checkConsent blocks a flow with no consent language. The machine-readable
+  consent ARTIFACT is TrustedForm/Jornaya (fields exist on Leads; populated
+  when credentials are configured — external, not present here). Consent is
+  disclosed and enforced; artifact capture is an external-credential matter.
+  No code change; documented.
+
 ## Known open work (gates not yet run)
 
 - **Gallery empty-box regression (R1, scouts 2+6):** release's
