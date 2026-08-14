@@ -48,3 +48,8 @@ docker-compose.override.yml
 
 # Scratch migration sets built by scripts/test-release-ordering.mts.
 .migrations-scratch-*/
+
+# Throwaway probe scripts (adversarial reviewers, ad-hoc reproduction). Kept in
+# scripts/ so their `@/`-aliased imports resolve; never part of the tree.
+scripts/.probe-*
+scripts/.probe-*.mts
