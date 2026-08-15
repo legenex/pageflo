@@ -68,11 +68,16 @@ export const QuizProgress = ({ form, theme, index, total, labels = [], note }: P
   )
 
   switch (form) {
-    // SQ-01 A hairline and a count. The quietest of the twenty.
+    // SQ-01 A 3px typographic rule that fills, and a count. The quietest of the
+    // twenty. It was a dead 1px hairline that never moved, which is a progress
+    // indicator that reports nothing; the source draws a 3px track filling in
+    // the brand behind the count.
     case 'rule_count':
       return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, width: '100%' }}>
-          <div style={{ flex: 1, height: 1, backgroundColor: s.line }} />
+          <div style={{ flex: 1, height: 3, backgroundColor: s.line }}>
+            <div style={{ height: '100%', width: `${percent}%`, backgroundColor: s.accentFill, transition: 'width .25s ease' }} />
+          </div>
           <span style={capsLabel}>{index + 1} / {total}</span>
         </div>
       )
@@ -86,18 +91,15 @@ export const QuizProgress = ({ form, theme, index, total, labels = [], note }: P
         </div>
       )
 
-    // SQ-03 Segmented blocks, one per question, and a step count in mono.
+    // SQ-03 Segmented blocks, one per question. Bare, as the source draws them:
+    // the console's own header band carries the zero-padded step count, and a
+    // second one beside the segments printed it twice on the same card.
     case 'segmented_blocks':
       return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, width: '100%' }}>
-          <div style={{ display: 'flex', gap: 3, flex: 1 }}>
-            {Array.from({ length: total }).map((_, i) => (
-              <div key={i} style={{ flex: 1, height: 6, backgroundColor: i <= index ? s.accentFill : s.line }} />
-            ))}
-          </div>
-          <span style={{ ...capsLabel, whiteSpace: 'nowrap' }}>
-            Step {String(index + 1).padStart(2, '0')}/{String(total).padStart(2, '0')}
-          </span>
+        <div style={{ display: 'flex', gap: 4, width: '100%' }}>
+          {Array.from({ length: total }).map((_, i) => (
+            <div key={i} style={{ flex: 1, height: 4, backgroundColor: i <= index ? s.accentFill : s.line, transition: 'background-color .2s ease' }} />
+          ))}
         </div>
       )
 
@@ -324,12 +326,17 @@ export const QuizProgress = ({ form, theme, index, total, labels = [], note }: P
         </div>
       )
 
-    // SQ-20 A count of items gathered, with the step named.
+    // SQ-20 A ledger header: the step named on the left, a filled count chip on
+    // the right. The chip is the source's own treatment - it prints the count
+    // in a brand-tinted block rather than as another line of caps - and it is
+    // the only mark in this design's chrome, since it draws no bar at all.
     case 'item_count':
       return (
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, width: '100%' }}>
           <span style={capsLabel}>{labels[index] ?? `Step ${index + 1}`}</span>
-          <span style={{ ...capsLabel, color: s.accent }}>{done} of {total} recorded</span>
+          <span style={{ ...capsLabel, color: s.onAccentFill, backgroundColor: s.accentFill, padding: '4px 10px', borderRadius: 3, whiteSpace: 'nowrap' }}>
+            {done} of {total} recorded
+          </span>
         </div>
       )
 

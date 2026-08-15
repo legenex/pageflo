@@ -1030,9 +1030,9 @@ const checkReachableConsent = (quiz: Quiz, walk: PathEnumeration): CheckResult =
   const c = collect('reachable_consent', 'Reachable required consent')
 
   // What consent IS here, verified against the code rather than assumed: there
-  // is no per-node consent field on the quiz model. `PreviewQuestionCard` (the
-  // one card component the builder preview and the public runtime both render
-  // through) prints `brand.legal.tcpaText` under exactly one condition -
+  // is no per-node consent field on the quiz model. `P.Consent` (the one
+  // primitive every composition prints consent through, on every surface)
+  // prints `brand.legal.tcpaText` under exactly one condition -
   // `node.type === 'form'`. Consent therefore lives on the lead form and is
   // supplied by the brand, so the only thing a FLOW can get wrong is delivering
   // a lead without the visitor ever having seen a form.

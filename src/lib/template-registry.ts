@@ -34,6 +34,8 @@ import {
 } from '@/lib/quiz-templates/model'
 import { PORTED_TEMPLATES, PORTED_BY_SLUG, type PortedTemplate } from '@/lib/lp-templates'
 import { LP_IDENTITIES } from '@/lib/lp-identities'
+// Strings only, no components. See the claims check in `registryHealth`.
+import { COMPOSITION_CLAIMS } from '@/lib/quiz-compositions/claims'
 
 export type TemplateKind = 'quiz' | 'lp'
 
@@ -414,6 +416,34 @@ export const registryHealth = (): { ok: boolean; problems: string[] } => {
   for (const t of listLegacyLpTemplates()) {
     if (t.renderer !== 'identity' || !t.identityId) {
       problems.push(`legacy landing-page template "${t.id}" names no identity`)
+    }
+  }
+
+  /*
+   * Quiz composition claims.
+   *
+   * A composition claiming an id the registry does not know draws nothing and
+   * says nothing, and two compositions claiming one id makes "which design is
+   * this" an ordering accident. Both are checked here rather than at the render
+   * seam because both are startup-visible facts about the tables, not about a
+   * particular request.
+   *
+   * `COMPOSITION_CLAIMS` is a table of strings with no imports of its own. The
+   * components that read it are NOT imported here on purpose - this module is
+   * pulled in by the deployment resolver, the publish preflight and several
+   * server actions, and none of them should be dragging the quiz renderer and
+   * `lucide-react` in behind it. An id absent from the table is not a problem:
+   * it draws through the default composition.
+   */
+  const claimedBy = new Map<string, string>()
+  for (const [key, ids] of Object.entries(COMPOSITION_CLAIMS)) {
+    for (const id of ids) {
+      if (!QUIZ_TEMPLATE_BY_ID[id]) {
+        problems.push(`quiz composition "${key}" claims unknown template "${id}"`)
+      }
+      const held = claimedBy.get(id)
+      if (held) problems.push(`quiz template "${id}" is claimed by both "${held}" and "${key}"`)
+      else claimedBy.set(id, key)
     }
   }
 

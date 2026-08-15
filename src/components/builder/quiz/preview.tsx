@@ -7,7 +7,9 @@
  *
  * What is NOT here any more, and why:
  *
- *  - THE QUESTION CARD moved to `public/quiz/QuizCard.tsx`. It was defined here
+ *  - THE QUESTION CARD moved out and then dissolved: it is now a COMPOSITION
+ *    per design under `src/lib/quiz-compositions/`, resolved from the sq_* id.
+ *    It was defined here
  *    and imported BY the public runtime, so drawing a question on a live page
  *    pulled the whole quiz editor - and a server-action import - into the
  *    public bundle. It is the same card either way; only its address changed.

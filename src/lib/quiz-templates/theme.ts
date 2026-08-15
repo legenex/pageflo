@@ -56,7 +56,14 @@ export type QuizTheme = {
   surface: Surface
   /** The page behind the card. Equals the card in inline mode. */
   page: Surface
-  fonts: { question: string; body: string; utility: string }
+  /**
+   * `question` is the face the template sets its question in - serif for the
+   * four that declare it, the display sans otherwise. `display` is that sans
+   * unconditionally, which is what a composition's own caps labels and band
+   * titles are set in: those are the template's furniture rather than its
+   * question, so they must not switch to a serif when the question does.
+   */
+  fonts: { question: string; display: string; body: string; utility: string }
   width: number | null
 }
 
@@ -68,6 +75,32 @@ export type QuizTheme = {
  * rather than against the quiz's own idea of a page, which is what keeps a
  * quiz readable inside a landing-page card of any tone.
  */
+/**
+ * A second ground inside one template, with its own verified copy colours.
+ *
+ * Four of the twenty designs band their shell — SQ-03 a dark console header,
+ * SQ-05 a dark headline band, SQ-07 an amber urgency strip, SQ-16 a dark
+ * titlebar over a tab strip. A band is a different GROUND from the card it sits
+ * in, so the text on it has to be derived against the band and not against the
+ * card, which is the whole reason this is a function and not a colour constant
+ * in a composition. `deriveSurface` is the same resolver the card itself goes
+ * through, so a band cannot end up with an idea of the brand's dark that the
+ * page around it disagrees with.
+ */
+export type QuizBand = 'page' | 'card' | 'alt' | 'primary' | 'dark'
+
+export const quizBandSurface = (theme: QuizTheme, band: QuizBand): Surface => {
+  const p = theme.palette
+  switch (band) {
+    case 'page': return theme.page
+    case 'card': return theme.surface
+    case 'alt': return deriveSurface(p.surfaceAlt, p)
+    case 'primary': return deriveSurface(p.primary, p)
+    case 'dark': return deriveSurface(p.surfaceDark, p)
+    default: return theme.surface
+  }
+}
+
 export const quizTheme = (
   template: QuizTemplate,
   brand: { colors?: Record<string, unknown> } | null | undefined,
@@ -83,6 +116,7 @@ export const quizTheme = (
     page,
     fonts: {
       question: template.serifQuestion ? QUIZ_FONTS.serif : QUIZ_FONTS.display,
+      display: QUIZ_FONTS.display,
       body: QUIZ_FONTS.body,
       utility: QUIZ_FONTS.mono,
     },

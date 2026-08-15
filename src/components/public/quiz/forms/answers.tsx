@@ -91,12 +91,25 @@ export const QuizAnswer = ({
   )
 
   switch (form) {
-    // SQ-01 A letter, a hairline, and the label. No box.
+    // SQ-01 A square letter badge, a hairline, and the label. No box.
+    //
+    // The badge is the design's whole selected state: the source fills it with
+    // the brand and leaves the row's border alone (`border:none` is hardcoded
+    // there, so its own `bd:B.primary` is dead code). The tint and the check are
+    // ours, because colour alone is not a selection signal.
     case 'lettered_hairline':
       return btn(
-        { ...base, backgroundColor: 'transparent', border: 'none', borderBottom: `1px solid ${s.line}`, color: s.text, padding: '15px 4px' },
+        { ...base, backgroundColor: selected ? s.card : 'transparent', border: 'none', borderBottom: `1px solid ${s.line}`, color: s.text, padding: '14px 8px', minHeight: 52, gap: 14 },
         <>
-          <span style={{ fontFamily: fonts.utility, fontSize: 12, color: selected ? s.accent : s.muted, width: 18, flexShrink: 0, fontWeight: 600 }}>{LETTERS[index] ?? index + 1}</span>
+          <span
+            style={{
+              width: 26, height: 26, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              border: `1px solid ${selected ? s.accentFill : s.line}`,
+              backgroundColor: selected ? s.accentFill : 'transparent',
+              color: selected ? s.onAccentFill : s.muted,
+              fontFamily: fonts.question, fontSize: 13, fontWeight: 600,
+            }}
+          >{LETTERS[index] ?? index + 1}</span>
           {withIcon ? <span style={{ opacity: 0.55, display: 'inline-flex' }}>{icon}</span> : null}
           <span style={{ flex: 1, fontWeight: selected ? 600 : 400 }}>{label}</span>
           {selected ? <Check size={16} strokeWidth={3} color={s.accent} /> : null}
@@ -116,9 +129,30 @@ export const QuizAnswer = ({
         </>,
       )
 
-    // SQ-03 Square everything: rows, markers, corners.
+    // SQ-03 A console record: a leading square marker, a hard 4px corner, and a
+    // row that tints rather than inverts. The marker fills to reveal the check,
+    // which is the design's third signal.
     case 'squared_rows':
-      return btn({ ...base, borderRadius: 0 }, <>{mark('square')}<span style={{ flex: 1 }}>{label}</span>{withIcon ? icon : null}</>)
+      return btn(
+        {
+          ...base, borderRadius: 4, padding: '12px 14px', minHeight: 50, gap: 12, fontSize: 14, fontWeight: 600,
+          backgroundColor: selected ? s.card : 'transparent',
+          color: s.text,
+          border: `1px solid ${selected ? s.accentFill : s.line}`,
+        },
+        <>
+          <span
+            style={{
+              width: 17, height: 17, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              border: `1.5px solid ${selected ? s.accentFill : s.line}`,
+              backgroundColor: selected ? s.accentFill : 'transparent',
+              color: s.onAccentFill,
+            }}
+          >{selected ? <Check size={11} strokeWidth={3} /> : null}</span>
+          <span style={{ flex: 1 }}>{label}</span>
+          {withIcon ? icon : null}
+        </>,
+      )
 
     // SQ-04 A document row that gets stamped when it is recorded.
     case 'document_stamps':
@@ -132,10 +166,11 @@ export const QuizAnswer = ({
         </>,
       )
 
-    // SQ-05 Bold, full width, with a chevron. Direct response.
+    // SQ-05 Bold, full width, with a chevron. Direct response: the row inverts
+    // completely rather than tinting, which is the loudest selected state here.
     case 'bold_buttons':
       return btn(
-        { ...base, borderRadius: 6, fontWeight: 700, fontSize: 16, padding: '18px 20px', backgroundColor: selected ? s.accentFill : s.card, color: selected ? s.onAccentFill : s.cardText, borderWidth: 2 },
+        { ...base, borderRadius: 6, fontWeight: 700, fontSize: 15.5, padding: '13px 16px', minHeight: 56, backgroundColor: selected ? s.accentFill : s.card, color: selected ? s.onAccentFill : s.cardText, border: `2px solid ${selected ? s.accentFill : s.line}` },
         <>
           {withIcon ? <span style={{ display: 'inline-flex' }}>{icon}</span> : null}
           <span style={{ flex: 1 }}>{label}</span>
@@ -240,25 +275,40 @@ export const QuizAnswer = ({
         <>{withIcon ? icon : null}<span style={{ flex: 1 }}>{label}</span>{selected ? <Check size={15} strokeWidth={3} /> : null}</>,
       )
 
-    // SQ-16 A field row in a case file: label left, value right.
+    // SQ-16 A record row in a case file: the label, and a mono stamp that
+    // APPEARS when the row goes on file. The stamp used to read `Empty` on
+    // every unselected row, so a four-answer question drew four `EMPTY` labels
+    // the source never draws; the source's marker has `display:none` until the
+    // row is chosen.
     case 'field_rows':
       return btn(
-        { ...base, borderRadius: 0, borderWidth: 0, borderBottom: `1px solid ${s.line}`, backgroundColor: selected ? s.card : 'transparent', color: s.text, padding: '13px 12px' },
+        { ...base, borderRadius: 5, padding: '10px 13px', minHeight: 46, gap: 11, fontSize: 13.5, fontWeight: 600, backgroundColor: selected ? s.card : 'transparent', color: s.text, border: `1px solid ${selected ? s.accentFill : s.line}` },
         <>
-          <span style={{ flex: 1, fontFamily: fonts.body, fontSize: 14.5 }}>{label}</span>
-          <span style={{ fontFamily: fonts.utility, fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: selected ? s.accent : s.muted }}>
-            {selected ? 'Selected' : 'Empty'}
-          </span>
+          <span style={{ flex: 1, fontFamily: fonts.body }}>{label}</span>
+          {selected ? (
+            <span style={{ fontFamily: fonts.utility, fontSize: 8, letterSpacing: '0.08em', textTransform: 'uppercase', color: s.accent, whiteSpace: 'nowrap' }}>
+              &bull; On file
+            </span>
+          ) : null}
         </>,
       )
 
-    // SQ-17 The biggest target in the set: a key-cap letter and large type.
+    // SQ-17 The biggest target in the set: a key-cap letter and large type, on
+    // a lifted card rather than a flat row — it is the only design of the twenty
+    // that gives its answers a shadow, because they are the only thing on the
+    // canvas.
     case 'oversized_letters':
       return btn(
-        { ...base, borderRadius: 12, padding: '22px 22px', fontSize: 19, minHeight: 76, borderWidth: 2, gap: 18 },
+        {
+          ...base, borderRadius: 14, padding: '16px 20px', fontSize: 17, fontWeight: 700, minHeight: 64, gap: 15,
+          backgroundColor: selected ? s.accentFill : s.card,
+          color: selected ? s.onAccentFill : s.cardText,
+          border: `2px solid ${selected ? s.accentFill : s.line}`,
+          boxShadow: '0 4px 14px rgba(29,36,46,.06)',
+        },
         <>
-          <span style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: `2px solid ${selected ? s.onAccentFill : s.line}`, fontFamily: fonts.utility, fontSize: 17, fontWeight: 700 }}>{LETTERS[index] ?? index + 1}</span>
-          <span style={{ flex: 1, fontWeight: 600 }}>{label}</span>
+          <span style={{ width: 30, height: 30, flexShrink: 0, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', border: `1.5px solid ${selected ? s.onAccentFill : s.line}`, fontFamily: fonts.utility, fontSize: 13, fontWeight: 600 }}>{LETTERS[index] ?? index + 1}</span>
+          <span style={{ flex: 1 }}>{label}</span>
         </>,
       )
 
@@ -272,13 +322,39 @@ export const QuizAnswer = ({
         </>,
       )
 
-    // SQ-20 A checkbox against a document. Multi-select by nature.
+    // SQ-20 A record in a ledger: a checkbox, a tinted 32px tray, then the
+    // label. Five selection channels in the source (fill, border, ink, the tray
+    // filling with the brand, and the checkbox revealing a check) and the tray
+    // is the one that reads at a glance, because it makes the run of answers a
+    // column of marks rather than a column of text.
+    //
+    // The tray holds the letter, not a fabricated icon: no answer in the model
+    // carries one, and inventing a document glyph per answer would be the
+    // renderer asserting what the author meant.
     case 'checkbox_docs':
       return btn(
-        { ...base, borderRadius: 6, backgroundColor: selected ? s.card : 'transparent', color: s.text, borderColor: selected ? s.accentFill : s.line },
+        { ...base, borderRadius: 8, padding: '11px 14px', minHeight: 50, gap: 12, fontSize: 14, fontWeight: 600, backgroundColor: selected ? s.card : 'transparent', color: s.text, border: `1px solid ${selected ? s.accentFill : s.line}` },
         <>
-          {mark('square')}
-          {withIcon ? <span style={{ display: 'inline-flex', color: s.muted }}>{icon}</span> : null}
+          <span
+            style={{
+              width: 18, height: 18, flexShrink: 0, borderRadius: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              border: `1.5px solid ${selected ? s.accentFill : s.line}`,
+              backgroundColor: selected ? s.accentFill : 'transparent',
+              color: s.onAccentFill,
+            }}
+          >{selected ? <Check size={11} strokeWidth={3} /> : null}</span>
+          <span
+            style={{
+              width: 32, height: 32, flexShrink: 0, borderRadius: 6, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              backgroundColor: selected ? s.accentFill : s.card,
+              // A tray whose fill is the same tone as the row it sits in is not
+              // a tray. The rule keeps it readable as an object on any ground
+              // the brand resolves to, including a card that is already white.
+              border: selected ? 'none' : `1px solid ${s.line}`,
+              color: selected ? s.onAccentFill : s.muted,
+              fontFamily: fonts.utility, fontSize: 12, fontWeight: 700,
+            }}
+          >{icon ?? (LETTERS[index] ?? index + 1)}</span>
           <span style={{ flex: 1 }}>{label}</span>
         </>,
       )
@@ -327,8 +403,9 @@ export const answerLayout = (form: AnswerForm, columns = 1): CSSProperties => {
       return { display: 'flex', flexWrap: 'wrap', gap: 8 }
     case 'reply_pills':
       return { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }
+    // The one run that is flush by design: a border-top on the container and a
+    // border-bottom per row make a table, and a gap would make it a stack.
     case 'lettered_hairline':
-    case 'field_rows':
       return { display: 'flex', flexDirection: 'column', gap: 0 }
     default:
       return columns > 1

@@ -377,7 +377,7 @@ export const templateMaxWidth = (t: QuizTemplate): number | null => (t.width[1] 
 export const PROGRESS_FORM_LABELS: Array<{ id: ProgressForm; label: string; from: string }> = [
   { id: 'rule_count', label: 'Thin rule + count', from: 'Editorial Inline' },
   { id: 'rounded_encourage', label: 'Rounded bar + encouragement', from: 'Recovery Soft' },
-  { id: 'segmented_blocks', label: 'Segmented blocks + step NN/NN', from: 'Authority Console' },
+  { id: 'segmented_blocks', label: 'Segmented blocks', from: 'Authority Console' },
   { id: 'factor_rail', label: 'Factor status rail', from: 'Case Dossier' },
   { id: 'bar_percent_chip', label: 'Bar + % chip', from: 'Direct Panel' },
   { id: 'bar_percent_label', label: 'Bar + % label', from: 'Quiz First' },

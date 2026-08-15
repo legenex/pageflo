@@ -28,6 +28,9 @@
 import { QuizSurface } from '@/components/public/quiz/QuizSurface'
 import { useStillQuizMachine, STILL_FIXTURE_QUIZ } from '@/components/public/quiz/machine'
 import { getTemplateConfig } from './templates'
+import { resolveCompositionForRender } from '@/lib/quiz-compositions/registry'
+import { resolveForRender, reportTemplateFallback } from '@/lib/template-registry'
+import { quizBandSurface, quizTheme } from '@/lib/quiz-templates/theme'
 import { PREVIEW_BRAND_DEFAULT } from '@/components/builder/preview-brand'
 
 /**
@@ -73,9 +76,24 @@ export const QuizStill = ({
  * not stop a transformed descendant painting over the card around it.
  */
 export const QuizStillThumb = ({ height = 190, scale = 0.55, width = '100%', ...still }) => {
-  // The ground the still will paint, so the fade at the cut matches the page
-  // instead of introducing a colour of its own.
-  const ground = getTemplateConfig(still.templateId, still.progressForm).pageBg(still.brand ?? PREVIEW_BRAND_DEFAULT)
+  /*
+   * The ground the still will paint, so the fade at the cut matches the page
+   * instead of introducing a colour of its own.
+   *
+   * Asked of the COMPOSITION rather than of the template config: a composition
+   * owns its canvas, and four of them deliberately ground on the alternate tone
+   * (a document on a desk rather than a card on a page). Reading `pageBg` here
+   * faded a grey still into white along its bottom edge.
+   */
+  const tc = getTemplateConfig(still.templateId, still.progressForm)
+  const brandForGround = still.brand ?? PREVIEW_BRAND_DEFAULT
+  const { composition } = resolveCompositionForRender(
+    reportTemplateFallback('quiz thumbnail', resolveForRender('quiz', still.templateId)).template.id,
+  )
+  const ground = quizBandSurface(
+    quizTheme(tc.spec, brandForGround),
+    composition.canvas,
+  ).bg
 
   return (
     <div

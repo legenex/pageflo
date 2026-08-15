@@ -27,7 +27,7 @@
  *
  * No database, no network, no clock.
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 
 import { buildSeedQuiz, SEED_STEPS, SEED_TIERS } from '../src/components/builder/quiz/seed-data.ts'
 import { siteToBrand } from '../src/lib/brand-map.ts'
@@ -217,16 +217,47 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
   t(/explicitStepIndex\(quiz, node\.defaultNextStepKey\)/.test(runtime), 'the runtime still honours a decision default route')
   t(/setFinished\(true\)\s*\n\s*void submitOnce\(newValues\)/.test(runtime), 'running out of steps still ends the funnel and submits the lead')
 
-  // Where consent actually lives. The consent check is built on this one line;
-  // if it moves, the check is measuring the wrong thing.
-  const preview = read('components/public/quiz/QuizCard.tsx')
+  /*
+   * Where consent actually lives.
+   *
+   * The publish preflight and `checkReachableConsent` both treat "the visitor
+   * reached a form node" as equivalent to "the visitor saw the TCPA text", and
+   * that equivalence is only true while exactly ONE component prints it on
+   * exactly one node type. It used to be the one question card; it is now the
+   * `P.Consent` primitive, and there are seven compositions that could have
+   * grown their own. So the check is stronger than it was rather than merely
+   * relocated: the line is read out of the view model in one place, printed in
+   * one place, and no composition file may mention it at all.
+   */
+  const viewModel = read('components/public/quiz/view-model.ts')
   t(
-    /node\.type === 'form' && <div[^>]*>\{interp\(brand\.legal\.tcpaText\)\}/.test(preview),
-    'the consent (TCPA) text is still rendered by, and only by, a form node',
+    /node\?\.type === 'form' \? interp\(brand\?\.legal\?\.tcpaText/.test(viewModel),
+    'the consent (TCPA) text is still read from the brand by, and only by, a form node',
   )
   t(
-    (preview.match(/brand\.legal\.tcpaText/g) ?? []).length === 1,
-    'there is still exactly one place consent is rendered, so "reached a form" is still the right flow-level test',
+    (viewModel.match(/tcpaText/g) ?? []).length === 1,
+    'there is still exactly one place consent is resolved, so "reached a form" is still the right flow-level test',
+  )
+
+  const primitives = read('components/public/quiz/primitives.tsx')
+  t(
+    /view\.phase !== 'form' \|\| !view\.legal\.tcpa/.test(primitives),
+    'and exactly one primitive prints it, on a form node only',
+  )
+  t(
+    (primitives.match(/\{view\.legal\.tcpa\}/g) ?? []).length === 1,
+    'the consent line is printed in exactly one place',
+  )
+
+  // `types.ts` DECLARES `legal.tcpa` on the view model, which is not rendering
+  // it; every other file in the module is a composition and must not name it.
+  const compositionDir = new URL('../src/lib/quiz-compositions/', import.meta.url).pathname
+  const offenders = readdirSync(compositionDir)
+    .filter((f) => (f.endsWith('.tsx') || f.endsWith('.ts')) && f !== 'types.ts')
+    .filter((f) => /tcpa/i.test(readFileSync(compositionDir + f, 'utf8')))
+  t(
+    offenders.length === 0,
+    `no composition renders consent itself (offenders: ${offenders.join(', ') || 'none'})`,
   )
 }
 

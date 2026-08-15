@@ -24,13 +24,25 @@ import { onPrimaryText, getSafeTextColor, getSafeMutedColor, deriveBrandSurface 
  * body sections and the header/footer chrome sit on. Distinct from the card
  * palette because page bg != card surface for most of the twenty.
  */
-export const resolvePagePalette = (brand, templateId, progressForm = null) => {
+/**
+ * @param ground  the opaque colour the chrome will actually sit on.
+ *
+ * Passed in by the surface because the CANVAS is the composition's, not the
+ * template config's: four of the compositions deliberately ground on the
+ * alternate tone rather than on the page colour. Deriving chrome text against
+ * `pageBg` while the composition painted something else is the same class of
+ * bug the whole colour system exists to prevent - and it is reachable, because
+ * a brand that states a dark `cardBg` and a light `background` makes those two
+ * grounds opposite ends of the range. Falls back to the template's page colour
+ * so every existing caller keeps its answer.
+ */
+export const resolvePagePalette = (brand, templateId, progressForm = null, ground = null) => {
   // The ground comes from the template's OWN resolver, which is brand-derived.
   // This used to hardcode a cream page for the editorial template and fall back
   // to a navy for everything else, so a brand's background was ignored twice
   // over: once by the template and once by the fallback.
   const tc = getTemplateConfig(templateId, progressForm)
-  const base = tc.pageBg(brand)
+  const base = ground || tc.pageBg(brand)
   const text = getSafeTextColor(base).hex
   const muted = getSafeMutedColor(text, base).hex
   const cardSurface = deriveBrandSurface(brand?.colors?.cardBg || base, brand?.colors?.primary || base, { hueBlend: 0.05 })

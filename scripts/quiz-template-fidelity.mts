@@ -32,7 +32,7 @@
  * WHAT IS RENDERED, ON BOTH SIDES
  *
  *   Implementation: `QuizStill` — the sanctioned frozen renderer, which mounts
- *   the real `QuizSurface` / `QuizCard` with a scripted machine. Not an
+ *   the real `QuizSurface` and its composition with a scripted machine. Not an
  *   approximation of one: the component that draws a gallery thumbnail is the
  *   component that draws a live page. It is mounted in a real Chromium with
  *   real effects (the container-width measurement that decides answer columns
@@ -989,7 +989,7 @@ const json = {
     grid: GRID,
   },
   framing: {
-    implementation: 'QuizStill (QuizSurface + QuizCard, still machine), PREVIEW_BRAND_DEFAULT, no page chrome',
+    implementation: 'QuizStill (QuizSurface + the resolved composition, still machine), PREVIEW_BRAND_DEFAULT, no page chrome',
     reference: `supplied bundle, chrome toggles off: ${REFERENCE_CHROME_TOGGLES.join(', ')}; progress indicator left on`,
     referenceStates: ['initial'],
     gatingState: 'initial',

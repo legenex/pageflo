@@ -567,8 +567,8 @@ const preflightWith = async (
 
 /* ------------------------------------- consent: the BRAND supplies the line */
 //
-// `PreviewQuestionCard` — the one card component the builder preview and the
-// public runtime both render through — prints `brand.legal.tcpaText` on every
+// `P.Consent` — the one primitive every quiz composition prints consent
+// through, on every surface — prints `brand.legal.tcpaText` on every
 // form node. `checkReachableConsent` in the flow validator says so outright.
 // Scanning only `quiz.nodes` therefore refused the platform's actual
 // configuration: production quiz 2 carries no consent wording at all, runs under

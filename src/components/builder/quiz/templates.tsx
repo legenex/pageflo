@@ -12,10 +12,12 @@
  * handoff, which are DATA - a width, a progress form, an answer form, an icon
  * policy - drawn by shared renderers under `public/quiz/forms/`.
  *
- * The exported surface is unchanged on purpose. `getTemplateConfig`, the three
- * render helpers and the colour audit are what the preview engine, the public
- * runtime and the template picker already call, so the twenty arrive behind the
- * same seam the six sat behind and nothing else had to be rewritten.
+ * What is left here after the composition seam landed is the TOKEN BAG and the
+ * colour audit: `getTemplateConfig` still answers "what ground does this
+ * template's page take" for the builder toolbar, the gallery thumbnail and the
+ * page chrome. The three render helpers that used to live below it are gone -
+ * two became primitives a composition places itself, and the third was a header
+ * strip identical above all twenty. See the note where they were.
  *
  * Colour comes from the brand through ONE resolver, the same one the landing
  * pages use. Two derivations would give a landing page and the quiz embedded in
@@ -23,13 +25,10 @@
  * form that not quite matches the page around it.
  */
 
-import { ShieldCheck } from 'lucide-react'
 import { onPrimaryText, auditColorPairs } from '@/lib/builder/color-system'
 import { QUIZ_TEMPLATES, templateMaxWidth, cleanProgressForm, PROGRESS_FORM_LABELS } from '@/lib/quiz-templates/model'
 import { resolveForRender, reportTemplateFallback } from '@/lib/template-registry'
 import { quizTheme, QUIZ_FONTS } from '@/lib/quiz-templates/theme'
-import { QuizProgress } from '@/components/public/quiz/forms/progress'
-import { QuizAnswer, answerLayout } from '@/components/public/quiz/forms/answers'
 
 /**
  * The spec a stored id draws as.
@@ -42,7 +41,7 @@ import { QuizAnswer, answerLayout } from '@/components/public/quiz/forms/answers
 export const resolveQuizTemplate = (id) =>
   reportTemplateFallback(`quiz builder preview`, resolveForRender('quiz', id)).template.template
 
-export { QUIZ_TEMPLATES, answerLayout, PROGRESS_FORM_LABELS }
+export { QUIZ_TEMPLATES, PROGRESS_FORM_LABELS }
 
 /**
  * Everything a template needs, for one brand.
@@ -140,92 +139,24 @@ export const TEMPLATE_CONFIGS = Object.fromEntries(
 )
 
 // ---------------------------------------------------------------------------
-// Render helpers, called by the preview engine and the public runtime
+// Render helpers
 // ---------------------------------------------------------------------------
-
-/**
- * One answer, in whichever form this template draws answers.
- *
- * The key belongs on the element returned here, because both callers map over
- * the answer list without supplying one.
- */
-export const renderAnswerButton = (a, idx, isSelected, onClick, tc, brand) => (
-  <QuizAnswer
-    key={a?.id ?? idx}
-    form={tc.spec.answers}
-    icons={tc.spec.icons}
-    theme={tc.theme(brand)}
-    label={a?.label ?? ''}
-    meta={a?.meta ?? a?.sublabel ?? ''}
-    index={idx}
-    selected={Boolean(isSelected)}
-    multi={Boolean(a?.multi)}
-    /*
-     * NO DATA SOURCE EXISTS FOR THIS, and saying so is the point.
-     *
-     * A quiz answer is `{ id, label, isDQ, fieldMappings, nextStepKey, setTier }`
-     * - `mkA` in seed-data.ts builds every one of them and there is no icon
-     * field anywhere in the model, the editor or the collection. So the entire
-     * fifteen-value `IconPolicy` axis is inert: `withIcon` is false for every
-     * answer of every template. The forms that draw an icon slot now fall back
-     * to something real (a letter) rather than an empty well; adding an icon
-     * per answer is a schema change and belongs in the stage that migrates.
-     */
-    icon={a?.iconNode ?? null}
-    onSelect={onClick}
-  />
-)
-
-/**
- * @param labels  the authored label of each visible step, in order.
- *
- * Eight of the twenty progress forms name their milestones - `factor_rail`,
- * `deadline_rail`, `route_breadcrumb`, `milestone_rail`, `tab_status`,
- * `path_nodes`, `item_count` and the tab row - and NO caller in the repository
- * ever passed them, so every one of them drew "Factor 1 / Step 2 / Incident"
- * placeholders and Case Router, whose entire identity is its breadcrumb, drew a
- * bare bar. The labels come from the quiz's own steps, filtered to the ones a
- * visitor can actually see, so a webhook row is never named at a visitor.
- */
-export const renderProgressIndicator = (stepIdx, totalSteps, tc, brand, labels = null) => (
-  // The percentage is carried as an attribute as well as drawn, because a
-  // progress bar is twenty different shapes across the library and "did it
-  // move" should not depend on which one a deployment chose.
-  <div
-    data-quiz-progress={String(totalSteps > 1 ? Math.round((stepIdx / (totalSteps - 1)) * 100) : 0)}
-    style={{ marginBottom: 'clamp(16px, 3vw, 24px)' }}
-  >
-    <QuizProgress
-      form={tc.spec.progress}
-      theme={tc.theme(brand)}
-      index={stepIdx}
-      total={totalSteps}
-      labels={Array.isArray(labels) ? labels : []}
-    />
-  </div>
-)
-
-/**
- * The strip above the question.
- *
- * Deliberately thin. Several of the twenty put their entire progress treatment
- * up here - tabs, a milestone rail, a path of nodes - so anything loud in this
- * strip would compete with the form the template already chose.
- */
-export const renderHeader = (stepIdx, totalSteps, tc, brand) => {
-  const theme = tc.theme(brand)
-  const s = theme.surface
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'clamp(12px, 2.5vw, 20px)', flexWrap: 'wrap', gap: 8 }}>
-      <span style={{ fontFamily: theme.fonts.utility, fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: s.muted, fontWeight: 600 }}>
-        Step {stepIdx + 1} of {totalSteps}
-      </span>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: s.muted, padding: '4px 10px', borderRadius: 999, border: `1px solid ${s.line}` }}>
-        <ShieldCheck size={11} /> Confidential
-      </span>
-    </div>
-  )
-}
+//
+// THREE OF THEM HAVE MOVED, and where they went is the point.
+//
+// `renderAnswerButton` and `renderProgressIndicator` are now `P.Answer` and
+// `P.Progress` in `src/components/public/quiz/primitives.tsx`, because a
+// composition places them itself rather than receiving them in a fixed slot.
+//
+// `renderHeader` is DELETED. It drew `STEP N OF M` and a `Confidential` pill,
+// byte-identical above all twenty templates, immediately above whichever of the
+// twenty progress forms the template had chosen - the same class of homogeniser
+// as the duplicate progress bar that came out before it, and by then the
+// largest single element every template shared. No reference design draws a
+// strip common to all twenty: each states its progress in its own words and its
+// own place, which is the entire point of having twenty progress forms. A
+// header is now the composition's, and sixteen of the twenty progress forms
+// already print a step count.
 
 /**
  * Flag pairings a brand can make unreadable.

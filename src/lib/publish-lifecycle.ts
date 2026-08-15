@@ -204,8 +204,8 @@ const checkQuizGraph = (quiz: Record<string, unknown> | null): PreflightCheck[] 
  * because a visitor cannot tell them apart:
  *
  *   - the quiz's own copy, which older flows carry per node, and
- *   - the BRAND's TCPA text. `PreviewQuestionCard` — the one card component the
- *     builder preview and the public runtime both render through — prints
+ *   - the BRAND's TCPA text. `P.Consent` — the one primitive every quiz
+ *     composition prints consent through, on every surface — prints
  *     `brand.legal.tcpaText` on every form node, so a brand-supplied line is
  *     what the visitor reads even when the flow itself says nothing. The flow
  *     validator states this outright in `checkReachableConsent`.
