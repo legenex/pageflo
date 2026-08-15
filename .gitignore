@@ -53,3 +53,7 @@ docker-compose.override.yml
 # scripts/ so their `@/`-aliased imports resolve; never part of the tree.
 scripts/.probe-*
 scripts/.probe-*.mts
+
+# Fidelity-harness output (screenshots + pairwise JSON) from
+# scripts/quiz-template-fidelity.mts. Regenerated on demand, never committed.
+artifacts/
