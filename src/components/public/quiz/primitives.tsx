@@ -410,6 +410,29 @@ const Endpoint: QuizPrimitives['Endpoint'] = ({ view, theme, surface, mode }) =>
       <div style={{ width: 60, height: 60, margin: '0 auto 16px', borderRadius: '50%', backgroundColor: s.card, border: `1px solid ${s.line}`, color: s.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <CheckCircle2 size={32} />
       </div>
+      {/*
+       * THE ENDPOINT'S OWN WORDS. Drawn here, by the primitive every composition
+       * already mounts, rather than left for each of them to remember.
+       *
+       * This card used to render the tick and the redirect and nothing else, so
+       * a flow whose final node says "Thank You! An Attorney Will Reach Out
+       * Shortly." finished on a green mark over an empty card — the one line the
+       * claimant most needs (that somebody is going to call them) was dropped.
+       * A browser walk of the live funnel caught it: the endpoint's accessible
+       * name came back empty.
+       *
+       * Making it the default is the point. A composition that forgot to draw
+       * its endpoint copy would fail silently and only at the very end of a
+       * funnel, which is the least-watched screen in the product.
+       */}
+      {view.node.headline ? (
+        <h2 data-quiz-headline="" style={{ margin: '0 0 6px', fontSize: 22, fontWeight: 700, color: s.text, lineHeight: 1.25 }}>
+          {view.node.headline}
+        </h2>
+      ) : null}
+      {view.node.subheadline ? (
+        <p style={{ margin: '0 0 12px', fontSize: 14, color: s.muted, lineHeight: 1.5 }}>{view.node.subheadline}</p>
+      ) : null}
       {e?.mode === 'immediate' && e.url ? (
         <div style={{ fontSize: 13, color: s.muted }}>{preview ? 'Would redirect here' : 'Redirecting...'}</div>
       ) : null}
@@ -432,6 +455,7 @@ const Endpoint: QuizPrimitives['Endpoint'] = ({ view, theme, surface, mode }) =>
     </div>
   )
 }
+
 
 /**
  * A step the visitor never sees: a decision, a webhook, a verification, a

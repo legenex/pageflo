@@ -232,9 +232,23 @@ const main = async (): Promise<void> => {
       log(`console errors (${consoleErrors.length}):`)
       for (const e of consoleErrors.slice(0, 5)) log(`   ${e.slice(0, 160)}`)
     }
-    log(`E2E_RESULT outcome=${outcome} steps=${i} placeholders=${leaked.length} consoleErrors=${consoleErrors.length}`)
+    /*
+     * THE LAST SCREEN MUST SAY SOMETHING.
+     *
+     * A composition reached the endpoint and drew a green tick over an empty
+     * card: the confirmation glyph rendered, the authored line ("Thank You! An
+     * Attorney Will Reach Out Shortly.") did not. The lead was still created, so
+     * every count-based check passed and the only symptom was that the claimant
+     * was told nothing. It is the least-watched screen in the product and the
+     * one a person sees last, so it gets an assertion of its own.
+     */
+    const endpointEmpty = outcome === 'endpoint' && endHeadline === ''
+    if (endpointEmpty) log('FAIL: reached the endpoint but it displayed no headline')
+
+    log(`E2E_RESULT outcome=${outcome} steps=${i} placeholders=${leaked.length} consoleErrors=${consoleErrors.length} endpointCopy=${endpointEmpty ? 'MISSING' : 'ok'}`)
     if (outcome !== 'endpoint') process.exitCode = 1
     if (leaked.length > 0) process.exitCode = 1
+    if (endpointEmpty) process.exitCode = 1
   } finally {
     if (browser && !keepOpen) await browser.close()
   }
