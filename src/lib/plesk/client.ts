@@ -15,7 +15,7 @@
  *
  * TLS note: when the app container talks to Plesk on the same host via the
  * server's public IP (e.g. https://51.81.202.161:8443), Plesk presents a cert
- * issued for its primary hostname (mo.legenex.com), not the IP — Node's fetch
+ * issued for its primary hostname (os.legenex.com), not the IP — Node's fetch
  * rejects the connection with a generic "fetch failed" wrapping a TLS hostname
  * mismatch. Setting PLESK_INSECURE_SKIP_TLS_VERIFY=true loosens verification
  * for Plesk calls only. Acceptable because the traffic never leaves the host

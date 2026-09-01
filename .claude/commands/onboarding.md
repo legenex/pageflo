@@ -1,29 +1,62 @@
 ---
-description: Bootstrap a brand-new LegalOS dev — fetch + follow the playbook at /setup.txt
+description: Bootstrap a new PageFlo developer from the repository's own canonical docs
 ---
 
-You're being invoked by a new team member who has VS Code + Claude Code installed, an empty workspace, and nothing else. Your job is to drive their entire setup from zero to "editing locally + can deploy with one word."
+Drive a new team member from an empty machine to a working local development
+environment, using this repository's canonical documentation.
 
-The detailed playbook lives at `https://mo.legenex.com/setup.txt` — fetch it now and follow it exactly. It has:
+**Do not fetch a playbook from a URL.** The previous version of this command
+fetched `https://mo.legenex.com/setup.txt`, a host that no longer exists, with a
+fallback to a GitHub repository that is not this one. Both paths were dead, and
+the playbook they pointed at described a retired live-server-editing workflow
+that now contradicts `AGENTS.md`. `public/setup.txt` and
+`public/teammate-init.txt` are banner-marked as superseded; read them only for
+history.
 
-- The project facts (repo URL, server host, etc.)
-- Phase 1: setup (prerequisite check matrix, clone, .env, install, SSH key handshake, dev server start) — one step per message
-- Phase 2: editing (use Read/Edit/Write on local clone, hot reload via pnpm dev)
-- Phase 3: deploy (commit + push + ssh-apply on server)
-- Constraints to never violate
+## Read first
 
-## Behavior rules
+1. `README.md`, for the stack, the local setup and the release path
+2. `AGENTS.md`, the canonical operating contract
+3. `docs/STATE.md`, current factual state
 
-1. **Fetch the playbook first.** Use WebFetch on `https://mo.legenex.com/setup.txt`. If that fails (e.g., server unreachable), fall back to fetching from the raw GitHub URL: `https://raw.githubusercontent.com/Morne080/legalos/main/public/setup.txt`.
+## Drive setup, one step per message
 
-2. **Track progress with TodoWrite.** Create a todo list mirroring Phase 1's checklist. Update in real time.
+This person is new. Do not dump the whole sequence at them. Use a todo list and
+update it in real time.
 
-3. **One step per message.** This user is brand new — don't dump.
+1. **Prerequisites.** Node `>=20.9`, `pnpm@9.15.0` (`corepack enable`), Docker,
+   git, and the `gh` CLI authenticated.
+2. **Clone.** `git clone https://github.com/legenex/legalos` and open it.
+3. **Environment.** `cp .env.example .env`. Walk them through the values.
+   `DATABASE_URI`, `PAYLOAD_SECRET`, `SUPER_ADMIN_EMAIL`,
+   `SUPER_ADMIN_PASSWORD` and `ANTHROPIC_API_KEY` are the minimum for a working
+   local environment. **Never ask them to paste a secret into chat, and never
+   read one back.** Where a value is unknown, leave the key blank; the code
+   branches on emptiness, not on placeholder text.
+4. **Services.** `docker compose up -d postgres redis`. Only those two.
+5. **Install.** `pnpm install`.
+6. **Schema.** `pnpm payload migrate`, then `pnpm generate:types`.
+   `src/payload-types.ts` is gitignored and does not exist in a fresh clone, and
+   ten modules import from it, so `pnpm typecheck` fails until it is generated.
+7. **Seed.** `pnpm seed`, which is idempotent.
+8. **Run.** `pnpm dev`, then open http://localhost:3000/admin.
+9. **Prove it works.** Have them run `pnpm typecheck` and `pnpm test`. Both
+   should pass. That is the real handshake, not a page that loads.
 
-4. **Wait for explicit confirmations** at the SSH key handshake (they have to send the key to Morne via Signal and get authorization back). Don't proceed until they say so.
+## What to tell them about shipping
 
-5. **After Phase 1 completes**, the `/onboarding` slash command effectively ends — the rest of the session is normal chat where they ask for code changes and you respond. The playbook covers Phases 2 and 3 too, so keep its instructions in mind for the whole session.
+Push to `main`, then release on the server. There is no CI, and a push alone
+changes nothing: the running service serves a prebuilt `.next/`. The release
+block is in `AGENTS.md` section 6, and it is mandatory at the end of any reply
+that pushes shipped code.
 
-6. **Never violate the constraints** in the playbook (no editing .env, no `npm`, no auto-deploy, etc.).
+Do not set them up with production SSH access as part of onboarding. Read-only
+production inspection is a separate, deliberate step, and nothing in the normal
+development loop needs it.
 
-Now: fetch the playbook and begin Phase 1, Step 1.1.
+## Constraints
+
+- Never edit files on the production server.
+- Never commit `.env` or any real credential.
+- Never run `scripts/release.sh` on their behalf during onboarding.
+- Everything in `AGENTS.md` applies from their first commit onward.

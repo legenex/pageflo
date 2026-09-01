@@ -1,3 +1,28 @@
+> # SUPERSEDED: DO NOT FOLLOW
+>
+> This document describes the **retired** deployment model: Docker Compose for
+> the application, `scripts/deploy.sh` driven by a cron flag, and the host
+> `mo.legenex.com`. None of that is true.
+>
+> - `mo.legenex.com` is no longer a Plesk domain. The control plane is
+>   `os.legenex.com`.
+> - The application runs under the `legalos-dev` systemd unit, not Docker. Only
+>   the `postgres` and `redis` services of `docker-compose.yml` are used.
+> - There is no deploy cron and no `/var/log/legalos-deploy.log`.
+>   `scripts/deploy.sh`, `scripts/cron-deploy.sh` and
+>   `scripts/trigger-deploy.sh` are dead.
+> - Releasing is `scripts/release.sh` after a Plesk fetch and deploy.
+>
+> **Current truth: `AGENTS.md` section 6, `docs/release-runbook.md`,
+> `docs/INFRASTRUCTURE.md`.**
+>
+> Retained because two sections are still the only written record of their
+> subject: the enum-migration workaround for Postgres inside a Payload
+> transaction, and the original one-time Plesk Git and API setup. Read those
+> for history. Do not run anything here.
+
+---
+
 # Deploying LegalOS
 
 Server: `mo.legenex.com` (51.81.202.161) — Plesk + Docker Compose on Debian 12.

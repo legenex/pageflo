@@ -1,19 +1,23 @@
-# Current task — 2026-05-18
+# Scratch hand-off file
 
-Three items, fanned out in parallel:
+This file is a scratch pad for in-flight parallel work, not a durable backlog.
+It is safe to overwrite when a new parallel run starts, and its contents should
+never be treated as an outstanding commitment.
 
-## 1. Fix Domains 3-dot menu clipping (main thread)
-- [ ] `src/app/(app)/admin/sites/[slug]/settings/domains/page.tsx` — outer card has `overflow-hidden` clipping the row dropdown. Switch to a layout that doesn't clip absolutely-positioned children (e.g., move rounded-corner clipping to inner header only, or render the menu in a portal).
-- [ ] Verify dropdown is visible on the last row of the list.
+The durable planning surfaces are:
 
-## 2. Build real Pages 3-dot dropdown (Agent 1)
-- [ ] `src/app/(app)/admin/sites/[slug]/pages/page.tsx` — replace `RowMenu` (currently a fake Link to /cms) with a real dropdown.
-- [ ] Actions: **Preview** (open public URL), **Edit** (link to /cms/collections/pages/{id}), **Duplicate** (server action), **Delete** (server action with confirm).
-- [ ] Add `actions.ts` next to the page for duplicate/delete server actions, scoped by `site.id`.
-- [ ] Match Domains row dropdown UX (no clipping).
+- `docs/EXECUTION-PLAN.md` for phases and their acceptance criteria
+- `docs/REQUIREMENTS.md` for what is LIVE, PARTIAL, PLANNED or UNKNOWN
+- `docs/STATE.md` for current factual state and blockers
+- `docs/audit-2026-06-04.md` and `/admin/plan` for the standing bug backlog
+- `docs/external-blockers.md` for what is blocked on someone outside the repo
 
-## 3. DNS auto-verify (Agent 2)
-- [ ] Client-side polling on the Domains page: when at least one domain is `pending`, poll `verifyAndPromoteDomain` (no skipDns) every ~30s while the page is open.
-- [ ] Show a "verifying…" indicator with the `last_checked_at` timestamp on each pending custom row.
-- [ ] Stop polling once all custom domains are `active` or `error`.
-- [ ] Do not auto-promote if the user has already set a primary explicitly (current `verifyAndPromoteDomain` always promotes — that may need a `promote=false` mode).
+---
+
+## Current contents: none
+
+Last real contents were a three-item parallel run dated 2026-05-18, covering a
+Domains dropdown clipping fix, a Pages row menu, and DNS auto-verify polling.
+That run is long finished and its items are either shipped or superseded; the
+text was removed on 2026-09-01 because a four-month-old scratch list reads as an
+open backlog and is not one.

@@ -1,3 +1,27 @@
+========================================================================
+SUPERSEDED - DO NOT FOLLOW
+========================================================================
+
+This playbook describes the retired live-server-editing workflow. It is
+wrong in ways that matter:
+
+  * It names https://mo.legenex.com, which is no longer a Plesk domain.
+    The control plane is https://os.legenex.com.
+  * It names the server work tree /var/www/vhosts/legenex.com/mo.legenex.com.
+    The application directory is .../os.legenex.com.
+  * It tells the agent to deploy by SSHing in and running scripts/deploy.sh,
+    which is retired and now refuses to run. The release path is
+    scripts/release.sh after a Plesk fetch and deploy.
+  * It describes hot reload against production. Production serves a
+    prebuilt .next/ under systemd. There is no HMR.
+
+Current onboarding: clone the repository, then read README.md, then
+AGENTS.md, then docs/STATE.md.
+
+Retained as the historical record of how the team was first onboarded.
+
+========================================================================
+
 LegalOS — new-machine setup playbook for Claude
 ================================================
 

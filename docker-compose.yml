@@ -1,7 +1,21 @@
-# Production stack for Plesk Debian 12.
+# Postgres and Redis for PageFlo (still named LegalOS in code).
+#
+# IMPORTANT: only the `postgres` and `redis` services below are used. In
+# PRODUCTION they run from this file under the Compose project `molegenexcom`,
+# out of /var/www/vhosts/legenex.com/mo.legenex.com, as the containers
+# `molegenexcom-postgres-1` and `molegenexcom-redis-1`. That project name is
+# baked into the container names and scripts/release.sh refers to the Postgres
+# one for its backup, so it is legacy naming that is technically required. Do
+# not rename it outside a planned migration. See docs/INFRASTRUCTURE.md.
+#
+# The `app` service is RETIRED and does not run anywhere. Production serves the
+# application from the `legalos-dev` systemd unit against a prebuilt .next/,
+# behind Plesk's nginx on 127.0.0.1:3000. It is kept only so the historical
+# build arguments stay readable; see docs/EXECUTION-PLAN.md phase 9.
+#
 # Everything binds to 127.0.0.1 only so Plesk's nginx is the sole ingress.
-# Plesk reverse-proxies mo.legenex.com -> 127.0.0.1:3000 and tenant domains
-# get added to Plesk via REST API on connect (see src/lib/plesk/).
+# Tenant domains are added to Plesk via its REST API on connect, see
+# src/lib/plesk/.
 
 services:
   postgres:

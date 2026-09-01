@@ -1,3 +1,21 @@
+> # SUPERSEDED: DO NOT FOLLOW
+>
+> This document tells a new developer to edit files directly on the production
+> server and describes changes going live in about two seconds. That workflow
+> is retired and now contradicts the operating contract.
+>
+> - Never SSH-edit production source. It is overwritten by the next deploy.
+>   `AGENTS.md` sections 3 and 14.
+> - The server runs a production build. There is no HMR and nothing is live in
+>   two seconds. A release is required.
+> - It also names `mo.legenex.com`, which is no longer a Plesk domain.
+>
+> **Current onboarding: `README.md`, then `AGENTS.md`, then `docs/STATE.md`.**
+>
+> Retained as the historical record of how the team was originally onboarded.
+
+---
+
 # Welcome to LegalOS — chat with Claude, changes go live in seconds
 
 You're going to edit our live site by chatting with Claude in VS Code. **No local setup. No clone. No Docker. No Node.** You prompt Claude → Claude edits the file on our server → live site reflects the change in ~2 seconds.

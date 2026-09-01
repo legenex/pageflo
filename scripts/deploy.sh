@@ -1,4 +1,32 @@
 #!/usr/bin/env bash
+#
+# ===========================================================================
+# RETIRED - DO NOT RUN. Kept as historical reference only.
+# ===========================================================================
+#
+# This script belongs to the Docker Compose + cron deploy model that PageFlo
+# (still named LegalOS in code) stopped using. Nothing invokes it: there is no
+# deploy cron on the host, no /var/log/legalos-deploy.log, no Plesk deployment
+# action pointing here, and the `app` service in docker-compose.yml has not run
+# for months. It also targets `mo.legenex.com`, which is no longer a Plesk
+# domain.
+#
+# Running it against production would try to build and start the retired app
+# container against the live database, on a host that also runs Buzz and
+# Hermes. That is why it refuses rather than merely warning.
+#
+# The current release path is `scripts/release.sh` after a Plesk fetch and
+# deploy. See AGENTS.md section 6 and docs/release-runbook.md.
+#
+# Retained rather than deleted because these four scripts are the only written
+# record of how the previous deployment model worked, which phase 9 needs when
+# it rebuilds host bring-up. See docs/EXECUTION-PLAN.md.
+
+if [ "${LEGALOS_ALLOW_RETIRED_SCRIPT:-}" != "1" ]; then
+  echo "REFUSED: this script is retired. See AGENTS.md section 6 for the current release path." >&2
+  echo "         Override only for archaeology: LEGALOS_ALLOW_RETIRED_SCRIPT=1" >&2
+  exit 78
+fi
 # Plesk Git extension runs this as the "Additional deployment actions" command
 # after every pull. Idempotent. Safe to run repeatedly.
 #
