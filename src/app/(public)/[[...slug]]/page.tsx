@@ -4,7 +4,9 @@ import { headers } from 'next/headers'
 import { notFound, redirect } from 'next/navigation'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
-import { resolveSiteByHost, isFallbackHost } from '@/lib/site-resolver'
+import { resolveSiteByHost } from '@/lib/site-resolver'
+import { classifyHost, isMarketingHost, appOrigin, marketingOrigin } from '@/lib/pageflo/hosts'
+import { legalFacts } from '@/lib/pageflo/legal'
 import {
   resolveQuizDeployment,
   quizDeploymentMeta,
@@ -21,7 +23,9 @@ import { LivePreview as LandingPageSections } from '@/components/builder/lp/rend
 import { renderTemplateVars, applyTemplateOverrides, deepRenderTemplateVars, type SiteForTemplate } from '@/lib/template-vars'
 import { resolvePhoneForPath } from '@/lib/resolve-phone'
 import { getCurrentUser, isBoundToSite } from '@/lib/auth'
-import LegalOSMarketing from '@/components/LegalOSMarketing'
+import { MarketingSite } from '@/components/marketing/MarketingSite'
+import { PrivacyPolicy } from '@/components/marketing/PrivacyPolicy'
+import { PRODUCT_DESCRIPTION, PRODUCT_NAME, PRODUCT_TAGLINE } from '@/lib/pageflo/product'
 import { BlockRenderer, type Block, type SiteForRender } from '@/components/blocks/BlockRenderer'
 import { SiteScripts, type TrackingConfigShape } from '@/components/public/SiteScripts'
 import CmcAdvertisingDisclosure from '@/components/public/check-my-claim/AdvertisingDisclosure'
@@ -114,8 +118,47 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params
   const path = normalizePath(slug)
   const h = await headers()
-  const host = h.get('x-legalos-host') ?? h.get('host') ?? ''
-  if (!host || isFallbackHost(host)) return {}
+  const host = h.get('x-pageflo-host') ?? h.get('x-legalos-host') ?? h.get('host') ?? ''
+  const hostRole = classifyHost(host)
+
+  // PageFlo's own hosts describe PageFlo, not a tenant. The console is
+  // explicitly noindex: it is an authenticated application and nothing about it
+  // belongs in a search result.
+  if (hostRole !== 'tenant') {
+    if (!isMarketingHost(host)) {
+      return { title: `${PRODUCT_NAME} Console`, robots: { index: false, follow: false } }
+    }
+    const origin = marketingOrigin() || `https://${host}`
+    if (path === '/privacy') {
+      return legalFacts()
+        ? {
+            title: `Privacy Policy — ${PRODUCT_NAME}`,
+            description: `How ${PRODUCT_NAME} handles operator, customer and lead information.`,
+            alternates: { canonical: `${origin}/privacy` },
+            robots: { index: true, follow: true },
+          }
+        : { robots: { index: false, follow: false } }
+    }
+    if (path !== '/') return {}
+    return {
+      title: `${PRODUCT_NAME} — ${PRODUCT_TAGLINE}`,
+      description: PRODUCT_DESCRIPTION,
+      alternates: { canonical: `${origin}/` },
+      robots: { index: true, follow: true },
+      openGraph: {
+        type: 'website',
+        siteName: PRODUCT_NAME,
+        title: `${PRODUCT_NAME} — ${PRODUCT_TAGLINE}`,
+        description: PRODUCT_DESCRIPTION,
+        url: `${origin}/`,
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: `${PRODUCT_NAME} — ${PRODUCT_TAGLINE}`,
+        description: PRODUCT_DESCRIPTION,
+      },
+    }
+  }
 
   const resolved = await resolveSiteByHost(host)
   if (!resolved?.siteId) return {}
@@ -276,9 +319,9 @@ export default async function PublicCatchAll({ params, searchParams }: Props) {
   // embed script injects. It affects nothing else on the public router.
   const embedMode = (await searchParams)?.embed === '1'
   const h = await headers()
-  const rawPreviewSiteSlug = h.get('x-legalos-preview-site')
-  const previewMode = h.get('x-legalos-preview') === '1'
-  const host = h.get('x-legalos-host') ?? h.get('host')
+  const rawPreviewSiteSlug = h.get('x-pageflo-preview-site') ?? h.get('x-legalos-preview-site')
+  const previewMode = (h.get('x-pageflo-preview') ?? h.get('x-legalos-preview')) === '1'
+  const host = h.get('x-pageflo-host') ?? h.get('x-legalos-host') ?? h.get('host')
 
   // Both preview channels (?site=<slug> and ?preview=1) are admin-only. Resolve
   // the user once, up front, so an anonymous visitor can never use a preview
@@ -299,8 +342,35 @@ export default async function PublicCatchAll({ params, searchParams }: Props) {
   const authedUser = wantsPreview || hasSessionCookie ? await getCurrentUser() : null
   const previewSiteSlug = authedUser ? rawPreviewSiteSlug : null
 
-  if (!previewSiteSlug && (!host || isFallbackHost(host))) {
-    return <LegalOSMarketing />
+  // PageFlo's own hosts, resolved before any Domains lookup so a `Domains` row
+  // can never claim the marketing site or the console. `?site=<slug>` is an
+  // authenticated tenant preview and deliberately still wins, which is how an
+  // operator previews a Site from the console host.
+  if (!previewSiteSlug) {
+    const hostRole = classifyHost(host)
+    if (!host || hostRole !== 'tenant') {
+      if (isMarketingHost(host)) {
+        if (path === '/privacy') {
+          const facts = legalFacts()
+          // Fail closed. Until the operating business supplies its legal facts
+          // there is no policy to publish, and a policy with a hole in it is
+          // worse than no page. See src/lib/pageflo/legal.ts.
+          if (!facts) notFound()
+          return <PrivacyPolicy facts={facts} appUrl={appOrigin()} />
+        }
+        // A legacy console host served the marketing page at every path before
+        // the rebrand. Preserved so nothing a visitor currently reaches starts
+        // returning 404 mid-migration. The dedicated marketing host is stricter.
+        if (path === '/' || hostRole === 'legacy-app') {
+          return <MarketingSite appUrl={appOrigin()} />
+        }
+        notFound()
+      }
+      // A dedicated console host has no public surface. `/` goes to the
+      // application, which sends an unauthenticated visitor to sign-in.
+      if (path === '/') redirect('/admin')
+      notFound()
+    }
   }
 
   const payload = await getPayload({ config })
@@ -323,8 +393,12 @@ export default async function PublicCatchAll({ params, searchParams }: Props) {
     siteId = resolved?.siteId ?? null
   }
 
+  // An unresolvable host is not PageFlo's marketing site. Rendering the product
+  // page for it advertised PageFlo on every misconfigured or hostile Host
+  // header, and disagreed with robots.txt, which already answered `Disallow: /`
+  // for the same request.
   if (!siteId) {
-    return <LegalOSMarketing />
+    notFound()
   }
 
   const site = (await payload.findByID({ collection: 'sites', id: siteId, overrideAccess: true })) as SiteForTemplate & {

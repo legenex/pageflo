@@ -4,7 +4,9 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import '../globals.css'
 import { getCurrentUser, isBoundToSite } from '@/lib/auth'
-import { resolveSiteByHost, isFallbackHost } from '@/lib/site-resolver'
+import { resolveSiteByHost } from '@/lib/site-resolver'
+import { isReservedHost } from '@/lib/pageflo/hosts'
+import { PAGEFLO_FONTS_HREF } from '@/lib/pageflo/fonts'
 import { resolveBrandTokens } from '@/lib/brand/resolve-tokens'
 import { IDENTITY_FONTS_HREF } from '@/lib/lp-identities'
 
@@ -31,7 +33,7 @@ type Site = {
 
 // Per-Site brand tokens use distinct names (--site-*) so they don't collide with the
 // dark-theme app tokens (--color-*) defined in globals.css. When no Site is matched
-// (the LegalOS marketing fallback), no site tokens are emitted — the dark @theme wins.
+// (the PageFlo marketing site), no site tokens are emitted — the dark @theme wins.
 //
 // Every value comes from resolveBrandTokens. This function used to carry its own
 // `?? '#0B1F3A'` fallback on each variable, which meant a brand with no data
@@ -66,8 +68,8 @@ const siteStyleVars = (site: Site): string => {
 
 export default async function PublicLayout({ children }: { children: ReactNode }) {
   const h = await headers()
-  const previewSiteSlug = h.get('x-legalos-preview-site')
-  const host = h.get('x-legalos-host') ?? h.get('host')
+  const previewSiteSlug = h.get('x-pageflo-preview-site') ?? h.get('x-legalos-preview-site')
+  const host = h.get('x-pageflo-host') ?? h.get('x-legalos-host') ?? h.get('host')
   let site: Site | null = null
 
   // Preview mode (?site=<slug>) — middleware stamps x-legalos-preview-site.
@@ -92,7 +94,7 @@ export default async function PublicLayout({ children }: { children: ReactNode }
     const candidate = (res.docs[0] as Site) ?? null
     const user = candidate ? await getCurrentUser() : null
     site = candidate && isBoundToSite(user, (candidate as { id: string | number }).id) ? candidate : null
-  } else if (host && !isFallbackHost(host)) {
+  } else if (host && !isReservedHost(host)) {
     const resolved = await resolveSiteByHost(host)
     if (resolved) {
       const payload = await getPayload({ config })
@@ -114,6 +116,10 @@ export default async function PublicLayout({ children }: { children: ReactNode }
             rather than a cosmetic loss. Preconnected because this sits on the
             critical path of a tenant page. */}
         <link rel="stylesheet" href={IDENTITY_FONTS_HREF} />
+        {/* PageFlo chrome faces, for the marketing and legal pages only. A
+            resolved tenant page renders in its own brand fonts and must not pay
+            for a stylesheet it never uses. */}
+        {site ? null : <link rel="stylesheet" href={PAGEFLO_FONTS_HREF} />}
         {site ? <style dangerouslySetInnerHTML={{ __html: siteStyleVars(site) }} /> : null}
         {site?.brand?.favicon_url ? <link rel="icon" href={site.brand.favicon_url} /> : null}
       </head>

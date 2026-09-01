@@ -1,31 +1,98 @@
 @import "tailwindcss";
 
+/* ============================================================================
+   PageFlo design tokens
+   ----------------------------------------------------------------------------
+   One semantic token layer for the whole operator application. Components
+   reference these names, never raw hex, so a palette change lands in one place.
+
+   Token names are stable on purpose. They predate the PageFlo rebrand and are
+   referenced by ~44 admin pages and both sidebars, so the rebrand re-points the
+   VALUES and adds new names rather than renaming the existing ones. Renaming
+   them would be a mechanical sweep with no design benefit and a large blast
+   radius.
+
+   This palette is the PageFlo operator chrome. It is deliberately separate from
+   the tenant Brand Kit tokens resolved in src/lib/builder/. A customer's brand
+   colours never reach these variables, and these variables never reach a
+   published tenant page.
+   ========================================================================== */
+
 @theme {
-  --color-canvas: #252E39;
-  --color-surface-1: #1C242E;
-  --color-surface-2: #2D3845;
-  --color-surface-3: #3A4756;
-  --color-border: #1F2433;
-  --color-border-strong: #2A3142;
+  /* Surfaces, darkest to lightest.
+     canvas        application background
+     surface-deep  inset surfaces: inputs, code blocks, table wells
+     surface-1     primary card surface
+     surface-2     elevated surface: popovers, modals, sidebar, gradient top
+     surface-3     raised / hover state */
+  --color-canvas: #0A0E15;
+  --color-surface-deep: #111823;
+  --color-surface-1: #131924;
+  --color-surface-2: #182030;
+  --color-surface-3: #1F2939;
 
-  --color-ink: #E6E8EC;
-  --color-ink-muted: #8B92A4;
-  --color-ink-dim: #5C6376;
+  --color-border: #243044;
+  --color-border-strong: #2C3A4E;
 
-  --color-brand-from: #FF5C75;
-  --color-brand-to: #B53E72;
-  --color-brand-strong: #EF4F6B;
+  /* Text, brightest to dimmest. Every value below is measured against the three
+     surfaces it can legally sit on (canvas, surface-1, surface-2):
+       ink            17.2 : 1  /  15.7 : 1  /  14.5 : 1
+       ink-secondary  12.0 : 1  /  10.9 : 1  /  10.1 : 1
+       ink-muted       6.4 : 1  /   5.8 : 1  /   5.4 : 1
+       ink-dim         5.7 : 1  /   5.2 : 1  /   4.8 : 1
+     ink-dim is #808C9E rather than the #737F92 named in the design brief.
+     #737F92 measures 4.35 : 1 on surface-1 and 4.20 : 1 on surface-2, i.e. it
+     fails WCAG AA for normal text on both card surfaces it is used on. One step
+     lighter clears AA on every surface and is visually indistinguishable. */
+  --color-ink: #EEF2F8;
+  --color-ink-secondary: #C7D0DC;
+  --color-ink-muted: #8B95A8;
+  --color-ink-dim: #808C9E;
 
-  --color-pos: #2DBE6C;
-  --color-pos-dim: #1B5E3B;
-  --color-warn: #E8B14B;
-  --color-warn-dim: #5A4421;
-  --color-neg: #E15B4F;
-  --color-info: #4F86E1;
+  /* PageFlo accent. A single restrained red, not a gradient identity.
+     brand-from / brand-to exist because gradients across the app already
+     reference them; they are now two stops of the same red. */
+  --color-brand: #E5484D;
+  --color-brand-from: #E5484D;
+  --color-brand-to: #C93338;
+  --color-brand-strong: #E5484D;
+  --color-brand-hover: #D43B40;
+
+  /* Status. pos / warn / neg / info are the four the application asserts on. */
+  --color-pos: #3DD68C;
+  --color-pos-dim: #12432C;
+  --color-warn: #FACC14;
+  --color-warn-dim: #4A3D07;
+  --color-neg: #E5484D;
+  --color-neg-dim: #4A1416;
+  --color-info: #5AA6DC;
+
+  /* Secondary accents used by status pills and flow lanes. */
+  --color-accent-teal: #41D9C7;
+  --color-accent-purple: #9585DD;
+  --color-accent-orange: #F97316;
+  --color-accent-blue: #5AA6DC;
+
+  /* The keyboard focus ring is its own token because globals.css is shared by
+     three surfaces: the dark operator chrome, the dark sign-in shell, and the
+     WHITE public tenant pages. #4F86E1 is the one value measured to clear
+     WCAG 2.2's 3:1 non-text minimum on both extremes: 5.6 : 1 against
+     --color-canvas and 3.6 : 1 against #fff. --color-info is lighter and
+     reads better on dark chrome, but drops to 2.65 : 1 on white, so the two
+     must not be the same token. */
+  --color-focus-ring: #4F86E1;
 
   --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 
-  --shadow-card: 0 1px 0 0 rgba(255,255,255,0.02) inset, 0 0 0 1px rgba(255,255,255,0.04);
+  /* Compact operator radii. --radius-app is the application default. */
+  --radius-app: 10px;
+  --radius-app-sm: 8px;
+  --radius-app-lg: 12px;
+
+  --shadow-card: 0 1px 0 0 rgba(255,255,255,0.02) inset, 0 0 0 1px rgba(255,255,255,0.03);
+  --shadow-pop: 0 16px 40px rgba(0,0,0,0.5);
+  --shadow-modal: 0 28px 70px rgba(0,0,0,0.6);
 }
 
 html, body {

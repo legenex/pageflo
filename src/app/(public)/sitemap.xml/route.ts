@@ -1,7 +1,9 @@
 import { headers } from 'next/headers'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { resolveSiteByHost, isFallbackHost } from '@/lib/site-resolver'
+import { resolveSiteByHost } from '@/lib/site-resolver'
+import { classifyHost, marketingOrigin } from '@/lib/pageflo/hosts'
+import { marketingSitemapEntries } from '@/lib/pageflo/marketing-routes'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,8 +11,24 @@ const escapeXml = (s: string): string => s.replace(/[<>&'"]/g, (c) => ({ '<': '&
 
 export async function GET() {
   const h = await headers()
-  const host = h.get('x-legalos-host') ?? h.get('host') ?? ''
-  if (!host || isFallbackHost(host)) {
+  const host = h.get('x-pageflo-host') ?? h.get('x-legalos-host') ?? h.get('host') ?? ''
+  const role = classifyHost(host)
+
+  // The marketing site has a small, fixed sitemap of its own public pages.
+  if (role === 'marketing') {
+    const origin = marketingOrigin() || `https://${host}`
+    const body = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+${marketingSitemapEntries()
+  .map((e) => `  <url><loc>${escapeXml(origin + e.path)}</loc><changefreq>${e.changefreq}</changefreq><priority>${e.priority}</priority></url>`)
+  .join('\n')}
+</urlset>`
+    return new Response(body, { headers: { 'content-type': 'application/xml' } })
+  }
+
+  // The console publishes nothing. An empty urlset is a valid answer and avoids
+  // a crawler treating a 404 here as a site-wide fault.
+  if (!host || role === 'app' || role === 'legacy-app') {
     return new Response('<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>', {
       headers: { 'content-type': 'application/xml' },
     })

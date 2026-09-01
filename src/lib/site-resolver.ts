@@ -1,6 +1,7 @@
 import { getPayload } from 'payload'
 
 import { domainEligibility, type DomainLike } from './domain-eligibility'
+import { isReservedHost } from './pageflo/hosts'
 
 /*
  * `@payload-config` is imported lazily: `payload.config.ts` imports
@@ -244,8 +245,14 @@ export const resolveDomainForProvisioning = async (
   }
 }
 
-export const isFallbackHost = (host: string | null | undefined): boolean => {
-  const normalized = normalizeHost(host)
-  const fallback = normalizeHost(process.env.LEGALOS_FALLBACK_HOST)
-  return Boolean(fallback) && normalized === fallback
-}
+/**
+ * True when this host belongs to PageFlo itself (marketing site, operator
+ * console, or a legacy console host kept alive during the domain migration) and
+ * must therefore never be resolved against the `Domains` table.
+ *
+ * Kept under its original name because five public surfaces call it and the
+ * meaning is unchanged: "this is not a tenant host". The implementation moved to
+ * `src/lib/pageflo/hosts.ts`, which understands three reserved hosts instead of
+ * one and is where new host rules belong.
+ */
+export const isFallbackHost = (host: string | null | undefined): boolean => isReservedHost(host)
