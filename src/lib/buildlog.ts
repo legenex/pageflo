@@ -163,6 +163,73 @@ export const buildLogEvidenceId = (entry: BuildLogEntry, item: BuildLogItem, ev:
 
 export const ENTRIES: BuildLogEntry[] = [
   {
+    date: '2026-09-02',
+    title: 'Responsive QA close-out: the console walk is real, and one leaked process behind it',
+    summary:
+      'A continuation session in a new codespace, resuming after the previous one was recycled mid-way through validating the console redesign\'s responsive behaviour. The corrected overflow assertion and the console walk itself were already right; this closed out verifying that honestly, found and fixed a real process leak in the end-to-end suite, and closed a small gap in the mobile Sites list and the image-host env var.',
+    items: [
+      {
+        title: 'The end-to-end lead suite leaked its server process on every run',
+        status: 'shipped',
+        detail:
+          'Unlike test-console-walk.mts, which spawns pnpm start detached and kills the whole process group, test-e2e-lead.mts spawned it plainly and called server.kill(\'SIGTERM\'), which only ever signalled the pnpm wrapper, not the next-server it actually runs as. Confirmed by running the suite twice and finding a live orphaned next-server both times, holding its port and memory. Fixed to match the console walk\'s pattern exactly; verified clean afterwards.',
+        files: ['scripts/test-e2e-lead.mts'],
+      },
+      {
+        title: 'The Sites mobile cards were missing the one action the desktop table had',
+        status: 'shipped',
+        detail:
+          'The lg:hidden card view carried domain, vertical, delivery and updated-at, but not the external "preview this Site" link the desktop row has. Added, same icon and target.',
+        files: ['src/app/(app)/admin/(top)/sites/page.tsx'],
+      },
+      {
+        title: 'next.config.mjs never read the canonical image-host variable',
+        status: 'shipped',
+        detail:
+          'src/lib/pageflo/env.ts declares PAGEFLO_IMAGE_HOSTS as canonical with LEGALOS_IMAGE_HOSTS as fallback, but next.config.mjs cannot import that module (it runs before the app exists) and had never been given the same precedence directly, so setting the new name alone would have silently admitted nothing. Restated the fallback locally.',
+        files: ['next.config.mjs'],
+      },
+      {
+        title: 'A cold production build reliably exceeded this codespace\'s available memory',
+        status: 'partial',
+        detail:
+          'pnpm build was killed by the OS on every attempt in this session (SIGTERM or SIGKILL, no cgroup oom_kill counter, so likely a host-level guard). Running next build directly with a capped V8 heap succeeded exactly once, before this session\'s edits landed; nine further attempts after that, including with the new experimental.webpackMemoryOptimizations flag, all died the same way. The flag is a real, documented Next.js lever for this problem and ships regardless; it was simply not sufficient on its own in this specific, resource-constrained codespace today. No build including this session\'s diff was confirmed complete here.',
+        files: ['next.config.mjs'],
+      },
+    ],
+    verification: [
+      {
+        label: 'pnpm typecheck',
+        state: 'verified',
+        detail: 'tsc --noEmit, exit 0, zero errors, run repeatedly through the session.',
+      },
+      {
+        label: 'pnpm test:console (the responsive/console walk)',
+        state: 'verified',
+        detail: '312 passed, 0 failed, widest horizontal overflow 0px, run twice against a real production build.',
+      },
+      {
+        label: 'pnpm test:e2e',
+        state: 'verified',
+        detail: '34 assertions, twice in a row after the process-leak fix, no leftover process either time.',
+      },
+      {
+        label: 'pnpm test (17 suites), test:isolation, test:identity, test:release, test:bootstrap, test:dom, verify:schema, check:paths, lint:tokens, check:handbook',
+        state: 'verified',
+        detail: 'All exit 0, 0 failed, full matrix run and read, not just exit-code checked.',
+      },
+      {
+        label: 'pnpm build, including this session\'s diff',
+        state: 'not-run',
+        detail: 'See the item above. Re-run before the next release, ideally with more headroom than this codespace had today.',
+      },
+    ],
+    openIssues: [
+      'pnpm build needs to be re-confirmed against this session\'s three-file diff before release; it was not possible in this codespace today.',
+      'Production was not touched: this codespace has no SSH configuration to it at all, and pageflo.io / app.pageflo.io DNS does not point at the production host yet regardless.',
+    ],
+  },
+  {
     date: '2026-09-01',
     title: 'PageFlo: the console, the product site, and the identifiers that stayed',
     summary:

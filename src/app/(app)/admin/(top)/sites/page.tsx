@@ -161,6 +161,7 @@ export default async function SitesPage({ searchParams }: { searchParams: Search
             <ul className="divide-y divide-border/70 lg:hidden">
               {sites.docs.map((site) => {
                 const primary = primaryByEntry.get(site.id)
+                const previewUrl = `/?site=${encodeURIComponent(site.slug)}`
                 return (
                   <li key={site.id} className="px-3.5 py-3">
                     <div className="flex items-start gap-2.5">
@@ -185,6 +186,14 @@ export default async function SitesPage({ searchParams }: { searchParams: Search
                         tone={SITE_STATUS_TONE[site.status] ?? 'neutral'}
                         dot={false}
                       />
+                      <Link
+                        href={previewUrl}
+                        target="_blank"
+                        className="-mr-1 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-app-sm text-ink-dim transition-colors hover:bg-surface-3 hover:text-ink"
+                        aria-label={`Preview ${site.name}`}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+                      </Link>
                     </div>
                     <dl className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-2">
                       <div className="min-w-0">

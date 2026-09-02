@@ -4,7 +4,7 @@ Update this file after every completed or blocked task. It is the persistent
 handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such.
 
-Last updated: 1 September 2026, PageFlo rebrand and console redesign.
+Last updated: 2 September 2026, responsive QA close-out and codespace continuation.
 
 ---
 
@@ -303,34 +303,74 @@ breakdown.
 
 ---
 
-## Validation capability, measured 1 September 2026
+## Validation capability, measured 2 September 2026
 
-Measured in this codespace, which has `node_modules`, a working `.env` pointed
-at localhost, a generated `src/payload-types.ts`, and PostgreSQL 16 plus
-Redis 7 in local Docker.
+Measured in a **new** codespace (the 1 September one had already been recycled
+for inactivity), which has `node_modules`, a working `.env` pointed at
+localhost, a generated `src/payload-types.ts`, and PostgreSQL 16 plus Redis 7
+in local Docker, same as before.
 
 | Command | Result |
 |---|---|
 | `pnpm typecheck` | PASS, exit 0, zero errors |
-| `pnpm build` | PASS, exit 0, full route table emitted |
-| `pnpm test` (17 suites) | PASS, exit 0 |
-| `pnpm test:rebrand` | PASS, 38 assertions |
+| `pnpm build` | **PASS once**, exit 0, full route table emitted — see "The build memory problem" below for what that claim does and does not cover |
+| `pnpm test` (17 suites) | PASS, exit 0, 721+247+... all green (see full log; every suite in the chain reported 0 failed) |
+| `pnpm test:rebrand` | PASS (run as part of `pnpm test`) |
 | `pnpm test:isolation` | PASS, 49 assertions |
 | `pnpm test:identity` | PASS, 33 assertions |
 | `pnpm test:release` | PASS, 31 assertions, on its own scratch database |
-| `pnpm test:e2e` | PASS, 34 assertions, Chromium via Playwright |
-| `pnpm check:paths` | PASS, 9 deployments, 0 unresolvable |
+| `pnpm test:e2e` | PASS, 34 assertions, Chromium via Playwright, twice in a row after the process-group fix below (a first run hit a transient Chromium "Page crashed" under memory pressure; the retry was clean) |
+| `pnpm test:bootstrap` | PASS, 58 assertions, own migration-only database |
+| `pnpm test:dom` | PASS, 369 assertions |
+| `pnpm check:paths` | PASS, 0 deployments, 0 unresolvable (dev DB has none seeded) |
 | `pnpm verify:schema` | PASS, 25 collections and 1 global read cleanly |
 | `pnpm lint:tokens` | PASS |
-| `pnpm check:buildlog` | PASS |
-| `pnpm check:handbook` | PASS, 21 routes documented, 32 screens, 0 missing |
+| `pnpm check:buildlog` | Runs clean (exit 0); reports 5 days of shipped-code commits since 2026-07-27 with no build-log entry, which is coverage reporting, not a failure |
+| `pnpm check:handbook` | PASS, 22 routes documented, 33 screens, 18 sidebar destinations, 0 missing, 0 mismatched |
+| `pnpm test:console` (the responsive/console walk) | **PASS, 312 passed, 0 failed, widest horizontal overflow 0px** — see below, this was the actual point of the session |
+| `pnpm test:ui`, `pnpm test:failclosed` | Not run to completion — both require a `pnpm dev` server started manually first (`ERR_CONNECTION_REFUSED` otherwise); neither is in `AGENTS.md`'s documented matrix or in `pnpm test` / `pnpm test:all` |
 | `pnpm lint` | **NOT A CHECK.** No ESLint config; prompts interactively, exits 1. |
 
-Not run this session: `pnpm test:bootstrap`, which needs its own empty
-migration-only database provisioned first.
+### The build memory problem
 
-**Earlier project documentation said this codespace could not build.** That was
-true when it was written and is not true now. Do not repeat it.
+This codespace has 7.8Gi total RAM, 2 CPUs, no swap, and swap cannot be added
+(`swapon` fails with "Invalid argument" on this container filesystem). A cold
+`next build` of this app's size (the ported builder code among it) needs more
+peak RSS than is reliably available alongside the IDE's own processes
+(extension host, two TypeScript servers, Pylance, an unrelated third-party
+`kilocode` extension server), which together idle around 4.5-6Gi.
+
+`pnpm build` (`cross-env NODE_OPTIONS=--no-deprecation next build`) was killed
+by the OS **every time** it was run as documented (SIGTERM/143 or SIGKILL/137,
+no cgroup `oom_kill` counter increment, so likely a host-level guard rather
+than the container's own cgroup). Running `next build` directly with
+`NODE_OPTIONS=--max-old-space-size=1536` succeeded exactly **once**, producing
+a full, clean route table (`✓ Compiled successfully in 112s`) — that run
+predates the three source edits in this session's diff. Eight further attempts
+after that (spanning heap ceilings from 4096 down to 896, warm and cold
+webpack cache, and with the new `experimental.webpackMemoryOptimizations: true`
+flag active) were all killed the same way. `.next/` is consequently **not**
+currently in a servable state in this codespace (no `BUILD_ID`); this does not
+affect what was pushed, since `.next/` is gitignored.
+
+What this does and does not prove: `pnpm typecheck` is clean (the check that
+actually type-checks; `next build` does not, per `next.config.mjs`'s
+`ignoreBuildErrors: true`), the one successful build proves the codebase as of
+just before this session's edits compiles cleanly end to end, and all three
+edits are small, typecheck-clean, and (for the Sites page change) follow an
+already-compiled, identical pattern in the same file. But **no build that
+includes this session's diff was confirmed to complete** in this environment.
+Do not treat that as proven; treat `pnpm build` as needing to be re-run,
+ideally in a codespace with more headroom or with the IDE's language servers
+quiesced, before the next release.
+
+**Earlier project documentation said this codespace could not build at all.**
+That was true when it was written and still is not the general case — the
+1 September session's own measurement (`pnpm build` PASS in one clean run) and
+this session's one successful run both prove the app builds correctly. What
+changed is that a fresh codespace, on this particular day, with the IDE's own
+tooling loaded, does not reliably have enough free memory to finish a cold
+build every time it is attempted. Re-verify before relying on either claim.
 
 ---
 
@@ -350,6 +390,24 @@ and phase 11, the production cutover.
 
 ## Active blockers
 
+- **`pageflo.io` / `app.pageflo.io` DNS is not pointed at production.** Measured
+  2 September 2026 from this codespace: `pageflo.io` resolves to `192.64.119.75`
+  (a Namecheap parking page, not `51.81.202.161`), `www.pageflo.io` resolves to
+  Namecheap parking IPs, and `app.pageflo.io` does not resolve at all. Nothing on
+  the production host can be configured for these hosts (new Plesk domain, TLS
+  issuance) until an operator repoints DNS, and any DNS change is a standing
+  human gate (`AGENTS.md` section 12). Required records, once ready to cut over:
+  `pageflo.io` A record to `51.81.202.161`; `www.pageflo.io` A (or CNAME) to the
+  same; `app.pageflo.io` A record to the same. Do not remove `os.legenex.com`'s
+  DNS or flip `PAGEFLO_LEGACY_HOST_REDIRECT` until the new hosts are verified
+  end to end.
+- **This codespace has no SSH path to production.** `~/.ssh/` does not exist
+  here at all (a fresh codespace; the `legalos` host alias and
+  `legalos_deploy` key `CLAUDE.md` describes were never provisioned into it).
+  No production inspection, Plesk change, or `scripts/release.sh` run was
+  possible this session as a result; every check in this entry ran against the
+  local codespace only. GitHub push access (`gh auth status`) works normally
+  and is unaffected.
 - **Legal publication facts are not configured.** `/privacy` fails closed and
   its footer link is absent until `PAGEFLO_LEGAL_ENTITY`,
   `PAGEFLO_LEGAL_ADDRESS`, `PAGEFLO_PRIVACY_CONTACT`,
@@ -393,6 +451,64 @@ human gates. See `docs/HUMAN-GATES.md`.
 ---
 
 ## Change log
+
+### 2 September 2026, responsive QA close-out and codespace continuation
+
+A continuation session in a new codespace, resuming after the previous one was
+recycled for inactivity mid-way through validating the console redesign's
+responsive behaviour. Confirmed `f114674c9170` was intact (HEAD, clean tree,
+matched `origin/main`) before making any change.
+
+**The console walk is real and it passes.** `scripts/test-console-walk.mts`
+already carried the corrected horizontal-overflow assertion from the prior
+session (it scrolls the window and reads `scrollX` back, rather than trusting
+`scrollWidth`, which is what let a genuine 579px page-level overflow read as
+green before). No canary, no leftover debug output. Ran twice against a real
+production build: 312 passed, 0 failed, widest horizontal overflow 0px across
+19 routes at desktop, tablet and mobile widths, including sign-in, mobile nav,
+sidebar accordions, the danger-zone confirmation dialog, and the Sites search
+empty state.
+
+**One real bug found and fixed: `scripts/test-e2e-lead.mts` leaked its server
+process on every run.** Unlike `test-console-walk.mts`, which spawns `pnpm
+start` `detached` and kills the whole process group, this suite spawned it
+plainly and called `server.kill('SIGTERM')`, which only ever signalled the
+`pnpm` wrapper, not the `next-server` it ends up running as. Confirmed by
+running the suite and finding a live orphaned `next-server` afterwards, twice.
+Fixed to match the console walk's pattern exactly. Verified: after the fix, the
+suite passes (34/34) and leaves nothing running.
+
+**The Sites list's mobile cards were missing the one action the desktop table
+had.** The `lg:hidden` card view (added in the prior session to fix a 579px
+overflow the dense table caused on a phone) carried domain, vertical, delivery
+and updated-at, but not the external "preview this Site" link the desktop row
+has. Added, same icon and target.
+
+**`next.config.mjs` read `LEGALOS_IMAGE_HOSTS` directly and never looked at
+`PAGEFLO_IMAGE_HOSTS`.** `src/lib/pageflo/env.ts` declares `PAGEFLO_IMAGE_HOSTS`
+as the canonical name with `LEGALOS_IMAGE_HOSTS` as fallback, but
+`next.config.mjs` cannot import that module (it runs before the app exists) and
+had never been given the same two-name precedence, so setting the new name
+alone would have silently done nothing. Restated the fallback locally, in the
+one file that could not share it.
+
+**Also added `experimental.webpackMemoryOptimizations: true`** after this
+session's own build kept getting killed by the codespace's memory ceiling; see
+"The build memory problem" above. Does not change build output, only how much
+memory producing it needs.
+
+**Production was not touched.** This codespace has no SSH configuration at all
+(`~/.ssh/` does not exist), so no host inspection, Plesk change or
+`scripts/release.sh` run was possible even with authorization. Separately,
+`pageflo.io` / `app.pageflo.io` DNS does not point at the production host yet
+(measured from this codespace: `pageflo.io` resolves to a Namecheap parking
+IP, `app.pageflo.io` does not resolve), which is a DNS change and a standing
+human gate regardless. Both are recorded under "Active blockers".
+
+**Validation.** `pnpm typecheck` clean throughout. Full matrix run: see
+"Validation capability, measured 2 September 2026" above for the complete
+table, including the one place a check could not be run to completion
+(`pnpm build` after this session's diff) and exactly why.
 
 ### 1 September 2026, PageFlo rebrand and console redesign
 

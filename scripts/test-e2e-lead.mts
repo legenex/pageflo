@@ -242,6 +242,13 @@ try {
   console.log(`  starting the app on ${ORIGIN}`)
   const serverLog: string[] = []
   server = spawn('pnpm', ['start'], {
+    // `detached` puts the server in its own process GROUP so it can be killed
+    // whole. `pnpm start` spawns `next start`, which spawns `next-server`;
+    // killing only the pnpm wrapper leaves the real server holding the port
+    // and its memory, and a suite run repeatedly leaves a pile of orphans
+    // behind that later runs then collide with. See the identical fix in
+    // scripts/test-console-walk.mts.
+    detached: true,
     stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, NODE_ENV: 'production', PORT: String(PORT) },
   })
@@ -417,10 +424,20 @@ try {
   fail++
   console.log(`  FAIL the end-to-end walk completed — ${err instanceof Error ? err.stack ?? err.message : String(err)}`)
 } finally {
-  if (server) {
-    server.kill('SIGTERM')
+  if (server?.pid) {
+    try {
+      process.kill(-server.pid, 'SIGTERM')
+    } catch {
+      server.kill('SIGTERM')
+    }
     await new Promise((r) => setTimeout(r, 500))
-    if (!server.killed) server.kill('SIGKILL')
+    if (!server.killed) {
+      try {
+        process.kill(-server.pid, 'SIGKILL')
+      } catch {
+        server.kill('SIGKILL')
+      }
+    }
   }
   for (const row of created.reverse()) {
     await payload.delete({ collection: row.collection, id: row.id, overrideAccess: true }).catch(() => null)

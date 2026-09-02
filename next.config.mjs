@@ -5,6 +5,11 @@ import { withPayload } from '@payloadcms/next/withPayload'
 // a config file is the one place in a codebase nothing can assert against.
 import { imageRemotePatterns, admitImageHosts } from './src/lib/net/image-hosts.mjs'
 
+// PAGEFLO_IMAGE_HOSTS first, LEGALOS_IMAGE_HOSTS as the legacy fallback - the
+// same precedence src/lib/pageflo/env.ts applies everywhere else, restated
+// here because this file cannot import that module (see above).
+const IMAGE_HOSTS_RAW = process.env.PAGEFLO_IMAGE_HOSTS || process.env.LEGALOS_IMAGE_HOSTS || ''
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -17,6 +22,12 @@ const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
   experimental: {
     reactCompiler: false,
+    // This app's builder code is large (the ported funnel/page-builder apps,
+    // ~24,000 @ts-nocheck'd lines among them), and a cold production build's
+    // peak RSS can exceed what a constrained host has available, killing the
+    // build with SIGKILL/SIGTERM before it finishes. This trades a slower
+    // build for a lower peak, and does not change the emitted output.
+    webpackMemoryOptimizations: true,
     serverActions: {
       // The brand wizard posts documents and downscaled images in one action,
       // and Next rejects an oversized body with a 413 BEFORE the action runs -
@@ -42,19 +53,24 @@ const nextConfig = {
     // Nothing remote is admitted now. Brand artwork does not need the optimiser:
     // the templates emit a plain <img> at the URL the brand supplied, so the
     // VISITOR's browser fetches it and this server never does, which is the only
-    // arrangement with no server-side fetch to exploit. `LEGALOS_IMAGE_HOSTS` is
-    // for an operator who deliberately wants a known CDN optimised, and every
-    // entry goes through the same shape admission every other outbound address
-    // does. Wildcards are refused, so this cannot regress to what it was.
-    remotePatterns: imageRemotePatterns(process.env.LEGALOS_IMAGE_HOSTS),
+    // arrangement with no server-side fetch to exploit. `PAGEFLO_IMAGE_HOSTS`
+    // (falling back to the legacy `LEGALOS_IMAGE_HOSTS` name, exactly as
+    // src/lib/pageflo/env.ts does for every other variable) is for an operator
+    // who deliberately wants a known CDN optimised, and every entry goes
+    // through the same shape admission every other outbound address does.
+    // Wildcards are refused, so this cannot regress to what it was.
+    //
+    // This file cannot import src/lib/pageflo/env.ts (see the note at the top),
+    // so the fallback is re-stated here rather than shared.
+    remotePatterns: imageRemotePatterns(IMAGE_HOSTS_RAW),
   },
 }
 
-for (const { entry, reason } of admitImageHosts(process.env.LEGALOS_IMAGE_HOSTS).refused) {
+for (const { entry, reason } of admitImageHosts(IMAGE_HOSTS_RAW).refused) {
   // A typo in an environment variable must cost the one host it names, not the
   // build - but silently dropping it is how an operator concludes the allowlist
   // does not work and reaches for the wildcard again.
-  console.warn(`[pageflo] LEGALOS_IMAGE_HOSTS: refused "${entry}" - ${reason}`)
+  console.warn(`[pageflo] PAGEFLO_IMAGE_HOSTS: refused "${entry}" - ${reason}`)
 }
 
 export default withPayload(nextConfig)
