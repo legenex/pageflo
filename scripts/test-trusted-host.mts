@@ -126,11 +126,14 @@ t(trustedHost({ headers: new Headers({ 'x-forwarded-host': 'tenant-b.test' }) })
 /*  B. The contract, in the source                                             */
 /* -------------------------------------------------------------------------- */
 
+// The canonical implementations. `src/app/api/legalos/*/route.ts` are re-export
+// aliases with no logic of their own, so pinning the contract here pins it for
+// both paths.
 const PUBLIC_API_ROUTES = [
   'src/app/api/leads/route.ts',
-  'src/app/api/legalos/quiz-webhook/route.ts',
-  'src/app/api/legalos/self-check/route.ts',
-  'src/app/api/legalos/client-error/route.ts',
+  'src/app/api/pageflo/quiz-webhook/route.ts',
+  'src/app/api/pageflo/self-check/route.ts',
+  'src/app/api/pageflo/client-error/route.ts',
 ]
 
 for (const route of PUBLIC_API_ROUTES) {
@@ -143,6 +146,13 @@ for (const route of PUBLIC_API_ROUTES) {
   t(
     !/headers\.get\(\s*['"]x-legalos-host['"]\s*\)/.test(text),
     `${route} does not read x-legalos-host (middleware never stamps it on /api/*)`,
+  )
+  // The rename does not get to reintroduce the hole under a new spelling. A
+  // PageFlo-branded forwarding header is the same caller-supplied string the
+  // old one was, and middleware does not stamp it on /api/* either.
+  t(
+    !/headers\.get\(\s*['"]x-pageflo-host['"]\s*\)/.test(text),
+    `${route} does not read x-pageflo-host either (the rebrand must not re-open the hole)`,
   )
 }
 

@@ -51,7 +51,7 @@ const BY_ID: ReadonlyMap<string, QuizComposition> = (() => {
       const held = map.get(id)
       if (held) {
         throw new Error(
-          `[legalos] quiz template "${id}" is claimed by two compositions ("${held.key}" and "${c.key}")`,
+          `[pageflo] quiz template "${id}" is claimed by two compositions ("${held.key}" and "${c.key}")`,
         )
       }
       map.set(id, c)

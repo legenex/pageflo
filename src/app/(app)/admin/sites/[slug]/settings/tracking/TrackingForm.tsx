@@ -206,7 +206,7 @@ export function TrackingForm({
         onChange={(webhooks) => setState((prev) => ({ ...prev, custom_webhooks: webhooks }))}
       />
 
-      <footer className="flex items-center justify-end gap-3 pt-2 sticky bottom-0 bg-[var(--color-canvas)]/80 backdrop-blur-md py-3 -mx-10 px-10 border-t border-[var(--color-border)]">
+      <footer className="flex items-center justify-end gap-3 pt-2 sticky bottom-0 bg-[var(--color-canvas)]/80 backdrop-blur-md py-3 -mx-5 px-5 sm:-mx-7 sm:px-7 border-t border-[var(--color-border)]">
         {error ? <span className="text-[13px] text-[var(--color-neg)]">{error}</span> : null}
         {savedAt ? <span className="text-[13px] text-[var(--color-pos)]">Saved {savedAt.toLocaleTimeString()}</span> : null}
         <button

@@ -9,16 +9,17 @@ import { invalidateHostCache } from '@/lib/site-resolver'
 import { invokeLLM } from '@/lib/ai/invoke'
 import { homeBlocksForVertical, starterQuizSteps, starterLandingPage } from '@/lib/starter-content'
 import { seedStarterFunnelsForBrand } from '@/lib/funnel-samples'
+import { VERTICALS } from '@/lib/verticals'
+import { env } from '@/lib/pageflo/env'
 
-const VERTICAL = z.enum([
-  'mass-tort',
-  'mva',
-  'workers-comp',
-  'personal-injury',
-  'medical-malpractice',
-  'class-action',
-  'multi',
-])
+/**
+ * The accepted vertical values, derived from the one list in
+ * `src/lib/verticals.ts` rather than restated. A second copy is how a form
+ * offers an option this action then rejects, which is what the general
+ * verticals added in 20260901_233000 would otherwise have caused.
+ */
+const VERTICAL_VALUES = VERTICALS.map((v) => v.value) as [string, ...string[]]
+const VERTICAL = z.enum(VERTICAL_VALUES)
 
 const Common = z.object({
   name: z.string().min(2),
@@ -62,7 +63,7 @@ const DEFAULT_BRAND = {
 
 const PHONE_BANK = ['(833) 555-0411', '(833) 555-0422', '(833) 555-0433', '(833) 555-0444', '(833) 555-0455']
 
-const previewHostFor = (slug: string): string => `${slug}.${process.env.LEGALOS_PREVIEW_DOMAIN ?? 'preview.legenex.com'}`
+const previewHostFor = (slug: string): string => `${slug}.${env('previewDomain') || 'preview.legenex.com'}`
 
 const slugify = (input: string): string =>
   input

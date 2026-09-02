@@ -323,13 +323,36 @@ export function ComingSoon({
 
 /* -------------------------------------------------------------------- table */
 
-/** Dense table shell. Owns the horizontal scroll so a page never scrolls sideways. */
+/**
+ * Dense table shell, and the horizontal scroll belongs to it.
+ *
+ * `min-w-0 max-w-full` on the scroller is not decoration. Without an explicit
+ * minimum a scroll container's `min-width` resolves to `auto`, which for a
+ * container of a wide table is that table's width, so the container grows to
+ * fit instead of scrolling and the whole page scrolls sideways with it. It is
+ * invisible on a desktop, where the table fits anyway, and it moves the page by
+ * 579px on a phone.
+ *
+ * Below `md` a table this wide is not the right shape at all; see `Sites` for
+ * the card list that replaces it. This component's job is to make the scroll
+ * safe where a table IS the right shape.
+ */
 export function TableWrap({ children, minWidth = 880 }: { children: ReactNode; minWidth?: number }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full border-collapse text-left" style={{ minWidth }}>
-        {children}
-      </table>
+    <div className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+      {/*
+        * The minimum width lives on a plain block wrapper, NOT on the <table>.
+        *
+        * A `<table>` carrying its own `min-width` propagated its overflow past
+        * two clipping ancestors and scrolled the whole window by 579px at
+        * 390px wide, while every ancestor correctly reported
+        * `scrollWidth === clientWidth`. Moving the constraint onto an ordinary
+        * block and leaving the table at `width: 100%` keeps the identical
+        * layout and the overflow stays inside the scroller, where it belongs.
+        */}
+      <div style={{ minWidth }}>
+        <table className="w-full border-collapse text-left">{children}</table>
+      </div>
     </div>
   )
 }

@@ -14,8 +14,10 @@ import { SEED_SITES, DEFAULT_LEGAL_PAGES } from './sites'
 import { HOME_BLOCKS_BY_SLUG } from './home-blocks'
 import { SAMPLE_LP_DEPLOYMENTS } from '../components/builder/lp/section-copy'
 import { ensureTemplateLibrary } from '../lib/template-records'
+import { PRODUCT_NAME } from '../lib/pageflo/product'
 import { buildSeedQuiz } from '../components/builder/quiz/seed-data'
 import { advBuildSeedAdvertorials } from '../components/builder/advertorial/seed-data'
+import { env } from '@/lib/pageflo/env'
 
 const log = (msg: string): void => {
   process.stdout.write(`[seed] ${msg}\n`)
@@ -82,7 +84,7 @@ const ensureSuperAdmin = async (payload: Awaited<ReturnType<typeof getPayload>>)
     data: {
       email,
       password,
-      name: 'LegalOS Super Admin',
+      name: `${PRODUCT_NAME} Super Admin`,
       super_admin: true,
       status: 'active',
     },
@@ -346,7 +348,7 @@ const run = async () => {
     // Each Site gets a preview subdomain (always live, never primary unless no custom)
     // plus its custom primary domain. Custom is primary when verified/active; otherwise
     // the preview subdomain is the primary so the Site has a working URL out of the box.
-    const previewBase = process.env.LEGALOS_PREVIEW_DOMAIN ?? 'preview.legenex.com'
+    const previewBase = env('previewDomain') || 'preview.legenex.com'
     const previewHost = `${spec.slug}.${previewBase}`
     const customIsActive = spec.primary_status === 'active'
 

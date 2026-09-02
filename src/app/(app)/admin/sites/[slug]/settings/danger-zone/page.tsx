@@ -1,14 +1,29 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { AlertOctagon } from 'lucide-react'
+import { getCurrentUser } from '@/lib/auth'
+import { Page, PageHeader } from '@/components/pageflo/primitives'
+import type { SiteStatus } from '../general/actions'
+import { DangerZoneClient } from './DangerZoneClient'
 
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const metadata = { title: 'Danger zone' }
 
 type Props = { params: Promise<{ slug: string }> }
 
+/**
+ * Counts are read here, not estimated in the dialog.
+ *
+ * The delete confirmation names how many leads go with the Site, and a number
+ * that is close but wrong is worse than no number: the whole point of showing
+ * it is that the operator can recognise "that is not the Site I meant".
+ */
 export default async function DangerZonePage({ params }: Props) {
   const { slug } = await params
+  const me = await getCurrentUser()
+  if (!me) redirect(`/sign-in?next=/admin/sites/${slug}/settings/danger-zone`)
+
   const payload = await getPayload({ config })
   const siteRes = await payload.find({
     collection: 'sites',
@@ -16,67 +31,45 @@ export default async function DangerZonePage({ params }: Props) {
     limit: 1,
     overrideAccess: true,
   })
-  const site = siteRes.docs[0]; if (!site) notFound()
+  const site = siteRes.docs[0]
+  if (!site) notFound()
+
+  const where = { site: { equals: site.id } }
+  const [pages, leads, domains, quizDeployments, lpDeployments, primary] = await Promise.all([
+    payload.count({ collection: 'pages', where, overrideAccess: true }),
+    payload.count({ collection: 'leads', where, overrideAccess: true }),
+    payload.count({ collection: 'domains', where, overrideAccess: true }),
+    payload.count({ collection: 'funnel-quiz-deployments' as never, where, overrideAccess: true }).catch(() => ({ totalDocs: 0 })),
+    payload.count({ collection: 'funnel-lp-deployments' as never, where, overrideAccess: true }).catch(() => ({ totalDocs: 0 })),
+    payload.find({
+      collection: 'domains',
+      where: { and: [where, { primary: { equals: true } }] },
+      limit: 1,
+      overrideAccess: true,
+    }),
+  ])
 
   return (
-    <div className="p-10 max-w-[900px]">
-      <header className="mb-6">
-        <h1 className="text-[28px] font-semibold tracking-tight text-white">Danger Zone</h1>
-        <p className="text-[var(--color-ink-muted)] text-[15px] mt-1">Destructive actions for {site.name}</p>
-      </header>
-
-      <div className="space-y-4">
-        <DangerCard
-          title="Pause Site"
-          body="Pause public traffic to this site. Visitors will see a maintenance page. Admin remains accessible. Reversible."
-          action="Pause Site"
-        />
-        <DangerCard
-          title="Archive Site"
-          body="Soft-delete. Site is hidden from the public router and the default Sites list. Content is preserved and restorable."
-          action="Archive Site"
-        />
-        <DangerCard
-          title="Delete Site"
-          body="Permanently delete this Site and all its Pages, Quizzes, Landing Pages, Numbers, and Tracking config. Leads are preserved. Type-to-confirm required."
-          action="Delete Site"
-          destructive
-        />
-      </div>
-    </div>
-  )
-}
-
-function DangerCard({
-  title,
-  body,
-  action,
-  destructive,
-}: {
-  title: string
-  body: string
-  action: string
-  destructive?: boolean
-}) {
-  return (
-    <section className={`rounded-xl border ${destructive ? 'border-[var(--color-neg)]/40' : 'border-[var(--color-border)]'} bg-[var(--color-surface-1)] p-5 card-edge flex items-start gap-4`}>
-      <span className={`w-9 h-9 shrink-0 rounded-lg inline-flex items-center justify-center ${destructive ? 'text-[var(--color-neg)] bg-[var(--color-neg)]/10' : 'text-[var(--color-warn)] bg-[var(--color-warn)]/10'}`}>
-        <AlertOctagon className="w-4 h-4" />
-      </span>
-      <div className="flex-1">
-        <h2 className="text-[15px] font-semibold text-white">{title}</h2>
-        <p className="text-[13px] text-[var(--color-ink-muted)] mt-1 leading-relaxed">{body}</p>
-      </div>
-      <button
-        type="button"
-        disabled
-        className={`shrink-0 text-[13px] font-semibold px-4 py-2 rounded-md disabled:opacity-50 ${
-          destructive ? 'bg-[var(--color-neg)]/15 text-[var(--color-neg)] border border-[var(--color-neg)]/30' : 'bg-[var(--color-surface-3)] text-white border border-[var(--color-border-strong)]'
-        }`}
-        title="Wired in next phase"
-      >
-        {action}
-      </button>
-    </section>
+    <Page className="max-w-[900px]">
+      <PageHeader
+        title="Danger zone"
+        subtitle={`Actions on ${site.name} that stop it serving, or remove it entirely. Each one says exactly what it does before it does it.`}
+      />
+      <DangerZoneClient
+        siteId={Number(site.id)}
+        siteName={site.name}
+        siteSlug={site.slug}
+        status={(site.status ?? 'draft') as SiteStatus}
+        primaryHost={primary.docs[0]?.host ?? null}
+        counts={{
+          pages: pages.totalDocs,
+          leads: leads.totalDocs,
+          domains: domains.totalDocs,
+          quizDeployments: quizDeployments.totalDocs,
+          lpDeployments: lpDeployments.totalDocs,
+        }}
+        canDelete={Boolean(me.super_admin)}
+      />
+    </Page>
   )
 }

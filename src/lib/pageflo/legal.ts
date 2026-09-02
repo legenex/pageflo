@@ -29,9 +29,9 @@ export type LegalFacts = {
   privacyContact: string
   /** Governing law and jurisdiction, e.g. 'England and Wales'. */
   jurisdiction: string
-  /** Named subprocessors and their purpose, one per line as "Name — purpose". */
+  /** Named subprocessors and their purpose, one per line as "Name: purpose". */
   subprocessors: string[]
-  /** Retention statement per data category, one per line as "Category — period". */
+  /** Retention statement per data category, one per line as "Category: period". */
   retention: string[]
   /** ISO date the policy last changed. */
   lastUpdated: string

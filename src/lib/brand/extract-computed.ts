@@ -325,7 +325,7 @@ export const extractBrandFromRender = async (rawUrl: string): Promise<ComputedEx
     const context = await browser.newContext({
       viewport: { width: 1440, height: 900 },
       userAgent:
-        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151 Safari/537.36 LegalOS-BrandExtract/1.0',
+        'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151 Safari/537.36 PageFlo-BrandExtract/1.0',
     })
     // A logo served from a CDN taints the canvas, and the dominant-colour read
     // fails on exactly the sites most likely to have a deliberate brand. This

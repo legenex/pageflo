@@ -164,7 +164,22 @@ export function buildBrandOverrideCss(brand: ExtractedBrand): string | null {
     lines.push(`  --site-font-body: '${brand.fontBody.replace(/'/g, "\\'")}', system-ui, sans-serif;`)
   if (lines.length === 0) return null
   // Extra-high specificity so we beat anything the public layout already set
-  // for this site. :root + html.site-shell + .legalos-builder-canvas matches
-  // the public site AND the admin builder preview canvas.
-  return [`/* Extracted brand override from import */`, `:root,`, `html.site-shell,`, `.legalos-builder-canvas {`, ...lines, `}`].join('\n')
+  // for this site. :root + html.site-shell + the builder canvas matches the
+  // public site AND the admin builder preview canvas.
+  //
+  // Both canvas selectors are emitted. This string is persisted verbatim into a
+  // `custom_html` block (see html-to-structured-blocks.ts), so every page
+  // imported before the PageFlo rename carries `.legalos-builder-canvas` in a
+  // Postgres row we do not rewrite. New imports carry both, which is what lets
+  // the canvas element eventually drop the legacy class without restyling the
+  // pages that already exist.
+  return [
+    `/* Extracted brand override from import */`,
+    `:root,`,
+    `html.site-shell,`,
+    `.pageflo-builder-canvas,`,
+    `.legalos-builder-canvas {`,
+    ...lines,
+    `}`,
+  ].join('\n')
 }

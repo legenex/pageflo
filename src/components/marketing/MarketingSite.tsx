@@ -779,17 +779,50 @@ export function MarketingSite({ appUrl }: { appUrl: string }) {
               </p>
             </div>
             <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+              {/* Every entry is a link to a section that exists on this page.
+                  They were plain text, which reads as a footer of things the
+                  product might have rather than a way to reach them. */}
               {[
-                { label: 'Product', links: ['Sites', 'Landing Pages', 'Advertorials', 'Flows', 'Leads', 'Domains'] },
-                { label: 'Builders', links: ['Page Builder', 'Quiz Builder', 'Advertorial Builder'] },
-                { label: 'Platform', links: ['Deployments', 'Brand Kits', 'Integrations', 'Campaign Integrity — soon'] },
+                {
+                  label: 'Product',
+                  links: [
+                    { label: 'Sites', href: '#product' },
+                    { label: 'Landing Pages', href: '#builders' },
+                    { label: 'Advertorials', href: '#builders' },
+                    { label: 'Flows', href: '#flows' },
+                    { label: 'Leads', href: '#leads' },
+                    { label: 'Domains', href: '#leads' },
+                  ],
+                },
+                {
+                  label: 'Builders',
+                  links: [
+                    { label: 'Page Builder', href: '#builders' },
+                    { label: 'Quiz Builder', href: '#flows' },
+                    { label: 'Advertorial Builder', href: '#builders' },
+                  ],
+                },
+                {
+                  label: 'Platform',
+                  links: [
+                    { label: 'Deployments', href: '#how' },
+                    { label: 'Brand Kits', href: '#product' },
+                    { label: 'Integrations', href: '#leads' },
+                    { label: 'Campaign Integrity, soon', href: '#integrity' },
+                  ],
+                },
               ].map((col) => (
                 <div key={col.label}>
                   <div className="text-[10px] font-semibold uppercase tracking-[0.11em] text-ink-dim">{col.label}</div>
                   <ul className="mt-3 space-y-2">
                     {col.links.map((l) => (
-                      <li key={l} className="text-[12.5px] text-ink-muted">
-                        {l}
+                      <li key={l.label}>
+                        <a
+                          href={l.href}
+                          className="text-[12.5px] text-ink-muted transition-colors hover:text-ink"
+                        >
+                          {l.label}
+                        </a>
                       </li>
                     ))}
                   </ul>

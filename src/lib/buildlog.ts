@@ -163,6 +163,161 @@ export const buildLogEvidenceId = (entry: BuildLogEntry, item: BuildLogItem, ev:
 
 export const ENTRIES: BuildLogEntry[] = [
   {
+    date: '2026-09-01',
+    title: 'PageFlo: the console, the product site, and the identifiers that stayed',
+    summary:
+      'The rebrand finished as a product change rather than a find-and-replace. Every user-facing surface says PageFlo and reads its name from one module; the builder palette moved to the console palette by changing 23 values rather than 1,797 call sites; four screens that were placeholders became real, including a Danger Zone whose three buttons had been disabled and whose copy said leads survive a Site delete when they do not. A set of identifiers is deliberately unchanged, each one now listed with the consumer that depends on it and asserted present by a test, so the next agent cannot finish the job and break a release.',
+    items: [
+      {
+        title: 'One module reads the environment, and a test enforces it',
+        status: 'shipped',
+        detail:
+          'Every configured value goes through src/lib/pageflo/env.ts, which tries the PAGEFLO_* name and falls back to the LEGALOS_* one. Twenty-five call sites were still reading process.env.LEGALOS_* directly, which is not a cosmetic problem: the moment an operator sets the PageFlo name in production, half the code reads the new value and half the old one, and nothing errors. pnpm test:rebrand fails if a second reader appears.',
+        files: ['src/lib/pageflo/env.ts', 'scripts/test-rebrand.mts'],
+      },
+      {
+        title: 'The CSRF allowlist is derived from the host variables, not typed twice',
+        status: 'shipped',
+        detail:
+          'payload.config.ts turns PAGEFLO_APP_HOST, PAGEFLO_MARKETING_HOST and every legacy app host into https origins, with and without www. A missing CSRF origin is the worst failure mode in a domain cutover because it is completely silent: Payload\'s cookie strategy returns user = null and every server action fails as "unauthenticated" with nothing anywhere naming CSRF. Deriving it means an operator who sets the hosts the router already needs cannot forget a second, differently-shaped variable for the same hosts.',
+        files: ['src/payload.config.ts'],
+      },
+      {
+        title: 'The builder is the same palette as the rest of the console',
+        status: 'shipped',
+        detail:
+          'Twenty-three files and 1,797 call sites read T.bg, T.primary, T.textMute and the rest from one object. Renaming those keys would have been a mechanical sweep through @ts-nocheck\'d ported code with a large blast radius and no design benefit, so the KEYS kept their names and the VALUES became the PageFlo tokens. Every text value was measured against the surface it sits on and all four clear WCAG AA. One key was renamed: pink held #F97316, and a key named pink holding an orange is a lie a reader has to discover by rendering it.',
+        files: ['src/components/builder/ui.tsx'],
+      },
+      {
+        title: 'The Danger Zone had three disabled buttons and one false sentence',
+        status: 'shipped',
+        detail:
+          'Pause, Archive and Delete were all disabled with title="Wired in next phase", and the delete card said "Leads are preserved". The opposite is true: cascadeDeleteSiteChildren removes the Site\'s Leads because their site column is NOT NULL and Postgres cannot SET NULL on it. A screen telling an operator their consent records survive a delete that destroys them is worse than a screen with no delete on it. All three now run the real authorised server actions, delete requires typing the Site\'s slug, and the confirmation names the actual counts read from the database.',
+        files: [
+          'src/app/(app)/admin/sites/[slug]/settings/danger-zone/page.tsx',
+          'src/app/(app)/admin/sites/[slug]/settings/danger-zone/DangerZoneClient.tsx',
+        ],
+        evidence: [
+          { label: 'Delete requires the slug', path: '/admin/sites', steps: ['Open a Site', 'Settings', 'Danger zone'] },
+        ],
+      },
+      {
+        title: 'A Site dashboard that reported zero funnels no matter how many were live',
+        status: 'shipped',
+        detail:
+          'The "Active Funnels" tile was a hardcoded 0 and the funnels panel said "No funnels bound to this site yet" without ever running a query. It now counts live landing page, quiz and advertorial deployments for the Site and lists them with their paths. When a deployment table cannot be read the panel says the list is incomplete rather than reporting none, because those are different facts. The 30-day leads tile was labelled "excl. test" and did not exclude test captures; it does now.',
+        files: ['src/app/(app)/admin/sites/[slug]/page.tsx'],
+      },
+      {
+        title: 'Five native confirm() dialogs became one owned component',
+        status: 'shipped',
+        detail:
+          'window.confirm blocks the main thread, cannot be styled, cannot say which of two consequences is the dangerous one, and is suppressed outright in some embedded browser contexts, where the guard silently returns false and the action never runs. useConfirm() replaces all five with the same ergonomics, adds a focus trap, focuses the least destructive control, and supports type-to-confirm for irreversible actions.',
+        files: ['src/components/pageflo/interactive.tsx'],
+      },
+      {
+        title: 'A sidebar entry pointed at a route that did not exist',
+        status: 'shipped',
+        detail:
+          'Campaign Integrity linked to /admin/integrity and nothing served it. pnpm check:handbook now walks every sidebar destination as well as every documented route, so a nav entry that 404s fails a check rather than being found by clicking. Analytics and Campaign Integrity are real pages that say what they are waiting on; neither shows a chart of invented numbers.',
+        files: [
+          'src/app/(app)/admin/(top)/integrity/page.tsx',
+          'src/app/(app)/admin/(top)/analytics/page.tsx',
+          'scripts/check-handbook-routes.ts',
+        ],
+      },
+      {
+        title: 'Sites can belong to a vertical that is not a legal practice area',
+        status: 'shipped',
+        detail:
+          'The vertical field offered seven legal practice areas and nothing else, which made the Site form itself a claim that the product is a legal tool. Nine general values were added by migration, additively: every existing value is kept and no row is rewritten. One list in src/lib/verticals.ts feeds the collection, the create wizard, the Site settings form and the list filter, because two lists of the same enum is how a filter offers a value the collection then rejects.',
+        files: ['src/lib/verticals.ts', 'src/migrations/20260901_233000_sites_vertical_general.ts'],
+      },
+      {
+        title: 'Two byte-identical system health pages became one component',
+        status: 'shipped',
+        detail:
+          '/admin/system and /admin/settings/system were 173-line copies of each other differing only in which path their refresh action revalidated. Two places for every future change to be made in, and one for it to be forgotten. The refresh action stays with the route because revalidatePath needs the caller\'s own path; everything else moved.',
+        files: ['src/components/app/SystemHealthReport.tsx'],
+      },
+      {
+        title: 'The console has an error boundary and a 404 of its own',
+        status: 'shipped',
+        detail:
+          'A render that threw inside /admin previously reached the root global-error, which replaces the entire layout and loses the sidebar. The new boundary sits at /admin so it also catches a failure inside a Site workspace, keeps both sidebars mounted, and shows the digest, which is the only string tying what the operator is looking at to a line in the server log. Both boundaries now report through one client module rather than a copied fetch.',
+        files: [
+          'src/app/(app)/admin/error.tsx',
+          'src/app/(app)/admin/not-found.tsx',
+          'src/lib/observability/client.ts',
+        ],
+      },
+      {
+        title: 'Health checks for the two things a cutover breaks silently',
+        status: 'shipped',
+        detail:
+          'PageFlo hosts and legal publication are both reported on /admin/system. An unset marketing or app host means the product site never serves and www never redirects, and it fails as "nothing happens" rather than as an error. /privacy fails closed until every legal fact is configured, which is correct and equally silent, so the missing keys are named rather than discovered by an operator wondering why the footer link is gone.',
+        files: ['src/lib/system-health/checks.ts'],
+      },
+      {
+        title: 'A privacy policy still cannot publish',
+        status: 'open',
+        detail:
+          'PAGEFLO_LEGAL_ENTITY, _ADDRESS, _JURISDICTION, PAGEFLO_PRIVACY_CONTACT, _SUBPROCESSORS, _DATA_RETENTION and _LAST_UPDATED are unset, so /privacy 404s and the footer link is absent. This is deliberate and it is not a code task: a privacy policy makes binding statements about a real legal entity, and none of those facts is derivable from this repository. The keys are documented in .env.example and the missing ones are listed on /admin/system.',
+        files: ['src/lib/pageflo/legal.ts'],
+      },
+    ],
+    verification: [
+      {
+        label: 'pnpm typecheck',
+        state: 'verified',
+        detail: 'tsc --noEmit, exit 0, zero errors.',
+      },
+      {
+        label: 'pnpm test',
+        state: 'verified',
+        detail: '17 suites including the new test:rebrand, exit 0.',
+      },
+      {
+        label: 'pnpm build',
+        state: 'verified',
+        detail: 'next build exit 0; /admin/integrity, /admin/analytics, /admin/settings and /admin/users all present in the route table.',
+      },
+      {
+        label: 'pnpm test:release',
+        state: 'verified',
+        detail:
+          '31 assertions on a scratch database, exercising the new sites_vertical_general migration up, down and re-applied.',
+      },
+      {
+        label: 'pnpm verify:schema',
+        state: 'verified',
+        detail: '25 collections and 1 global read cleanly.',
+      },
+      {
+        label: 'pnpm test:isolation / test:identity / check:paths',
+        state: 'verified',
+        detail: '49, 33 and 9-deployment checks respectively, all exit 0.',
+      },
+      {
+        label: 'pnpm check:handbook',
+        state: 'verified',
+        detail: '22 routes documented, 33 screens, 18 sidebar destinations, 0 missing.',
+      },
+    ],
+    deployNotes: [
+      'The production .env needs PAGEFLO_MARKETING_HOST, PAGEFLO_APP_HOST and PAGEFLO_LEGACY_APP_HOSTS before the new domains behave correctly. Until they are set, every host resolves against the Domains table exactly as it does today.',
+      'PAGEFLO_LEGACY_HOST_REDIRECT stays false until the new hosts are verified. It is what turns os.legenex.com into a 308 and therefore what removes the rollback path.',
+      'One migration ships with this release: 20260901_233000_sites_vertical_general. It widens an enum additively and rewrites no row.',
+    ],
+    openIssues: [
+      'Analytics has no aggregation layer, so the screen states what it is waiting on rather than showing a chart.',
+      'Campaign Integrity has no implementation and no agreed review model.',
+      'Per-Site user management still requires workspace ownership; a Site admin cannot add an editor to their own brand.',
+      'Site-wide SEO defaults do not exist. Per-page SEO does and is what a crawler reads.',
+    ],
+  },
+  {
     date: '2026-08-07',
     title: 'Twelve landing-page templates, ported rather than rebuilt',
     summary:

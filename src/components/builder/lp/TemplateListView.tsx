@@ -35,7 +35,7 @@ const ORIGIN_COLORS = {
   stock: T.info,
   clone: T.purple,
   blank: T.textMute,
-  ai: T.pink,
+  ai: T.orange,
   legacy: T.warning,
 }
 

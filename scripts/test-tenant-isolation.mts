@@ -357,37 +357,37 @@ try {
   // through the raw door must still be refused, because going live is a
   // publish and a publish runs the preflight — `setLpDeploymentStatus` /
   // `setQuizDeploymentStatus` are the one door that runs it, and they mark
-  // their write with `context: { legalosPreflighted: true }`.
+  // their write with `context: { pagefloPreflighted: true }`.
   await refused('ATTACK: flip another tenant\'s draft LP deployment to live', () =>
     payload.update({ collection: 'funnel-lp-deployments', id: lpDepB.id, data: { status: 'live' } as never, ...asUser }))
   await refused('ATTACK: flip another tenant\'s draft quiz deployment to live', () =>
     payload.update({ collection: 'funnel-quiz-deployments', id: quizDepB.id, data: { status: 'live' } as never, ...asUser }))
-  await refused('ATTACK: a forged legalosPreflighted context must not bypass tenancy on another tenant\'s deployment', () =>
+  await refused('ATTACK: a forged pagefloPreflighted context must not bypass tenancy on another tenant\'s deployment', () =>
     payload.update({
       collection: 'funnel-quiz-deployments',
       id: quizDepB.id,
       data: { status: 'live' } as never,
-      context: { legalosPreflighted: true },
+      context: { pagefloPreflighted: true },
       ...asUser,
     }))
   await refused('the raw door refuses an UNPREFLIGHTED go-live of an LP deployment even for the brand\'s own admin', () =>
     payload.update({ collection: 'funnel-lp-deployments', id: lpDepB.id, data: { status: 'live' } as never, ...asUserB }))
   await refused('the raw door refuses an UNPREFLIGHTED go-live of a quiz deployment even for the brand\'s own admin', () =>
     payload.update({ collection: 'funnel-quiz-deployments', id: quizDepB.id, data: { status: 'live' } as never, ...asUserB }))
-  await allowed('the preflighted door can put the brand\'s own quiz deployment live (context legalosPreflighted)', () =>
+  await allowed('the preflighted door can put the brand\'s own quiz deployment live (context pagefloPreflighted)', () =>
     payload.update({
       collection: 'funnel-quiz-deployments',
       id: quizDepB.id,
       data: { status: 'live' } as never,
-      context: { legalosPreflighted: true },
+      context: { pagefloPreflighted: true },
       ...asUserB,
     }))
-  await allowed('the preflighted door can put the brand\'s own LP deployment live (context legalosPreflighted)', () =>
+  await allowed('the preflighted door can put the brand\'s own LP deployment live (context pagefloPreflighted)', () =>
     payload.update({
       collection: 'funnel-lp-deployments',
       id: lpDepB.id,
       data: { status: 'live' } as never,
-      context: { legalosPreflighted: true },
+      context: { pagefloPreflighted: true },
       ...asUserB,
     }))
   await allowed('an advertorial deployment goes live without the marker - advertorials have no preflight door, by design', () =>

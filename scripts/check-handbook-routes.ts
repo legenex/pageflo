@@ -13,6 +13,7 @@
  */
 import fs from 'node:fs'
 import { ALL_PAGES, FIRST_RUN } from '../src/lib/handbook.ts'
+import { NAV } from '../src/components/app/nav-config.ts'
 
 /** Routes outside the admin, which do not follow the admin file layout. */
 const SPECIAL: Record<string, string> = {
@@ -50,8 +51,32 @@ for (const page of ALL_PAGES) {
   }
 }
 
+/**
+ * Every sidebar destination must exist too.
+ *
+ * The handbook check above only proves that DOCUMENTED routes exist. The
+ * sidebar is the other list of routes in this application, it is the one every
+ * operator actually clicks, and it had a group pointing at `/admin/integrity`
+ * when no such page existed. A nav entry that 404s is worse than a missing
+ * feature: it reads as the product being broken rather than unfinished.
+ */
+const navRoutes = [
+  ...NAV.map((g) => g.href),
+  ...NAV.flatMap((g) => g.children?.map((c) => c.href) ?? []),
+]
+const navTargets = [...new Set(navRoutes.map((href) => href.split('?')[0]))].sort()
+
+let navMissing = 0
+for (const route of navTargets) {
+  if (!fileFor(route)) {
+    console.log(`  MISSING  ${route} is in the sidebar but no page serves it`)
+    navMissing += 1
+  }
+}
+
 console.log(
   `\n${routes.length} routes documented, ${ALL_PAGES.length} screens described, ` +
-    `${missing} missing, ${mismatched} mismatched`,
+    `${navTargets.length} sidebar destinations, ` +
+    `${missing + navMissing} missing, ${mismatched} mismatched`,
 )
-if (missing || mismatched) process.exit(1)
+if (missing || navMissing || mismatched) process.exit(1)

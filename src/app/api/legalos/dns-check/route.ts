@@ -1,34 +1,18 @@
-import { NextResponse, type NextRequest } from 'next/server'
-import { z } from 'zod'
-import { getCurrentUser } from '@/lib/auth'
-import { checkDomainDns } from '@/lib/dns-check'
+/**
+ * Compatibility alias. The implementation lives at `/api/pageflo/dns-check`.
+ *
+ * The whole `/api/legalos/*` namespace stays mounted because consumers this
+ * deploy does not control still call it: the release health gate in
+ * `scripts/release.sh`, the SSL poller in `src/lib/ssl-poll.ts` hitting tenant
+ * hosts that may still be serving an older build, copies of `q.js` already
+ * cached on third-party pages, and operator bookmarks.
+ *
+ * Removing this file is safe only once those consumers call
+ * `/api/pageflo/dns-check` instead.
+ */
 
+// Re-stated rather than re-exported: Next reads route segment config off the
+// route file itself, and it must match the canonical route exactly.
 export const dynamic = 'force-dynamic'
 
-const Body = z.object({
-  host: z.string().min(3),
-  verification_token: z.string().optional(),
-})
-
-export async function POST(req: NextRequest) {
-  const user = await getCurrentUser()
-  if (!user) return NextResponse.json({ ok: false, error: 'unauthenticated' }, { status: 401 })
-
-  let json: unknown
-  try {
-    json = await req.json()
-  } catch {
-    return NextResponse.json({ ok: false, error: 'invalid json' }, { status: 400 })
-  }
-  const parsed = Body.safeParse(json)
-  if (!parsed.success) return NextResponse.json({ ok: false, error: 'invalid payload' }, { status: 400 })
-
-  const result = await checkDomainDns({
-    host: parsed.data.host,
-    cnameTarget: process.env.LEGALOS_CNAME_TARGET ?? null,
-    aTarget: process.env.LEGALOS_A_TARGET ?? null,
-    verificationToken: parsed.data.verification_token ?? null,
-  })
-
-  return NextResponse.json(result)
-}
+export { POST } from '../../pageflo/dns-check/route'

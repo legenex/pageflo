@@ -1,5 +1,5 @@
 /**
- * The operator handbook: what every page in LegalOS is for, how to use it, and
+ * The operator handbook: what every page in PageFlo is for, how to use it, and
  * what it does underneath.
  *
  * Written as data rather than prose in a component so the page can group,
@@ -168,28 +168,42 @@ export const SECTIONS: HandbookSection[] = [
       {
         route: '/admin/leads',
         title: 'Leads',
-        status: 'placeholder',
-        purpose: 'Intended as the cross-Site lead inbox with a mandatory Site filter.',
+        status: 'working',
+        purpose: 'The cross-Site lead inbox: every lead this account can see, with its delivery, enrichment and consent evidence.',
         use: [
-          'Not usable yet. The screen renders a "Coming soon" panel with a link into the raw admin.',
-          'To read leads today, go to /cms/collections/leads and filter by Site.',
+          'Use the status rail to move between all leads and the delivery states. The counts on it are live.',
+          'Open a lead to read its full record: summary, system response, HLR trace, CAPI log and delivery log.',
+          'Filter by Site, funnel and date when you are looking for a specific capture rather than reading the stream.',
         ],
         mechanism: [
-          'Lead capture itself is fully working. Public form posts land at /api/leads, run the whole pipeline, and persist a Leads row.',
-          'What is missing is only the reading surface in the custom admin. No lead is lost, and none is waiting on this screen.',
+          'Capture runs synchronously inside the request. A public form POST to /api/leads runs attribution, consent capture, HLR enrichment, CAPI, webhooks and Slack notify, then persists the row.',
+          'Everything you see is scoped by your bindings. A user bound to two Sites sees those two Sites, not the platform.',
+          'The delivery log is the real dispatch record, not a re-derivation: it is what the pipeline wrote at the time.',
         ],
         watchOut: [
-          'Because the only reader is the raw admin, a Site delete that removes its leads is easy to do without having looked at them first. Export before deleting.',
+          'Deleting a Site deletes its leads, including their consent certificates. Export first if you need to retain them.',
         ],
       },
       {
         route: '/admin/analytics',
         title: 'Analytics',
         status: 'placeholder',
-        purpose: 'Intended for funnel and conversion reporting.',
-        use: ['Not usable yet. The sidebar marks it "soon" and the screen says the same.'],
+        purpose: 'Intended for funnel, conversion and attribution reporting across every Site.',
+        use: ['Not usable yet. The sidebar marks it "Soon" and the screen says what it is waiting on.'],
         mechanism: [
-          'The data it would report on is already being collected: leads carry attribution, an event id, and the tracking config that was live when they converted.',
+          'The data it would report on is already being collected: every lead carries its attribution, its shared conversion event id, the deployment that produced it, and the tracking config that was live at the time.',
+          'What does not exist is the aggregation layer. Counting across Sites and date ranges on every page load would put a table scan on the console, so the numbers need a rollup written as leads arrive, and there is no background worker to write one.',
+        ],
+      },
+      {
+        route: '/admin/integrity',
+        title: 'Campaign Integrity',
+        status: 'placeholder',
+        purpose: 'Intended for consent evidence, compliance review and traffic-quality signals in one place.',
+        use: ['Not usable yet. The screen names what is captured today and what the area is waiting on.'],
+        mechanism: [
+          'The evidence it would review IS captured on every lead: the TrustedForm certificate claimed server-side at submission, the Jornaya token verification, the HLR line-status lookup, and a snapshot of the consent language the visitor was shown.',
+          'Those run today and are visible on a lead detail view. What is missing is the review surface across a campaign, and there is no agreed scoring model behind it.',
         ],
       },
     ],
@@ -510,7 +524,7 @@ export const SECTIONS: HandbookSection[] = [
         route: '/admin/settings/integrations',
         title: 'Integrations',
         status: 'working',
-        purpose: 'LegalOS wide integration settings: mail, notifications, source control and search console.',
+        purpose: 'PageFlo wide integration settings: mail, notifications, source control and search console.',
         use: ['Enter credentials once for the whole platform and save.'],
         mechanism: [
           'These are platform wide and restricted to super admins.',
@@ -553,18 +567,22 @@ export const SECTIONS: HandbookSection[] = [
       {
         route: '/admin/settings',
         title: 'Settings index',
-        status: 'placeholder',
-        purpose: 'Intended as an overview of platform settings.',
-        use: ['Not usable. Go straight to Integrations, Users or System.'],
-        mechanism: ['The three screens it would summarise all work.'],
+        status: 'working',
+        purpose: 'The index of workspace settings, and a reminder of which settings live inside a Site instead.',
+        use: ['Pick Integrations, Users, System health or Profile.'],
+        mechanism: [
+          'Screens restricted to workspace owners are shown to everyone with a visible "Owner only" chip rather than hidden, because an editor who cannot find Users concludes the feature is missing.',
+        ],
       },
       {
         route: '/admin/users',
         title: 'Users (old route)',
-        status: 'placeholder',
-        purpose: 'An earlier route for the roster.',
-        use: ['Not usable. Use Settings then Users.'],
-        mechanism: ['Renders a placeholder that links into the raw admin.'],
+        status: 'working',
+        purpose: 'The pre-rebrand route for the roster.',
+        use: ['Nothing to do. It permanently redirects to Settings, Users.'],
+        mechanism: [
+          'A 308 rather than a placeholder page, so an old bookmark or link lands on the real screen instead of on an explanation of where the real screen went.',
+        ],
       },
     ],
   },

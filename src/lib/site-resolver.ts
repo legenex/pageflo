@@ -2,6 +2,7 @@ import { getPayload } from 'payload'
 
 import { domainEligibility, type DomainLike } from './domain-eligibility'
 import { isReservedHost } from './pageflo/hosts'
+import { envFlag } from '@/lib/pageflo/env'
 
 /*
  * `@payload-config` is imported lazily: `payload.config.ts` imports
@@ -53,7 +54,7 @@ const payloadClient = async () => {
  * Off, every refusal is still LOGGED with its reason, so the same list can be
  * re-derived from the journal after any future domain change.
  */
-const ENFORCE_DOMAIN_ELIGIBILITY = process.env.LEGALOS_ENFORCE_DOMAIN_ELIGIBILITY === 'true'
+const ENFORCE_DOMAIN_ELIGIBILITY = envFlag('enforceDomainEligibility')
 
 export const RESOLVER_ELIGIBILITY_LOG_PREFIX = '[site-resolver] ineligible host'
 

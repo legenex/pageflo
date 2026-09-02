@@ -17,6 +17,7 @@ import {
   ChevronLeft,
   ExternalLink,
 } from 'lucide-react'
+import { PRODUCT_NAME } from '@/lib/pageflo/product'
 import { SignOutButton } from './SignOutButton'
 
 type NavItem = { href: string; label: string; icon: typeof LayoutGrid }
@@ -62,7 +63,7 @@ export function SiteSidebar({
     <aside className="w-[250px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-surface-1)] flex flex-col">
       <Link href="/admin/sites" className="px-4 py-3 border-b border-[var(--color-border)] flex items-center gap-2 text-[12px] text-[var(--color-ink-muted)] hover:text-white transition-colors">
         <ChevronLeft className="w-3.5 h-3.5" />
-        Back to LegalOS
+        Back to {PRODUCT_NAME}
       </Link>
 
       <div className="px-5 py-5 border-b border-[var(--color-border)]">

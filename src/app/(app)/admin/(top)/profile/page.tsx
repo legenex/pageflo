@@ -1,8 +1,10 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
+import { Page, PageHeader } from '@/components/pageflo/primitives'
 import { ProfileForm } from './ProfileForm'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Profile' }
 
 type UserExtra = {
   avatar_url?: string | null
@@ -17,13 +19,11 @@ export default async function ProfilePage() {
   const extra = user as unknown as UserExtra
 
   return (
-    <div className="px-10 py-8">
-      <header className="mb-8 max-w-3xl">
-        <h1 className="text-[24px] font-semibold text-white mb-1">Profile</h1>
-        <p className="text-[14px] text-[var(--color-ink-muted)]">
-          Your personal account settings. These changes apply only to your own login.
-        </p>
-      </header>
+    <Page>
+      <PageHeader
+        title="Profile"
+        subtitle="Your own account. These settings apply to your login only and are never workspace settings."
+      />
       <ProfileForm
         initial={{
           name: user.name ?? '',
@@ -34,6 +34,6 @@ export default async function ProfilePage() {
           timezone: extra.timezone ?? '',
         }}
       />
-    </div>
+    </Page>
   )
 }

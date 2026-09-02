@@ -228,15 +228,64 @@ BUILDLOG_CAPTURE_EMAIL  BUILDLOG_CAPTURE_PASSWORD
 ```
 
 `.env.example` documents the keys and is the only file permitted to hold
-placeholders. It currently omits several keys production actually uses and still
-names `mo.legenex.com`; correcting it is phase 1 work.
+placeholders.
+
+### One reader, two namespaces
+
+`src/lib/pageflo/env.ts` is the only module that reads a configured value. Every
+accessor tries the `PAGEFLO_*` name first and falls back to the `LEGALOS_*` one,
+so a host whose `.env` has not been migrated keeps working unchanged and no call
+site has to know two names exist. `pnpm test:rebrand` asserts that no
+`process.env.LEGALOS_*` read exists anywhere else, because a second reader is a
+split brain: after the operator sets the PageFlo name, half the code would see
+the new value and half the old one, with nothing to signal it.
+
+The PageFlo names the cutover adds:
+
+| PageFlo name | Legacy name still accepted | What it decides |
+|---|---|---|
+| `PAGEFLO_SERVER_URL` | `NEXT_PUBLIC_SERVER_URL` | canonical console origin; CSRF, email links, absolute admin URLs |
+| `PAGEFLO_MARKETING_HOST` | none, new | which host serves the product marketing site |
+| `PAGEFLO_APP_HOST` | none, new | which host serves the console and authentication |
+| `PAGEFLO_LEGACY_APP_HOSTS` | `LEGALOS_FALLBACK_HOST` | hosts that served the console before the rebrand |
+| `PAGEFLO_LEGACY_HOST_REDIRECT` | none, new | when `true`, a legacy host 308s to the app host |
+| `PAGEFLO_PREVIEW_DOMAIN` | `LEGALOS_PREVIEW_DOMAIN` | preview subdomain pattern |
+| `PAGEFLO_CNAME_TARGET` | `LEGALOS_CNAME_TARGET` | what tenant CNAMEs point at |
+| `PAGEFLO_A_TARGET` | `LEGALOS_A_TARGET` | A record for apex tenants |
+| `PAGEFLO_EXTRA_ORIGINS` | `LEGALOS_EXTRA_ORIGINS` | additional CSRF origins |
+| `PAGEFLO_IMAGE_HOSTS` | `LEGALOS_IMAGE_HOSTS` | hosts `/_next/image` may fetch |
+| `PAGEFLO_ERROR_WEBHOOK_URL` | `LEGALOS_ERROR_WEBHOOK_URL` | where server errors are POSTed |
+| `PAGEFLO_DEV_SKIP_DNS` | `LEGALOS_DEV_SKIP_DNS` | local-dev DNS bypass; false in production |
+| `PAGEFLO_ENFORCE_DOMAIN_ELIGIBILITY` | `LEGALOS_ENFORCE_DOMAIN_ELIGIBILITY` | refuse a deployment onto an ineligible domain |
+| `PAGEFLO_DISABLE_PROVISIONING` | `LEGALOS_DISABLE_PROVISIONING` | kill switch for Plesk vhost provisioning |
+| `PAGEFLO_MIGRATION_DIR` | `LEGALOS_MIGRATION_DIR` | migration directory override, harnesses only |
+| `PAGEFLO_GIT_SHA` / `_BUILD_NUMBER` / `_BUILD_TIME` | `LEGALOS_*` equivalents | build stamp shown in the version footer |
+| `PAGEFLO_CHROMIUM_PATH` | `LEGALOS_CHROMIUM_PATH` | Chromium binary for the Playwright harnesses |
+
+The CSRF allowlist is DERIVED from the host variables rather than typed twice:
+`src/payload.config.ts` turns `PAGEFLO_APP_HOST`, `PAGEFLO_MARKETING_HOST` and
+every legacy app host into https origins, with and without `www.`. A missing
+CSRF origin is the worst failure mode in a domain cutover because it is
+completely silent: Payload's cookie strategy returns `user = null` and every
+server action fails as "unauthenticated" with nothing anywhere naming CSRF.
 
 `PLESK_INSECURE_SKIP_TLS_VERIFY=true` is set in production because Plesk serves
 its API on 8443 with a certificate that does not match the IP the app connects
 to. Traffic stays on the host loopback. This is scoped to Plesk calls only and
 must not spread.
 
-## Load-bearing legacy names
+## Compatibility identifiers
+
+**These are deliberately not renamed. Renaming one breaks production, and the
+break is not visible until a release fails or a third party stops receiving
+leads.** `pnpm test:rebrand` asserts that each is still present, so a future
+sweep cannot quietly "finish the job".
+
+They fall into two groups. The first is live infrastructure, which cannot be
+renamed by editing code at all; the second is wire identifiers that something
+outside this deployment already depends on.
+
+### Infrastructure
 
 Every one of these is live infrastructure. None can be renamed by editing code.
 
@@ -255,8 +304,26 @@ Every one of these is live infrastructure. None can be renamed by editing code.
 | `*.preview.legenex.com` | Wildcard DNS and certificate for every Site's preview domain |
 | `legalos_deploy` | SSH key name and host alias |
 
-Phase 1 decides the strategy for each. Phases 9 through 11 execute the
-infrastructure half, once the infrastructure they name is being replaced anyway.
+### Wire identifiers
+
+Renaming one of these is a breaking change to a consumer outside this deploy,
+not a rebrand. Each is asserted present by `pnpm test:rebrand`, with the
+consumer named.
+
+| Identifier | Consumer that depends on it |
+|---|---|
+| `X-LegalOS-Event`, `X-LegalOS-Signature` | third-party webhook receivers already switching on and verifying these headers. The `X-PageFlo-*` pair is sent alongside so receivers can migrate on their own schedule. |
+| `x-legalos-host`, `x-legalos-preview`, `x-legalos-preview-site` | stamped by middleware and read by the public page routes. `x-pageflo-*` is canonical and read first. |
+| `/api/legalos/*` | `scripts/release.sh` health gate, the SSL poller probing tenant hosts that may still be serving an older build, cached copies of `q.js`, operator bookmarks. Every route is a re-export shim over `/api/pageflo/*`. |
+| `app: "legalos"` | the marker `/api/pageflo/self-check` compares against to prove a host reached this application. Changing it makes every custom domain fail verification. |
+| `.legalos-builder-canvas` | a CSS scope baked into page HTML saved before the rename. `bespoke-css.ts` dual-scopes it with `.pageflo-builder-canvas`. |
+| `legalos:quiz-height`, `data-legalos-booted` | the postMessage protocol and guard attribute in copies of `q.js` already embedded on third-party pages. |
+| `_legalos.<host>` | the DNS TXT record name tenants have already published to prove domain ownership. |
+| `preview.legenex.com` | every issued preview host and its certificate. |
+
+Phases 9 through 11 execute the infrastructure half, once the infrastructure
+they name is being replaced anyway. The wire identifiers are retired one
+consumer at a time, never as a sweep.
 
 ---
 

@@ -14,6 +14,9 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { checkInfra } from '@/lib/infra-check'
 import { pleskIsConfigured, pleskGet } from '@/lib/plesk/client'
+import { env } from '@/lib/pageflo/env'
+import { appHost, appOrigin, legacyAppHosts, legacyHostsRedirect, marketingHost } from '@/lib/pageflo/hosts'
+import { missingLegalFacts } from '@/lib/pageflo/legal'
 
 const exec = promisify(execFile)
 
@@ -391,6 +394,97 @@ export const checkAnthropic = async (): Promise<SystemCheck> => {
 }
 
 /* -------------------------------------------------------------------------- */
+/*                          PageFlo host configuration                         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * The hosts the public router treats as PageFlo's own.
+ *
+ * Reported because getting this wrong is invisible from inside the console: an
+ * unconfigured marketing host means the product site never serves, and an
+ * unconfigured app host means `www.` never redirects and the CSRF allowlist is
+ * missing an origin. Both fail as "nothing happens", not as an error.
+ */
+export const checkPageFloHosts = async (): Promise<SystemCheck> => {
+  const marketing = marketingHost()
+  const app = appHost()
+  const legacy = legacyAppHosts()
+  const detail = {
+    marketing_host: marketing || null,
+    app_host: app || null,
+    legacy_app_hosts: legacy.length ? legacy.join(', ') : null,
+    legacy_redirect: legacyHostsRedirect(),
+    app_origin: appOrigin(),
+  }
+
+  if (!marketing && !app) {
+    return {
+      id: 'runtime.pageflo-hosts',
+      label: 'PageFlo hosts',
+      category: 'runtime',
+      status: 'warn',
+      message:
+        'PAGEFLO_MARKETING_HOST and PAGEFLO_APP_HOST are both unset — every host resolves against the Domains table',
+      detail,
+    }
+  }
+
+  const missing: string[] = []
+  if (!marketing) missing.push('PAGEFLO_MARKETING_HOST')
+  if (!app) missing.push('PAGEFLO_APP_HOST')
+  if (missing.length > 0) {
+    return {
+      id: 'runtime.pageflo-hosts',
+      label: 'PageFlo hosts',
+      category: 'runtime',
+      status: 'warn',
+      message: `${missing.join(' and ')} unset`,
+      detail,
+    }
+  }
+
+  return {
+    id: 'runtime.pageflo-hosts',
+    label: 'PageFlo hosts',
+    category: 'runtime',
+    status: 'ok',
+    message: legacy.length
+      ? `${app} serves the console, ${marketing} the marketing site, ${legacy.length} legacy host(s) ${legacyHostsRedirect() ? 'redirecting' : 'still serving'}`
+      : `${app} serves the console, ${marketing} the marketing site`,
+    detail,
+  }
+}
+
+/**
+ * Whether the public legal pages can publish.
+ *
+ * `/privacy` fails closed: it 404s and its footer link is absent until every
+ * mandatory legal fact is configured. That is correct behaviour but it is
+ * silent, so the missing keys are named here rather than discovered by an
+ * operator wondering why the link is gone.
+ */
+export const checkLegalPublication = async (): Promise<SystemCheck> => {
+  const missing = missingLegalFacts()
+  if (missing.length === 0) {
+    return {
+      id: 'runtime.legal-publication',
+      label: 'Legal pages',
+      category: 'runtime',
+      status: 'ok',
+      message: '/privacy is published; every mandatory legal fact is configured',
+    }
+  }
+  return {
+    id: 'runtime.legal-publication',
+    label: 'Legal pages',
+    category: 'runtime',
+    status: 'warn',
+    message: `/privacy is NOT published: ${missing.length} legal fact(s) missing. This is a business decision, not a code change.`,
+    detail: { missing: missing.join(', ') },
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /*                              DNS infra                                      */
 /* -------------------------------------------------------------------------- */
 
@@ -411,7 +505,7 @@ export const checkDnsInfra = async (): Promise<SystemCheck[]> => {
 
   checks.push({
     id: 'dns.preview_wildcard',
-    label: `Preview wildcard: *.${process.env.LEGALOS_PREVIEW_DOMAIN ?? '(unset)'}`,
+    label: `Preview wildcard: *.${env('previewDomain') || '(unset)'}`,
     category: 'dns',
     status: result.preview_wildcard.resolves ? 'ok' : 'error',
     message: result.preview_wildcard.resolves
@@ -453,7 +547,7 @@ const fetchTlsCertExpiry = (host: string): Promise<{ valid_to: string; days_rema
 }
 
 export const checkSelfSslCert = async (): Promise<SystemCheck | null> => {
-  const host = process.env.LEGALOS_FALLBACK_HOST
+  const host = legacyAppHosts()[0]
   if (!host || host === 'localhost') {
     return {
       id: 'dns.self_ssl',

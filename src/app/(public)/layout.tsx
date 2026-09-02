@@ -50,7 +50,7 @@ const siteStyleVars = (site: Site): string => {
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error(
-      `[legalos] brand tokens unresolvable for site ${site?.id}:`,
+      `[pageflo] brand tokens unresolvable for site ${site?.id}:`,
       err instanceof Error ? err.message : err,
     )
     return ''

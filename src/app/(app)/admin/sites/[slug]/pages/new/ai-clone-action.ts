@@ -114,7 +114,7 @@ export async function createPageFromUrl(args: {
       schema: CLONE_SCHEMA,
       schemaName: 'cloned_page',
       system: [
-        'You convert a public marketing/landing-page URL into a structured list of body_blocks for a LegalOS Page.',
+        'You convert a public marketing/landing-page URL into a structured list of body_blocks for a PageFlo Page.',
         'Read the HTML body content, identify each visible section top-to-bottom, and emit ONE block per section using the closest matching blockType.',
         '',
         'Mapping rules:',

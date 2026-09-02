@@ -141,20 +141,20 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     }
     if (path !== '/') return {}
     return {
-      title: `${PRODUCT_NAME} — ${PRODUCT_TAGLINE}`,
+      title: `${PRODUCT_NAME} · ${PRODUCT_TAGLINE}`,
       description: PRODUCT_DESCRIPTION,
       alternates: { canonical: `${origin}/` },
       robots: { index: true, follow: true },
       openGraph: {
         type: 'website',
         siteName: PRODUCT_NAME,
-        title: `${PRODUCT_NAME} — ${PRODUCT_TAGLINE}`,
+        title: `${PRODUCT_NAME} · ${PRODUCT_TAGLINE}`,
         description: PRODUCT_DESCRIPTION,
         url: `${origin}/`,
       },
       twitter: {
         card: 'summary_large_image',
-        title: `${PRODUCT_NAME} — ${PRODUCT_TAGLINE}`,
+        title: `${PRODUCT_NAME} · ${PRODUCT_TAGLINE}`,
         description: PRODUCT_DESCRIPTION,
       },
     }

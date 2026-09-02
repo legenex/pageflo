@@ -24,7 +24,7 @@ export default function PublicError({
   reset: () => void
 }) {
   useEffect(() => {
-    void fetch('/api/legalos/client-error', {
+    void fetch('/api/pageflo/client-error', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

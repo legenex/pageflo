@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useId, useRef, useState, useTransition } from 'react'
 import { MoreHorizontal, Pencil, ExternalLink, Copy, Trash2 } from 'lucide-react'
+import { useConfirm } from '@/components/pageflo/interactive'
 import { duplicatePage, deletePage } from './actions'
 
 // Broadcast fired when any row menu opens, carrying that menu's id. Every other
@@ -10,7 +11,7 @@ import { duplicatePage, deletePage } from './actions'
 // across these independent island components, without lifting state to the
 // (server-rendered) list. Covers keyboard/programmatic opens too, where a
 // pointerdown-outside would not fire.
-const MENU_OPEN_EVENT = 'legalos:page-row-menu-open'
+const MENU_OPEN_EVENT = 'pageflo:page-row-menu-open'
 
 type Props = {
   pageId: number | string
@@ -26,6 +27,7 @@ export function PageRowMenu({ pageId, pageSlug, pageTitle, siteSlug }: Props) {
   const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
   const [menuPos, setMenuPos] = useState<{ top: number; right: number } | null>(null)
+  const [confirm, confirmDialog] = useConfirm()
 
   const openMenu = () => {
     if (!buttonRef.current) return
@@ -79,10 +81,16 @@ export function PageRowMenu({ pageId, pageSlug, pageTitle, siteSlug }: Props) {
     })
   }
 
-  const onDelete = () => {
+  const onDelete = async () => {
     setOpen(false)
     if (isHome) return
-    if (!confirm(`Delete "${pageTitle}"?\nThis cannot be undone.`)) return
+    const ok = await confirm({
+      title: 'Delete this page?',
+      message: `"${pageTitle}" and everything authored on it are removed. Any visitor reaching its path afterwards gets a 404 unless another page claims it.`,
+      confirmLabel: 'Delete page',
+      tone: 'danger',
+    })
+    if (!ok) return
     start(async () => {
       const res = await deletePage({ pageId, siteSlug })
       if (!res.ok) alert(`Delete failed: ${res.error}`)
@@ -91,6 +99,7 @@ export function PageRowMenu({ pageId, pageSlug, pageTitle, siteSlug }: Props) {
 
   return (
     <div className="justify-self-end">
+      {confirmDialog}
       <button
         ref={buttonRef}
         type="button"

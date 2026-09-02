@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
+import { PRODUCT_NAME } from '@/lib/pageflo/product'
 
 type ActionResult = { ok: true } | { ok: false; error: string }
 
@@ -39,7 +40,7 @@ export async function saveIntegrationConfig(formData: FormData): Promise<ActionR
       port: Number(formData.get('smtp_port') ?? 587),
       user: String(formData.get('smtp_user') ?? '') || null,
       pass: String(formData.get('smtp_pass') ?? '') || null,
-      from_name: String(formData.get('smtp_from_name') ?? 'Legenex LegalOS'),
+      from_name: String(formData.get('smtp_from_name') ?? PRODUCT_NAME),
       from_email: String(formData.get('smtp_from_email') ?? 'noreply@legenex.com'),
     },
     slack: {

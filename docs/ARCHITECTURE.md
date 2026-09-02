@@ -18,10 +18,15 @@ the Next.js app on `127.0.0.1:3000`. From there:
    (`/admin/*`, `/cms/*`, `/api/*`) or public site territory. For the public
    path it stamps three request-intent headers onto the response so the
    catch-all route can read them:
-   - `x-legalos-host`, the raw `Host:`
-   - `x-legalos-preview-site`, from `?site=<slug>`, which bypasses host lookup
-   - `x-legalos-preview`, from `?preview=1`, which asks the route to skip the
+   - `x-pageflo-host`, the raw `Host:`
+   - `x-pageflo-preview-site`, from `?site=<slug>`, which bypasses host lookup
+   - `x-pageflo-preview`, from `?preview=1`, which asks the route to skip the
      `status='published'` filter so drafts and scheduled content render
+   - `x-pageflo-host-role`, the classification from `src/lib/pageflo/hosts.ts`
+
+   The `x-legalos-*` spellings of the first three are stamped alongside and read
+   as a fallback. They are compatibility identifiers; see
+   `docs/INFRASTRUCTURE.md`.
 
    Middleware only forwards the preview intent. **The route re-verifies that the
    request is authenticated before honouring the draft bypass.** Never move that
@@ -31,18 +36,31 @@ the Next.js app on `127.0.0.1:3000`. From there:
 3. **`/cms/*`** is the raw Payload admin, configured with `routes.admin: '/cms'`
    in `src/payload.config.ts`. It is used for fields not yet exposed in the
    custom UI, and several custom pages deep-link into it.
-4. **`/api/*`** is Payload's REST and GraphQL surface plus our own endpoints:
-   `/api/legalos/*` (health, dns-check, self-check, test-capture, agent-plan,
+4. **`/api/*`** is Payload's REST surface plus our own endpoints:
+   `/api/pageflo/*` (health, dns-check, self-check, test-capture, agent-plan,
    quiz-ai, quiz-webhook, client-error, buildlog-capture, legal-template
    affected-sites), `/api/leads` for public capture, `/api/media/upload` for
-   builder uploads.
-5. **`/(public)/[[...slug]]/page.tsx`** is the public catch-all. It calls
-   `resolveSiteByHost()` in `src/lib/site-resolver.ts` to map `Host:` to Domain
-   to Site, applies the Site's brand tokens, resolves the path to a
-   `Page` / `LandingPage` / `BlogPost`, falls back to a `SharedLegalTemplate`
-   for known legal slugs (`/privacy`, `/terms`, `/partners`, `/submitted`,
-   `/thanks`, `/tcpa`, `/disclosures`), and finally to the marketing component
-   (`LegalOSMarketing`) if no Site matches the host.
+   builder uploads. Every one is also mounted at `/api/legalos/*` as a
+   re-export, for consumers this deploy does not control: the release health
+   gate, the SSL poller probing tenant hosts that may be serving an older build,
+   and cached copies of `q.js` on third-party pages.
+5. **`/(public)/[[...slug]]/page.tsx`** is the public catch-all, and its FIRST
+   decision is `classifyHost()` from `src/lib/pageflo/hosts.ts`, taken before
+   any database lookup:
+   - `marketing` renders the PageFlo product site at `/` and `/privacy`;
+   - `app` redirects `/` to `/admin` and 404s everything else public;
+   - `legacy-app` behaves exactly as it did before the rebrand until
+     `PAGEFLO_LEGACY_HOST_REDIRECT` is `true`, then 308s to the app host;
+   - `tenant` is the only role that reaches `resolveSiteByHost()`.
+
+   Checking reserved hosts first is what makes it impossible for a `Domains`
+   row to claim `pageflo.io` or `app.pageflo.io`. For a tenant host the route
+   maps `Host:` to Domain to Site, applies the Site's brand tokens, resolves the
+   path to a `Page` / `LandingPage` / `BlogPost` or a funnel deployment, and
+   falls back to a `SharedLegalTemplate` for known legal slugs (`/privacy`,
+   `/terms`, `/partners`, `/submitted`, `/thanks`, `/tcpa`, `/disclosures`). An
+   unresolvable host **404s**; it does not render the product site, which is
+   what `robots.txt` was already saying for the same request.
 
 The host cache in `site-resolver.ts` has a 60 second TTL. Call
 `invalidateHostCache(host)` after Domain mutations.
@@ -214,7 +232,8 @@ through `invokeLLM`.
 `CheckMyClaimHome` component and the `BlockRenderer` ports of its sections, so
 the visual stays identical while sections migrate block by block. **Every rule
 is dual-scoped** `html.site-shell` for the public page and
-`.legalos-builder-canvas` for the admin preview. Add both selectors or the
+`.pageflo-builder-canvas` for the admin preview, plus `.legalos-builder-canvas`
+for page HTML saved before the rename. Add all three selectors or the
 builder preview diverges from the live page. Its `:root` fallbacks are a neutral
 navy and gray palette, deliberately not Check My Claim blue, so a brand-unaware
 Site cannot inherit that identity.
@@ -249,7 +268,7 @@ repository, any migration, any seed, or the Base44 account.
 ## Lead capture pipeline
 
 Public lead submissions (`POST /api/leads`, `src/app/api/leads/route.ts`) and
-the test harness (`POST /api/legalos/test-capture`) funnel into one
+the test harness (`POST /api/pageflo/test-capture`) funnel into one
 orchestrator: `runLeadPipeline()` in `src/lib/lead-pipeline/run.ts`.
 
 **It runs synchronously inside the request. There is no background worker.**
@@ -471,6 +490,6 @@ made the admin return 500.
   the runtime status layer, one atomically written JSON file per agent under
   `data/agent-status/`, gitignored and created lazily, so concurrent agents can
   POST status without a read-modify-write race. Agents report via
-  `POST /api/legalos/agent-plan`. Deliberately not a Payload collection: it is a
+  `POST /api/pageflo/agent-plan`. Deliberately not a Payload collection: it is a
   dev and ops surface with no tenant benefit that would otherwise cost a
   migration.

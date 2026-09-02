@@ -2,6 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { Plus, Search, Shield, MoreVertical, Pencil, Trash2, X, UserCheck, UserX, Mail } from 'lucide-react'
+import { PRODUCT_NAME } from '@/lib/pageflo/product'
 import { inviteUser, updateUser, deleteUser, setStatus } from './actions'
 
 export type Role = 'admin' | 'editor' | 'analyst'
@@ -64,12 +65,12 @@ export function UsersClient({ meId, users, sites }: { meId: string; users: UserR
   }
 
   return (
-    <div className="p-10 max-w-[1400px]">
+    <div className="px-5 pb-16 pt-6 sm:px-7 max-w-[1400px]">
       <header className="mb-6 flex items-start justify-between gap-6">
         <div>
-          <h1 className="text-[28px] font-semibold tracking-tight text-white">Users</h1>
-          <p className="text-[var(--color-ink-muted)] text-[15px] mt-1">
-            LegalOS-wide roster and per-Site role bindings.
+          <h1 className="text-[22px] font-bold tracking-[-0.02em] text-ink">Users</h1>
+          <p className="text-ink-muted text-[13px] mt-1.5">
+            {PRODUCT_NAME}-wide roster and per-Site role bindings.
           </p>
         </div>
         <button

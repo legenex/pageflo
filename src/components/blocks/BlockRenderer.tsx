@@ -67,8 +67,8 @@ const PAD_PX: Record<string, number | undefined> = {
 }
 
 const RESPONSIVE_CSS = `
-@media (max-width: 640px) { .legalos-hide-mobile { display: none !important; } }
-@media (min-width: 1024px) { .legalos-hide-desktop { display: none !important; } }
+@media (max-width: 640px) { .pageflo-hide-mobile { display: none !important; } }
+@media (min-width: 1024px) { .pageflo-hide-desktop { display: none !important; } }
 `
 
 // Compose the inline style overrides for one block. Only includes properties
@@ -121,8 +121,8 @@ export function BlockRenderer({
       {blocks.map((block, idx) => {
         const meta = block.id ? blockMeta?.[block.id] : undefined
         const classes: string[] = []
-        if (meta?.hide_mobile) classes.push('legalos-hide-mobile')
-        if (meta?.hide_desktop) classes.push('legalos-hide-desktop')
+        if (meta?.hide_mobile) classes.push('pageflo-hide-mobile')
+        if (meta?.hide_desktop) classes.push('pageflo-hide-desktop')
         const overrideStyle = styleOverridesFor(meta)
         const key = block.id ?? `${block.blockType}-${idx}`
         const child = <BlockDispatch block={block} ctx={ctx} />

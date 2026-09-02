@@ -12,6 +12,7 @@ import { sendSlackNotification } from './slack'
 import { deriveFbc, type Attribution } from './attribution'
 import { newEventId } from './event-id'
 import { reportError } from '@/lib/observability/report'
+import { appOrigin } from '@/lib/pageflo/hosts'
 
 export type LeadCaptureInput = {
   // Resolved server-side
@@ -504,7 +505,11 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
           contact: input.contact,
           funnelType: input.funnel_type,
           testCapture: input.test_capture,
-          adminUrl: `${process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000'}/cms/collections/leads/${leadId}`,
+          // appOrigin() resolves PAGEFLO_SERVER_URL, then the configured app
+          // host, then localhost. Reading NEXT_PUBLIC_SERVER_URL directly here
+          // was the one place a Slack link would still point at the pre-rebrand
+          // console after the environment had been migrated.
+          adminUrl: `${appOrigin()}/cms/collections/leads/${leadId}`,
         })
         steps.push({ step: 'slack.notify', ok: res.ok, detail: res.error ?? w.label ?? 'sent', duration_ms: t(started) })
         logDelivery('slack.notify', res.ok, res.error)

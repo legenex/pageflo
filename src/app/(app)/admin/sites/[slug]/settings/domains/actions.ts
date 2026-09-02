@@ -10,6 +10,7 @@ import { invalidateHostCache } from '@/lib/site-resolver'
 import { checkDomainDns } from '@/lib/dns-check'
 import { pollDomainSslStatus } from '@/lib/ssl-poll'
 import { provisionDomainInPlesk, unprovisionDomainInPlesk, pleskIsConfigured } from '@/lib/plesk/provision-domain'
+import { env } from '@/lib/pageflo/env'
 
 /* --------------------------------- Verify -------------------------------------- */
 
@@ -52,7 +53,7 @@ export async function verifyAndPromoteDomain(args: {
   // in a production .env can never bypass DNS or optimistically mark a domain.
   const skipAllowed =
     process.env.NODE_ENV !== 'production' &&
-    (process.env.LEGALOS_DEV_SKIP_DNS ?? 'false').toLowerCase() === 'true'
+    env('devSkipDns').toLowerCase() === 'true'
   let dnsResult: Awaited<ReturnType<typeof checkDomainDns>>
 
   if (args.skipDns && skipAllowed) {
@@ -61,16 +62,16 @@ export async function verifyAndPromoteDomain(args: {
       matched: 'txt',
       observed: { cname: [], a: [], txt: ['(skipped in dev)'] },
       expected: {
-        cname_target: process.env.LEGALOS_CNAME_TARGET ?? null,
-        a_target: process.env.LEGALOS_A_TARGET ?? null,
+        cname_target: env('cnameTarget') || null,
+        a_target: env('aTarget') || null,
         txt_token_at: `_legalos.${domain.host}`,
       },
     }
   } else {
     dnsResult = await checkDomainDns({
       host: domain.host,
-      cnameTarget: process.env.LEGALOS_CNAME_TARGET ?? null,
-      aTarget: process.env.LEGALOS_A_TARGET ?? null,
+      cnameTarget: env('cnameTarget') || null,
+      aTarget: env('aTarget') || null,
       verificationToken: domain.verification_token ?? null,
     })
   }
@@ -253,8 +254,8 @@ export async function recheckDomainDns(args: {
       matched: null,
       observed: { cname: [], a: [], txt: [] },
       expected: {
-        cname_target: process.env.LEGALOS_CNAME_TARGET ?? null,
-        a_target: process.env.LEGALOS_A_TARGET ?? null,
+        cname_target: env('cnameTarget') || null,
+        a_target: env('aTarget') || null,
         txt_token_at: `_legalos.${domain.host}`,
       },
     },

@@ -1350,7 +1350,7 @@ const AdvancedBlockPanel = ({ blockId, meta, onPatch }) => {
 // VISIBILITY ROW — per-section responsive visibility checkboxes shown in the
 // section editor right under the AI rewrite panel. Sets hide_mobile /
 // hide_desktop flags on the page's block_meta[blockId] map; the public
-// BlockRenderer adds .legalos-hide-mobile / .legalos-hide-desktop wrapper
+// BlockRenderer adds .pageflo-hide-mobile / .pageflo-hide-desktop wrapper
 // classes whose @media rules drop the block at the matching breakpoint.
 // ============================================================================
 const VisibilityRow = ({ blockId, meta, onPatch }) => (
@@ -2593,7 +2593,13 @@ export function PageBlocksBuilderApp({ pageId, siteSlug, siteId, primaryHost, si
               </div>
             ) : (
               <div
-                className="legalos-builder-canvas"
+                // Both names, deliberately. `.pageflo-builder-canvas` is the
+                // canonical one; `.legalos-builder-canvas` is still carried
+                // because HTML imports from before the rename persisted a
+                // `custom_html` <style> block scoped to it, and those rows live
+                // in Postgres. Drop the legacy class only once they are
+                // rewritten. See src/lib/builder/extract-brand-tokens.ts.
+                className="pageflo-builder-canvas legalos-builder-canvas"
                 style={
                   viewport === 'desktop'
                     ? undefined

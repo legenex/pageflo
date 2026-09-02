@@ -1,10 +1,13 @@
 import { getPayload } from 'payload'
 import config from '@payload-config'
+import { Globe } from 'lucide-react'
 import { buildDnsRecords, type DnsRecord } from '@/lib/dns-records'
+import { Card, EmptyState, Mono, Page, PageHeader } from '@/components/pageflo/primitives'
 import { AddDomainButton } from './AddDomainModal'
 import { BrandDomainRow } from './BrandDomainRow'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: 'Domains' }
 
 type SiteLite = { id: number; name: string; slug: string }
 type DomainLite = {
@@ -89,18 +92,14 @@ export default async function DomainsIndexPage() {
     .sort((a, b) => a.site.name.localeCompare(b.site.name))
 
   return (
-    <div className="p-10 max-w-[1400px]">
-      <header className="mb-6 flex items-start justify-between gap-6">
-        <div>
-          <h1 className="text-[28px] font-semibold tracking-tight text-white">Domains</h1>
-          <p className="text-[var(--color-ink-muted)] text-[15px] mt-1">
-            All domain configuration lives here: add, verify DNS, set primary, attach/detach to brands, delete.
-          </p>
-        </div>
-        <AddDomainButton />
-      </header>
+    <Page>
+      <PageHeader
+        title="Domains"
+        subtitle="Every hostname pointed at a Site: add one, verify its DNS, set the primary, move it between brands or remove it."
+        actions={<AddDomainButton />}
+      />
 
-      <div className="space-y-8">
+      <div className="space-y-6">
         {unassigned.length > 0 ? (
           <BrandGroup
             heading="Unassigned"
@@ -131,14 +130,17 @@ export default async function DomainsIndexPage() {
         ))}
 
         {domains.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[var(--color-border)] bg-[var(--color-surface-1)] py-16 text-center">
-            <p className="text-[var(--color-ink-muted)] text-[14px]">
-              No domains yet. Click <strong className="text-white">Add Domain</strong> to add your first one.
-            </p>
-          </div>
+          <Card>
+            <EmptyState
+              icon={<Globe className="h-[18px] w-[18px]" aria-hidden="true" />}
+              title="No domains yet"
+              message="Add a hostname and point its DNS at PageFlo. Every Site also gets a preview domain automatically, which stays primary until a custom domain has completed a real HTTPS handshake."
+              action={<AddDomainButton />}
+            />
+          </Card>
         ) : null}
       </div>
-    </div>
+    </Page>
   )
 }
 
@@ -159,20 +161,21 @@ function BrandGroup({
 }) {
   return (
     <section>
-      <header className="flex items-center gap-3 mb-3">
+      <header className="mb-2.5 flex flex-wrap items-center gap-2.5">
         <span
-          className="inline-flex items-center justify-center w-9 h-9 rounded-md text-[11px] font-bold text-white"
+          aria-hidden="true"
+          className="inline-flex h-7 w-7 items-center justify-center rounded-app-sm text-[10.5px] font-bold text-white"
           style={{ background: tint }}
         >
           {initials}
         </span>
-        <h2 className="text-[16px] font-semibold text-white">{heading}</h2>
-        <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-[var(--color-surface-1)] text-[var(--color-ink-muted)] border border-[var(--color-border)]">
+        <h2 className="text-[14px] font-semibold text-ink">{heading}</h2>
+        <Mono className="rounded-app-sm border border-border bg-surface-1 px-1.5 py-0.5 text-[10.5px] font-semibold text-ink-muted">
           {badge}
-        </span>
-        {sub ? <span className="text-[12px] text-[var(--color-ink-dim)] ml-2">{sub}</span> : null}
+        </Mono>
+        {sub ? <span className="text-[11.5px] text-ink-dim">{sub}</span> : null}
       </header>
-      <div className="space-y-2">{children}</div>
+      <div className="space-y-1.5">{children}</div>
     </section>
   )
 }

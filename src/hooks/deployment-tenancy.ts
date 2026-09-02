@@ -66,7 +66,7 @@ const asRecord = (v: unknown): Record<string, unknown> =>
  * @param publishRequiresPreflight `true` on `funnel-lp-deployments` and
  *   `funnel-quiz-deployments`, whose one gated publish door
  *   (`setLpDeploymentStatus` / `setQuizDeploymentStatus`) runs the full
- *   preflight and marks its write with `context: { legalosPreflighted: true }`.
+ *   preflight and marks its write with `context: { pagefloPreflighted: true }`.
  *   A userful write that flips a non-live row to `live` WITHOUT that marker is
  *   a raw REST/`/cms` publish skipping the preflight, and is refused. `false`
  *   on advertorial deployments, which have no preflight door — refusing there
@@ -148,7 +148,7 @@ export const enforceDeploymentTenancy =
     if (publishRequiresPreflight) {
       const requested = incomingData.status
       const previous = operation === 'update' ? String(asRecord(originalDoc).status ?? 'draft') : 'draft'
-      if (requested === 'live' && previous !== 'live' && req.context?.legalosPreflighted !== true) {
+      if (requested === 'live' && previous !== 'live' && req.context?.pagefloPreflighted !== true) {
         throw new APIError(
           'going live runs the publish preflight; use the publish action rather than writing status directly',
           403,

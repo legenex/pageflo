@@ -1,10 +1,11 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { getPayload } from 'payload'
+import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
 import { AlertCircle, CheckCircle2, ExternalLink, FileText, Globe, Inbox, Layers, Pencil } from 'lucide-react'
 import { TestCaptureButton } from '@/components/app/TestCaptureModal'
 import { SitePublishControl } from '@/components/app/SitePublishControl'
+import { PRODUCT_NAME } from '@/lib/pageflo/product'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,30 +30,88 @@ export default async function SiteOverviewPage({ params }: Props) {
   const since30d = new Date()
   since30d.setDate(since30d.getDate() - 30)
 
-  const [pagesPub, domainsCount, leads30d, primaryDomain] = await Promise.all([
-    payload.count({
-      collection: 'pages',
-      where: { and: [{ site: { equals: site.id } }, { status: { equals: 'published' } }] },
-      overrideAccess: true,
-    }),
-    payload.count({ collection: 'domains', where: { site: { equals: site.id } }, overrideAccess: true }),
-    payload.count({
-      collection: 'leads',
-      where: {
-        and: [
-          { site: { equals: site.id } },
-          { createdAt: { greater_than: since30d.toISOString() } },
-        ],
-      },
-      overrideAccess: true,
-    }),
-    payload.find({
-      collection: 'domains',
-      where: { and: [{ site: { equals: site.id } }, { primary: { equals: true } }] },
-      limit: 1,
-      overrideAccess: true,
-    }),
-  ])
+  /**
+   * Every number on this page is a live count of a real row.
+   *
+   * "Active Funnels" was a hardcoded `0` and the funnels panel said "No funnels
+   * bound to this site yet" without ever running a query, so a Site with six
+   * live deployments reported none. A dashboard that invents an operational
+   * count is worse than one that omits it: the operator believes it.
+   */
+  const liveOnThisSite: Where = {
+    and: [{ site: { equals: site.id } }, { status: { equals: 'live' } }],
+  }
+
+  const [pagesPub, domainsCount, leads30d, primaryDomain, lpDeployments, quizDeployments, advertorialDeployments] =
+    await Promise.all([
+      payload.count({
+        collection: 'pages',
+        where: { and: [{ site: { equals: site.id } }, { status: { equals: 'published' } }] },
+        overrideAccess: true,
+      }),
+      payload.count({ collection: 'domains', where: { site: { equals: site.id } }, overrideAccess: true }),
+      payload.count({
+        collection: 'leads',
+        where: {
+          and: [
+            { site: { equals: site.id } },
+            { createdAt: { greater_than: since30d.toISOString() } },
+            // The label says "excluding test captures", so the query has to.
+            // It did not, which made every test submission look like a lead.
+            { test_capture: { not_equals: true } },
+          ],
+        },
+        overrideAccess: true,
+      }),
+      payload.find({
+        collection: 'domains',
+        where: { and: [{ site: { equals: site.id } }, { primary: { equals: true } }] },
+        limit: 1,
+        overrideAccess: true,
+      }),
+      // Tolerated rather than awaited blindly: on a database where the funnel
+      // migrations have not run the table is missing, and a Site dashboard that
+      // 500s is worse than one whose funnels panel is empty and says so.
+      payload
+        .find({
+          collection: 'funnel-lp-deployments' as never,
+          where: liveOnThisSite,
+          limit: 50,
+          depth: 0,
+          overrideAccess: true,
+        })
+        .catch(() => null),
+      payload
+        .find({
+          collection: 'funnel-quiz-deployments' as never,
+          where: liveOnThisSite,
+          limit: 50,
+          depth: 0,
+          overrideAccess: true,
+        })
+        .catch(() => null),
+      payload
+        .find({
+          collection: 'funnel-advertorial-deployments' as never,
+          where: liveOnThisSite,
+          limit: 50,
+          depth: 0,
+          overrideAccess: true,
+        })
+        .catch(() => null),
+    ])
+
+  type DeploymentRow = { id: string | number; name?: string | null; path?: string | null }
+  const asRows = (res: { docs: unknown[] } | null): DeploymentRow[] =>
+    ((res?.docs ?? []) as DeploymentRow[])
+
+  // `null` means the query failed, which is different from "there are none".
+  const funnelsUnavailable = !lpDeployments || !quizDeployments || !advertorialDeployments
+  const funnels: Array<{ kind: string; href: string; row: DeploymentRow }> = [
+    ...asRows(lpDeployments).map((row) => ({ kind: 'Landing page', href: '/admin/landing-pages', row })),
+    ...asRows(quizDeployments).map((row) => ({ kind: 'Quiz', href: '/admin/quizzes', row })),
+    ...asRows(advertorialDeployments).map((row) => ({ kind: 'Advertorial', href: '/admin/advertorials', row })),
+  ]
 
   const primary = primaryDomain.docs[0]
 
@@ -85,7 +144,7 @@ export default async function SiteOverviewPage({ params }: Props) {
   })
 
   return (
-    <div className="p-10 max-w-[1400px]">
+    <div className="px-5 pb-16 pt-6 sm:px-7 max-w-[1400px]">
       <header className="rounded-2xl border border-[var(--color-border)] bg-[var(--color-surface-1)] card-edge p-6 mb-6 flex items-center gap-5 flex-wrap">
         <span
           className="w-14 h-14 rounded-xl flex items-center justify-center text-[18px] font-bold text-white shrink-0"
@@ -94,7 +153,7 @@ export default async function SiteOverviewPage({ params }: Props) {
           {site.name.split(/\s+/).slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()}
         </span>
         <div className="min-w-0 flex-1">
-          <h1 className="text-[24px] font-semibold tracking-tight text-white">{site.name}</h1>
+          <h1 className="text-[22px] font-bold tracking-[-0.02em] text-ink">{site.name}</h1>
           <p className="text-[13px] text-[var(--color-ink-muted)]">
             {primary ? (
               <a href={livePreviewUrl} target="_blank" rel="noreferrer" className="text-[var(--color-info)] hover:underline inline-flex items-center gap-1">
@@ -131,17 +190,57 @@ export default async function SiteOverviewPage({ params }: Props) {
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPI icon={<FileText className="w-4 h-4" />} value={pagesPub.totalDocs} label="Active Pages" />
         <KPI icon={<Globe className="w-4 h-4" />} value={domainsCount.totalDocs} label="Domains" />
-        <KPI icon={<Inbox className="w-4 h-4" />} value={leads30d.totalDocs} label="Leads (30d)" sub="excl. test" />
-        <KPI icon={<Layers className="w-4 h-4" />} value={0} label="Active Funnels" sub="serving this site" />
+        <KPI icon={<Inbox className="w-4 h-4" />} value={leads30d.totalDocs} label="Leads (30d)" sub="excluding test captures" />
+        <KPI
+          icon={<Layers className="w-4 h-4" />}
+          value={funnels.length}
+          label="Live funnels"
+          sub={funnelsUnavailable ? 'partial: a deployment table is unreadable' : 'serving this Site now'}
+        />
       </section>
 
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
-          <CardHeader>Funnels Active on This Site</CardHeader>
-          <CardEmpty>No funnels bound to this site yet.</CardEmpty>
+          <CardHeader
+            right={
+              <Link href="/admin/landing-pages" className="text-[12px] text-info hover:underline">
+                Manage deployments
+              </Link>
+            }
+          >
+            Live funnels on this Site
+          </CardHeader>
+          {funnelsUnavailable ? (
+            <CardEmpty>
+              A deployment table could not be read, so this list is incomplete. It is not a statement that there are
+              none.
+            </CardEmpty>
+          ) : funnels.length === 0 ? (
+            <CardEmpty>
+              No landing page, quiz or advertorial deployment is live on this Site. Draft and paused deployments are not
+              counted here.
+            </CardEmpty>
+          ) : (
+            <ul className="divide-y divide-border/70">
+              {funnels.slice(0, 8).map((f) => (
+                <li key={`${f.kind}-${f.row.id}`} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                  <Link href={f.href} className="min-w-0 flex-1 truncate text-[13px] text-ink hover:text-info">
+                    {f.row.name || `${f.kind} ${f.row.id}`}
+                  </Link>
+                  <span className="shrink-0 font-mono text-[11.5px] text-ink-dim">{f.row.path || '/'}</span>
+                  <span className="shrink-0 text-[11px] text-ink-muted">{f.kind}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {funnels.length > 8 ? (
+            <p className="border-t border-border px-3.5 py-2 text-[11.5px] text-ink-dim">
+              and {funnels.length - 8} more
+            </p>
+          ) : null}
         </Card>
         <Card>
-          <CardHeader right={<Link href="/admin/leads" className="text-[12px] text-[var(--color-info)] hover:underline">View all in LegalOS</Link>}>
+          <CardHeader right={<Link href="/admin/leads" className="text-[12px] text-[var(--color-info)] hover:underline">View all in {PRODUCT_NAME}</Link>}>
             Recent Leads
           </CardHeader>
           {recentLeads.docs.length === 0 ? (

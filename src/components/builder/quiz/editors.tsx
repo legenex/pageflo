@@ -192,7 +192,7 @@ export const WebhookTester = ({ method, url, headers, payload, customFields, res
   const runTest = async () => {
     setBusy(true); setResult(null)
     try {
-      const res = await fetch('/api/legalos/quiz-webhook-test', {
+      const res = await fetch('/api/pageflo/quiz-webhook-test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -35,7 +35,7 @@ function TestCaptureModal({ siteSlug, onClose }: { siteSlug: string; onClose: ()
     setResult(null)
     start(async () => {
       try {
-        const resp = await fetch('/api/legalos/test-capture', {
+        const resp = await fetch('/api/pageflo/test-capture', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

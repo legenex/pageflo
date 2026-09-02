@@ -310,7 +310,7 @@ const resolveLpDeploymentUncached = async (
   if (!includeUnpublished && portedTemplate?.quizMount && !quiz) {
     // eslint-disable-next-line no-console
     console.error(
-      `[legalos] lp deployment ${doc.id} (${normalized}) is live and has no quiz to mount: ` +
+      `[pageflo] lp deployment ${doc.id} (${normalized}) is live and has no quiz to mount: ` +
         `${ownQuizId ? `flow ${ownQuizId} did not resolve` : quizDeploymentId ? `legacy pointer "${quizDeploymentId}" did not resolve` : 'no flow is bound'}. ` +
         'Serving 404 rather than an empty card. See pnpm reconcile:lp-quiz.',
     )

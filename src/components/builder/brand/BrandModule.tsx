@@ -132,7 +132,7 @@ const BODY_SECTION_DEFS = {
   TrustBlock: { label: 'Trust Block', icon: ShieldCheck, color: T.success, desc: 'Headline + bullets + stats card' },
   RecentWins: { label: 'Recent Wins', icon: Trophy, color: T.warning, desc: 'Settlement cards with amounts' },
   Disclaimer: { label: 'Disclaimer', icon: AlertCircle, color: T.textMute, desc: 'Legal disclaimer text' },
-  CustomHTML: { label: 'Custom HTML', icon: Code2, color: T.pink, desc: 'Raw HTML escape hatch' },
+  CustomHTML: { label: 'Custom HTML', icon: Code2, color: T.orange, desc: 'Raw HTML escape hatch' },
 }
 
 const ICON_OPTIONS = { Trophy, CheckCircle2, Sparkles, ShieldCheck, Award, Star, Phone, Globe, Zap }

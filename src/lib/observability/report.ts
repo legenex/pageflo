@@ -26,6 +26,7 @@
  */
 
 import { safePost } from '@/lib/net/ssrf'
+import { env } from '@/lib/pageflo/env'
 
 export type ErrorKind =
   /** An unhandled failure in a route handler or server action. */
@@ -169,7 +170,7 @@ export const buildErrorEvent = (
     stack: err instanceof Error && err.stack ? redact(err.stack).slice(0, 4000) : null,
     fingerprint: fingerprint(kind, message, context.operation),
     environment: process.env.NODE_ENV ?? 'unknown',
-    release: process.env.LEGALOS_GIT_SHA ?? 'unknown',
+    release: env('gitSha') || 'unknown',
     context: {
       siteId: context.siteId == null ? null : String(context.siteId),
       route: context.route ? redact(context.route).slice(0, 200) : null,
@@ -193,7 +194,7 @@ export type ErrorTransport = (event: ErrorEvent) => void | Promise<void>
  */
 export const logTransport: ErrorTransport = (event) => {
   // eslint-disable-next-line no-console
-  console.error(`[legalos:error] ${JSON.stringify(event)}`)
+  console.error(`[pageflo:error] ${JSON.stringify(event)}`)
 }
 
 /**
@@ -214,7 +215,7 @@ export const webhookTransport = (url: string): ErrorTransport => async (event) =
   })
   if (!res.ok) {
     // eslint-disable-next-line no-console
-    console.error(`[legalos:error] the error webhook itself failed: ${res.reason}`)
+    console.error(`[pageflo:error] the error webhook itself failed: ${res.reason}`)
   }
 }
 
@@ -230,7 +231,7 @@ let configured: ErrorTransport[] | null = null
 export const transports = (): ErrorTransport[] => {
   if (configured) return configured
   const out: ErrorTransport[] = [logTransport]
-  const url = (process.env.LEGALOS_ERROR_WEBHOOK_URL ?? '').trim()
+  const url = env('errorWebhookUrl').trim()
   if (url) out.push(webhookTransport(url))
   configured = out
   return configured

@@ -54,7 +54,7 @@ for (const { entry, reason } of admitImageHosts(process.env.LEGALOS_IMAGE_HOSTS)
   // A typo in an environment variable must cost the one host it names, not the
   // build - but silently dropping it is how an operator concludes the allowlist
   // does not work and reaches for the wildcard again.
-  console.warn(`[legalos] LEGALOS_IMAGE_HOSTS: refused "${entry}" - ${reason}`)
+  console.warn(`[pageflo] LEGALOS_IMAGE_HOSTS: refused "${entry}" - ${reason}`)
 }
 
 export default withPayload(nextConfig)

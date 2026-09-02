@@ -21,6 +21,7 @@
  */
 
 import { useEffect } from 'react'
+import { reportClientError } from '@/lib/observability/client'
 
 export default function GlobalError({
   error,
@@ -32,17 +33,8 @@ export default function GlobalError({
   useEffect(() => {
     // POSTed rather than reported directly: this is the client, and the reporter
     // — with its redaction, its transports and its SSRF-guarded webhook — is
-    // server-side and stays there.
-    void fetch('/api/legalos/client-error', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: error.message,
-        digest: error.digest ?? null,
-        route: typeof window === 'undefined' ? null : window.location.pathname,
-      }),
-      keepalive: true,
-    }).catch(() => undefined)
+    // server-side and stays there. See src/lib/observability/client.ts.
+    void reportClientError(error, { surface: 'root' })
   }, [error])
 
   return (

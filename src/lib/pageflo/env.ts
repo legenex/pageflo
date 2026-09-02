@@ -76,6 +76,18 @@ export const ENV_SPECS = {
     key: 'PAGEFLO_ENFORCE_DOMAIN_ELIGIBILITY',
     legacyKey: 'LEGALOS_ENFORCE_DOMAIN_ELIGIBILITY',
   },
+  /** Kill switch for Plesk vhost provisioning. Set during host maintenance. */
+  disableProvisioning: {
+    key: 'PAGEFLO_DISABLE_PROVISIONING',
+    legacyKey: 'LEGALOS_DISABLE_PROVISIONING',
+    fallback: 'false',
+  },
+  /**
+   * Override for the migration directory. Read by payload.config at boot, which
+   * is BEFORE anything else in this module runs, and only by the release and
+   * test harnesses. Blank means Payload's default, `src/migrations`.
+   */
+  migrationDir: { key: 'PAGEFLO_MIGRATION_DIR', legacyKey: 'LEGALOS_MIGRATION_DIR' },
 } as const satisfies Record<string, EnvSpec>
 
 export type EnvName = keyof typeof ENV_SPECS

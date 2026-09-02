@@ -1,21 +1,32 @@
 // Bespoke CSS shared between the legacy CheckMyClaimHome component and the
 // data-driven BlockRenderer ports of its sections. Keeping the CSS string in
 // one place means the visual stays in sync as we migrate block-by-block.
+//
+// Every rule that reaches the admin builder preview is scoped THREE times:
+// `html.site-shell` for the public page, `.pageflo-builder-canvas` for the
+// canvas, and `.legalos-builder-canvas` for the same canvas under its old
+// name. The old selector is not dead weight and must not be swept up by the
+// rename: `src/lib/builder/extract-brand-tokens.ts` writes it into the
+// `custom_html` blocks produced by HTML import, and those rows are already
+// stored in Postgres. Until every such row is rewritten, a page imported
+// before the rename still styles itself through `.legalos-builder-canvas`,
+// which is why `PageBlocksBuilderApp` puts both class names on the canvas and
+// why both appear below.
 
 export const BESPOKE_CSS = `
 /* High-specificity overrides for site-shell brand vars from PublicLayout. */
 html.site-shell .hero h1, .legalos-builder-canvas .hero h1, html.site-shell .hero__heading, .legalos-builder-canvas .hero__heading,
-html.site-shell .hero__heading .hero__heading-gradient , .legalos-builder-canvas .hero__heading .hero__heading-gradient { color: var(--site-ink-inverse); }
-html.site-shell .hero__heading .hero__heading-gradient , .legalos-builder-canvas .hero__heading .hero__heading-gradient { background: linear-gradient(90deg,var(--site-primary-400),var(--site-primary-600)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-html.site-shell .hero__sub , .legalos-builder-canvas .hero__sub { color: var(--site-ink-inverse-muted); }
-html.site-shell .hero__cta-sub , .legalos-builder-canvas .hero__cta-sub { color: var(--site-ink-inverse-muted); }
-html.site-shell .hero__pill-text , .legalos-builder-canvas .hero__pill-text { color: color-mix(in srgb, var(--site-ink-inverse) 80%, transparent); }
-html.site-shell .trust-banner__label , .legalos-builder-canvas .trust-banner__label { color: var(--site-ink-inverse); }
-html.site-shell .panel-dark, .legalos-builder-canvas .panel-dark, html.site-shell .panel-dark p, .legalos-builder-canvas .panel-dark p, html.site-shell .panel-dark h1, .legalos-builder-canvas .panel-dark h1, html.site-shell .panel-dark h2, .legalos-builder-canvas .panel-dark h2, html.site-shell .panel-dark h3, .legalos-builder-canvas .panel-dark h3, html.site-shell .panel-dark span , .legalos-builder-canvas .panel-dark span { color: var(--site-ink-inverse); }
-html.site-shell .btn-nav, .legalos-builder-canvas .btn-nav, html.site-shell .btn-hero, .legalos-builder-canvas .btn-hero, html.site-shell a.btn-nav, .legalos-builder-canvas a.btn-nav, html.site-shell a.btn-hero , .legalos-builder-canvas a.btn-hero { color: var(--site-cta-ink); }
-html.site-shell .footer, .legalos-builder-canvas .footer, html.site-shell .footer h1, .legalos-builder-canvas .footer h1, html.site-shell .footer h2, .legalos-builder-canvas .footer h2, html.site-shell .footer h3, .legalos-builder-canvas .footer h3, html.site-shell .footer__heading, .legalos-builder-canvas .footer__heading, html.site-shell .footer__logo + .footer__desc , .legalos-builder-canvas .footer__logo + .footer__desc { color: var(--site-ink-inverse); }
-html.site-shell .footer .footer__link, .legalos-builder-canvas .footer .footer__link, html.site-shell .footer .footer__contact-row, .legalos-builder-canvas .footer .footer__contact-row, html.site-shell .footer .footer__policy-link , .legalos-builder-canvas .footer .footer__policy-link { color: color-mix(in srgb, var(--site-ink-inverse) 70%, transparent); }
-html.site-shell .footer .footer__link:hover, .legalos-builder-canvas .footer .footer__link:hover, html.site-shell .footer .footer__contact-row:hover, .legalos-builder-canvas .footer .footer__contact-row:hover, html.site-shell .footer .footer__policy-link:hover , .legalos-builder-canvas .footer .footer__policy-link:hover { color: var(--color-blue-start); }
+html.site-shell .hero__heading .hero__heading-gradient , .legalos-builder-canvas .hero__heading .hero__heading-gradient, .pageflo-builder-canvas .hero h1, .pageflo-builder-canvas .hero__heading, .pageflo-builder-canvas .hero__heading .hero__heading-gradient { color: var(--site-ink-inverse); }
+html.site-shell .hero__heading .hero__heading-gradient , .legalos-builder-canvas .hero__heading .hero__heading-gradient, .pageflo-builder-canvas .hero__heading .hero__heading-gradient { background: linear-gradient(90deg,var(--site-primary-400),var(--site-primary-600)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+html.site-shell .hero__sub , .legalos-builder-canvas .hero__sub, .pageflo-builder-canvas .hero__sub { color: var(--site-ink-inverse-muted); }
+html.site-shell .hero__cta-sub , .legalos-builder-canvas .hero__cta-sub, .pageflo-builder-canvas .hero__cta-sub { color: var(--site-ink-inverse-muted); }
+html.site-shell .hero__pill-text , .legalos-builder-canvas .hero__pill-text, .pageflo-builder-canvas .hero__pill-text { color: color-mix(in srgb, var(--site-ink-inverse) 80%, transparent); }
+html.site-shell .trust-banner__label , .legalos-builder-canvas .trust-banner__label, .pageflo-builder-canvas .trust-banner__label { color: var(--site-ink-inverse); }
+html.site-shell .panel-dark, .legalos-builder-canvas .panel-dark, html.site-shell .panel-dark p, .legalos-builder-canvas .panel-dark p, html.site-shell .panel-dark h1, .legalos-builder-canvas .panel-dark h1, html.site-shell .panel-dark h2, .legalos-builder-canvas .panel-dark h2, html.site-shell .panel-dark h3, .legalos-builder-canvas .panel-dark h3, html.site-shell .panel-dark span , .legalos-builder-canvas .panel-dark span, .pageflo-builder-canvas .panel-dark, .pageflo-builder-canvas .panel-dark p, .pageflo-builder-canvas .panel-dark h1, .pageflo-builder-canvas .panel-dark h2, .pageflo-builder-canvas .panel-dark h3, .pageflo-builder-canvas .panel-dark span { color: var(--site-ink-inverse); }
+html.site-shell .btn-nav, .legalos-builder-canvas .btn-nav, html.site-shell .btn-hero, .legalos-builder-canvas .btn-hero, html.site-shell a.btn-nav, .legalos-builder-canvas a.btn-nav, html.site-shell a.btn-hero , .legalos-builder-canvas a.btn-hero, .pageflo-builder-canvas .btn-nav, .pageflo-builder-canvas .btn-hero, .pageflo-builder-canvas a.btn-nav, .pageflo-builder-canvas a.btn-hero { color: var(--site-cta-ink); }
+html.site-shell .footer, .legalos-builder-canvas .footer, html.site-shell .footer h1, .legalos-builder-canvas .footer h1, html.site-shell .footer h2, .legalos-builder-canvas .footer h2, html.site-shell .footer h3, .legalos-builder-canvas .footer h3, html.site-shell .footer__heading, .legalos-builder-canvas .footer__heading, html.site-shell .footer__logo + .footer__desc , .legalos-builder-canvas .footer__logo + .footer__desc, .pageflo-builder-canvas .footer, .pageflo-builder-canvas .footer h1, .pageflo-builder-canvas .footer h2, .pageflo-builder-canvas .footer h3, .pageflo-builder-canvas .footer__heading, .pageflo-builder-canvas .footer__logo + .footer__desc { color: var(--site-ink-inverse); }
+html.site-shell .footer .footer__link, .legalos-builder-canvas .footer .footer__link, html.site-shell .footer .footer__contact-row, .legalos-builder-canvas .footer .footer__contact-row, html.site-shell .footer .footer__policy-link , .legalos-builder-canvas .footer .footer__policy-link, .pageflo-builder-canvas .footer .footer__link, .pageflo-builder-canvas .footer .footer__contact-row, .pageflo-builder-canvas .footer .footer__policy-link { color: color-mix(in srgb, var(--site-ink-inverse) 70%, transparent); }
+html.site-shell .footer .footer__link:hover, .legalos-builder-canvas .footer .footer__link:hover, html.site-shell .footer .footer__contact-row:hover, .legalos-builder-canvas .footer .footer__contact-row:hover, html.site-shell .footer .footer__policy-link:hover , .legalos-builder-canvas .footer .footer__policy-link:hover, .pageflo-builder-canvas .footer .footer__link:hover, .pageflo-builder-canvas .footer .footer__contact-row:hover, .pageflo-builder-canvas .footer .footer__policy-link:hover { color: var(--color-blue-start); }
 
 :root {
   /* Brand cascade: these inherit from the per-Site --site-* tokens emitted by
@@ -42,10 +53,10 @@ html.site-shell .footer .footer__link:hover, .legalos-builder-canvas .footer .fo
   --radius-pill: 9999px;
 }
 
-html.site-shell, .legalos-builder-canvas, html.site-shell body , .legalos-builder-canvas body { background: var(--site-bg); color: var(--color-navy); margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.5; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-html.site-shell * , .legalos-builder-canvas * { box-sizing: border-box; }
-html.site-shell h1, .legalos-builder-canvas h1, html.site-shell h2, .legalos-builder-canvas h2, html.site-shell h3, .legalos-builder-canvas h3, html.site-shell h4, .legalos-builder-canvas h4, html.site-shell h5, .legalos-builder-canvas h5, html.site-shell h6 , .legalos-builder-canvas h6 { line-height: 1.1; color: var(--color-navy); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-html.site-shell a , .legalos-builder-canvas a { color: inherit; text-decoration: none; }
+html.site-shell, .legalos-builder-canvas, html.site-shell body , .legalos-builder-canvas body, .pageflo-builder-canvas, .pageflo-builder-canvas body { background: var(--site-bg); color: var(--color-navy); margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; line-height: 1.5; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+html.site-shell * , .legalos-builder-canvas *, .pageflo-builder-canvas * { box-sizing: border-box; }
+html.site-shell h1, .legalos-builder-canvas h1, html.site-shell h2, .legalos-builder-canvas h2, html.site-shell h3, .legalos-builder-canvas h3, html.site-shell h4, .legalos-builder-canvas h4, html.site-shell h5, .legalos-builder-canvas h5, html.site-shell h6 , .legalos-builder-canvas h6, .pageflo-builder-canvas h1, .pageflo-builder-canvas h2, .pageflo-builder-canvas h3, .pageflo-builder-canvas h4, .pageflo-builder-canvas h5, .pageflo-builder-canvas h6 { line-height: 1.1; color: var(--color-navy); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+html.site-shell a , .legalos-builder-canvas a, .pageflo-builder-canvas a { color: inherit; text-decoration: none; }
 
 button { cursor: pointer; background: none; border: none; font: inherit; color: inherit; }
 img, video { display: block; max-width: 100%; height: auto; }
@@ -265,18 +276,19 @@ img, video { display: block; max-width: 100%; height: auto; }
    so inside the admin builder canvas they escape the center pane and cover
    the left section list / right settings panel.
 
-   Inside .legalos-builder-canvas we re-anchor the navbar to absolute so it
+   Inside the builder canvas (.pageflo-builder-canvas, and .legalos-builder-canvas
+   for pages imported before the rename) we re-anchor the navbar to absolute so it
    stays inside the canvas, give the canvas relative positioning, and trim
    the hero to a sensible viewable height. The public site is unaffected
    because these selectors are scoped to the builder wrapper only. */
-.legalos-builder-canvas { position: relative; isolation: isolate; }
-.legalos-builder-canvas .navbar { position: absolute; }
-.legalos-builder-canvas .hero { min-height: 540px; margin-top: 0; }
-.legalos-builder-canvas .hero__content { padding-top: 96px; }
+.legalos-builder-canvas, .pageflo-builder-canvas { position: relative; isolation: isolate; }
+.legalos-builder-canvas .navbar, .pageflo-builder-canvas .navbar { position: absolute; }
+.legalos-builder-canvas .hero, .pageflo-builder-canvas .hero { min-height: 540px; margin-top: 0; }
+.legalos-builder-canvas .hero__content, .pageflo-builder-canvas .hero__content { padding-top: 96px; }
 /* The hero's full-viewport image was also bleeding through because img dims
    inherit nothing from a sized parent until object-fit kicks in. inset:0
    keeps it inside .hero. */
-.legalos-builder-canvas .hero__bg-img { max-width: 100%; }
+.legalos-builder-canvas .hero__bg-img, .pageflo-builder-canvas .hero__bg-img { max-width: 100%; }
 /* The .section--dark and .footer use width:100% and rely on viewport-anchored
    positioning for their decorative ::before patterns; nothing escapes the
    container so they're fine. No override needed. */

@@ -71,5 +71,5 @@ export const decideTier = (args: {
 
 /** The log line for a rejected tier. One place, so it reads the same everywhere. */
 export const rejectedTierMessage = (rejected: NonNullable<TierDecision['rejected']>): string =>
-  `[legalos] quiz webhook returned tier "${rejected.returned}", which this quiz does not declare ` +
+  `[pageflo] quiz webhook returned tier "${rejected.returned}", which this quiz does not declare ` +
   `(${rejected.declared.join(', ') || 'no tiers'}). Routing tier left unchanged.`

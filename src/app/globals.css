@@ -31,6 +31,11 @@
   --color-surface-2: #182030;
   --color-surface-3: #1F2939;
 
+  /* The sidebar sits between the canvas and the card surface so the shell reads
+     as chrome rather than as another panel. */
+  --color-sidebar: #0D121B;
+  --color-sidebar-border: #1A2130;
+
   --color-border: #243044;
   --color-border-strong: #2C3A4E;
 
@@ -144,6 +149,10 @@ html, body {
 .card-edge {
   box-shadow: var(--shadow-card);
 }
+
+/* Live-state indicator. Suppressed under prefers-reduced-motion below. */
+@keyframes pfPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+.pf-pulse { animation: pfPulse 2.4s ease-in-out infinite; }
 
 /* --- Marketing page animations --- */
 
@@ -288,7 +297,8 @@ html, body {
   .pulse-glow,
   .route-enter,
   .route-fade,
-  .fade-up { animation: none; }
+  .fade-up,
+  .pf-pulse { animation: none; }
   /* Keep loaders legible but static for reduced-motion users. */
   .route-bar::before { animation: none; left: 0; width: 100%; opacity: 0.7; }
   .route-spinner { animation: none; }

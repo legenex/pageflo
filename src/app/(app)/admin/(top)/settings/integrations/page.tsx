@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation'
 import { getPayload } from 'payload'
 import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
-import { ShieldAlert } from 'lucide-react'
+import { PRODUCT_NAME } from '@/lib/pageflo/product'
+import { Card, DeniedState, Page, PageHeader } from '@/components/pageflo/primitives'
 import { IntegrationsForm, type SiteOption } from './IntegrationsForm'
 
 export const dynamic = 'force-dynamic'
@@ -14,21 +15,18 @@ export default async function IntegrationsPage() {
 
   if (!me.super_admin) {
     return (
-      <div className="p-10 max-w-[1100px]">
-        <header className="mb-6">
-          <h1 className="text-[28px] font-semibold tracking-tight text-white">Integrations</h1>
-          <p className="text-[var(--color-ink-muted)] text-[15px] mt-1">
-            LegalOS-wide integrations (SMTP, Slack, GitHub, Search Console).
-          </p>
-        </header>
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-1)] p-10 text-center card-edge">
-          <ShieldAlert className="w-10 h-10 mx-auto text-[var(--color-ink-muted)] mb-3" />
-          <h2 className="text-[18px] font-semibold text-white">Super admin only</h2>
-          <p className="text-[14px] text-[var(--color-ink-muted)] mt-2">
-            Managing integrations requires LegalOS super admin permissions.
-          </p>
-        </div>
-      </div>
+      <Page>
+        <PageHeader
+          title="Integrations"
+          subtitle={`Workspace-wide outbound connections for ${PRODUCT_NAME}: SMTP, Slack, repositories and Search Console.`}
+        />
+        <Card>
+          <DeniedState
+            what="Integrations"
+            message="These credentials are workspace-wide, so changing one changes behaviour for every Site. Only a workspace owner can edit them. Ask an owner to make the change, or to grant your account owner access."
+          />
+        </Card>
+      </Page>
     )
   }
 
@@ -55,7 +53,7 @@ export default async function IntegrationsPage() {
           port: Number(smtp.port ?? 587),
           user: (smtp.user as string) ?? '',
           pass: (smtp.pass as string) ?? '',
-          from_name: (smtp.from_name as string) ?? 'Legenex LegalOS',
+          from_name: (smtp.from_name as string) ?? PRODUCT_NAME,
           from_email: (smtp.from_email as string) ?? 'noreply@legenex.com',
         },
         slack_webhooks: (slack.webhooks ?? []).map((w) => ({

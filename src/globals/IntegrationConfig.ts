@@ -1,11 +1,12 @@
 import type { GlobalConfig } from 'payload'
 import { isSuperAdmin } from '../access'
+import { PRODUCT_NAME } from '../lib/pageflo/product'
 
 export const IntegrationConfig: GlobalConfig = {
   slug: 'integration-config',
   admin: {
-    group: 'LegalOS',
-    description: 'LegalOS-wide integrations (SMTP, Slack, GitHub, Search Console). Per-Site values live in TrackingConfig.',
+    group: PRODUCT_NAME,
+    description: `${PRODUCT_NAME}-wide integrations (SMTP, Slack, GitHub, Search Console). Per-Site values live in TrackingConfig.`,
   },
   access: {
     read: isSuperAdmin,
@@ -37,7 +38,7 @@ export const IntegrationConfig: GlobalConfig = {
         { name: 'port', type: 'number', defaultValue: 587 },
         { name: 'user', type: 'text' },
         { name: 'pass', type: 'text' },
-        { name: 'from_name', type: 'text', defaultValue: 'Legenex LegalOS' },
+        { name: 'from_name', type: 'text', defaultValue: PRODUCT_NAME },
         { name: 'from_email', type: 'email', defaultValue: 'noreply@legenex.com' },
       ],
     },

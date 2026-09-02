@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { Mail, MessageSquare, Github, Search, CreditCard, Plus, X, Save } from 'lucide-react'
+import { PRODUCT_NAME } from '@/lib/pageflo/product'
 import { saveIntegrationConfig } from './actions'
 
 export type SiteOption = { id: number; name: string }
@@ -34,12 +35,12 @@ export function IntegrationsForm({ initial, sites }: { initial: InitialConfig; s
   }
 
   return (
-    <div className="p-10 max-w-[1100px]">
+    <div className="px-5 pb-16 pt-6 sm:px-7 max-w-[1100px]">
       <header className="mb-6 flex items-start justify-between gap-6">
         <div>
-          <h1 className="text-[28px] font-semibold tracking-tight text-white">Integrations</h1>
-          <p className="text-[var(--color-ink-muted)] text-[15px] mt-1">
-            LegalOS-wide integrations (SMTP, Slack, GitHub, Search Console). Per-Site values live in Site settings.
+          <h1 className="text-[22px] font-bold tracking-[-0.02em] text-ink">Integrations</h1>
+          <p className="text-ink-muted text-[13px] mt-1.5">
+            {PRODUCT_NAME}-wide integrations (SMTP, Slack, GitHub, Search Console). Per-Site values live in Site settings.
           </p>
         </div>
       </header>
@@ -172,7 +173,7 @@ export function IntegrationsForm({ initial, sites }: { initial: InitialConfig; s
           </div>
         ) : null}
 
-        <div className="sticky bottom-0 -mx-10 px-10 py-4 border-t border-[var(--color-border)] bg-[var(--color-canvas)]/95 backdrop-blur flex items-center justify-between">
+        <div className="sticky bottom-0 -mx-5 px-5 py-4 sm:-mx-7 sm:px-7 border-t border-[var(--color-border)] bg-[var(--color-canvas)]/95 backdrop-blur flex items-center justify-between">
           <div className="text-[12px] text-[var(--color-ink-dim)]">
             {savedAt ? `Saved ${savedAt.toLocaleTimeString()}` : 'Changes are not saved until you click Save.'}
           </div>

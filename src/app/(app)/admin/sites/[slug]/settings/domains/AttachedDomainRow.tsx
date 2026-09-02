@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Globe, Star, Unlink } from 'lucide-react'
 import { detachDomainFromSite } from '@/app/(app)/admin/(top)/brands/domains/actions'
+import { useConfirm } from '@/components/pageflo/interactive'
 
 type Domain = {
   id: number
@@ -23,10 +24,17 @@ export function AttachedDomainRow({
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
 
-  const onDetach = (): void => {
+  const onDetach = async (): Promise<void> => {
     if (domain.kind === 'preview') return
-    if (!window.confirm(`Detach ${domain.host} from this brand? It returns to the unassigned pool.`)) return
+    const ok = await confirm({
+      title: 'Detach this domain?',
+      message: `${domain.host} returns to the unassigned pool and stops resolving to this Site. The domain is kept and can be attached again.`,
+      confirmLabel: 'Detach',
+      tone: 'danger',
+    })
+    if (!ok) return
     startTransition(async () => {
       const result = await detachDomainFromSite({ domainId: domain.id, siteSlug })
       if (!result.ok) {
@@ -47,8 +55,9 @@ export function AttachedDomainRow({
   const tone = statusTone[domain.status] ?? statusTone.pending
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-1)] px-4 py-2.5">
-      <Globe className="w-4 h-4 text-[var(--color-ink-muted)] shrink-0" />
+    <div className="flex items-center gap-3 rounded-app border border-border bg-surface-1 px-3.5 py-2.5">
+      {confirmDialog}
+      <Globe className="h-4 w-4 shrink-0 text-ink-muted" aria-hidden="true" />
       <Link
         href={`/admin/brands/domains#domain-${domain.id}`}
         className="text-[14px] font-mono text-white flex-1 truncate hover:text-[var(--color-info)]"

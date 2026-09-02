@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { isSuperAdmin, anyAuthenticatedRead } from '../access'
+import { PRODUCT_NAME } from '../lib/pageflo/product'
 import { auditAfterChange } from '../hooks/audit'
 
 export const TEMPLATE_KEYS = [
@@ -21,7 +22,7 @@ export const SharedLegalTemplates: CollectionConfig = {
   admin: {
     useAsTitle: 'template_key',
     defaultColumns: ['template_key', 'default_meta_title', 'last_reviewed_at'],
-    group: 'LegalOS',
+    group: PRODUCT_NAME,
     description: 'Shared legal templates. Editing one propagates to every Site that uses it on next render.',
   },
   access: {

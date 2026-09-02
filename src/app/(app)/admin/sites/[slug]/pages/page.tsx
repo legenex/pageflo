@@ -64,11 +64,11 @@ export default async function SitePagesPage({ params, searchParams }: Props) {
   })
 
   return (
-    <div className="p-10 max-w-[1400px]">
+    <div className="px-5 pb-16 pt-6 sm:px-7 max-w-[1400px]">
       <header className="mb-6 flex items-start justify-between gap-6">
         <div>
-          <h1 className="text-[28px] font-semibold tracking-tight text-white">Pages</h1>
-          <p className="text-[var(--color-ink-muted)] text-[15px] mt-1">{site.name} site pages</p>
+          <h1 className="text-[22px] font-bold tracking-[-0.02em] text-ink">Pages</h1>
+          <p className="text-ink-muted text-[13px] mt-1.5">{site.name} site pages</p>
         </div>
         <Link
           href={`/admin/sites/${slug}/pages/new`}

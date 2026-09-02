@@ -20,10 +20,10 @@ export default async function GeneralSettingsPage({ params }: Props) {
   if (!site) notFound()
 
   return (
-    <div className="p-10 max-w-[1100px]">
+    <div className="px-5 pb-16 pt-6 sm:px-7 max-w-[1100px]">
       <header className="mb-6">
-        <h1 className="text-[28px] font-semibold tracking-tight text-white">General Settings</h1>
-        <p className="text-[var(--color-ink-muted)] text-[15px] mt-1">Configure {site.name}</p>
+        <h1 className="text-[22px] font-bold tracking-[-0.02em] text-ink">General Settings</h1>
+        <p className="text-ink-muted text-[13px] mt-1.5">Configure {site.name}</p>
       </header>
       <GeneralForm
         site={{

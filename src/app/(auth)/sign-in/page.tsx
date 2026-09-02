@@ -1,51 +1,72 @@
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth'
+import { PageFloMark } from '@/components/marketing/PageFloLogo'
+import { COMPANY_NAME, PRODUCT_CONCEPTS, PRODUCT_NAME } from '@/lib/pageflo/product'
+import { marketingOrigin } from '@/lib/pageflo/hosts'
 import { SignInForm } from './SignInForm'
 
 export const dynamic = 'force-dynamic'
 
-type Props = { searchParams: Promise<{ redirect?: string }> }
+type Props = { searchParams: Promise<{ redirect?: string; next?: string }> }
+
+/**
+ * Only same-origin, absolute-path redirects are honoured. `//evil.com` is a
+ * protocol-relative URL that a browser resolves as a different origin, so the
+ * `//` case is rejected explicitly rather than relying on the leading `/`.
+ */
+const safeNext = (raw: string | undefined): string => {
+  if (!raw) return '/admin/overview'
+  if (!raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return '/admin/overview'
+  return raw
+}
 
 export default async function SignInPage({ searchParams }: Props) {
-  const { redirect: redirectParam } = await searchParams
-  const safeRedirect = redirectParam && redirectParam.startsWith('/') && !redirectParam.startsWith('//')
-    ? redirectParam
-    : '/admin/overview'
+  const params = await searchParams
+  // Two parameter names reach this page. `redirect` is what the admin layout
+  // sends; `next` is what several server actions send. Honouring only one of
+  // them silently dropped operators back on Overview after a deep-link sign-in.
+  const safeRedirect = safeNext(params.redirect ?? params.next)
 
-  // If you're already signed in, skip the form.
   const user = await getCurrentUser()
   if (user) redirect(safeRedirect)
 
+  const marketing = marketingOrigin()
+
   return (
-    <main className="min-h-screen flex items-center justify-center px-6 py-12 bg-[var(--color-canvas)] relative overflow-hidden">
-      <div className="absolute inset-0 pointer-events-none" aria-hidden>
-        <div className="absolute -top-32 left-1/2 -translate-x-1/2 w-[900px] h-[900px] rounded-full bg-gradient-to-b from-[var(--color-brand-from)]/12 via-[var(--color-brand-to)]/6 to-transparent blur-3xl" />
-        <div className="absolute bottom-0 right-0 w-[500px] h-[500px] rounded-full bg-[var(--color-info)]/8 blur-3xl" />
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-canvas px-5 py-10">
+      <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+        <div className="absolute -top-40 left-1/2 h-[760px] w-[760px] -translate-x-1/2 rounded-full bg-brand/10 blur-[130px]" />
+        <div className="absolute -bottom-56 right-[-120px] h-[520px] w-[520px] rounded-full bg-info/[0.07] blur-[130px]" />
       </div>
 
-      <div className="relative w-full max-w-[420px]">
-        <header className="text-center mb-8">
-          <a href="/" className="inline-flex items-center gap-2.5">
-            <span className="text-[22px] font-bold tracking-tight">
-              <span className="text-[var(--color-brand-strong)]">Legal</span>
-              <span className="text-white">OS</span>
-            </span>
-            <span className="text-[11px] text-[var(--color-ink-muted)] border border-[var(--color-border-strong)] rounded-full px-2 py-0.5">
-              by Legenex
+      <div className="relative w-full max-w-[400px]">
+        <header className="mb-7 text-center">
+          <a
+            href={marketing || '/'}
+            className="inline-flex items-center gap-2.5 rounded-app-sm"
+            aria-label={`${PRODUCT_NAME} home`}
+          >
+            <PageFloMark size={30} className="text-ink" />
+            <span className="text-[23px] font-bold leading-none tracking-[-0.02em] text-ink">
+              Page<span className="text-brand">Flo</span>
             </span>
           </a>
-          <h1 className="mt-6 text-[26px] font-bold tracking-tight text-white">Sign in to LegalOS</h1>
-          <p className="mt-2 text-[14px] text-[var(--color-ink-muted)]">
-            Manage every brand site, funnel, and lead from one admin.
+          <h1 className="mt-6 text-[24px] font-bold tracking-[-0.02em] text-ink">Sign in to {PRODUCT_NAME}</h1>
+          <p className="mx-auto mt-2 max-w-[330px] text-[13px] leading-[1.6] text-ink-muted">
+            {PRODUCT_CONCEPTS.join(' · ')}
           </p>
         </header>
 
-        <div className="rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-surface-1)] p-6 sm:p-8 shadow-2xl shadow-black/40">
-          <SignInForm redirectTo={safeRedirect} />
+        <div className="rounded-app-lg border border-border bg-linear-to-b from-surface-2 to-surface-1 p-6 shadow-[var(--shadow-pop)] sm:p-7">
+          <SignInForm redirectTo={safeRedirect} siteHref={marketing || '/'} />
         </div>
 
-        <footer className="mt-6 flex items-center justify-between text-[12px] text-[var(--color-ink-dim)]">
-          <span>© {new Date().getFullYear()} Legenex</span>
+        <footer className="mt-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-[11.5px] text-ink-dim">
+          <span>
+            © {new Date().getFullYear()} {COMPANY_NAME}
+          </span>
+          <span aria-hidden="true">·</span>
+          <span className="font-mono">{PRODUCT_NAME}</span>
         </footer>
       </div>
     </main>

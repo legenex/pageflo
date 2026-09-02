@@ -60,7 +60,7 @@ export const NODE_CATEGORIES = [
     { id: 'call_now', name: 'Call Now Page', desc: 'Phone-only conversion', icon: Phone },
     { id: 'redirect', name: 'External Redirect', desc: 'Redirect to URL', icon: ExternalLink },
   ] },
-  { key: 'custom', name: 'Custom Pages', icon: Code2, color: T.pink, types: [
+  { key: 'custom', name: 'Custom Pages', icon: Code2, color: T.orange, types: [
     { id: 'custom_html', name: 'Custom HTML', desc: 'Raw HTML content', icon: Code2 },
     { id: 'tcpa', name: 'TCPA Page', desc: 'TCPA consent disclosure', icon: ShieldCheck },
     { id: 'video', name: 'Video Page', desc: 'Embedded video', icon: Video },

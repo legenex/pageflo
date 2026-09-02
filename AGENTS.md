@@ -25,10 +25,24 @@ and operates brand sites, landing pages, advertorials and qualification quizzes,
 deploys one piece of brandless content under many brands, and captures,
 validates, records consent for, and routes the leads those funnels produce.
 
-**The product is currently named LegalOS in code, in the database, in the
-service name and in the user interface. PageFlo is the target name. The rebrand
-has not started.** Do not assume a name change has happened, and do not perform
-one outside the phase that owns it. See section 4 and `docs/EXECUTION-PLAN.md`.
+**The user-facing rebrand from LegalOS to PageFlo is done.** Every screen, page
+title, metadata string, email sender name, marketing surface and package
+identifier says PageFlo. `src/lib/pageflo/product.ts` holds the name; nothing
+repeats it as a literal.
+
+**A set of identifiers is deliberately NOT renamed.** They are load-bearing
+production infrastructure or wire contracts a third party already depends on:
+the `legalos` database and role, the `legalos-dev` systemd unit, the
+`molegenexcom` Docker Compose project, the `legalos.git` Plesk repository, the
+`os.legenex.com` Plesk domain and application directory, the
+`preview.legenex.com` wildcard, the `X-LegalOS-*` webhook headers, the
+`x-legalos-*` request headers, the `/api/legalos/*` compatibility routes, the
+`app: "legalos"` self-check marker, the `.legalos-builder-canvas` CSS scope, the
+`legalos:quiz-height` postMessage protocol and the `_legalos.` DNS TXT record.
+Every one is listed with its consumer in `docs/INFRASTRUCTURE.md` under
+"Compatibility identifiers", and `pnpm test:rebrand` asserts each is still
+present. **Do not "finish" the rename by removing one.** Retiring one is a
+migration for its consumer, not a sweep.
 
 Current stack, verified in this repository:
 
@@ -39,23 +53,26 @@ Current stack, verified in this repository:
 - TypeScript 5.7.3, Tailwind CSS 4, `pnpm@9.15.0`, Node `>=20.9`
 - Playwright, used server-side for screenshot and fidelity harnesses
 
-The legal-vertical positioning in the marketing surface, the collection named
-`SharedLegalTemplates`, and the `LegalOS*` identifiers are legacy. They still
-work and are still load-bearing. Removing them is planned work with its own
-phase, not incidental cleanup.
+The collection named `SharedLegalTemplates` and the legal-vertical starter
+content are legacy names for things that still work and are still load-bearing.
+The marketing surface is no longer legal-vertical: it is the PageFlo product
+site. Renaming the collection is planned work with its own phase, not incidental
+cleanup.
 
 ---
 
 ## 2. Repository and environments
 
-- GitHub repository: `legenex/legalos`
+- GitHub repository: `legenex/pageflo`
 - Production and release branch: `main`
 - Production host: `51.81.202.161`, Debian 12, Plesk, hostname `vps-3ae59fb7`
 - Production application path: `/var/www/vhosts/legenex.com/os.legenex.com`
 - Production service: `legalos-dev.service`, systemd, runs `pnpm start` against
   a prebuilt `.next/`. It is a production build. There is no HMR.
 - Bare git repository on the host: `/var/www/vhosts/legenex.com/git/legalos.git`
-- Control-plane host: `https://os.legenex.com`
+- Control-plane hosts: `https://app.pageflo.io` (canonical) and
+  `https://os.legenex.com` (legacy, kept as the rollback path)
+- Public marketing site: `https://pageflo.io`, `www.` redirects 308 to the apex
 - Release command, run on the host: `scripts/release.sh`
 - There is no CI. This repository has no `.github/` directory and no GitHub
   Actions workflow.
@@ -147,7 +164,9 @@ shipping.
 
 ```bash
 pnpm typecheck        # tsc --noEmit
-pnpm test             # 16 assertion suites, the main gate
+pnpm test             # 17 assertion suites, the main gate
+pnpm test:rebrand     # the rebrand contract: one env reader, no brand leaks,
+                      # reserved hosts, compatibility identifiers still present
 pnpm build            # next build, proves the production bundle compiles
 pnpm verify:schema    # reads every collection and global, as a boot would
 pnpm test:release     # migration order, up/down, idempotency, on a scratch DB
@@ -251,7 +270,9 @@ Full narrative: `docs/release-runbook.md`.
 Verify the surface the change actually touched:
 
 - the service is `active (running)`
-- `https://os.legenex.com/api/legalos/health` returns 200
+- `https://app.pageflo.io/api/pageflo/health` returns 200, and
+  `https://os.legenex.com/api/legalos/health` still does while the legacy host
+  is the rollback path
 - the changed public surface responds
 - the changed functionality behaves, where that can be checked programmatically
 
@@ -424,7 +445,7 @@ concurrent changes into the commit.
 Routine commits and pushes are pre-authorized. Do not ask "should I commit
 this?" or "would you like the commands to push this?".
 
-`origin` is `https://github.com/legenex/legalos` over HTTPS through the GitHub
+`origin` is `https://github.com/legenex/pageflo` over HTTPS through the GitHub
 CLI credential helper. Use the configured remote. Never expose private key
 material, and never ask the operator to paste a token, passphrase or SSH key
 into chat.

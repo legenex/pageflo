@@ -2,6 +2,7 @@ import type { CollectionConfig } from 'payload'
 import { siteScopedRead, siteScopedAdmin } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
 import { invalidateHostCache } from '../lib/site-resolver'
+import { PRODUCT_NAME } from '../lib/pageflo/product'
 import { enforceSiteBinding } from '../hooks/enforce-site-binding'
 
 export const Domains: CollectionConfig = {
@@ -83,7 +84,7 @@ export const Domains: CollectionConfig = {
         { label: 'Preview', value: 'preview' },
         { label: 'Custom', value: 'custom' },
       ],
-      admin: { description: 'Preview domains are auto-issued by LegalOS and cannot be deleted. Custom domains are user-connected.' },
+      admin: { description: `Preview domains are auto-issued by ${PRODUCT_NAME} and cannot be deleted. Custom domains are user-connected.` },
     },
     { name: 'primary', type: 'checkbox', defaultValue: false, admin: { description: 'The canonical host for this Site. SEO and emitted links use this.' } },
     {

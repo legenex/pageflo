@@ -208,8 +208,11 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
     /WEBHOOK_NODE_TYPES = new Set\(\['webhook', 'verification'\]\)/.test(runtime),
     'the runtime executes both webhook and verification nodes, which carry the identical shape',
   )
+  // The canonical path is `/api/pageflo/*`; `/api/legalos/*` survives only as a
+  // re-export alias for consumers this deploy does not control, and the runtime
+  // is not one of them.
   t(
-    /\/api\/legalos\/quiz-webhook/.test(runtime),
+    /\/api\/pageflo\/quiz-webhook/.test(runtime),
     'and it executes them server-side, so the destination is never chosen by the visitor',
   )
   t(/nextSequentialStepIndex\(quiz, stepIdx, nextTier\)/.test(runtime), 'the runtime still falls through sequentially with the new tier')

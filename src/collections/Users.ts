@@ -1,5 +1,6 @@
 import type { CollectionConfig } from 'payload'
 import { isSuperAdmin, isSuperAdminField } from '../access'
+import { PRODUCT_NAME } from '../lib/pageflo/product'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
 
 export const Users: CollectionConfig = {
@@ -11,7 +12,7 @@ export const Users: CollectionConfig = {
   admin: {
     useAsTitle: 'email',
     defaultColumns: ['email', 'name', 'super_admin', 'status', 'last_login_at'],
-    group: 'LegalOS',
+    group: PRODUCT_NAME,
   },
   access: {
     // Non-super-admins may only read their own user row. Without this any
@@ -47,7 +48,7 @@ export const Users: CollectionConfig = {
         update: isSuperAdminField,
         create: isSuperAdminField,
       },
-      admin: { description: 'LegalOS-wide super admin. Bypasses all SiteUser bindings.' },
+      admin: { description: `${PRODUCT_NAME}-wide super admin. Bypasses all SiteUser bindings.` },
     },
     {
       name: 'status',

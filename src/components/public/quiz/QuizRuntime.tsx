@@ -13,9 +13,9 @@
  * and the only thing that is, is what "live" MEANS:
  *
  *  - Non-visual nodes execute for real. Webhook and verification nodes POST to
- *    `/api/legalos/quiz-webhook`, which reads the URL and payload out of the
+ *    `/api/pageflo/quiz-webhook`, which reads the URL and payload out of the
  *    stored node and hands back only the fields the author mapped. AI nodes POST
- *    to `/api/legalos/quiz-ai` for the same reason: the prompt lives in the
+ *    to `/api/pageflo/quiz-ai` for the same reason: the prompt lives in the
  *    database, so a visitor can never post an arbitrary prompt to our key.
  *  - The lead is submitted, exactly once, with a stable idempotency key and one
  *    retry, and the pixel fires on the shared `event_id`.
@@ -86,7 +86,7 @@ export function QuizRuntime({
     // on a real deployment's behalf.
     runAiNode: live && deployment?.id
       ? async (node, values) => {
-        const resp = await fetch('/api/legalos/quiz-ai', {
+        const resp = await fetch('/api/pageflo/quiz-ai', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ deployment_id: String(deployment.id), node_id: node.id, values }),
@@ -99,7 +99,7 @@ export function QuizRuntime({
     // Suppressed in preview: a builder click must not deliver to a buyer.
     runWebhookNode: live && deployment?.id
       ? async (node, values) => {
-        const resp = await fetch('/api/legalos/quiz-webhook', {
+        const resp = await fetch('/api/pageflo/quiz-webhook', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ deployment_id: String(deployment.id), node_id: node.id, values }),
@@ -154,7 +154,7 @@ export function QuizRuntime({
         // and would cost the conversion. The failure is logged for the operator
         // and the guard is released so a later endpoint can try again.
         // eslint-disable-next-line no-console
-        console.error('[legalos] lead submit failed:', result.error)
+        console.error('[pageflo] lead submit failed:', result.error)
         return false
       }
       : null,

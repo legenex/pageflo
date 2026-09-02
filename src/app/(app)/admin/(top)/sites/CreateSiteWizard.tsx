@@ -3,20 +3,13 @@
 import { useEffect, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Plus, X, File, Copy, Sparkles, Loader2 } from 'lucide-react'
+import { VERTICALS, type VerticalGroup } from '@/lib/verticals'
 import { createSite, suggestSlug } from './actions'
 
-type SourceSite = { id: number; name: string; slug: string }
-type Vertical = 'mass-tort' | 'mva' | 'workers-comp' | 'personal-injury' | 'medical-malpractice' | 'class-action' | 'multi'
+const VERTICAL_GROUPS: VerticalGroup[] = ['General', 'Legal']
 
-const VERTICALS: Array<{ value: Vertical; label: string }> = [
-  { value: 'mass-tort', label: 'Mass Tort' },
-  { value: 'mva', label: 'MVA' },
-  { value: 'workers-comp', label: "Workers' Comp" },
-  { value: 'personal-injury', label: 'Personal Injury' },
-  { value: 'medical-malpractice', label: 'Medical Malpractice' },
-  { value: 'class-action', label: 'Class Action' },
-  { value: 'multi', label: 'Multi-vertical' },
-]
+type SourceSite = { id: number; name: string; slug: string }
+type Vertical = string
 
 type Mode = 'blank' | 'duplicate' | 'ai-template'
 
@@ -144,10 +137,14 @@ function CreateSiteWizard({ sources, onClose }: { sources: SourceSite[]; onClose
             </Grid2>
             <Field label="Vertical">
               <select value={vertical} onChange={(e) => setVertical(e.target.value as Vertical)} className={inputClass}>
-                {VERTICALS.map((v) => (
-                  <option key={v.value} value={v.value}>
-                    {v.label}
-                  </option>
+                {VERTICAL_GROUPS.map((group) => (
+                  <optgroup key={group} label={group}>
+                    {VERTICALS.filter((v) => v.group === group).map((v) => (
+                      <option key={v.value} value={v.value}>
+                        {v.label}
+                      </option>
+                    ))}
+                  </optgroup>
                 ))}
               </select>
             </Field>

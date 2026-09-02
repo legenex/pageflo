@@ -1,15 +1,17 @@
 import type { CollectionConfig } from 'payload'
 import { isSuperAdmin } from '../access'
+import { PRODUCT_NAME } from '../lib/pageflo/product'
 import { relationId } from '../lib/authz'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
 import { cascadeDeleteSiteChildren } from '../hooks/site-cascade'
+import { VERTICAL_OPTIONS } from '../lib/verticals'
 
 export const Sites: CollectionConfig = {
   slug: 'sites',
   admin: {
     useAsTitle: 'name',
     defaultColumns: ['name', 'slug', 'vertical', 'status', 'updatedAt'],
-    group: 'LegalOS',
+    group: PRODUCT_NAME,
   },
   access: {
     // `b.site` is a POPULATED OBJECT: Users.auth sets no depth, so Payload reads
@@ -83,19 +85,14 @@ export const Sites: CollectionConfig = {
       ],
     },
     {
+      // Options live in src/lib/verticals.ts so the collection, the Sites filter
+      // and the label map cannot disagree. Widening this enum needs a migration;
+      // see 20260901_233000_sites_vertical_general.
       name: 'vertical',
       type: 'select',
       required: true,
       defaultValue: 'multi',
-      options: [
-        { label: 'Mass Tort', value: 'mass-tort' },
-        { label: 'Motor Vehicle Accident', value: 'mva' },
-        { label: 'Workers Comp', value: 'workers-comp' },
-        { label: 'Personal Injury', value: 'personal-injury' },
-        { label: 'Medical Malpractice', value: 'medical-malpractice' },
-        { label: 'Class Action', value: 'class-action' },
-        { label: 'Multi-vertical', value: 'multi' },
-      ],
+      options: VERTICAL_OPTIONS,
     },
     { name: 'tagline', type: 'text' },
     { name: 'default_phone', type: 'text', admin: { description: 'Display format, e.g. (555) 555-5555' } },

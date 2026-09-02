@@ -41,10 +41,10 @@ export default async function DomainsPage({ params }: Props) {
   const pool = poolRes.docs.map((d) => ({ id: Number(d.id), host: d.host }))
 
   return (
-    <div className="p-10 max-w-[1400px]">
+    <div className="px-5 pb-16 pt-6 sm:px-7 max-w-[1400px]">
       <header className="mb-6">
-        <h1 className="text-[28px] font-semibold tracking-tight text-white">Domains</h1>
-        <p className="text-[var(--color-ink-muted)] text-[15px] mt-1">
+        <h1 className="text-[22px] font-bold tracking-[-0.02em] text-ink">Domains</h1>
+        <p className="text-ink-muted text-[13px] mt-1.5">
           Pick domains for {site.name} from the pool. All configuration (DNS, verification, primary) is managed in{' '}
           <Link href="/admin/brands/domains" className="text-[var(--color-info)] hover:underline inline-flex items-center gap-1">
             Brands → Domains <ExternalLink className="w-3 h-3" />

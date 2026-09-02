@@ -1,6 +1,8 @@
 import {
   checkDeployInfo,
   checkRuntime,
+  checkPageFloHosts,
+  checkLegalPublication,
   checkPostgres,
   checkLockedDocumentRels,
   checkRedis,
@@ -33,6 +35,8 @@ export const runSystemReport = async (force = false): Promise<SystemReport> => {
   const settled = await Promise.allSettled([
     checkDeployInfo(),
     checkRuntime(),
+    checkPageFloHosts(),
+    checkLegalPublication(),
     checkPostgres(),
     checkLockedDocumentRels(),
     checkRedis(),

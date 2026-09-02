@@ -17,6 +17,7 @@ import {
   type BuildLogEvidence,
 } from '@/lib/buildlog'
 import { readCaptures, type BuildLogCapture } from '@/lib/buildlog/captures'
+import { Eyebrow, Page, PageHeader } from '@/components/pageflo/primitives'
 import { CommentThread, type BuildLogComment } from './CommentThread'
 
 type CommentIndex = {
@@ -27,6 +28,7 @@ type CommentIndex = {
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+export const metadata = { title: 'Build log' }
 
 const STATUS_STYLE: Record<ItemStatus, { icon: typeof CheckCircle2; className: string }> = {
   shipped: { icon: CheckCircle2, className: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/30' },
@@ -84,7 +86,7 @@ function Evidence({
     <div className="mt-3 flex flex-col gap-2">
       {evidence.map((ev) => {
         const capture = captures[buildLogEvidenceId(entry, item, ev)]
-        const src = ev.image || (capture ? `/api/legalos/buildlog-capture/${buildLogEvidenceId(entry, item, ev)}` : null)
+        const src = ev.image || (capture ? `/api/pageflo/buildlog-capture/${buildLogEvidenceId(entry, item, ev)}` : null)
         return (
         <div key={`${ev.path}-${ev.label}`} className="rounded-lg border border-[var(--color-border)] bg-black/20 overflow-hidden">
           {src ? (
@@ -203,8 +205,11 @@ function Entry({
         ))}
       </ol>
 
-      <div className="grid gap-4 mt-6 md:grid-cols-2">
-        <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-1)] p-4 card-edge">
+      {/* `min-w-0` on the children: a grid item's default `min-width: auto` is
+          its content width, so one long unbroken token in either panel widens
+          the whole page instead of wrapping. */}
+      <div className="mt-6 grid gap-2.5 md:grid-cols-2">
+        <div className="min-w-0 rounded-app-lg border border-border bg-surface-1 p-3.5">
           <h3 className="flex items-center gap-2 text-[13px] font-semibold text-white mb-3">
             <FlaskConical className="w-3.5 h-3.5 text-[var(--color-ink-muted)]" />
             What was checked
@@ -352,27 +357,27 @@ export default async function BuildLogPage() {
   const notRun = ENTRIES.flatMap((e) => e.verification).filter((v) => v.state === 'not-run').length
 
   return (
-    <div className="p-10 max-w-[1100px]">
-      <header className="mb-6">
-        <h1 className="text-[28px] font-semibold tracking-tight text-white">Build log</h1>
-        <p className="text-[var(--color-ink-muted)] text-[15px] mt-1 max-w-[75ch]">
-          What shipped, what is only partly done, and what was actually checked rather than assumed. Comment on
-          any item and it stays attached to that decision. Newest first.
-        </p>
-      </header>
+    <Page className="max-w-[1100px]">
+      <PageHeader
+        title="Build log"
+        subtitle="What shipped, what is only partly done, and what was actually checked rather than assumed. Comments stay attached to the decision they are about. Newest first."
+      />
 
-      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[var(--color-border)] border border-[var(--color-border)] rounded-xl overflow-hidden mb-8">
+      <dl className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         {[
           { label: 'Entries', value: ENTRIES.length, tone: '' },
           { label: 'Items', value: allItems.length, tone: '' },
-          { label: 'Not shipped', value: notShipped, tone: notShipped > 0 ? 'text-amber-400' : '' },
-          { label: 'Open comments', value: index.openTotal, tone: index.openTotal > 0 ? 'text-amber-400' : '' },
+          { label: 'Not shipped', value: notShipped, tone: notShipped > 0 ? 'text-warn' : '' },
+          { label: 'Open comments', value: index.openTotal, tone: index.openTotal > 0 ? 'text-warn' : '' },
         ].map((s) => (
-          <div key={s.label} className="bg-[var(--color-surface-1)] px-4 py-3">
-            <dt className="text-[10.5px] font-mono uppercase tracking-wider text-[var(--color-ink-muted)]">
-              {s.label}
+          <div
+            key={s.label}
+            className="rounded-app border border-border bg-linear-to-b from-surface-2 to-surface-1 px-3.5 py-3"
+          >
+            <dt>
+              <Eyebrow>{s.label}</Eyebrow>
             </dt>
-            <dd className={`text-[22px] font-semibold tabular-nums mt-0.5 ${s.tone || 'text-white'}`}>
+            <dd className={`mt-2 text-[22px] font-bold leading-none tabular-nums ${s.tone || 'text-ink'}`}>
               {s.value}
             </dd>
           </div>
@@ -380,15 +385,15 @@ export default async function BuildLogPage() {
       </dl>
 
       {notRun > 0 ? (
-        <p className="text-[12.5px] text-amber-300/90 mb-8 leading-relaxed max-w-[75ch]">
-          {notRun} verification {notRun === 1 ? 'check has' : 'checks have'} not been run. They are listed
-          against the entries below rather than summarised away, because an unrun check is not a passing one.
+        <p className="mb-5 rounded-app border border-warn/25 bg-warn/[0.07] px-3.5 py-2.5 text-[12.5px] leading-[1.6] text-warn">
+          {notRun} verification {notRun === 1 ? 'check has' : 'checks have'} not been run. They are listed against
+          the entries below rather than summarised away, because an unrun check is not a passing one.
         </p>
       ) : null}
 
       {ENTRIES.map((entry, i) => (
         <Entry key={`${entry.date}-${i}`} entry={entry} index={index} userEmail={userEmail} captures={captures} />
       ))}
-    </div>
+    </Page>
   )
 }

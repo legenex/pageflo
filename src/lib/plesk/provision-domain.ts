@@ -27,6 +27,7 @@
 import { promises as fs } from 'fs'
 import { spawn } from 'child_process'
 import path from 'path'
+import { env } from '@/lib/pageflo/env'
 
 export type ProvisionStep = { step: string; ok: boolean; detail?: string }
 export type ProvisionResult = {
@@ -548,6 +549,6 @@ export const unprovisionDomainInPlesk = async (args: { pleskDomainId: string }):
  * access. Only PLESK_PROXY_TARGET and (optionally) PLESK_IP_ADDRESS are read.
  */
 export const pleskIsConfigured = (): boolean => {
-  if ((process.env.LEGALOS_DISABLE_PROVISIONING ?? 'false').toLowerCase() === 'true') return false
+  if (env('disableProvisioning').toLowerCase() === 'true') return false
   return true
 }

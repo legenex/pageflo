@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, ExternalLink, Trash2 } from 'lucide-react'
+import { useConfirm } from '@/components/pageflo/interactive'
 import { updatePage, deletePage } from '../actions'
 
 type Option = { label: string; value: string }
@@ -55,6 +56,7 @@ export function EditPageForm({
   const [success, setSuccess] = useState(false)
   const [pending, start] = useTransition()
   const [deletePending, startDelete] = useTransition()
+  const [confirm, confirmDialog] = useConfirm()
 
   const isHome = slug === '/' || initial.slug === '/'
   const normalized = normalizeSlug(slug)
@@ -88,9 +90,15 @@ export function EditPageForm({
     })
   }
 
-  const onDelete = () => {
+  const onDelete = async () => {
     if (isHome) return
-    if (!confirm(`Delete "${initial.title}"?\nThis cannot be undone.`)) return
+    const ok = await confirm({
+      title: 'Delete this page?',
+      message: `"${initial.title}" and everything authored on it are removed. Any visitor reaching its path afterwards gets a 404 unless another page claims it.`,
+      confirmLabel: 'Delete page',
+      tone: 'danger',
+    })
+    if (!ok) return
     startDelete(async () => {
       const res = await deletePage({ pageId, siteSlug })
       if (!res.ok) {
@@ -106,6 +114,7 @@ export function EditPageForm({
 
   return (
     <form onSubmit={onSubmit} className="space-y-5">
+      {confirmDialog}
       {/* --- Page section --- */}
       <Card title="Page">
         <Field label="Title">

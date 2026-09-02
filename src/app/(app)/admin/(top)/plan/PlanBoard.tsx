@@ -83,7 +83,7 @@ export function PlanBoard({
     inFlight.current = true
     setRefreshing(true)
     try {
-      const res = await fetch('/api/legalos/agent-plan', { cache: 'no-store', signal })
+      const res = await fetch('/api/pageflo/agent-plan', { cache: 'no-store', signal })
       if (!res.ok) throw new Error(String(res.status))
       const data = (await res.json()) as { ok: boolean; status: StatusMap; syncedAt: string }
       if (data.ok) {
@@ -158,15 +158,15 @@ export function PlanBoard({
   return (
     <div>
       {/* Header */}
-      <header className="mb-6 flex items-start justify-between gap-4">
+      <header className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-[28px] font-semibold tracking-tight text-white">Agent Plan</h1>
-          <p className="text-[var(--color-ink-muted)] text-[15px] mt-1">
+          <h1 className="text-[22px] font-bold tracking-[-0.02em] text-ink">Agent Plan</h1>
+          <p className="text-ink-muted text-[13px] mt-1.5">
             Live board of what every review/fix agent is working on — {totalFindings} confirmed findings from the{' '}
             2026-06-04 audit, assigned across {reviewers.length} agents.
           </p>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="flex items-center gap-2 text-[12px] text-[var(--color-ink-muted)]">
             <span
               className="w-2 h-2 rounded-full"
@@ -267,7 +267,10 @@ export function PlanBoard({
                 </div>
 
                 {/* right meta */}
-                <div className="w-[120px] shrink-0 text-right">
+                {/* Fixed width only once there is room for it. At 390px a
+                    120px column that cannot shrink pushes the row wider than
+                    the screen. */}
+                <div className="w-full text-left sm:w-[120px] sm:shrink-0 sm:text-right">
                   <div className="text-[12px] tabular-nums" style={{ color: state.color }}>
                     {state.label}
                   </div>
@@ -328,7 +331,7 @@ export function PlanBoard({
       </div>
 
       <p className="text-[11px] text-[var(--color-ink-dim)] mt-5">
-        Status is reported by the agents as they work (POST /api/legalos/agent-plan). The board polls every{' '}
+        Status is reported by the agents as they work (POST /api/pageflo/agent-plan). The board polls every{' '}
         {POLL_MS / 1000}s. Assignments come from docs/audit-2026-06-04.md.
       </p>
     </div>

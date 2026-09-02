@@ -4,7 +4,7 @@
 // spinner, so navigation feels fast. The thin top bar marks that work is in
 // flight. There are no real inputs here, so the page is inert while loading.
 const SkeletonRow = ({ titleW }: { titleW: string }) => (
-  <div className="flex items-center gap-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-1)] p-4">
+  <div className="flex items-center gap-4 rounded-app-lg border border-border bg-surface-1 p-3.5">
     <div className="skeleton h-11 w-11 shrink-0 rounded-lg" />
     <div className="flex-1 space-y-2">
       <div className={`skeleton h-4 ${titleW}`} />
@@ -21,9 +21,9 @@ export default function TopLoading() {
     <div className="relative min-h-screen" aria-busy="true" aria-live="polite">
       <div className="route-bar" />
       <span className="sr-only">Loading</span>
-      <div className="route-fade max-w-[1400px] px-10 py-8">
+      <div className="route-fade px-5 pb-16 pt-6 sm:px-7">
         {/* Page header: title + subtitle + primary action */}
-        <div className="mb-8 flex items-start justify-between gap-6">
+        <div className="mb-5 flex items-start justify-between gap-5">
           <div className="space-y-3">
             <div className="skeleton h-7 w-56" />
             <div className="skeleton h-4 w-80" />
@@ -32,14 +32,14 @@ export default function TopLoading() {
         </div>
 
         {/* Filter / action row */}
-        <div className="mb-6 flex flex-wrap gap-3">
+        <div className="mb-2.5 flex flex-wrap gap-2">
           <div className="skeleton h-9 w-64 rounded-md" />
           <div className="skeleton h-9 w-36 rounded-md" />
           <div className="skeleton h-9 w-36 rounded-md" />
         </div>
 
         {/* List of content rows */}
-        <div className="space-y-3">
+        <div className="space-y-2">
           {widths.map((w, i) => (
             <SkeletonRow key={i} titleW={w} />
           ))}

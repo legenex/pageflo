@@ -2,6 +2,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { invalidateHostCache } from './site-resolver'
 import { safeFetch } from './net/ssrf'
+import { PRODUCT_NAME } from './pageflo/product'
 
 /**
  * Post-provision verifier. After a Domain is DNS-verified AND Plesk has
@@ -77,7 +78,7 @@ const tryReach = async (args: { host: string; expectedSiteId: string }): Promise
   } catch (err) {
     return { ok: false, error: `invalid JSON: ${err instanceof Error ? err.message : 'parse failed'}` }
   }
-  if (body.app !== APP_MARKER) return { ok: false, error: `wrong app marker: ${body.app ?? '(none)'} — this host is not pointed at LegalOS` }
+  if (body.app !== APP_MARKER) return { ok: false, error: `wrong app marker: ${body.app ?? '(none)'}, this host is not pointed at ${PRODUCT_NAME}` }
   if (!body.ok) return { ok: false, error: 'self-check returned ok:false (host not mapped to a site)' }
   if (String(body.site_id ?? '') !== String(args.expectedSiteId)) {
     return { ok: false, error: `wrong site: served ${body.site_id ?? '(none)'}, expected ${args.expectedSiteId}` }

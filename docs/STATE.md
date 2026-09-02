@@ -4,7 +4,7 @@ Update this file after every completed or blocked task. It is the persistent
 handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such.
 
-Last updated: 1 September 2026, Phase 0 repository and operating cleanup.
+Last updated: 1 September 2026, PageFlo rebrand and console redesign.
 
 ---
 
@@ -12,18 +12,40 @@ Last updated: 1 September 2026, Phase 0 repository and operating cleanup.
 
 | | |
 |---|---|
-| Current product name | LegalOS |
-| Target product name | PageFlo |
-| Rebrand status | **Not started.** No code, database, service name, environment variable or user-facing string has been renamed. |
-| Repository | `legenex/legalos` on GitHub |
+| Product name | PageFlo |
+| Rebrand status | **User-facing rebrand complete.** Every screen, title, metadata string, email sender name, marketing surface and package identifier says PageFlo. A documented set of infrastructure and wire identifiers is deliberately unchanged; see "Compatibility identifiers" below. |
+| Repository | `legenex/pageflo` on GitHub |
 | Working and release branch | `main` |
-| Repository status at time of writing | Clean tree, `main` at `12ba129`, identical to `origin/main` and to the bare repository on the host |
 | Canonical agent contract | `AGENTS.md`. `CLAUDE.md` is a short Claude Code entrypoint that defers to it. |
 | Release mode | **Semi-autonomous.** Implement, validate, commit and push are pre-authorized. Running `scripts/release.sh` on production is not. See `AGENTS.md` section 4. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current phase | Phase 0 of `docs/EXECUTION-PLAN.md` |
-| Active human gates | None open. `docs/HUMAN-GATES.md` lists the standing gates. |
+| Current phase | Phases 1 and 2 of `docs/EXECUTION-PLAN.md` complete in the repository. |
+| Active human gates | Legal publication facts, see "Active blockers". |
 | Active blockers | See "Active blockers" below. |
+
+## Compatibility identifiers
+
+**These are deliberately not renamed and must not be "cleaned up".** Each is
+either live infrastructure that exists under that name on the host, or a wire
+contract something outside this deployment already depends on. Every one is
+listed with its consumer in `docs/INFRASTRUCTURE.md`, and `pnpm test:rebrand`
+asserts each is still present.
+
+Infrastructure: the `legalos` PostgreSQL database and role, the `legalos-dev`
+systemd unit and its two timers, the `molegenexcom` Docker Compose project, the
+`/var/www/vhosts/legenex.com/os.legenex.com` application directory, the
+`legalos.git` Plesk bare repository, the `*.preview.legenex.com` wildcard and
+its certificates, the `legalos_deploy` SSH key.
+
+Wire contracts: `X-LegalOS-Event` and `X-LegalOS-Signature` on outbound
+webhooks, the `x-legalos-*` request headers, the `/api/legalos/*` route
+namespace (every route a re-export of `/api/pageflo/*`), the `app: "legalos"`
+self-check marker, the `.legalos-builder-canvas` CSS scope, the
+`legalos:quiz-height` postMessage protocol, and the `_legalos.<host>` DNS TXT
+record name.
+
+The `LEGALOS_*` environment variables are also still accepted, but only through
+`src/lib/pageflo/env.ts`, which reads the `PAGEFLO_*` name first.
 
 ---
 
@@ -93,6 +115,25 @@ documentation that said Docker is only used locally was wrong.
 `https://os.legenex.com` is the control plane and deliberately has no `Domains`
 row, so `/api/legalos/self-check` returns 404 for it. That is correct, and it is
 why the release health gate points at `/api/legalos/health` instead.
+
+### PageFlo hosts
+
+One application serves four kinds of host, classified by
+`src/lib/pageflo/hosts.ts` **before** any `Domains` lookup so a tenant row can
+never claim one of PageFlo's own:
+
+| Host | Role | Behaviour |
+|---|---|---|
+| `pageflo.io` | marketing | the public product site |
+| `www.pageflo.io` | marketing | 308 to the apex |
+| `app.pageflo.io` | app | the console and authentication; `/` redirects to `/admin` |
+| `os.legenex.com` | legacy-app | unchanged, and the rollback path, until `PAGEFLO_LEGACY_HOST_REDIRECT=true` |
+| a customer domain | tenant | resolved against `Domains` exactly as before |
+
+An unresolvable host now **404s**. It used to render the product marketing page,
+which advertised the product on every misconfigured or hostile `Host:` header
+and disagreed with `robots.txt`, which already answered `Disallow: /` for the
+same request.
 
 Plesk domains on the host:
 
@@ -233,9 +274,16 @@ breakdown.
 
 ## Known unfinished areas
 
-- **`/admin/analytics`, `/admin/leads` and `/admin/users` are `Placeholder`
-  components.** They render a title and a deep link into the raw Payload admin
-  at `/cms`. There is no operator UI for leads, users or analytics.
+- **`/admin/analytics` and `/admin/integrity` are unbuilt**, and say so. Both
+  render a "coming soon" surface naming exactly what they are waiting on.
+  Neither shows fabricated data. Analytics is waiting on an aggregation layer;
+  the lead data it would report on is already captured in full. Campaign
+  Integrity has no code and no agreed review model.
+- **Per-Site user management requires workspace ownership.** Role bindings are
+  real and enforced, but only a super admin can edit them, so a Site admin
+  cannot add an editor to their own brand.
+- **Site-wide SEO defaults do not exist.** Per-page SEO does, and is what a
+  crawler actually reads.
 - **54 files carry `// @ts-nocheck`**, about 24,000 of roughly 100,000 lines of
   `src/`. The original reason, missing `funnel-*` slugs in the generated types,
   no longer holds: `src/payload-types.ts` now contains all seven. The silencing
@@ -265,7 +313,8 @@ Redis 7 in local Docker.
 |---|---|
 | `pnpm typecheck` | PASS, exit 0, zero errors |
 | `pnpm build` | PASS, exit 0, full route table emitted |
-| `pnpm test` (16 suites) | PASS, exit 0 |
+| `pnpm test` (17 suites) | PASS, exit 0 |
+| `pnpm test:rebrand` | PASS, 38 assertions |
 | `pnpm test:isolation` | PASS, 49 assertions |
 | `pnpm test:identity` | PASS, 33 assertions |
 | `pnpm test:release` | PASS, 31 assertions, on its own scratch database |
@@ -301,6 +350,16 @@ and phase 11, the production cutover.
 
 ## Active blockers
 
+- **Legal publication facts are not configured.** `/privacy` fails closed and
+  its footer link is absent until `PAGEFLO_LEGAL_ENTITY`,
+  `PAGEFLO_LEGAL_ADDRESS`, `PAGEFLO_PRIVACY_CONTACT`,
+  `PAGEFLO_LEGAL_JURISDICTION`, `PAGEFLO_SUBPROCESSORS`,
+  `PAGEFLO_DATA_RETENTION` and `PAGEFLO_LEGAL_LAST_UPDATED` are set. This is a
+  business decision, not a code task: a privacy policy makes binding statements
+  about a real legal entity and none of those facts is derivable from this
+  repository. `/admin/system` lists which are missing. There is deliberately no
+  `/terms` route at all, because liability, warranty, payment and governing law
+  are a contract rather than a description of the software.
 - **EB-1, MVA qualification tier service does not exist.** The seeded MVA tiered
   quiz calls `https://api.legenex.com/mva-tier-lookup`. The contract is pinned by
   the node and asserted in `scripts/test-quiz-webhook.mts`, but the rule that
@@ -319,19 +378,72 @@ and phase 11, the production cutover.
 
 ## Next major milestone
 
-Phase 1 of `docs/EXECUTION-PLAN.md`: the PageFlo rebrand foundation. Establish
-the product name, the naming boundary between what is safe to rename and what is
-technically load-bearing, and the compatibility strategy for the `LEGALOS_*`
-environment variables, the `/api/legalos/*` route namespace, the `legalos-dev`
-service name, the `legalos` database name and the `molegenexcom` compose
-project.
+The production domain cutover: `pageflo.io`, `www.pageflo.io` and
+`app.pageflo.io` as Plesk domains on the existing host, reverse-proxied to the
+same application, with certificates issued and the three `PAGEFLO_*` host
+variables set in the production `.env`.
 
-Do not begin the PageFlo visual redesign before phase 2, and do not begin it at
-all in the same change as the rebrand foundation.
+`os.legenex.com` stays exactly as it is until the new hosts are verified end to
+end. `PAGEFLO_LEGACY_HOST_REDIRECT` is the last switch to flip, because setting
+it to `true` is what removes the rollback path.
+
+Changing the production `.env`, adding Plesk domains and any DNS change are all
+human gates. See `docs/HUMAN-GATES.md`.
 
 ---
 
 ## Change log
+
+### 1 September 2026, PageFlo rebrand and console redesign
+
+The user-facing rebrand and the console redesign, in the repository. No
+production change is part of this entry.
+
+**Naming.** Every screen, page title, metadata string, email sender default,
+marketing surface and package identifier says PageFlo, and reads it from
+`src/lib/pageflo/product.ts` rather than repeating a literal. The infrastructure
+and wire identifiers listed under "Compatibility identifiers" above are
+deliberately unchanged; `pnpm test:rebrand` asserts each is still present, and
+also that no `process.env.LEGALOS_*` read exists outside
+`src/lib/pageflo/env.ts`. Twenty-five such reads did exist, which would have
+split the configuration in half the moment an operator set a `PAGEFLO_*` name.
+
+**Hosts.** `src/lib/pageflo/hosts.ts` classifies a host as marketing, app,
+legacy-app or tenant, and every public surface asks it before any `Domains`
+lookup. `src/payload.config.ts` now DERIVES the CSRF allowlist from the same
+host variables rather than reading one differently-shaped variable, because a
+missing CSRF origin fails silently: Payload returns `user = null` and every
+server action reports "unauthenticated" with nothing naming CSRF.
+
+**Console.** The design tokens, the sidebar, Overview and Leads landed in
+`344526c` and the preceding working tree. This change completes the rest:
+sign-in, Sites, Domains, Settings and its index, System health (two
+byte-identical pages became one component), Profile, Agent Plan, Build Log,
+Handbook, and the Site workspace. `src/components/pageflo/primitives.tsx` and
+`interactive.tsx` are the shared vocabulary. The builder screens moved to the
+console palette by re-pointing 23 values in `src/components/builder/ui.tsx`
+rather than editing 1,797 call sites.
+
+**Things that were not true, now fixed.** The Site Danger Zone had three
+disabled buttons and told the operator that leads survive a Site delete, when
+`cascadeDeleteSiteChildren` removes them. The Site dashboard reported a
+hardcoded zero for active funnels and an empty funnels panel that never ran a
+query. Its 30-day leads tile was labelled "excl. test" and did not exclude test
+captures. The sidebar linked to `/admin/integrity`, which did not exist. Five
+`window.confirm` dialogs became one owned component with a focus trap and
+type-to-confirm.
+
+**Schema.** One migration, `20260901_233000_sites_vertical_general`, widens
+`enum_sites_vertical` with nine general values so a Site is not required to be a
+legal practice area. Additive: no existing value is removed and no row is
+rewritten. `pnpm test:release` exercises it up, down and re-applied.
+
+**Validation.** `pnpm typecheck`, `pnpm test` (17 suites), `pnpm build`,
+`pnpm verify:schema`, `pnpm test:release`, `pnpm test:isolation`,
+`pnpm test:identity`, `pnpm check:paths`, `pnpm lint:tokens`,
+`pnpm check:buildlog` and `pnpm check:handbook` all pass. `check:handbook` now
+also walks every sidebar destination, which is what catches a nav entry that
+404s.
 
 ### 1 September 2026, Phase 0: repository and operating cleanup
 

@@ -6,6 +6,22 @@ import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { requireSiteAdmin } from '@/lib/authz'
 import { invalidateHostCache } from '@/lib/site-resolver'
+import { VERTICALS } from '@/lib/verticals'
+import type { Site } from '@/payload-types'
+
+/**
+ * Accept only a known vertical; anything else falls back to the default.
+ *
+ * The narrow return type is Payload's own generated union, so adding a value to
+ * `src/lib/verticals.ts` without the matching migration and `generate:types`
+ * fails the typecheck here rather than at save time with a Postgres 22P02.
+ */
+const VERTICAL_VALUES = new Set<string>(VERTICALS.map((v) => v.value))
+const coerceVertical = (raw: FormDataEntryValue | null): Site['vertical'] => {
+  const value = String(raw ?? '')
+  return VERTICAL_VALUES.has(value) ? (value as Site['vertical']) : 'multi'
+}
+
 
 const toTel = (display: string | null | undefined): string => {
   if (!display) return ''
@@ -28,14 +44,10 @@ export async function saveGeneralSettings(formData: FormData): Promise<{ ok: boo
     name: String(formData.get('name') ?? ''),
     slug: String(formData.get('slug') ?? ''),
     tagline: String(formData.get('tagline') ?? ''),
-    vertical: String(formData.get('vertical') ?? 'multi') as
-      | 'mass-tort'
-      | 'mva'
-      | 'workers-comp'
-      | 'personal-injury'
-      | 'medical-malpractice'
-      | 'class-action'
-      | 'multi',
+    // Validated against the one list in src/lib/verticals.ts rather than cast.
+    // A cast would have written whatever the form posted straight into a
+    // Postgres enum column, where an unknown value is a 22P02 at save time.
+    vertical: coerceVertical(formData.get('vertical')),
     org_name: String(formData.get('org_name') ?? ''),
     org_address: String(formData.get('org_address') ?? ''),
     support_email: String(formData.get('support_email') ?? ''),

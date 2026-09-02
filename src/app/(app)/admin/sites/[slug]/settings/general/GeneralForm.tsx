@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { Upload } from 'lucide-react'
 import { saveGeneralSettings } from './actions'
+import { VERTICALS, type VerticalGroup } from '@/lib/verticals'
 
 type Site = {
   id: number
@@ -68,13 +69,15 @@ export function GeneralForm({ site }: { site: Site }) {
         </Field>
         <Field label="Vertical">
           <select name="vertical" defaultValue={site.vertical ?? 'multi'} className={inputClass}>
-            <option value="mass-tort">Mass Tort</option>
-            <option value="mva">MVA</option>
-            <option value="workers-comp">Workers&apos; Comp</option>
-            <option value="personal-injury">Personal Injury</option>
-            <option value="medical-malpractice">Medical Malpractice</option>
-            <option value="class-action">Class Action</option>
-            <option value="multi">Multi-vertical</option>
+            {(['General', 'Legal'] as VerticalGroup[]).map((group) => (
+              <optgroup key={group} label={group}>
+                {VERTICALS.filter((v) => v.group === group).map((v) => (
+                  <option key={v.value} value={v.value}>
+                    {v.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
           </select>
         </Field>
       </Card>

@@ -1,5 +1,6 @@
 import { readFile } from 'fs/promises'
 import { join } from 'path'
+import { env } from '@/lib/pageflo/env'
 
 /**
  * Tiny version pill anchored to the bottom-right of the admin shell.
@@ -12,7 +13,7 @@ import { join } from 'path'
  * testing against.
  */
 
-const REPO_URL = 'https://github.com/Morne080/legalos'
+const REPO_URL = 'https://github.com/legenex/pageflo'
 
 type VersionInfo = {
   isProd: boolean
@@ -22,9 +23,9 @@ type VersionInfo = {
 }
 
 async function resolveVersion(): Promise<VersionInfo> {
-  const envSha = process.env.LEGALOS_GIT_SHA
-  const envBuild = process.env.LEGALOS_BUILD_NUMBER
-  const envTime = process.env.LEGALOS_BUILD_TIME
+  const envSha = env('gitSha')
+  const envBuild = env('buildNumber')
+  const envTime = env('buildTime')
 
   if (envSha && envSha !== 'unknown') {
     return {

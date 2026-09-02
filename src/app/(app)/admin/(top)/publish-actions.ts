@@ -148,7 +148,7 @@ export async function setQuizDeploymentStatus(args: {
     overrideAccess: false,
     // The deployment-tenancy hook refuses a userful go-live that skipped the
     // preflight. This is the one door that just RAN it, so the write says so.
-    context: { legalosPreflighted: true },
+    context: { pagefloPreflighted: true },
   })
   revalidatePath(QUIZ_PATH)
   return { ok: true, status: verdict.status, preflight }
@@ -293,7 +293,7 @@ export async function setLpDeploymentStatus(args: {
     overrideAccess: false,
     // The deployment-tenancy hook refuses a userful go-live that skipped the
     // preflight. This is the one door that just RAN it, so the write says so.
-    context: { legalosPreflighted: true },
+    context: { pagefloPreflighted: true },
   })
   revalidatePath(LP_PATH)
   return {

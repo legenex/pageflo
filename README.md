@@ -3,10 +3,16 @@
 Vertical-agnostic dynamic acquisition infrastructure. One codebase, one admin,
 many public-facing brand sites.
 
-> **Naming.** The product is being renamed from **LegalOS** to **PageFlo**. The
-> code, the database, the systemd service and the user interface still say
-> LegalOS, and several of those names are load-bearing production
-> infrastructure. See `docs/EXECUTION-PLAN.md` phase 1.
+> **Naming.** The user-facing rebrand from LegalOS to PageFlo is done: every
+> screen, title, metadata string and marketing surface says PageFlo. A set of
+> identifiers is deliberately **not** renamed because it is load-bearing
+> production infrastructure or a wire contract a third party already depends on:
+> the `legalos` database and role, the `legalos-dev` service, the `legalos.git`
+> Plesk repository, the `os.legenex.com` application directory, the
+> `X-LegalOS-*` webhook headers and the `/api/legalos/*` compatibility routes,
+> among others. They are listed with their consumers in
+> `docs/INFRASTRUCTURE.md` and asserted present by `pnpm test:rebrand`. Do not
+> remove one as cleanup.
 
 ## Read these first
 
@@ -52,16 +58,28 @@ pnpm generate:types                   # src/payload-types.ts is gitignored and r
 pnpm dev
 ```
 
-- Admin: http://localhost:3000/admin
+- Console: http://localhost:3000/admin
 - Raw Payload admin: http://localhost:3000/cms
-- Marketing fallback: http://localhost:3000
+- Marketing site: http://localhost:3000
+
+Which host serves what is configuration, not code: `PAGEFLO_MARKETING_HOST`,
+`PAGEFLO_APP_HOST` and `PAGEFLO_LEGACY_APP_HOSTS` are classified by
+`src/lib/pageflo/hosts.ts` **before** any `Domains` lookup, so a tenant row can
+never claim the console or the product site. Locally both are unset, so
+`localhost` behaves as a marketing host at `/` and the console at `/admin`.
 
 Preview a Site without DNS by appending `?site=<slug>` to any URL. Add
 `?preview=1`, while authenticated, to render drafts and scheduled content.
 
 `pnpm seed` seeds the shared legal templates and placeholder Sites.
-`LEGALOS_DEV_SKIP_DNS=true` reveals a Skip DNS button in the Connect Domain
-modal. It must be `false` in production.
+`PAGEFLO_DEV_SKIP_DNS=true` (legacy `LEGALOS_DEV_SKIP_DNS`) reveals a Skip DNS
+button in the Connect Domain modal. It must be `false` in production.
+
+Every configured value is read through `src/lib/pageflo/env.ts`, which tries the
+`PAGEFLO_*` name and falls back to the `LEGALOS_*` one. `pnpm test:rebrand`
+fails if anything reads `process.env.LEGALOS_*` directly, because two readers of
+the same setting is how half the code ends up on the new value and half on the
+old.
 
 ## Validation
 
@@ -70,7 +88,7 @@ harnesses under `scripts/`, plus `tsc`.
 
 ```bash
 pnpm typecheck        # tsc --noEmit
-pnpm test             # 16 assertion suites, the main gate
+pnpm test             # 17 assertion suites, the main gate
 pnpm build            # proves the production bundle compiles
 pnpm verify:schema    # reads every collection and global, as a boot would
 pnpm test:release     # migration order, up/down, idempotency, on a scratch DB
@@ -123,22 +141,28 @@ Details and reasoning: `docs/release-runbook.md` and `AGENTS.md` section 6.
 ## Architecture at a glance
 
 ```
-Internet -> os.legenex.com / tenant-domain.com
+Internet -> pageflo.io | app.pageflo.io | os.legenex.com | tenant-domain.com
    |
 Plesk nginx (TLS termination, ports 80/443)
    | reverse proxy
 127.0.0.1:3000 (Next.js, systemd unit legalos-dev)
-   |- /admin/*        Custom branded dashboard
+   |- /admin/*        PageFlo console
    |- /cms/*          Raw Payload admin
-   |- /api/*          Payload REST + GraphQL
-   |- /api/legalos/*  Health, dns-check, self-check, quiz-ai, agent-plan, ...
+   |- /api/*          Payload REST
+   |- /api/pageflo/*  Health, dns-check, self-check, quiz-ai, agent-plan, ...
+   |- /api/legalos/*  Compatibility shims re-exporting the above
    |- /api/leads      Public lead capture
-   `- /*              Public router, host-routed
-        |- Host -> Domain -> Site
-        |- Apply the Site's brand tokens
-        |- Path -> Page / LandingPage / BlogPost
-        |- Fall back to a SharedLegalTemplate for known legal slugs
-        `- Fall back to the marketing component if no Site matches
+   `- /*              Public router
+        |- classifyHost() FIRST, before any Domains lookup
+        |    marketing   -> the PageFlo product site
+        |    app         -> / redirects to /admin
+        |    legacy-app  -> unchanged until PAGEFLO_LEGACY_HOST_REDIRECT
+        `- tenant
+             |- Host -> Domain -> Site
+             |- Apply the Site's brand tokens
+             |- Path -> Page / LandingPage / BlogPost / deployment
+             |- Fall back to a SharedLegalTemplate for known legal slugs
+             `- 404 when no Site matches
 ```
 
 Full detail in `docs/ARCHITECTURE.md`.

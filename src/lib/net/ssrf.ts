@@ -442,7 +442,7 @@ const DEFAULT_MAX_REDIRECTS = 3
 const DEFAULT_TIMEOUT_MS = 8000
 
 /** Identifies the crawler honestly; some brand sites refuse an empty agent. */
-const USER_AGENT = 'LegalOS-BrandIdentity/1 (+https://os.legenex.com)'
+const USER_AGENT = 'PageFlo-BrandIdentity/1 (+https://pageflo.io)'
 
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308])
 

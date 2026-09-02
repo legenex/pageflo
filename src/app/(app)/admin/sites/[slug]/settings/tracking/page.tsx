@@ -46,10 +46,10 @@ export default async function TrackingPage({ params }: Props) {
     : {}
 
   return (
-    <div className="p-10 max-w-[1100px]">
+    <div className="px-5 pb-16 pt-6 sm:px-7 max-w-[1100px]">
       <header className="mb-6">
-        <h1 className="text-[28px] font-semibold tracking-tight text-white">Tracking &amp; Pixels</h1>
-        <p className="text-[var(--color-ink-muted)] text-[15px] mt-1">
+        <h1 className="text-[22px] font-bold tracking-[-0.02em] text-ink">Tracking &amp; Pixels</h1>
+        <p className="text-ink-muted text-[13px] mt-1.5">
           Configure advertising pixels, CAPI, analytics, and webhooks for this site
         </p>
       </header>

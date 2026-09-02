@@ -11,6 +11,7 @@ import {
   makeDomainPrimary,
 } from './actions'
 import type { DnsRecord } from '@/lib/dns-records'
+import { useConfirm } from '@/components/pageflo/interactive'
 
 type SiteOption = { id: number; name: string; slug: string }
 
@@ -33,12 +34,20 @@ export function BrandDomainRow({ domain, sites }: { domain: Domain; sites: SiteO
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [attachTarget, setAttachTarget] = useState<string>('')
+  const [confirm, confirmDialog] = useConfirm()
 
   const refresh = (): void => router.refresh()
 
-  const onDelete = (): void => {
+  const onDelete = async (): Promise<void> => {
     if (domain.kind === 'preview') return
-    if (!window.confirm(`Delete ${domain.host}? This cannot be undone.`)) return
+    const ok = await confirm({
+      title: 'Delete this domain?',
+      message: `${domain.host} is removed from PageFlo and its vhost is deleted. Any visitor still reaching it stops being served.`,
+      confirmLabel: 'Delete domain',
+      tone: 'danger',
+      typeToConfirm: domain.host,
+    })
+    if (!ok) return
     setError(null)
     startTransition(async () => {
       const result = await deletePoolDomain({ domainId: domain.id })
@@ -62,8 +71,14 @@ export function BrandDomainRow({ domain, sites }: { domain: Domain; sites: SiteO
     })
   }
 
-  const onDetach = (): void => {
-    if (!window.confirm(`Detach ${domain.host} from its brand? It returns to the unassigned pool.`)) return
+  const onDetach = async (): Promise<void> => {
+    const ok = await confirm({
+      title: 'Detach this domain?',
+      message: `${domain.host} returns to the unassigned pool and stops resolving to its current Site. The domain itself is kept and can be attached again.`,
+      confirmLabel: 'Detach',
+      tone: 'danger',
+    })
+    if (!ok) return
     setError(null)
     startTransition(async () => {
       const result = await detachDomainFromSite({ domainId: domain.id, siteSlug: domain.siteSlug ?? undefined })
@@ -95,7 +110,8 @@ export function BrandDomainRow({ domain, sites }: { domain: Domain; sites: SiteO
     domain.siteId != null && !domain.primary && (domain.status === 'active' || domain.status === 'verified' || domain.kind === 'preview')
 
   return (
-    <div id={`domain-${domain.id}`} className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-1)] overflow-hidden">
+    <div id={`domain-${domain.id}`} className="rounded-app border border-border bg-surface-1 overflow-hidden">
+      {confirmDialog}
       <div className="flex items-center gap-3 px-4 py-2.5">
         <Globe className="w-4 h-4 text-[var(--color-ink-muted)] shrink-0" />
         <span className="text-[14px] font-mono text-white flex-1 truncate">{domain.host}</span>

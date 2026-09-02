@@ -3,12 +3,21 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowRight, Loader2, Lock, Mail } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react'
 import { signIn } from './actions'
 
-export function SignInForm({ redirectTo }: { redirectTo: string }) {
+const FIELD =
+  'w-full rounded-app border border-border bg-surface-deep py-2.5 pl-9 pr-3 text-[14px] text-ink placeholder:text-ink-dim'
+
+/**
+ * `siteHref` is the public site to return to. On a dedicated console host `/`
+ * redirects straight back to `/admin`, and therefore to this form, so the link
+ * has to be the marketing origin rather than the current origin's root.
+ */
+export function SignInForm({ redirectTo, siteHref = '/' }: { redirectTo: string; siteHref?: string }) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
   const [pending, start] = useTransition()
 
   const onSubmit = (formData: FormData) => {
@@ -25,42 +34,63 @@ export function SignInForm({ redirectTo }: { redirectTo: string }) {
   }
 
   return (
-    <form action={onSubmit} className="space-y-4">
+    <form action={onSubmit} className="space-y-3.5">
       <input type="hidden" name="redirect" value={redirectTo} />
 
       <label className="block">
-        <span className="block text-[12px] font-semibold text-[var(--color-ink-muted)] mb-1.5">Email</span>
+        <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+          Email
+        </span>
         <div className="relative">
-          <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)] pointer-events-none" />
+          <Mail
+            className="pointer-events-none absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-ink-dim"
+            aria-hidden="true"
+          />
           <input
             type="email"
             name="email"
             autoComplete="email"
             autoFocus
             required
-            placeholder="team@legenex.com"
-            className="w-full bg-[var(--color-canvas)] border border-[var(--color-border)] rounded-lg pl-10 pr-3 py-3 text-[15px] text-white placeholder:text-[var(--color-ink-dim)] focus:outline-none focus:border-[var(--color-border-strong)] focus:ring-2 focus:ring-[var(--color-brand-strong)]/20"
+            placeholder="you@company.com"
+            className={FIELD}
           />
         </div>
       </label>
 
       <label className="block">
-        <span className="block text-[12px] font-semibold text-[var(--color-ink-muted)] mb-1.5">Password</span>
+        <span className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-ink-muted">
+          Password
+        </span>
         <div className="relative">
-          <Lock className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-ink-muted)] pointer-events-none" />
+          <Lock
+            className="pointer-events-none absolute left-3 top-1/2 h-[15px] w-[15px] -translate-y-1/2 text-ink-dim"
+            aria-hidden="true"
+          />
           <input
-            type="password"
+            type={showPassword ? 'text' : 'password'}
             name="password"
             autoComplete="current-password"
             required
             placeholder="••••••••••"
-            className="w-full bg-[var(--color-canvas)] border border-[var(--color-border)] rounded-lg pl-10 pr-3 py-3 text-[15px] text-white placeholder:text-[var(--color-ink-dim)] focus:outline-none focus:border-[var(--color-border-strong)] focus:ring-2 focus:ring-[var(--color-brand-strong)]/20"
+            className={`${FIELD} pr-10`}
           />
+          <button
+            type="button"
+            onClick={() => setShowPassword((v) => !v)}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-app-sm text-ink-dim hover:bg-surface-3 hover:text-ink"
+          >
+            {showPassword ? <EyeOff className="h-[15px] w-[15px]" /> : <Eye className="h-[15px] w-[15px]" />}
+          </button>
         </div>
       </label>
 
       {error ? (
-        <div className="text-[13px] text-[var(--color-neg)] bg-[var(--color-neg)]/10 border border-[var(--color-neg)]/30 rounded-md px-3 py-2.5" role="alert">
+        <div
+          role="alert"
+          className="rounded-app border border-neg/30 bg-neg/10 px-3 py-2.5 text-[12.5px] leading-[1.55] text-neg"
+        >
           {error}
         </div>
       ) : null}
@@ -68,20 +98,20 @@ export function SignInForm({ redirectTo }: { redirectTo: string }) {
       <button
         type="submit"
         disabled={pending}
-        className="brand-gradient w-full text-white font-semibold text-[15px] px-5 py-3.5 rounded-lg disabled:opacity-60 hover:opacity-90 transition-opacity inline-flex items-center justify-center gap-2"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-app bg-brand px-5 py-3 text-[14px] font-semibold text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {pending ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-        {pending ? 'Signing in…' : 'Sign in'}
-        {!pending ? <ArrowRight className="w-4 h-4" /> : null}
+        {pending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : null}
+        {pending ? 'Signing in' : 'Sign in'}
+        {pending ? null : <ArrowRight className="h-4 w-4" aria-hidden="true" />}
       </button>
 
-      <div className="flex items-center justify-between pt-1">
-        <Link href="/cms/forgot" className="text-[12px] text-[var(--color-ink-muted)] hover:text-white transition-colors">
+      <div className="flex items-center justify-between pt-0.5 text-[11.5px]">
+        <Link href="/cms/forgot" className="text-ink-muted transition-colors hover:text-ink">
           Forgot password?
         </Link>
-        <Link href="/" className="text-[12px] text-[var(--color-ink-muted)] hover:text-white transition-colors">
+        <a href={siteHref} className="text-ink-muted transition-colors hover:text-ink">
           Back to site
-        </Link>
+        </a>
       </div>
     </form>
   )

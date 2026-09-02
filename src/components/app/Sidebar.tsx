@@ -1,89 +1,92 @@
 'use client'
 
 import Link, { useLinkStatus } from 'next/link'
-import { usePathname } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { usePathname, useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useState } from 'react'
+import { ChevronDown, ChevronRight, Loader2, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { PageFloMark } from '@/components/marketing/PageFloLogo'
 import { SignOutButton } from './SignOutButton'
 import {
-  LayoutGrid,
-  Globe,
-  Layers,
-  Palette,
-  Building2,
-  HelpCircle,
-  Rocket,
-  Megaphone,
-  Inbox,
-  BarChart3,
-  Users,
-  Settings,
-  Plug,
-  Activity,
-  Bot,
-  ScrollText,
-  BookOpen,
-  ChevronDown,
-  ChevronRight,
-  Loader2,
-  Menu,
-} from 'lucide-react'
+  GROUP_KEYS_WITH_CHILDREN,
+  NAV,
+  isChildActive,
+  isGroupActive,
+  type NavChild,
+  type NavGroup,
+  type NavIcon,
+} from './nav-config'
+import { WorkspaceClock } from './WorkspaceClock'
 
-type NavItem = {
-  href: string
-  label: string
-  icon: typeof LayoutGrid
-  badge?: string
-  disabled?: boolean
+const OPEN_GROUPS_KEY = 'pageflo.nav.openGroups'
+const COLLAPSED_KEY = 'pageflo.nav.collapsed'
+
+type Shared = {
+  pathname: string
+  search: string
+  navigating: boolean
+  collapsed: boolean
+  onNavStart: () => void
 }
 
-const TOP_NAV: NavItem[] = [
-  { href: '/admin/overview', label: 'Overview', icon: LayoutGrid },
-  { href: '/admin/leads', label: 'Leads', icon: Inbox },
-  { href: '/admin/analytics', label: 'Analytics', icon: BarChart3, badge: 'soon' },
-  { href: '/admin/sites', label: 'Sites', icon: Globe },
-]
-
-const BRANDS_NAV: NavItem[] = [
-  { href: '/admin/brands/domains', label: 'Domains', icon: Globe },
-  { href: '/admin/brands/brand-identities', label: 'Brand Identities', icon: Building2 },
-]
-
-const FUNNELS_NAV: NavItem[] = [
-  { href: '/admin/quizzes', label: 'Quizzes', icon: HelpCircle },
-  { href: '/admin/landing-pages', label: 'Landing Pages', icon: Rocket },
-  { href: '/admin/advertorials', label: 'Advertorials', icon: Megaphone },
-]
-
-const SETTINGS_NAV: NavItem[] = [
-  { href: '/admin/settings/integrations', label: 'Integrations', icon: Plug },
-  { href: '/admin/settings/users', label: 'Users', icon: Users },
-  { href: '/admin/settings/system', label: 'System', icon: Activity },
-  { href: '/admin/plan', label: 'Agent Plan', icon: Bot },
-  { href: '/admin/buildlog', label: 'Build Log', icon: ScrollText },
-  { href: '/admin/handbook', label: 'Handbook', icon: BookOpen },
-]
-
-export function Sidebar({ userEmail }: { userEmail: string }) {
+/**
+ * The PageFlo console sidebar.
+ *
+ * 248px expanded, 68px collapsed, with a rounded outer edge so the shell reads
+ * as chrome sitting on the canvas rather than as a second panel. Groups are
+ * accordions whose open state and the collapsed state both persist per browser,
+ * because an operator who collapses the nav to get canvas back does not want it
+ * restored on every navigation.
+ *
+ * Three behaviours from the previous sidebar are preserved deliberately:
+ *   - the per-link `useLinkStatus` spinner, which is the only per-item "this one
+ *     is loading" feedback in the application,
+ *   - the navigation lock, which makes the nav inert while a route commits so a
+ *     second click cannot start a competing navigation,
+ *   - the mobile rail plus overlay drawer, including its accessible names, which
+ *     `scripts/test-admin-ui.mts` drives at 390x844.
+ */
+export function Sidebar({ userEmail, roleLabel }: { userEmail: string; roleLabel: string }) {
   const pathname = usePathname()
-  const [brandsOpen, setBrandsOpen] = useState(true)
-  const [funnelsOpen, setFunnelsOpen] = useState(true)
-  const [settingsOpen, setSettingsOpen] = useState(true)
+  const searchParams = useSearchParams()
+  const search = searchParams.toString()
 
-  // Below md the 250px sidebar would leave a 390px phone with ~140px of
-  // content, so it collapses to a 48px rail whose only control opens the full
-  // nav as an overlay drawer. Closed on navigation (the pathname effect below),
-  // on the scrim, and on Escape.
+  const [openGroups, setOpenGroups] = useState<string[]>(['leads'])
+  const [collapsed, setCollapsed] = useState(false)
+  const [hydrated, setHydrated] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-
-  // Navigation lock: set when a nav link is clicked, cleared once the route
-  // commits (pathname changes). While locked the nav is made inert so a second
-  // click can't fire a competing navigation. The per-link spinner
-  // (useLinkStatus) gives the actual "this one is loading" feedback.
   const [navigating, setNavigating] = useState(false)
+
+  // Read persisted state after mount. Reading during render would make the
+  // server and client markup disagree and React would discard the client tree.
+  useEffect(() => {
+    try {
+      const rawGroups = window.localStorage.getItem(OPEN_GROUPS_KEY)
+      if (rawGroups) {
+        const parsed: unknown = JSON.parse(rawGroups)
+        if (Array.isArray(parsed)) setOpenGroups(parsed.filter((k): k is string => typeof k === 'string'))
+      }
+      setCollapsed(window.localStorage.getItem(COLLAPSED_KEY) === '1')
+    } catch {
+      // A browser with storage blocked still gets a working nav, just not a
+      // remembered one. Never let a preference read break navigation.
+    }
+    setHydrated(true)
+  }, [])
+
+  useEffect(() => {
+    if (!hydrated) return
+    try {
+      window.localStorage.setItem(OPEN_GROUPS_KEY, JSON.stringify(openGroups))
+      window.localStorage.setItem(COLLAPSED_KEY, collapsed ? '1' : '0')
+    } catch {
+      /* storage blocked; preference simply is not remembered */
+    }
+  }, [openGroups, collapsed, hydrated])
+
   useEffect(() => {
     setNavigating(false)
     setMobileOpen(false)
-  }, [pathname])
+  }, [pathname, search])
 
   useEffect(() => {
     if (!mobileOpen) return
@@ -94,91 +97,128 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
     return () => document.removeEventListener('keydown', onKey)
   }, [mobileOpen])
 
-  const shared: SharedNav = { pathname, navigating, onNavStart: () => setNavigating(true) }
+  const toggleGroup = useCallback((key: string) => {
+    setOpenGroups((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]))
+  }, [])
 
-  // One nav body, rendered by the desktop aside and the mobile drawer alike so
-  // the two can never drift. No ids inside, so the duplicate mount is safe.
-  const content = (
-    <>
-      <Link href="/admin/overview" className="px-6 py-6 border-b border-[var(--color-border)] block hover:opacity-80 transition-opacity">
-        <div className="flex items-baseline gap-1.5">
-          <span className="brand-text-gradient text-[18px] font-bold tracking-tight">Legenex</span>
-          <span className="text-[18px] font-bold tracking-tight text-white">LegalOS</span>
+  const allOpen = GROUP_KEYS_WITH_CHILDREN.every((k) => openGroups.includes(k))
+
+  // The collapsed rail has no room for group children, so a collapsed sidebar
+  // always renders flat. The drawer is always expanded for the same reason.
+  const body = (drawer: boolean) => {
+    const isCollapsed = collapsed && !drawer
+    const shared: Shared = { pathname, search, navigating, collapsed: isCollapsed, onNavStart: () => setNavigating(true) }
+    return (
+      <>
+        <div className={`flex shrink-0 items-center gap-2.5 border-b border-sidebar-border px-3 py-4 ${isCollapsed ? 'justify-center' : ''}`}>
+          <Link href="/admin/overview" aria-label="PageFlo overview" className="flex items-center gap-2.5 rounded-app-sm">
+            <PageFloMark size={26} className="shrink-0 text-ink" />
+            {isCollapsed ? null : (
+              <span className="text-[19px] font-bold leading-none tracking-[-0.02em] text-ink">
+                Page<span className="text-brand">Flo</span>
+              </span>
+            )}
+          </Link>
         </div>
-        <p className="text-[12px] text-[var(--color-ink-dim)] mt-1">The smart legal brand website builder.</p>
-      </Link>
 
-      {/* While navigating, the nav is made inert (pointer-events none) so a
-          second click can't fire a competing navigation. */}
-      <nav
-        className="flex-1 py-3 overflow-y-auto transition-opacity duration-150"
-        style={navigating ? { pointerEvents: 'none', opacity: 0.75 } : undefined}
-        aria-busy={navigating}
-      >
-        <NavSection items={TOP_NAV} {...shared} />
+        <nav
+          aria-label="Console"
+          className="flex-1 overflow-y-auto px-2.5 py-2.5 transition-opacity duration-150"
+          style={navigating ? { pointerEvents: 'none', opacity: 0.75 } : undefined}
+          aria-busy={navigating}
+        >
+          <ul className="flex flex-col gap-0.5">
+            {NAV.map((group) => (
+              <li key={group.key}>
+                <Group
+                  group={group}
+                  open={openGroups.includes(group.key)}
+                  onToggle={() => toggleGroup(group.key)}
+                  {...shared}
+                />
+              </li>
+            ))}
+          </ul>
+        </nav>
 
-        <DisclosureSection
-          label="Brands"
-          icon={Palette}
-          open={brandsOpen}
-          onToggle={() => setBrandsOpen((v) => !v)}
-          items={BRANDS_NAV}
-          {...shared}
-        />
+        <div className="shrink-0 border-t border-sidebar-border p-2.5">
+          {isCollapsed ? (
+            <button
+              type="button"
+              onClick={() => setCollapsed(false)}
+              aria-label="Expand sidebar"
+              className="mx-auto flex h-9 w-9 items-center justify-center rounded-app border border-sidebar-border text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+            >
+              <PanelLeftOpen className="h-[17px] w-[17px]" />
+            </button>
+          ) : (
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => setOpenGroups(allOpen ? [] : GROUP_KEYS_WITH_CHILDREN)}
+                className="flex h-8 w-full items-center justify-center gap-2 rounded-app border border-sidebar-border text-[12px] font-medium text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+              >
+                {allOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                {allOpen ? 'Collapse all' : 'Expand all'}
+              </button>
 
-        <DisclosureSection
-          label="Funnels"
-          icon={Layers}
-          open={funnelsOpen}
-          onToggle={() => setFunnelsOpen((v) => !v)}
-          items={FUNNELS_NAV}
-          {...shared}
-        />
+              <SignOutButton userEmail={userEmail} roleLabel={roleLabel} />
 
-        <DisclosureSection
-          label="Settings"
-          icon={Settings}
-          open={settingsOpen}
-          onToggle={() => setSettingsOpen((v) => !v)}
-          items={SETTINGS_NAV}
-          {...shared}
-        />
-      </nav>
+              <div className="flex items-center gap-2">
+                <WorkspaceClock />
+                {drawer ? null : (
+                  <button
+                    type="button"
+                    onClick={() => setCollapsed(true)}
+                    aria-label="Collapse sidebar"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-app border border-sidebar-border text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
+                  >
+                    <PanelLeftClose className="h-[15px] w-[15px]" />
+                  </button>
+                )}
+              </div>
 
-      <div className="border-t border-[var(--color-border)] px-4 py-2">
-        <Link href="/cms" className="block text-xs text-[var(--color-ink-dim)] hover:text-[var(--color-ink-muted)] py-1">
-          Open raw Payload admin →
-        </Link>
-      </div>
-
-      <SignOutButton userEmail={userEmail} />
-    </>
-  )
+              <Link
+                href="/cms"
+                className="rounded-app-sm px-1 py-0.5 text-[11px] text-ink-dim transition-colors hover:text-ink-muted"
+              >
+                Open raw Payload admin &rarr;
+              </Link>
+            </div>
+          )}
+        </div>
+      </>
+    )
+  }
 
   return (
     <>
-      <aside className="hidden md:flex w-[250px] shrink-0 border-r border-[var(--color-border)] bg-[var(--color-surface-1)] flex-col">
-        {content}
+      <aside
+        data-pageflo-sidebar={collapsed ? 'collapsed' : 'expanded'}
+        style={{ width: collapsed ? 68 : 248 }}
+        className="relative z-20 hidden shrink-0 flex-col rounded-r-2xl border-r border-sidebar-border bg-sidebar md:flex"
+      >
+        {body(false)}
       </aside>
 
       {/* Mobile rail: keeps the shell's flex-row layout intact while giving the
           content back ~340 of 390px. The hamburger is the only control. */}
-      <div className="md:hidden w-12 shrink-0 border-r border-[var(--color-border)] bg-[var(--color-surface-1)] flex flex-col items-center py-3">
+      <div className="flex w-12 shrink-0 flex-col items-center border-r border-sidebar-border bg-sidebar py-3 md:hidden">
         <button
           type="button"
           aria-label="Open navigation"
           aria-expanded={mobileOpen}
           onClick={() => setMobileOpen(true)}
-          className="p-2 rounded-md text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-[var(--color-surface-2)] transition-colors"
+          className="rounded-app-sm p-2 text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink"
         >
-          <Menu className="w-5 h-5" />
+          <Menu className="h-5 w-5" />
         </button>
       </div>
 
       {mobileOpen ? (
-        <div className="md:hidden fixed inset-0 z-50 flex" role="dialog" aria-modal="true" aria-label="Navigation">
-          <aside className="w-[250px] max-w-[80vw] h-full border-r border-[var(--color-border)] bg-[var(--color-surface-1)] flex flex-col">
-            {content}
+        <div className="fixed inset-0 z-50 flex md:hidden" role="dialog" aria-modal="true" aria-label="Navigation">
+          <aside className="flex h-full w-[248px] max-w-[80vw] flex-col border-r border-sidebar-border bg-sidebar">
+            {body(true)}
           </aside>
           {/* The scrim is a real button so closing the drawer is reachable by
               keyboard and announced, not just a click target. */}
@@ -186,7 +226,7 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
             type="button"
             aria-label="Close navigation"
             onClick={() => setMobileOpen(false)}
-            className="flex-1 bg-black/60 cursor-default"
+            className="flex-1 cursor-default bg-black/60"
           />
         </div>
       ) : null}
@@ -194,108 +234,160 @@ export function Sidebar({ userEmail }: { userEmail: string }) {
   )
 }
 
-type SharedNav = { pathname: string; navigating: boolean; onNavStart: () => void }
+/* ------------------------------------------------------------------ pieces */
 
-function NavSection({ items, pathname, navigating, onNavStart }: { items: NavItem[] } & SharedNav) {
-  return (
-    <div className="px-3 space-y-0.5">
-      {items.map((item) => (
-        <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} navigating={navigating} onNavStart={onNavStart} />
-      ))}
-    </div>
-  )
-}
-
-function DisclosureSection({
-  label,
-  icon: Icon,
+function Group({
+  group,
   open,
   onToggle,
-  items,
   pathname,
+  search,
   navigating,
+  collapsed,
   onNavStart,
-}: {
-  label: string
-  icon: typeof LayoutGrid
-  open: boolean
-  onToggle: () => void
-  items: NavItem[]
-} & SharedNav) {
+}: { group: NavGroup; open: boolean; onToggle: () => void } & Shared) {
+  const active = isGroupActive(pathname, group)
+  const hasChildren = Boolean(group.children?.length) && !collapsed
+
   return (
-    <div className="px-3 mt-1">
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-3 px-3 py-2 rounded-md text-[14px] text-[var(--color-ink-muted)] hover:text-[var(--color-ink)] hover:bg-[var(--color-surface-2)] transition-colors"
-      >
-        <Icon className="w-[18px] h-[18px]" />
-        <span className="flex-1 text-left">{label}</span>
-        {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-      </button>
-      {open ? (
-        <div className="mt-0.5 ml-3 pl-3 border-l border-[var(--color-border)] space-y-0.5">
-          {items.map((item) => (
-            <NavLink key={item.href} item={item} active={isActive(pathname, item.href)} navigating={navigating} onNavStart={onNavStart} />
+    <div>
+      <div className="flex items-center gap-[3px]">
+        <NavRow
+          href={group.href}
+          label={group.label}
+          icon={group.icon}
+          badge={group.badge}
+          active={active}
+          highlight={active}
+          collapsed={collapsed}
+          navigating={navigating}
+          onNavStart={onNavStart}
+        />
+        {hasChildren ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            aria-label={`${open ? 'Collapse' : 'Expand'} ${group.label}`}
+            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-app-sm border transition-colors ${
+              open
+                ? 'border-brand/30 bg-brand/15 text-brand'
+                : 'border-sidebar-border bg-surface-1/70 text-ink-muted hover:bg-surface-2'
+            }`}
+          >
+            {open ? <ChevronDown className="h-[13px] w-[13px]" /> : <ChevronRight className="h-[13px] w-[13px]" />}
+          </button>
+        ) : null}
+      </div>
+
+      {hasChildren && open ? (
+        <ul className="mb-1.5 ml-4 mt-0.5 flex flex-col gap-px border-l border-sidebar-border pl-3">
+          {group.children!.map((child) => (
+            <li key={child.href}>
+              <ChildRow
+                child={child}
+                active={isChildActive(pathname, search, child)}
+                navigating={navigating}
+                onNavStart={onNavStart}
+              />
+            </li>
           ))}
-        </div>
+        </ul>
       ) : null}
     </div>
   )
 }
 
-// Swaps the item's icon for a spinner the moment its navigation is in flight.
-// useLinkStatus must run inside the <Link>, so this renders as its child.
-function NavIcon({ icon: Icon }: { icon: typeof LayoutGrid }) {
+/** Swaps the icon for a spinner while this link's navigation is in flight. */
+function RowIcon({ icon: Icon, className = 'h-[18px] w-[18px]' }: { icon: NavIcon; className?: string }) {
   const { pending } = useLinkStatus()
-  return pending ? (
-    <Loader2 className="w-[18px] h-[18px] animate-spin text-[var(--color-brand-from)]" />
-  ) : (
-    <Icon className="w-[18px] h-[18px]" />
-  )
+  return pending ? <Loader2 className={`${className} animate-spin text-brand`} /> : <Icon className={className} />
 }
 
-function NavLink({ item, active, navigating, onNavStart }: { item: NavItem; active: boolean; navigating: boolean; onNavStart: () => void }) {
-  const Icon = item.icon
-  if (item.disabled) {
-    return (
-      <div className="flex items-center gap-3 px-3 py-2 rounded-md text-[14px] text-[var(--color-ink-dim)] cursor-not-allowed select-none">
-        <Icon className="w-[18px] h-[18px]" />
-        <span className="flex-1">{item.label}</span>
-        {item.badge ? <Badge>{item.badge}</Badge> : null}
-      </div>
-    )
-  }
+function NavRow({
+  href,
+  label,
+  icon,
+  badge,
+  active,
+  highlight,
+  collapsed,
+  navigating,
+  onNavStart,
+}: {
+  href: string
+  label: string
+  icon: NavIcon
+  badge?: string
+  active: boolean
+  highlight: boolean
+  collapsed: boolean
+  navigating: boolean
+  onNavStart: () => void
+}) {
   return (
     <Link
-      href={item.href}
+      href={href}
+      title={collapsed ? label : undefined}
       onClick={() => {
-        // Only lock for a real navigation; clicking the current route is a no-op.
         if (!active) onNavStart()
       }}
       aria-disabled={navigating || undefined}
-      className={`flex items-center gap-3 px-3 py-2 rounded-md text-[14px] transition-colors ${
-        active
-          ? 'text-[var(--color-brand-from)] bg-[rgba(255,92,117,0.08)] border border-[rgba(255,92,117,0.30)]'
-          : 'text-[var(--color-ink-muted)] border border-transparent hover:text-[var(--color-ink)] hover:bg-[var(--color-surface-2)]'
-      }`}
+      aria-current={active ? 'page' : undefined}
+      className={`relative flex min-w-0 flex-1 items-center gap-3 rounded-app text-[13px] transition-colors ${
+        collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'
+      } ${highlight ? 'bg-brand/10 font-semibold text-ink' : 'font-medium text-ink-muted hover:bg-surface-2 hover:text-ink'}`}
     >
-      <NavIcon icon={Icon} />
-      <span className="flex-1">{item.label}</span>
-      {item.badge ? <Badge>{item.badge}</Badge> : null}
+      {highlight ? (
+        <span
+          aria-hidden="true"
+          className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-brand"
+        />
+      ) : null}
+      <span className={highlight ? 'text-brand' : ''}>
+        <RowIcon icon={icon} />
+      </span>
+      {collapsed ? (
+        <span className="sr-only">{label}</span>
+      ) : (
+        <>
+          <span className="min-w-0 flex-1 truncate">{label}</span>
+          {badge ? (
+            <span className="shrink-0 rounded-app-sm border border-border bg-surface-1 px-1.5 py-px text-[9px] font-semibold uppercase tracking-[0.06em] text-ink-muted">
+              {badge}
+            </span>
+          ) : null}
+        </>
+      )}
     </Link>
   )
 }
 
-function Badge({ children }: { children: React.ReactNode }) {
+function ChildRow({
+  child,
+  active,
+  navigating,
+  onNavStart,
+}: {
+  child: NavChild
+  active: boolean
+  navigating: boolean
+  onNavStart: () => void
+}) {
   return (
-    <span className="text-[10px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded border border-[var(--color-border-strong)] text-[var(--color-ink-dim)]">
-      {children}
-    </span>
+    <Link
+      href={child.href}
+      onClick={() => {
+        if (!active) onNavStart()
+      }}
+      aria-disabled={navigating || undefined}
+      aria-current={active ? 'page' : undefined}
+      className={`flex items-center gap-2.5 rounded-app-sm px-3 py-1.5 text-[12px] font-medium transition-colors ${
+        active ? 'bg-brand/10 text-brand' : 'text-ink-muted hover:bg-surface-2 hover:text-ink'
+      }`}
+    >
+      <RowIcon icon={child.icon} className="h-[15px] w-[15px] shrink-0" />
+      <span className="min-w-0 flex-1 truncate">{child.label}</span>
+    </Link>
   )
-}
-
-function isActive(pathname: string, href: string): boolean {
-  if (href === pathname) return true
-  if (pathname.startsWith(`${href}/`)) return true
-  return false
 }

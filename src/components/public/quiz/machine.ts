@@ -395,7 +395,7 @@ export const useQuizMachine = ({
     autoAdvanceRef.current += 1
     if (autoAdvanceRef.current > (quiz?.steps?.length ?? 0) + 5) {
       // eslint-disable-next-line no-console
-      console.error('[legalos] quiz flow made no visible progress; ending the session')
+      console.error('[pageflo] quiz flow made no visible progress; ending the session')
       setFinished(true)
       void submitOnce(fieldValues)
       return

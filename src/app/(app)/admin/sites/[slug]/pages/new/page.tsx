@@ -38,7 +38,7 @@ export default async function NewSitePage({ params }: Props) {
   ]
 
   return (
-    <div className="px-10 py-8 max-w-[820px]">
+    <div className="px-5 pb-16 pt-6 sm:px-7 max-w-[820px]">
       <Link
         href={`/admin/sites/${slug}/pages`}
         className="inline-flex items-center gap-1.5 text-[12.5px] text-[var(--color-ink-muted)] hover:text-white transition-colors mb-5"

@@ -1,12 +1,13 @@
 import type { CollectionConfig } from 'payload'
 import { isSuperAdmin, siteScopedRead } from '../access'
+import { PRODUCT_NAME } from '../lib/pageflo/product'
 
 export const AuditLog: CollectionConfig = {
   slug: 'audit-log',
   admin: {
     useAsTitle: 'action',
     defaultColumns: ['createdAt', 'user', 'action', 'entity_type', 'entity_id', 'site'],
-    group: 'LegalOS',
+    group: PRODUCT_NAME,
     description: 'Read-only log of admin write actions. Cannot be edited or deleted from the UI.',
   },
   access: {

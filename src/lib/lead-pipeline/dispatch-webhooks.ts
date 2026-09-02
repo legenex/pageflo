@@ -45,11 +45,22 @@ export const dispatchWebhooks = async (args: {
     enabled.map(async (w): Promise<WebhookDispatchResult> => {
       const started = Date.now()
       try {
+        // Both spellings, same values. A receiver on the other end of this
+        // POST is a third party's endpoint that already switches on
+        // `X-LegalOS-Event` and verifies `X-LegalOS-Signature`; renaming the
+        // header would silently drop their leads on the floor. Send the
+        // PageFlo names alongside so receivers can migrate on their own
+        // schedule, and remove the LegalOS pair only once they have.
+        const signature = w.hmac_secret ? `sha256=${signBody(body, w.hmac_secret)}` : null
         const headers: Record<string, string> = {
           'Content-Type': 'application/json',
           'X-LegalOS-Event': event,
+          'X-PageFlo-Event': event,
         }
-        if (w.hmac_secret) headers['X-LegalOS-Signature'] = `sha256=${signBody(body, w.hmac_secret)}`
+        if (signature) {
+          headers['X-LegalOS-Signature'] = signature
+          headers['X-PageFlo-Signature'] = signature
+        }
         // An outbound webhook URL is typed by a tenant admin, so it is a
         // user-supplied address the server posts a LEAD to. Unguarded, it
         // doubles as a port scanner and a way to POST a signed payload at

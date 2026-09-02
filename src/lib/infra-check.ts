@@ -1,8 +1,8 @@
 /**
- * Production readiness check for the LegalOS infrastructure that tenant domains
+ * Production readiness check for the PageFlo infrastructure that tenant domains
  * rely on. Surfaces a banner in the admin if the operator hasn't finished setting up:
- *   - LEGALOS_CNAME_TARGET (e.g. cname.legenex.com) — what tenant CNAMEs point at
- *   - {anything}.LEGALOS_PREVIEW_DOMAIN wildcard DNS — what /admin auto-issues per Site
+ *   - PAGEFLO_CNAME_TARGET (e.g. cname.legenex.com) — what tenant CNAMEs point at
+ *   - {anything}.PAGEFLO_PREVIEW_DOMAIN wildcard DNS — what /admin auto-issues per Site
  *
  * Without these resolving, the verifier will still mark domains "verified" because
  * the chain technically matches, but the page won't load because the chain
@@ -10,6 +10,8 @@
  *
  * Result is cached in-process for 5 minutes so we don't hit DoH on every page render.
  */
+
+import { env } from '@/lib/pageflo/env'
 
 const CLOUDFLARE_DOH = 'https://cloudflare-dns.com/dns-query'
 const TTL_MS = 5 * 60 * 1000
@@ -40,8 +42,8 @@ export const checkInfra = async (force = false): Promise<InfraCheck> => {
   const now = Date.now()
   if (!force && cache && cache.expiresAt > now) return cache.value
 
-  const cnameTarget = process.env.LEGALOS_CNAME_TARGET ?? null
-  const previewDomain = process.env.LEGALOS_PREVIEW_DOMAIN ?? null
+  const cnameTarget = env('cnameTarget') || null
+  const previewDomain = env('previewDomain') || null
   // Probe with a stable sample subdomain so we're actually exercising the wildcard.
   const sampleHost = previewDomain ? `wildcard-probe.${previewDomain}` : null
 

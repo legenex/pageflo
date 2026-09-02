@@ -14,6 +14,9 @@
 // Records are recomputed on read (see brands/domains/page.tsx) so existing rows
 // reflect the current logic without a backfill.
 
+import { PRODUCT_NAME } from './pageflo/product'
+import { env } from '@/lib/pageflo/env'
+
 export type DnsRecord = {
   type: 'A' | 'CNAME' | 'TXT'
   name: string
@@ -53,8 +56,8 @@ export const isApexDomain = (host: string): boolean => {
  * subdomain. That one record both routes traffic AND verifies ownership.
  */
 export const buildDnsRecords = (host: string): DnsRecord[] => {
-  const cnameTarget = process.env.LEGALOS_CNAME_TARGET ?? 'cname.legenex.com'
-  const aTarget = process.env.LEGALOS_A_TARGET || null
+  const cnameTarget = env('cnameTarget') || 'cname.legenex.com'
+  const aTarget = env('aTarget') || null
 
   if (isApexDomain(host)) {
     if (aTarget) {
@@ -64,7 +67,7 @@ export const buildDnsRecords = (host: string): DnsRecord[] => {
           name: host,
           value: aTarget,
           required: true,
-          note: 'Points your root domain at LegalOS. Serves the site AND verifies ownership. Apex domains use an A record, not a CNAME.',
+          note: `Points your root domain at ${PRODUCT_NAME}. Serves the site AND verifies ownership. Apex domains use an A record, not a CNAME.`,
         },
       ]
     }
@@ -88,7 +91,7 @@ export const buildDnsRecords = (host: string): DnsRecord[] => {
       name: host,
       value: cnameTarget,
       required: true,
-      note: 'Points this subdomain at LegalOS. Serves the site AND verifies ownership.',
+      note: `Points this subdomain at ${PRODUCT_NAME}. Serves the site AND verifies ownership.`,
     },
   ]
 }

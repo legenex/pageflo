@@ -75,7 +75,7 @@ const ADV_SECTION_TYPES = [
   { id: 'dateline', name: 'Dateline', desc: 'LOCATION - Date prefix', icon: Calendar, color: T.textMute },
   { id: 'lede', name: 'Lead', desc: 'Opening italic paragraph', icon: ScrollText, color: T.info },
   { id: 'paragraph', name: 'Paragraph', desc: 'Standard body text', icon: FileText, color: T.text },
-  { id: 'pull_quote', name: 'Pull Quote', desc: 'Large blockquote callout', icon: Quote, color: T.pink },
+  { id: 'pull_quote', name: 'Pull Quote', desc: 'Large blockquote callout', icon: Quote, color: T.orange },
   { id: 'callout_box', name: 'Callout Box', desc: 'Highlighted info box', icon: AlertTriangle, color: T.warning },
   { id: 'stat_block', name: 'Stat Block', desc: 'Big number + caption', icon: Hash, color: T.cyan },
   { id: 'bullet_list', name: 'Bullet List', desc: 'Unordered points', icon: List, color: T.text },

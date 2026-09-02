@@ -4,13 +4,14 @@ import {
   CheckCircle2,
   CircleDashed,
   CircleDot,
-  BookOpen,
   Compass,
   AlertTriangle,
   Cog,
   MousePointerClick,
 } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth'
+import { PRODUCT_NAME } from '@/lib/pageflo/product'
+import { Eyebrow, Page, PageHeader } from '@/components/pageflo/primitives'
 import {
   SECTIONS,
   CONCEPTS,
@@ -133,31 +134,27 @@ export default async function HandbookPage() {
   const notBuilt = countByStatus('placeholder')
 
   return (
-    <div className="p-10 max-w-[1400px]">
-      <header className="mb-6">
-        <h1 className="flex items-center gap-2.5 text-[28px] font-semibold tracking-tight text-white">
-          <BookOpen className="w-6 h-6 text-[var(--color-ink-muted)]" />
-          Handbook
-        </h1>
-        <p className="text-[var(--color-ink-muted)] text-[15px] mt-1 max-w-[78ch] leading-relaxed">
-          Every screen in LegalOS: what it is for, how to use it, and what it does underneath. The mechanism
-          matters as much as the buttons, because most of what surprises people here is mechanical rather than
-          visual.
-        </p>
-      </header>
+    <Page>
+      <PageHeader
+        title="Handbook"
+        subtitle={`Every screen in ${PRODUCT_NAME}: what it is for, how to use it, and what it does underneath. The mechanism matters as much as the buttons, because most of what surprises people here is mechanical rather than visual.`}
+      />
 
-      <dl className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-[var(--color-border)] border border-[var(--color-border)] rounded-xl overflow-hidden mb-8">
+      <dl className="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
         {[
           { label: 'Screens', value: ALL_PAGES.length, tone: '' },
-          { label: 'Working', value: countByStatus('working'), tone: 'text-emerald-400' },
-          { label: 'Partly built', value: countByStatus('partial'), tone: 'text-amber-400' },
-          { label: 'Not built yet', value: notBuilt, tone: notBuilt > 0 ? 'text-zinc-400' : '' },
+          { label: 'Working', value: countByStatus('working'), tone: 'text-pos' },
+          { label: 'Partly built', value: countByStatus('partial'), tone: 'text-warn' },
+          { label: 'Not built yet', value: notBuilt, tone: notBuilt > 0 ? 'text-ink-muted' : '' },
         ].map((s) => (
-          <div key={s.label} className="bg-[var(--color-surface-1)] px-4 py-3">
-            <dt className="text-[10.5px] font-mono uppercase tracking-wider text-[var(--color-ink-muted)]">
-              {s.label}
+          <div
+            key={s.label}
+            className="rounded-app border border-border bg-linear-to-b from-surface-2 to-surface-1 px-3.5 py-3"
+          >
+            <dt>
+              <Eyebrow>{s.label}</Eyebrow>
             </dt>
-            <dd className={`text-[22px] font-semibold tabular-nums mt-0.5 ${s.tone || 'text-white'}`}>
+            <dd className={`mt-2 text-[22px] font-bold leading-none tabular-nums ${s.tone || 'text-ink'}`}>
               {s.value}
             </dd>
           </div>
@@ -165,10 +162,10 @@ export default async function HandbookPage() {
       </dl>
 
       {notBuilt > 0 ? (
-        <p className="text-[13px] text-[var(--color-ink-muted)] mb-8 leading-relaxed max-w-[78ch]">
-          {notBuilt} screens render a &ldquo;Coming soon&rdquo; panel, including Leads, which sits in the main
-          sidebar. They are listed below with what to use instead, rather than left out, because finding out by
-          clicking is the expensive way to learn it.
+        <p className="mb-5 max-w-[78ch] text-[12.5px] leading-[1.65] text-ink-muted">
+          {notBuilt} {notBuilt === 1 ? 'screen renders' : 'screens render'} a &ldquo;Coming soon&rdquo; panel. They
+          are listed below with what to use instead, rather than left out, because finding out by clicking is the
+          expensive way to learn it.
         </p>
       ) : null}
 
@@ -283,6 +280,6 @@ export default async function HandbookPage() {
           ))}
         </div>
       </div>
-    </div>
+    </Page>
   )
 }

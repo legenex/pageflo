@@ -61,7 +61,7 @@ export const defaultProgressFor = (t) => {
 
 const progressLabel = (id) => PROGRESS_FORM_LABELS.find((p) => p.id === id)?.label ?? id ?? 'renderer default'
 
-const ORIGIN_COLOR = { stock: T.info, clone: T.purple, blank: T.cyan, ai: T.pink, legacy: T.textLow }
+const ORIGIN_COLOR = { stock: T.info, clone: T.purple, blank: T.cyan, ai: T.orange, legacy: T.textLow }
 
 /* ------------------------------------------------------------------ pieces */
 

@@ -1,4 +1,4 @@
-# Releasing LegalOS
+# Releasing PageFlo
 
 One command, on the server, in the app directory:
 
@@ -39,7 +39,7 @@ remembering a step.
 
 ## The health gate is a liveness route, not `self-check`
 
-`self-check` answers a different question — *did this request reach LegalOS for
+`self-check` answers a different question — *did this request reach PageFlo for
 the right **tenant**?* — and returns **404** for a host with no `Domains` row.
 `os.legenex.com` is the control plane and deliberately has no such row, so
 pointing the gate there made a **successful** release exit 1 at its last stage,
@@ -51,6 +51,13 @@ a release that had worked. Measured on production 2026-08-14.
 new build is serving, and it can reach the database it was just migrated
 against — and depends on no host mapping, so no future `Domains` change can turn
 the gate red again.
+
+**The gate deliberately still uses the `/api/legalos/*` path.** The canonical
+route is `/api/pageflo/health` and `/api/legalos/health` is a re-export of it,
+so both answer on the current build. The legacy path is the one that also
+answers on every OLDER build, which is exactly the situation a rollback puts the
+health gate in. Pointing the gate at the new path would make it fail on the
+build you are rolling back to. `LEGALOS_HEALTH_URL` overrides it per host.
 
 ## The backup is size-checked, and that is not paranoia
 
@@ -149,10 +156,11 @@ believed to be authoritative is a trap.
 
 ## Staging a long migration
 
-`LEGALOS_MIGRATION_DIR` points the migrator at a different set of files, so a
-release can be applied as far as a known point rather than all at once:
+`PAGEFLO_MIGRATION_DIR` (legacy `LEGALOS_MIGRATION_DIR`, still read) points the
+migrator at a different set of files, so a release can be applied as far as a
+known point rather than all at once:
 
-    LEGALOS_MIGRATION_DIR=/path/to/subset pnpm payload migrate
+    PAGEFLO_MIGRATION_DIR=/path/to/subset pnpm payload migrate
 
 This is also how `pnpm test:release` builds the previous release's schema
 exactly, from this repository alone.
@@ -170,3 +178,38 @@ Every value the script uses is overridable, and the defaults are production's.
 | `LEGALOS_HEALTH_URL` | `http://127.0.0.1:3000/api/legalos/health` |
 | `LEGALOS_BACKUP_DIR` | `/root/legalos-backups` |
 | `LEGALOS_PG_DUMP` | `docker exec molegenexcom-postgres-1 pg_dump` |
+
+Every one of these names is a **compatibility identifier** and is deliberately
+not renamed: they address live infrastructure that exists under those names on
+the host. See `docs/INFRASTRUCTURE.md`, "Compatibility identifiers".
+
+## The PageFlo domain cutover
+
+Three hosts reach the same application through the same Plesk reverse proxy:
+
+| Host | Behaviour |
+|---|---|
+| `pageflo.io` | the public product site |
+| `www.pageflo.io` | 308 to the apex |
+| `app.pageflo.io` | the console and authentication |
+| `os.legenex.com` | unchanged, and the rollback path |
+
+Classification happens in `src/lib/pageflo/hosts.ts` **before** any `Domains`
+lookup, so a tenant row can never claim one of them. It is driven entirely by
+`PAGEFLO_MARKETING_HOST`, `PAGEFLO_APP_HOST` and `PAGEFLO_LEGACY_APP_HOSTS`.
+
+Two environment facts decide whether a cutover works, and both fail silently:
+
+1. **`PAGEFLO_SERVER_URL` must be the canonical console origin.** It feeds
+   Payload's CSRF allowlist, transactional email links and every absolute admin
+   URL.
+2. **The CSRF allowlist must contain the origin the browser actually sends.**
+   `src/payload.config.ts` derives it from the three host variables above, with
+   and without `www.`, so setting the hosts is enough. When it is wrong, Payload
+   returns `user = null` and every server action fails as "unauthenticated" with
+   nothing anywhere naming CSRF.
+
+`PAGEFLO_LEGACY_HOST_REDIRECT` is the last switch to flip, not the first. While
+it is `false`, `os.legenex.com` serves exactly as it does today, which is what
+makes it a rollback path. Setting it to `true` turns that host into a 308 and
+removes the rollback path, so flip it only after the new hosts are verified.

@@ -1,5 +1,6 @@
 import { AlertTriangle, ExternalLink } from 'lucide-react'
 import type { InfraCheck } from '@/lib/infra-check'
+import { PRODUCT_NAME } from '@/lib/pageflo/product'
 
 export function InfraReadinessBanner({ infra }: { infra: InfraCheck }) {
   if (infra.ok) return null
@@ -14,7 +15,7 @@ export function InfraReadinessBanner({ infra }: { infra: InfraCheck }) {
           <AlertTriangle className="w-4 h-4" />
         </span>
         <div className="flex-1 min-w-0">
-          <h3 className="text-[14px] font-semibold text-white">LegalOS infrastructure not fully wired</h3>
+          <h3 className="text-[14px] font-semibold text-white">{PRODUCT_NAME} infrastructure not fully wired</h3>
           <p className="text-[13px] text-[var(--color-ink)] mt-1 leading-relaxed">
             Domains will verify but won&apos;t actually load until your operator-level DNS is set up at <code className="font-mono text-[var(--color-info)]">legenex.com</code>:
           </p>
@@ -56,7 +57,7 @@ export function InfraReadinessBanner({ infra }: { infra: InfraCheck }) {
           <p className="mt-3 text-[12px] text-[var(--color-ink-dim)]">
             This check runs from the server via Cloudflare DoH and caches for 5 minutes. Until both items are green, tenant domains will appear &ldquo;verified&rdquo; but won&apos;t serve traffic.{' '}
             <a
-              href="https://github.com/legenex/legalos#deploy"
+              href="https://github.com/legenex/pageflo#deploy"
               className="text-[var(--color-info)] hover:underline inline-flex items-center gap-0.5"
               target="_blank"
               rel="noreferrer"

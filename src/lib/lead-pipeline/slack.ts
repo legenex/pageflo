@@ -1,4 +1,5 @@
 import { safePost } from '@/lib/net/ssrf'
+import { PRODUCT_NAME } from '@/lib/pageflo/product'
 
 export type SlackNotificationArgs = {
   webhookUrl: string
@@ -30,7 +31,7 @@ export const sendSlackNotification = async (args: SlackNotificationArgs): Promis
         color: testCapture ? '#5CC1E1' : '#2DBE6C',
         fields,
         actions: [
-          { type: 'button', text: 'Open in LegalOS', url: adminUrl },
+          { type: 'button', text: `Open in ${PRODUCT_NAME}`, url: adminUrl },
         ],
         footer: `Lead ID ${leadId}`,
         ts: Math.floor(Date.now() / 1000),

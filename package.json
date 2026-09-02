@@ -1,7 +1,12 @@
 {
-  "name": "legenex-legalos",
+  "name": "pageflo",
   "version": "0.1.0",
   "private": true,
+  "description": "PageFlo: dynamic acquisition infrastructure. Sites, landing pages, advertorials, quizzes, brand kits, domains, deployments and leads.",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/legenex/pageflo.git"
+  },
   "type": "module",
   "scripts": {
     "dev": "cross-env NODE_OPTIONS=--no-deprecation next dev",
@@ -38,7 +43,7 @@
     "test:certs": "tsx scripts/test-cert-ownership.mts",
     "check:live-preflight": "cross-env NODE_ENV=production tsx scripts/check-live-preflight.mts",
     "verify:schema": "cross-env NODE_ENV=production tsx scripts/verify-schema.mts",
-    "test": "pnpm test:certs && pnpm test:brand && pnpm test:authz && pnpm test:registry && pnpm test:records && pnpm test:slots && pnpm test:publish && pnpm test:ai && pnpm test:flow && pnpm test:compositions && pnpm test:webhook && pnpm test:idempotency && pnpm test:timeouts && pnpm test:trusted-host && pnpm test:observability && pnpm test:brand-identity",
+    "test": "pnpm test:rebrand && pnpm test:certs && pnpm test:brand && pnpm test:authz && pnpm test:registry && pnpm test:records && pnpm test:slots && pnpm test:publish && pnpm test:ai && pnpm test:flow && pnpm test:compositions && pnpm test:webhook && pnpm test:idempotency && pnpm test:timeouts && pnpm test:trusted-host && pnpm test:observability && pnpm test:brand-identity",
     "test:all": "pnpm test && pnpm test:isolation && pnpm test:identity && pnpm test:bootstrap",
     "sweep:templates": "tsx scripts/sweep-templates.mts",
     "reconcile:lp-quiz": "tsx scripts/reconcile-lp-quiz-bindings.mts",
@@ -48,7 +53,9 @@
     "generate:types": "cross-env NODE_OPTIONS=--no-deprecation payload generate:types",
     "generate:importmap": "cross-env NODE_OPTIONS=--no-deprecation payload generate:importmap",
     "seed": "cross-env NODE_OPTIONS=--no-deprecation tsx src/seed/index.ts",
-    "test:idempotency": "tsx scripts/test-lead-idempotency.mts"
+    "test:idempotency": "tsx scripts/test-lead-idempotency.mts",
+    "test:rebrand": "tsx scripts/test-rebrand.mts",
+    "test:console": "cross-env NODE_ENV=production tsx scripts/test-console-walk.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",

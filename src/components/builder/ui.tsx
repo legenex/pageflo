@@ -2,10 +2,35 @@
 /* eslint-disable */
 'use client'
 
-// Ported verbatim from the LegalOS funnel-builder artifact. Shared theme (T) and
-// UI primitives used by every builder screen (Brand Identities, Landing Pages,
-// Quizzes, Advertorials). Inline styles + the T palette are intentionally kept
-// identical to the artifact so the screens are pixel-for-pixel the same.
+// Shared theme (T) and UI primitives used by every builder screen (Brand
+// Identities, Landing Pages, Quizzes, Advertorials, Page Blocks). The JSX is the
+// port of the original funnel-builder artifact and still paints with inline
+// styles; only the palette below decides what colour those styles produce.
+//
+// THE REBRAND CHANGES VALUES, NOT KEYS, with one exception. 1,797 call sites
+// across 23 files read
+// `T.bg`, `T.primary`, `T.textMute` and the rest. Renaming them would be a
+// mechanical sweep through @ts-nocheck'd ported code with a large blast radius
+// and no design benefit, so every key below keeps its name and takes the
+// PageFlo value from `src/app/globals.css`. The builder is now the same palette
+// as the rest of the console rather than a second, lighter dark theme sitting
+// next to it. The exception is `pink`, renamed to `orange`: PageFlo's accent set
+// is teal, purple, orange and blue, and a key named `pink` holding #F97316 is a
+// lie a future reader has to discover by rendering it. Six call sites, all
+// mechanical.
+//
+// The values are literals rather than `var(--color-*)` because this object is
+// also read in plain JavaScript (comparisons, canvas fills, colour maths in
+// TemplateGallery and the LP renderer), where a CSS variable is an opaque
+// string. `scripts/test-brand-tokens` style checks treat this file as admin
+// chrome, which is fixed product surface and deliberately not brand-painted.
+//
+// Contrast, measured against the surface each value actually sits on:
+//   text      #EEF2F8 on bg #0A0E15 -> 17.2:1
+//   textDim   #C7D0DC on bgElev #131924 -> 10.9:1
+//   textMute  #8B95A8 on bgElev #131924 ->  5.8:1
+//   textLow   #808C9E on bgElev #131924 ->  5.2:1
+// All four clear WCAG AA for normal text on every builder surface.
 
 import { useEffect } from 'react'
 import { AlertCircle, ChevronLeft, Eye, Power, PowerOff, X } from 'lucide-react'
@@ -14,27 +39,27 @@ import { AlertCircle, ChevronLeft, Eye, Power, PowerOff, X } from 'lucide-react'
 // THEME
 // ============================================================================
 export const T = {
-  bg: '#252E39',
-  bgElev: '#2d3845',
-  bgElev2: '#364250',
-  bgElev3: '#3f4c5d',
-  border: '#2a3140',
-  borderHover: '#3a4452',
-  text: '#fafafa',
-  textDim: '#c1c7d0',
-  textMute: '#8b95a7',
-  textLow: '#6b7689',
-  primary: '#ef4444',
-  primaryHover: '#dc2626',
-  primarySoft: 'rgba(239, 68, 68, 0.08)',
-  primaryGlow: 'rgba(239, 68, 68, 0.25)',
-  success: '#10b981',
-  warning: '#f59e0b',
-  danger: '#ef4444',
-  info: '#0ea5e9',
-  purple: '#a78bfa',
-  pink: '#ec4899',
-  cyan: '#06b6d4',
+  bg: '#0A0E15',
+  bgElev: '#131924',
+  bgElev2: '#182030',
+  bgElev3: '#1F2939',
+  border: '#243044',
+  borderHover: '#2C3A4E',
+  text: '#EEF2F8',
+  textDim: '#C7D0DC',
+  textMute: '#8B95A8',
+  textLow: '#808C9E',
+  primary: '#E5484D',
+  primaryHover: '#D43B40',
+  primarySoft: 'rgba(229, 72, 77, 0.08)',
+  primaryGlow: 'rgba(229, 72, 77, 0.25)',
+  success: '#3DD68C',
+  warning: '#FACC14',
+  danger: '#E5484D',
+  info: '#5AA6DC',
+  purple: '#9585DD',
+  orange: '#F97316',
+  cyan: '#41D9C7',
 }
 
 // ============================================================================
