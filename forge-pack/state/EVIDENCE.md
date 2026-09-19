@@ -1,5 +1,12 @@
 # Evidence
 
+## W12 2026-09-19
+
+- `pnpm typecheck`: pass
+- `pnpm test:durability`: 12 passed, 0 failed
+- `pnpm test:idempotency`: 23 passed, 0 failed
+- Production Plesk release: UNPROVEN (SSH alias missing in this Codespace)
+
 ## W11 2026-09-19
 
 - `pnpm typecheck`: pass

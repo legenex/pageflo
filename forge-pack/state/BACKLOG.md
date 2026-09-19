@@ -3,7 +3,7 @@
 - [x] W00 Re-audit and reconcile operating contract
 - [x] W10 PageFlo shell and Brand-first navigation
 - [x] W11 Brand/Site identity foundation
-- [ ] W12 Lead durability foundation
+- [x] W12 Lead durability foundation
 - [ ] W20 Brand Website model and section editor
 - [ ] W21 Master asset/version semantics
 - [ ] W22 Quiz composition renderer repair

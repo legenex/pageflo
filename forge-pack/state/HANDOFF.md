@@ -1,8 +1,8 @@
 # Handoff
 
-Current phase: Wave 01 in progress.
-Current unit: W11 done. Next: W12 Lead durability.
-Last verified state: W10 `6557632`. W11 typecheck and test:release passed.
-Known failure: production SSH alias `legalos` missing. `app.pageflo.io` DNS UNPROVEN.
-Next action: W12 durable Lead persist then queue/retry/idempotency using existing Redis/BullMQ. Do not replace working synchronous capture until queue tests pass. `src/lib/lead-pipeline/run.ts` is integrator-only.
-Important files: `src/lib/lead-pipeline/run.ts`, `src/lib/lead-pipeline/dispatch-webhooks.ts`.
+Current phase: Wave 01 complete. Wave 02 is next.
+Current unit: W12 done. Next unblocked: W20 (needs W10+W11), W21 (needs W11), W22 (needs W10+W21).
+Last verified state: W11 `3ab9aed`. W12 durability and idempotency tests passed.
+Known failure: production SSH alias `legalos` missing. `app.pageflo.io` DNS UNPROVEN. Ordinary Plesk release of Wave 01 src changes is UNPROVEN.
+Next action: W21 master asset/version semantics, then W22 quiz composition repair. W20 website editor can proceed in parallel with disjoint files. Do not edit `src/migrations/` in parallel.
+Important files: `src/lib/lead-pipeline/run.ts`, `src/queues/lead-delivery.ts`, `src/lib/quiz-templates/`.

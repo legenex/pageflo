@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-09-19 W12
+
+Lead persist remains the request-critical write. Downstream is idempotent via `downstream.completed`. A crash after persist returns the stored lead and leaves delivery for `deliverStoredLead` / BullMQ `lead-delivery` jobs keyed by `lead:${id}`. Ordinary in-request delivery is unchanged. `pnpm test:durability` 12 passed. `pnpm test:idempotency` 23 passed. `pnpm typecheck` pass.
+
 ## 2026-09-19 W11
 
 Added required `debt` vertical with idempotent migration `20260919_120000_sites_vertical_debt`. New Brands seed hosted `/privacy` and `/terms`, bind `legal.privacy_url`/`terms_url` to those paths, and clone without copying production domains or leads. AI brand direction is niche-agnostic and does not auto-publish. `pnpm typecheck` pass. `pnpm test:release` 31 passed.

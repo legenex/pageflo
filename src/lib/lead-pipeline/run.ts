@@ -13,6 +13,13 @@ import { deriveFbc, type Attribution } from './attribution'
 import { newEventId } from './event-id'
 import { reportError } from '@/lib/observability/report'
 import { appOrigin } from '@/lib/pageflo/hosts'
+import { enqueueLeadDelivery } from '@/queues/lead-delivery'
+
+let leadAfterPersistHook: ((leadId: number) => Promise<void>) | null = null
+
+export const setLeadAfterPersistHook = (hook: ((leadId: number) => Promise<void>) | null): void => {
+  leadAfterPersistHook = hook
+}
 
 export type LeadCaptureInput = {
   // Resolved server-side
@@ -82,11 +89,14 @@ const t = (started: number): number => Date.now() - started
  *  - TrustedForm cert claim and HLR run server-side only.
  *  - HLR never blocks the response.
  */
-export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipelineResult> => {
+export const runLeadPipeline = async (
+  input: LeadCaptureInput,
+  opts?: { resumeLeadId?: number },
+): Promise<LeadPipelineResult> => {
   const payload = await getPayload({ config })
-  const event_id = newEventId()
+  let event_id = newEventId()
   const steps: PipelineStep[] = []
-  let leadId: number | null = null
+  let leadId: number | null = opts?.resumeLeadId ?? null
 
   // ---------- 0. Idempotency ----------
   //
@@ -101,7 +111,7 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
     typeof input.client_submission_id === 'string' && input.client_submission_id.trim()
       ? input.client_submission_id.trim()
       : null
-  if (submissionKey) {
+  if (!opts?.resumeLeadId && submissionKey) {
     const existing = await payload
       .find({
         collection: 'leads',
@@ -122,6 +132,18 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
     }
   }
 
+  if (opts?.resumeLeadId) {
+    leadId = opts.resumeLeadId
+    const existing = await payload.findByID({
+      collection: 'leads',
+      id: leadId,
+      depth: 0,
+      overrideAccess: true,
+    }).catch(() => null)
+    const priorEvent = (existing as { attribution?: { event_id?: string } } | null)?.attribution?.event_id
+    if (priorEvent) event_id = priorEvent
+  }
+
   // ---------- 1. Write Lead row ----------
   const writeStarted = Date.now()
   const attribution: Attribution = {
@@ -133,7 +155,11 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
   }
 
   let lead: { id: string | number } | null = null
-  try {
+  if (opts?.resumeLeadId) {
+    lead = { id: opts.resumeLeadId }
+    leadId = opts.resumeLeadId
+  } else {
+    try {
     lead = (await payload.create({
       collection: 'leads',
       data: {
@@ -188,11 +214,32 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
     // The one failure a visitor actually feels: the lead did not persist.
     reportError('pipeline', err, { siteId: input.siteId, route: 'lead-pipeline', operation: 'lead-pipeline:lead.create', extra: { event_id } })
     return { ok: false, lead_id: null, event_id, steps, error: 'lead write failed' }
+    }
+    if (leadId != null) {
+      await enqueueLeadDelivery(leadId)
+      if (leadAfterPersistHook) {
+        try {
+          await leadAfterPersistHook(leadId)
+        } catch {
+          steps.push({ step: 'delivery.queued', ok: true, detail: 'interrupted after persist' })
+          return { ok: true, lead_id: leadId, event_id, steps }
+        }
+      }
+    }
   }
 
   // Snapshot of update payload — patched as integrations complete.
   // Declared before the TrackingConfig read so that read's own failure can be
   // recorded on the lead like any other step.
+  const prior = await payload
+    .findByID({ collection: 'leads', id: leadId!, depth: 0, overrideAccess: true })
+    .catch(() => null)
+  const priorLog = ((prior as { delivery_log?: Array<{ step?: string }> } | null)?.delivery_log ?? [])
+  if (priorLog.some((entry) => entry.step === 'downstream.completed')) {
+    steps.push({ step: 'delivery.deduplicated', ok: true, detail: `lead ${leadId}` })
+    return { ok: true, lead_id: leadId, event_id, steps }
+  }
+
   const leadPatch: Record<string, unknown> = {}
   const deliveryLog: Array<{ at: string; step: string; ok: boolean; detail?: string }> = []
   const logDelivery = (step: string, ok: boolean, detail?: string) => {
@@ -528,6 +575,7 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
   await Promise.allSettled([tfTask, jorTask, metaTask, tiktokTask, ga4Task, truecallTask, webhookTask, slackTask])
 
   // ---------- 4. Persist delivery log + integration patches on the Lead row ----------
+  logDelivery('downstream.completed', true)
   try {
     await payload.update({
       collection: 'leads',
@@ -598,4 +646,28 @@ export const runLeadPipeline = async (input: LeadCaptureInput): Promise<LeadPipe
   }
 
   return { ok: true, lead_id: leadId, event_id, steps }
+}
+
+export const deliverStoredLead = async (leadId: number): Promise<LeadPipelineResult> => {
+  const payload = await getPayload({ config })
+  const lead = await payload.findByID({ collection: 'leads', id: leadId, depth: 1, overrideAccess: true })
+  const siteRaw = (lead as { site?: unknown }).site
+  const site = siteRaw && typeof siteRaw === 'object' ? (siteRaw as { id: number; slug: string; name: string }) : null
+  const siteId = Number(site?.id ?? siteRaw)
+  const attribution = ((lead as { attribution?: Attribution }).attribution ?? {}) as Attribution
+  const input: LeadCaptureInput = {
+    siteId,
+    siteSlug: site?.slug ?? '',
+    siteName: site?.name ?? '',
+    primaryHost: null,
+    funnel_type: ((lead as { source_entity_type?: LeadCaptureInput['funnel_type'] }).source_entity_type ?? 'quiz'),
+    funnel_id: (lead as { source_entity_id?: string }).source_entity_id ?? undefined,
+    contact: ((lead as { contact?: LeadCaptureInput['contact'] }).contact ?? {}) as LeadCaptureInput['contact'],
+    quiz_answers: (lead as { quiz_answers?: Record<string, unknown> }).quiz_answers,
+    attribution,
+    trustedform_cert_url: (lead as { trustedform_cert_url?: string }).trustedform_cert_url,
+    jornaya_lead_id: (lead as { jornaya_lead_id?: string }).jornaya_lead_id,
+    test_capture: Boolean((lead as { test_capture?: boolean }).test_capture),
+  }
+  return runLeadPipeline(input, { resumeLeadId: leadId })
 }
