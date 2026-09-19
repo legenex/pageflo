@@ -7,7 +7,10 @@ before doing any work.
 Read `docs/STATE.md` before making changes. Read `docs/PRODUCT-BRIEF.md`,
 `docs/REQUIREMENTS.md`, `docs/EXECUTION-PLAN.md`, `docs/HUMAN-GATES.md`,
 `docs/INFRASTRUCTURE.md` and `docs/ARCHITECTURE.md` when the task touches the
-areas they cover.
+areas they cover. During the internal V1 completion run, also read
+`forge-pack/state/HANDOFF.md` and `forge-pack/state/BACKLOG.md`, and treat
+`forge-pack/00-intake/DISCOVERY.md` plus `forge-pack/01-product/DECISIONS.md`
+as the product-scope source of truth.
 
 These instructions apply to every task unless the operator explicitly says
 otherwise for that task. Harness-specific entrypoint files, such as `CLAUDE.md`,
@@ -19,11 +22,30 @@ elsewhere should be removed rather than worked around.
 
 ## 1. Product and stack
 
-PageFlo is a vertical-agnostic dynamic acquisition infrastructure platform for
-lead generators, affiliates, agencies, media buyers and growth teams. It builds
-and operates brand sites, landing pages, advertorials and qualification quizzes,
-deploys one piece of brandless content under many brands, and captures,
-validates, records consent for, and routes the leads those funnels produce.
+PageFlo V1 is Legenex's internal acquisition-site and funnel operating system.
+Internal operators create Brands, websites, quizzes, landing pages and
+advertorials, deploy them under the correct Brand, domain and path, and capture,
+validate, record consent for, and route the leads those funnels produce.
+
+Customer SaaS packaging is deferred: paid plans, billing, public signup,
+enterprise SSO, client portals, and a broad integration marketplace. Existing
+auth and roles stay. Do not expand them for V1.
+
+The operator-facing model is Brand first. A Brand is the current `Site` tenant
+boundary. Public assets inherit or explicitly bind to the selected Brand.
+Master Quiz, Landing Page and Advertorial assets stay brand-neutral.
+Deployments bind a master to a Brand, domain and path. Deployments do not
+store public copy overrides. Brand identity reskins automatically. Quiz logic
+stays on the master Quiz; Quiz visual design is a separate template.
+Bulk multi-brand deploy is required in V1. Lead capture must persist the Lead
+before queued, retryable, idempotent downstream delivery. The supplied PageFlo
+redesign pack is the binding visual reference for the operator shell. Do not
+present fake metrics or demo entities as live data.
+
+Current completion contract: `forge-pack/`. Persistent execution memory lives
+in `forge-pack/state/`. Where approved discovery conflicts with older
+product-scope language in this repository, the approved discovery wins.
+Current code and tests win on implementation facts.
 
 **The user-facing rebrand from LegalOS to PageFlo is done.** Every screen, page
 title, metadata string, email sender name, marketing surface and package
@@ -127,30 +149,38 @@ Do not ask whether routine completed work should be committed and pushed. Do not
 ask permission for ordinary implementation decisions, test choices, refactors
 inside the task's scope, or documentation updates. That is the default flow.
 
-**Where PageFlo differs from a repository with CI: the release is not
-automatic.** There is no pipeline that deploys a push. Releasing means stopping
-the live service, rebuilding, migrating the production database, and restarting.
-That is a production infrastructure action on a shared Plesk host that also runs
-other Legenex production systems, and it takes the site down for the duration.
+There is no CI pipeline that deploys a push. Releasing means stopping the live
+service, rebuilding, migrating the production database, and restarting on a
+shared Plesk host. The sequence in section 6 is still the only supported path.
+Do not invent a second deployment path, and do not SSH-edit production source.
+
+Ordinary approved application releases on that path are now pre-authorized.
+The operator approved this in discovery decision 12.4: deploy and verify
+ordinary approved application changes to the existing Plesk production
+environment autonomously, but stop for destructive or genuinely high-risk
+production actions. Record those in `forge-pack/state/BLOCKERS.md` and continue
+independent work. Do not interrupt the operator for routine coding, tests,
+commits, pushes, or ordinary Plesk releases.
 
 So the line is:
 
 | Action | Authorization |
 |---|---|
 | Implement, validate, commit, push `main` | Pre-authorized. Do it. |
-| Run `scripts/release.sh` on production | Operator asks for it in that session, or is present and has said to release. |
+| Ordinary approved app release via the section 6 Plesk sequence, after gates pass | Pre-authorized. Run it, then verify. |
 | Anything in `docs/HUMAN-GATES.md` | Explicit human approval, every time. |
 
-When you finish work that touches `src/`, `package.json`, `next.config.mjs`,
+When work touches `src/`, `package.json`, `next.config.mjs`,
 `tailwind.config.*`, `payload.config.ts`, `src/migrations/`, or anything that
-ends up in `.next/`, end your reply with the release block in section 6. See the
-mandatory-block rule there. It is an explicit, repeated owner instruction.
+ends up in `.next/`, and the required gates have passed, run the section 6
+sequence yourself. Include the exact commands and verification evidence in the
+completion report. If production host access is unavailable, record that as
+`UNPROVEN` in `forge-pack/state/BLOCKERS.md`, still print the sequence, and do
+not claim the change is live.
 
-This division is temporary and is owned by phases 9 through 11 of
-`docs/EXECUTION-PLAN.md`. When PageFlo has its own VPS and a real deployment
-pipeline, routine release becomes autonomous, exactly as it is in the DashFlo
-repository today. Do not build a second manual deployment path in the meantime,
-and do not treat the current arrangement as the intended end state.
+A dedicated PageFlo VPS and a real deployment pipeline remain later work. Do
+not treat the current Plesk arrangement as the intended end state, and do not
+build a second manual deployment path in the meantime.
 
 ---
 
@@ -217,14 +247,11 @@ Record what you ran, and what it printed, in the completion report.
 
 The release is one command on the host, and it is the only supported path.
 
-### The mandatory release block
+### The only supported release sequence
 
-**Every reply in which you push a change touching `src/`, `package.json`,
-`next.config.mjs`, `tailwind.config.*`, `payload.config.ts`, `src/migrations/`,
-or anything compiled into `.next/` must end with this exact block.** The owner
-has asked for this repeatedly and explicitly. It applies every time, including
-for a one-line fix, including when the previous reply already showed it. Do not
-summarize it, do not shorten it, and do not substitute "run pnpm build".
+This is the only supported production release path. Run it after repository
+gates pass for a change that ships into `.next/`. Do not summarize it, do not
+shorten it, and do not substitute `pnpm build` or a hand-rolled restart.
 
 ```
 cd /var/www/vhosts/legenex.com/os.legenex.com
@@ -233,11 +260,12 @@ plesk ext git --deploy -domain os.legenex.com -name legalos.git
 scripts/release.sh
 ```
 
-Then tell the operator to hard-refresh: Ctrl+Shift+R on Windows, Cmd+Shift+R on
-Mac.
+Both `plesk` lines are required, in that order, then `scripts/release.sh`.
+Print the same block in the completion report as evidence of what ran, or of
+what remains to run if host access is missing.
 
-The change is not live until that block has run. Never tell the operator "it is
-live in ten seconds".
+The change is not live until that sequence has run and health checks pass.
+Never claim "it is live in ten seconds".
 
 ### Why the block is shaped that way
 
@@ -322,7 +350,10 @@ tenancy failure. Violating one is a defect, not a style disagreement.
    poller. Never inferred from a Plesk response.
 9. **Preview domains** (`{slug}.preview.legenex.com`) are auto-issued, stay
    `primary: true` until a custom domain is verified, and cannot be deleted from
-   the UI.
+   the UI. The canonical preview target is `{slug}.preview.pageflo.io`. Keep
+   serving the existing `preview.legenex.com` wildcard until a DNS cutover is
+   explicitly authorized. Application support for the new host is ordinary
+   work; the DNS change itself is a human gate.
 10. **`SharedLegalTemplate` edits surface an affected-Sites list before save.**
 11. **A page-builder block field must land in all three places at once**:
     `src/lib/builder/block-schemas.ts`, `src/collections/Pages.ts`, and
@@ -458,6 +489,8 @@ already available. Report the blocker only when it genuinely cannot be repaired.
 ## 12. Human approval gates
 
 Committing and pushing tested code is pre-authorized and needs no approval.
+Ordinary approved application releases through the section 6 Plesk sequence
+are also pre-authorized after gates pass.
 
 Stop and get explicit human approval before:
 
@@ -518,11 +551,12 @@ Read-only inspection is allowed and encouraged when a task depends on production
 truth: service state, `journalctl -u legalos-dev`, health endpoints, the Plesk
 domain list, the migration ledger, disk. Read-only means read-only.
 
-Write operations on the host are limited to running `scripts/release.sh` under
-the authorization in section 4, and to genuine infrastructure work the release
-system cannot do, which is a human gate.
+Write operations on the host are limited to running the section 6 sequence
+for ordinary approved application changes after gates pass, and to genuine
+infrastructure work the release system cannot do, which is a human gate.
 
-If manual host work is genuinely required, explain why before doing it.
+If manual host work outside that sequence is genuinely required, record it as
+a red-gate blocker rather than improvising.
 
 ---
 
@@ -659,10 +693,10 @@ A task is done only when:
 - the diff was reviewed for tenancy scoping, access control, PII, secrets,
   consent handling, live URLs, idempotency and migration coverage
 - the work is committed and `main` is pushed
-- `docs/STATE.md` records evidence and rollback for anything beyond a trivial
-  change
-- the release block was given to the operator when the change touches shipped
-  code
+- `docs/STATE.md` and `forge-pack/state/` record evidence and rollback for
+  anything beyond a trivial change
+- when the change touches shipped code, the section 6 sequence was run after
+  gates passed, or the missing host access is recorded as `UNPROVEN`
 - no unapproved production action occurred
 
 If a fact cannot be proven, label it `UNPROVEN` and either keep the task open or
@@ -683,7 +717,8 @@ Close a task with a concise completion report containing:
 - push result
 - what is genuinely still unverified, and why
 - final git status
-- the release block from section 6, when the change touches shipped code
+- the section 6 sequence, plus whether it ran and what health checks returned,
+  when the change touches shipped code
 
 Do not dump internal reasoning. Do not restate the contract.
 

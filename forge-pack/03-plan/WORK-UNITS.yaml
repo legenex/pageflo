@@ -1,0 +1,188 @@
+work_units:
+  - id: W00
+    title: Re-audit and reconcile operating contract
+    owner: orchestrator
+    dependencies:
+      []
+    write_scope:
+      - "AGENTS.md"
+      - "CLAUDE.md"
+      - "docs/STATE.md"
+      - "docs/PRODUCT-BRIEF.md"
+      - "docs/REQUIREMENTS.md"
+      - "docs/EXECUTION-PLAN.md"
+      - "docs/HUMAN-GATES.md"
+      - "forge-pack/state/*"
+    goal_predicate: "Canonical repo docs reflect approved internal V1 and new ordinary-release authority without losing verified technical invariants."
+  - id: W10
+    title: PageFlo shell and Brand-first navigation
+    owner: frontend
+    dependencies:
+      - W00
+    write_scope:
+      - "src/app/**"
+      - "src/components/** excluding owned builder subtrees"
+    goal_predicate: "Internal nav and core shell match redesign with real data/empty states and no required top-level Brand Kits workflow."
+  - id: W11
+    title: Brand/Site identity foundation
+    owner: backend
+    dependencies:
+      - W00
+    write_scope:
+      - "src/collections/Sites*"
+      - "src/lib/brand/**"
+      - "src/components/**brand**"
+      - "src/migrations/**"
+    goal_predicate: "Brand identity fields and hosted Privacy/Terms work within current tenancy and migration rules."
+  - id: W12
+    title: Lead durability foundation
+    owner: backend
+    dependencies:
+      - W00
+    write_scope:
+      - "src/lib/lead-pipeline/**"
+      - "src/workers/**"
+      - "src/queues/**"
+      - "src/migrations/**"
+      - "scripts/test-*lead*"
+    goal_predicate: "Lead persists before downstream work, queue retry/idempotency tests pass, no duplicate side effect in controlled failure tests."
+  - id: W20
+    title: Brand Website model and section editor
+    owner: frontend-backend
+    dependencies:
+      - W10
+      - W11
+    write_scope:
+      - "src/collections/**Website*"
+      - "src/lib/site-builder/**"
+      - "src/components/**website**"
+      - "src/migrations/**"
+    goal_predicate: "Brand owns editable multi-page website with practical section operations and versioned draft/publish boundary."
+  - id: W21
+    title: Master asset/version semantics
+    owner: architecture
+    dependencies:
+      - W11
+    write_scope:
+      - "src/collections/Funnel*"
+      - "src/lib/*deployment*"
+      - "src/lib/*template*"
+      - "src/migrations/**"
+    goal_predicate: "Masters remain brand-neutral, clone/archive/delete safe, live deployments change only on explicit republish, new deployment copy overrides absent."
+  - id: W22
+    title: Quiz composition renderer repair
+    owner: frontend
+    dependencies:
+      - W10
+      - W21
+    write_scope:
+      - "src/components/builder/quiz/**"
+      - "src/components/public/quiz/**"
+      - "src/lib/quiz-templates/**"
+      - "scripts/test-quiz-*"
+    goal_predicate: "20 quiz templates have real structural degrees of freedom and preview/runtime composition identity tests pass."
+  - id: W30
+    title: Website import and AI editing
+    owner: ai-integration
+    dependencies:
+      - W20
+    write_scope:
+      - "src/lib/ai/**"
+      - "src/lib/import/**"
+      - "src/components/**website**"
+      - "src/app/**import**"
+    goal_predicate: "Controlled WordPress and Base44/public-site imports become editable local PageFlo drafts and AI editing supports preview or direct-to-draft."
+  - id: W31
+    title: Landing Page and Advertorial fidelity
+    owner: frontend
+    dependencies:
+      - W21
+      - W10
+    write_scope:
+      - "src/components/**landing**"
+      - "src/components/**advertorial**"
+      - "src/lib/*template*"
+      - "scripts/*template*"
+    goal_predicate: "LP and Advertorial templates render materially distinct designs and remain reusable masters."
+  - id: W32
+    title: Master Quiz builder/runtime completion
+    owner: frontend-backend
+    dependencies:
+      - W21
+      - W22
+    write_scope:
+      - "src/collections/FunnelQuizzes*"
+      - "src/components/builder/quiz/**"
+      - "src/components/public/quiz/**"
+      - "src/lib/quiz-*"
+    goal_predicate: "Master quiz logic, branching, outcomes, consent, contact, result logic and design selection work end to end without deployment logic overrides."
+  - id: W40
+    title: Deployment and Brand auto-reskin
+    owner: integrator
+    dependencies:
+      - W11
+      - W21
+      - W31
+      - W32
+    write_scope:
+      - "src/collections/Funnel*Deployments*"
+      - "src/lib/*deployment*"
+      - "src/app/**deploy*"
+      - "src/components/**deploy*"
+      - "src/migrations/**"
+    goal_predicate: "One master deploys correctly under Check A Case and Don't Settle with correct Brand identity and no deployment copy divergence."
+  - id: W41
+    title: Bulk deploy and preview routing
+    owner: integrator
+    dependencies:
+      - W40
+    write_scope:
+      - "src/lib/*deployment*"
+      - "src/app/**deploy*"
+      - "src/components/**deploy*"
+      - "scripts/check-deployment-paths*"
+    goal_predicate: "Bulk multi-brand deploy supports review, isolated failures and preview URL per deployment."
+  - id: W42
+    title: Domains and PageFlo preview host application support
+    owner: infrastructure
+    dependencies:
+      - W41
+    write_scope:
+      - "src/collections/Domains*"
+      - "src/lib/**domain**"
+      - "src/app/**domain**"
+      - "scripts/test-cert*"
+      - "docs/INFRASTRUCTURE.md"
+    goal_predicate: "App supports *.preview.pageflo.io and custom domain/path routing safely; any external DNS red gate is explicitly recorded rather than faked."
+  - id: W43
+    title: Leads UI and delivery observability
+    owner: frontend-backend
+    dependencies:
+      - W12
+      - W10
+    write_scope:
+      - "src/app/**lead*"
+      - "src/components/**lead*"
+      - "src/lib/lead-pipeline/**"
+    goal_predicate: "Internal Leads UI exposes search, detail, consent, validation and delivery history from real records."
+  - id: W50
+    title: End-to-end integration and migration compatibility
+    owner: integrator
+    dependencies:
+      - W30
+      - W40
+      - W42
+      - W43
+    write_scope:
+      - "cross-cutting only after lane handoffs"
+    goal_predicate: "Primary acceptance and multi-brand acceptance journeys pass with production-compatible data migration behavior."
+  - id: W60
+    title: Full QA, release and final verification
+    owner: orchestrator
+    dependencies:
+      - W50
+    write_scope:
+      - "docs/STATE.md"
+      - "forge-pack/state/*"
+      - "test fixes only"
+    goal_predicate: "Full required gates pass, ordinary production release is healthy, no unresolved P0/P1 blocker except documented red-gate external action."

@@ -1,16 +1,22 @@
 # PageFlo execution plan
 
-Version 1, 1 September 2026.
+Version 2, 19 September 2026.
 
-Transforming LegalOS into PageFlo, in phases. The plan is dependency-led. Phase
-numbers express order, not calendar. A phase is complete when its acceptance
-criteria are met and `docs/STATE.md` records the evidence.
+**Current execution contract:** `forge-pack/03-plan/BUILD-PLAN.md` and
+`forge-pack/03-plan/WORK-UNITS.yaml`. Waves W00 through W60 are the work.
+Persistent memory is `forge-pack/state/`.
 
-**Standing constraint: the current LegalOS production system must keep working
-throughout.** Every phase before 11 is additive or internally-scoped. Nothing
-before phase 10 changes where PageFlo runs, and nothing before phase 11 changes
-what production serves in a way a visitor would notice without deliberate
-approval.
+The numbered phases below are historical planning from 1 September 2026. They
+remain useful evidence of intended sequencing, but they do not override the
+approved internal V1 discovery. Customer SaaS packaging, dedicated VPS
+migration, and Campaign Integrity product work stay deferred.
+
+**Standing constraint: the current production system must keep working
+throughout.** Keep Plesk. Preserve compatibility identifiers. Ordinary
+approved application releases use the one supported Plesk sequence in
+`AGENTS.md` section 6 and are pre-authorized after gates pass. DNS cutover,
+credential rotation, destructive data work, and infrastructure migration
+remain human gates.
 
 ---
 

@@ -1,10 +1,20 @@
 # PageFlo requirements
 
-Version 1, 1 September 2026.
+Version 2, 19 September 2026.
 
 This document is built from functionality **actually present in the repository**,
 plus clearly identified future PageFlo requirements. Every LIVE claim was
 checked against code and, where a harness exists, against a suite that ran.
+
+**V1 completion requirements** are `forge-pack/01-product/REQUIREMENTS.md`
+(PF-001 through PF-093). Those IDs are the execution contract. This file
+remains the measured implementation inventory. Where the two disagree on what
+must be built, the forge-pack IDs win. Where they disagree on what already
+exists, this file plus current code win.
+
+Customer SaaS packaging (billing, public signup, enterprise SSO, client
+portals, a broad marketplace) is deferred and must not be treated as V1
+work.
 
 ## Status vocabulary
 

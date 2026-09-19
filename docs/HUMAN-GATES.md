@@ -24,6 +24,10 @@ real gate gets waved through.
   drop their own scratch databases
 - creating a commit
 - pushing `main`
+- running the existing Plesk fetch, deploy, and `scripts/release.sh` sequence
+  for ordinary approved application changes after repository gates pass
+- verifying the released application and repairing regressions caused by that
+  release
 - reading production state: service status, logs, health endpoints, the Plesk
   domain list, the migration ledger, disk, container status
 - adding a dependency that is not a paid service
@@ -237,9 +241,15 @@ send.** Answer it first.
 
 ## How a gate interacts with autonomy
 
-`AGENTS.md` section 4 makes implement, validate, commit and push autonomous.
-That does not soften a gate. Approval for one action does not extend to the
-next one, to a later tranche, or to a similar action on a different domain.
+`AGENTS.md` section 4 makes implement, validate, commit, push, and ordinary
+approved Plesk application releases autonomous. That does not soften a gate.
+Approval for one action does not extend to the next one, to a later tranche,
+or to a similar action on a different domain.
+
+Ordinary Plesk release is not Gate 4. Gate 4 still covers dedicated VPS
+provisioning, host replacement, systemd/nginx/container changes outside a
+release, and anything touching the DashFlo VPS. Gate 3 still covers every DNS
+change, including a `preview.pageflo.io` cutover that is not already live.
 
 A harness permission that allows an action does not authorize an action a gate
 covers. An agent that *can* run a destructive command is exactly the agent that
@@ -256,7 +266,7 @@ No gate is currently open.
 
 | Date | Gate | Request | Decision |
 |---|---|---|---|
-| | | | |
+| 2026-09-19 | n/a (authority update, not a gate) | Ordinary approved application releases through the existing Plesk sequence during the internal V1 completion run | Approved in discovery decision 12.4. Recorded in `AGENTS.md` section 4 and `forge-pack/00-intake/OPERATOR-AUTHORITY.md`. Destructive production data work, credential rotation, irreversible migrations, DNS cutover, infrastructure migration, money movement, and live buyer activation remain red gates. |
 
 Phase 10 of `docs/EXECUTION-PLAN.md` will open gates 4, 7 and 2, in that order:
 provisioning the dedicated VPS, its spend, and the production data restore into

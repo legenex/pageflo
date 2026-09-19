@@ -1,14 +1,59 @@
 # PageFlo product brief
 
-Version 1, 1 September 2026. This is the initial brief. It states what PageFlo
-is for and what it is made of. `docs/REQUIREMENTS.md` turns it into delivery
-constraints and marks what is actually built. Where the two appear to conflict,
-`docs/REQUIREMENTS.md` governs what is true today and this file governs what the
-product is aiming at.
+Version 2, 19 September 2026. Internal V1 completion contract.
 
-**Nothing in this brief asserts that a capability is live.** Read
-`docs/REQUIREMENTS.md` for that. A concept described here may be fully built,
-half built, or not started.
+The approved product-scope source of truth for this completion run is
+`forge-pack/00-intake/DISCOVERY.md` and `forge-pack/01-product/DECISIONS.md`.
+This brief is aligned to that contract. Historical customer-SaaS positioning
+below is deferred, not current V1 scope.
+
+`docs/REQUIREMENTS.md` records what is actually built today. Where a LIVE
+status conflicts with this brief, the requirement file is the implementation
+fact and the brief is the target.
+
+**Nothing in this brief asserts that a capability is live.**
+
+---
+
+## Internal V1 (current)
+
+PageFlo V1 is Legenex's internal acquisition-site and funnel operating system.
+It is not a customer SaaS launch.
+
+Operators:
+
+1. Create or select a Brand (the current `Site` tenant boundary).
+2. Complete Brand identity and PageFlo-hosted Privacy and Terms pages.
+3. Create, AI-generate, clone, or import the Brand website.
+4. Edit that website inside PageFlo with AI and practical section controls.
+5. Create or select reusable brand-neutral master Quiz, Landing Page, or
+   Advertorial assets.
+6. Keep master Quiz logic separate from Quiz visual templates.
+7. Bind a master to a Brand, domain, and path through a Deployment.
+8. Let Brand identity reskin the deployment automatically.
+9. Preview, then publish.
+10. Capture a Lead durably with consent and attribution, then deliver with
+    queue/retry/idempotency.
+11. Inspect Leads inside PageFlo.
+
+Locked rules for this phase:
+
+- Brand first. Brand Kits are not a required top-level operator workflow.
+- No deployment-specific public copy overrides. Different copy needs a new or
+  cloned master.
+- Bulk multi-brand deploy is in V1.
+- Canonical preview host target is `*.preview.pageflo.io`. Keep serving
+  `*.preview.legenex.com` until a DNS cutover is authorized.
+- WordPress and Base44 are import sources, not runtime dependencies after
+  cutover.
+- Payload CMS is an administrator escape hatch, not the normal workflow.
+- Analytics and Campaign Integrity stay deferred, with honest empty/soon
+  states and no fake metrics.
+- Keep the current Plesk production environment. Do not migrate infrastructure
+  in this phase.
+- The supplied PageFlo redesign pack in the repository is the binding visual
+  reference for shell, navigation, spacing, and dark visual system.
+- Lead capture must persist durably before queued downstream delivery.
 
 ---
 

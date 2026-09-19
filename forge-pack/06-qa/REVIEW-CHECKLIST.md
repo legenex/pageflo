@@ -1,0 +1,25 @@
+# Final review checklist
+
+- [ ] Internal V1 scope, not accidental SaaS expansion
+- [ ] Brand first workflow is obvious in UI
+- [ ] Brand identity is not duplicated across unrelated screens
+- [ ] Existing production data migrated/preserved
+- [ ] Compatibility identifiers preserved
+- [ ] No cross-tenant access path
+- [ ] No source CMS runtime dependency after migrated site publish
+- [ ] AI cannot silently alter live content
+- [ ] Master asset versioning prevents silent live fan-out
+- [ ] No new deployment public-copy override path
+- [ ] Quiz templates materially differ structurally
+- [ ] LP/Advertorial templates materially differ structurally
+- [ ] Preview uses real/equivalent render path
+- [ ] Bulk deploy has review and isolated errors
+- [ ] Preview host application routing correct
+- [ ] Lead durable before downstream side effects
+- [ ] Queue retry is idempotent
+- [ ] Leads UI uses real data
+- [ ] Prototype fake data absent from production
+- [ ] Primary E2E passes
+- [ ] Full gate output recorded
+- [ ] Production release evidence recorded
+- [ ] No unresolved P0/P1 issues

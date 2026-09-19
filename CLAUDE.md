@@ -25,9 +25,10 @@ Then follow the workflow in `AGENTS.md` for the task itself.
 **Pushing does not deploy.** There is no CI. A change touching `src/`,
 `package.json`, `next.config.mjs`, `tailwind.config.*`, `payload.config.ts`,
 `src/migrations/`, or anything compiled into `.next/` is not live until the
-operator runs the release block. Ending such a reply with that exact block is
-mandatory. It is in `AGENTS.md` section 6, and the owner has asked for it
-repeatedly and explicitly.
+section 6 Plesk sequence in `AGENTS.md` has run. Ordinary approved application
+releases on that path are pre-authorized. Run the sequence after gates pass.
+Do not invent a second deploy path. If host access is missing, record it as
+`UNPROVEN` and do not claim the change is live.
 
 ## Project-local tooling
 
@@ -71,10 +72,11 @@ ssh legalos 'journalctl -u legalos-dev -n 50 --no-pager'
 `ssh root@51.81.202.161` without `-i` fails; older documentation used that form.
 Use the alias.
 
-Read-only means read-only. Everything in `AGENTS.md` sections 12, 14 and 15
-applies unchanged: no editing the live checkout, no manual restarts outside a
-release, no production database writes, and no running `scripts/release.sh`
-unless the operator asked for it in this session.
+Read-only means read-only except for the one supported release sequence in
+`AGENTS.md` section 6. Everything in `AGENTS.md` sections 12, 14 and 15
+applies: no editing the live checkout, no manual restarts outside a release,
+no production database writes, and no running `scripts/release.sh` except as
+an ordinary approved application release after gates pass.
 
 ## Subagents and parallel sessions
 

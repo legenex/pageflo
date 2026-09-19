@@ -2,9 +2,10 @@
 
 Update this file after every completed or blocked task. It is the persistent
 handoff between sessions and agents. It holds current factual state only.
-Anything not measured is labelled as such.
+Anything not measured is labelled as such. During the internal V1 completion
+run, also update `forge-pack/state/`.
 
-Last updated: 2 September 2026, responsive QA close-out and codespace continuation.
+Last updated: 19 September 2026, Wave 00 contract reconciliation.
 
 ---
 
@@ -13,15 +14,19 @@ Last updated: 2 September 2026, responsive QA close-out and codespace continuati
 | | |
 |---|---|
 | Product name | PageFlo |
+| Product for this phase | Internal Legenex acquisition-site and funnel OS. Customer SaaS packaging is deferred. |
 | Rebrand status | **User-facing rebrand complete.** Every screen, title, metadata string, email sender name, marketing surface and package identifier says PageFlo. A documented set of infrastructure and wire identifiers is deliberately unchanged; see "Compatibility identifiers" below. |
 | Repository | `legenex/pageflo` on GitHub |
 | Working and release branch | `main` |
-| Canonical agent contract | `AGENTS.md`. `CLAUDE.md` is a short Claude Code entrypoint that defers to it. |
-| Release mode | **Semi-autonomous.** Implement, validate, commit and push are pre-authorized. Running `scripts/release.sh` on production is not. See `AGENTS.md` section 4. |
+| Canonical agent contract | `AGENTS.md`. `CLAUDE.md` is a short host entrypoint that defers to it. |
+| Product-scope source of truth | `forge-pack/00-intake/DISCOVERY.md` and `forge-pack/01-product/DECISIONS.md` |
+| Completion plan | `forge-pack/03-plan/WORK-UNITS.yaml`, waves W00-W60 |
+| Execution memory | `forge-pack/state/` |
+| Release mode | **Autonomous ordinary Plesk releases.** Implement, validate, commit, push, and the section 6 Plesk sequence after gates pass are pre-authorized (discovery 12.4). Human gates in `docs/HUMAN-GATES.md` still apply. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current phase | Phases 1 and 2 of `docs/EXECUTION-PLAN.md` complete in the repository. |
-| Active human gates | Legal publication facts, see "Active blockers". |
-| Active blockers | See "Active blockers" below. |
+| Current wave | W00 complete. Next: Wave 01 (W10, W11, W12). |
+| Active human gates | DNS cutover for `*.preview.pageflo.io` if not already live. Other red gates unchanged. |
+| Active blockers | Production SSH alias `legalos` is not configured in this Codespace. `app.pageflo.io` did not resolve from this environment on 19 September 2026. See Wave 00 re-audit. |
 
 ## Compatibility identifiers
 
@@ -46,6 +51,99 @@ record name.
 
 The `LEGALOS_*` environment variables are also still accepted, but only through
 `src/lib/pageflo/env.ts`, which reads the `PAGEFLO_*` name first.
+
+---
+
+## Wave 00 re-audit, measured 19 September 2026
+
+HEAD `6736d09` on `main`, working tree was clean before pack extraction.
+Repository code wins over stale audit statements. Approved discovery wins over
+older product-scope docs.
+
+### Collections (25 + 1 global)
+
+No first-class Brand Website collection. Brand websites today are site-scoped
+`Pages`. Brand-neutral masters are `FunnelQuizzes`, `FunnelLandingPages`,
+`FunnelAdvertorials`. Bindings are `FunnelQuizDeployments`,
+`FunnelLpDeployments`, `FunnelAdvertorialDeployments`. Visual skins are
+`FunnelQuizTemplates`. Tenant root is `sites`. Brand identity lives on
+`Sites.brand`, `Sites.legal`, `Sites.typography`, and `Sites.brand_identity`
+json. `/admin/brands/brand-identities` is still a top-level Brand Kits child
+under Sites.
+
+Funnel master collections have no required `site` and use `isAuthenticated`
+access, not `siteScoped*` helpers. Deployments have nullable `site`.
+
+### Verticals
+
+`src/lib/verticals.ts` already has `mva`, `workers-comp`, `insurance`,
+`financial-services`, `home-services`, and `other`. There is no `debt` value.
+Discovery 2.2 requires it. That is W11 work, not a Wave 00 schema change.
+
+### Copy overrides (conflicts with decision 4.5)
+
+`funnel_lp_deployments.content_overrides` exists, is written by landing-page
+admin actions, and is applied at publish/render time in
+`src/lib/lp-deployment.ts` and `src/lib/publish-lifecycle.ts`. New UI must not
+expose this as a normal authoring path. W21 migrates or ignores it.
+
+### Lead pipeline
+
+`src/lib/lead-pipeline/run.ts` persists the Lead row before third-party calls,
+then fans out TrustedForm, CAPI, webhooks, and Slack in-request. `bullmq` and
+`ioredis` are dependencies. The only `ioredis` use is a health ping in
+`src/lib/system-health/checks.ts`. No worker, no queue. W12.
+
+### Import and AI
+
+HTML import (`html-to-blocks`, `html-import-action`) and URL AI clone
+(`ai-clone-action`) exist. There is no dedicated WordPress or Base44 importer.
+Public Check My Claim surfaces still load Base44/Supabase image URLs at
+runtime. `invokeLLM` in `src/lib/ai/invoke.ts` is the only Anthropic SDK
+import. No provider abstraction beyond that wrapper.
+
+### Navigation vs required V1 nav
+
+Current sidebar: Overview, Leads, Sites (All Sites, Domains, Brand Kits),
+Quizzes, Landing Pages (All Landing Pages, Advertorials), Analytics Soon,
+Campaign Integrity Soon, Tools, Settings. Missing as first-class items:
+Brands (label), Websites, Deployments. Brand Kits is still required
+navigation. W10.
+
+### Quiz templates
+
+`docs/quiz-renderer-architecture.md` diagnosis still matches the code path:
+one `PreviewQuestionCard` composition plus token bags. W22.
+
+### Preview and production from this Codespace
+
+- Canonical preview target is `*.preview.pageflo.io`. Live wildcard is still
+  `*.preview.legenex.com`. Application default fallback in several UI files is
+  `preview.legenex.com`. W42.
+- `https://os.legenex.com/api/legalos/health` returned 200
+  `{"ok":true,"app":"legalos"}` on 19 September 2026.
+- `app.pageflo.io` did not resolve from this Codespace (`curl: Could not
+  resolve host`). `pageflo.io` resolved to `192.64.119.75`, not the Plesk
+  host. Labelled `UNPROVEN` from this environment.
+- SSH host alias `legalos` is not configured here (`Could not resolve
+  hostname legalos`). Host-level service inspection is `UNPROVEN`. Public
+  legacy health is proven.
+
+### Validation facts still true
+
+No committed ESLint config. `pnpm lint` is not a gate. `next.config.mjs`
+still ignores TypeScript and ESLint during builds. `bullmq` is installed and
+unwired. Compatibility identifiers must remain.
+
+### Docs reconciled in W00
+
+`AGENTS.md`, `CLAUDE.md`, `docs/STATE.md`, `docs/PRODUCT-BRIEF.md`,
+`docs/REQUIREMENTS.md`, `docs/EXECUTION-PLAN.md`, `docs/HUMAN-GATES.md`, and
+`forge-pack/state/*` now state internal V1, Brand-first, no new deployment
+copy overrides, bulk deploy in V1, Lead queue durability, redesign as visual
+source, and autonomous ordinary Plesk release authority. Technical,
+security, tenancy, migration, secret, and compatibility invariants are
+preserved.
 
 ---
 
