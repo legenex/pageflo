@@ -62,7 +62,11 @@ export async function deleteAdvertorial(args: { id: string }) {
   const payload = await getPayload({ config })
   try {
     const deps = await payload.find({ collection: 'funnel-advertorial-deployments', where: { advertorial: { equals: args.id } }, limit: 500, overrideAccess: true })
-    for (const d of deps.docs) await payload.delete({ collection: 'funnel-advertorial-deployments', id: d.id, user, overrideAccess: false })
+    if (deps.docs.length > 0) {
+      const { masterHasDeploymentsMessage } = await import('@/lib/master-safety')
+      const labels = deps.docs.slice(0, 8).map((d) => String((d as { name?: string }).name || d.id))
+      return { ok: false, error: masterHasDeploymentsMessage('advertorial', deps.docs.length, labels) }
+    }
     await payload.delete({ collection: 'funnel-advertorials', id: args.id, user, overrideAccess: false })
     revalidatePath(PATH)
     return { ok: true }

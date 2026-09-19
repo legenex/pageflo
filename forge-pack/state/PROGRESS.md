@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-09-19 W21
+
+Master delete of quizzes and advertorials now refuses while deployments exist. New landing-page deployment copy writes are refused; operators must edit or clone the master. Legacy `content_overrides` rows still render so live pages do not silently change. `pnpm test:master-semantics` 5 passed. `pnpm typecheck` pass.
+
 ## 2026-09-19 W12
 
 Lead persist remains the request-critical write. Downstream is idempotent via `downstream.completed`. A crash after persist returns the stored lead and leaves delivery for `deliverStoredLead` / BullMQ `lead-delivery` jobs keyed by `lead:${id}`. Ordinary in-request delivery is unchanged. `pnpm test:durability` 12 passed. `pnpm test:idempotency` 23 passed. `pnpm typecheck` pass.

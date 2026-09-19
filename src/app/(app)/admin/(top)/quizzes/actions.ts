@@ -134,7 +134,11 @@ export async function deleteQuiz(args: { id: string }) {
   const payload = await getPayload({ config })
   try {
     const deps = await payload.find({ collection: 'funnel-quiz-deployments', where: { quiz: { equals: args.id } }, limit: 500, overrideAccess: true })
-    for (const d of deps.docs) await payload.delete({ collection: 'funnel-quiz-deployments', id: d.id, user, overrideAccess: false })
+    if (deps.docs.length > 0) {
+      const { masterHasDeploymentsMessage } = await import('@/lib/master-safety')
+      const labels = deps.docs.slice(0, 8).map((d) => String((d as { name?: string }).name || d.id))
+      return { ok: false, error: masterHasDeploymentsMessage('quiz', deps.docs.length, labels) }
+    }
     await payload.delete({ collection: 'funnel-quizzes', id: args.id, user, overrideAccess: false })
     revalidatePath(PATH)
     return { ok: true }
