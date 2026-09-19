@@ -213,7 +213,7 @@ export default async function OverviewPage() {
       <MetricGrid>
         <MetricCard
           accent
-          label="Active sites"
+          label="Active brands"
           value={sitesActive.totalDocs}
           sub={`${sitesAll.totalDocs} total, ${sitesPaused.totalDocs} paused, ${sitesDraft.totalDocs} draft`}
           icon={<Globe className="h-3.5 w-3.5" />}
@@ -261,7 +261,7 @@ export default async function OverviewPage() {
             sub="source asset, brand, domain and path"
             actions={
               <Link
-                href="/admin/quizzes"
+                href="/admin/deployments"
                 className="inline-flex h-6 items-center rounded-app-sm border border-border px-2 text-[11px] text-ink-muted transition-colors hover:bg-surface-3 hover:text-ink"
               >
                 All deployments

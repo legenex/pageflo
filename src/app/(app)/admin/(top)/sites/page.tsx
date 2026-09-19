@@ -21,7 +21,7 @@ import { SitesFilters } from './SitesFilters'
 import { NewSiteButton } from './CreateSiteWizard'
 
 export const dynamic = 'force-dynamic'
-export const metadata = { title: 'Sites' }
+export const metadata = { title: 'Brands' }
 
 type SearchParams = Promise<{ status?: string; vertical?: string; q?: string }>
 
@@ -105,8 +105,8 @@ export default async function SitesPage({ searchParams }: { searchParams: Search
   return (
     <Page>
       <PageHeader
-        title="Sites"
-        subtitle="Every brand you operate. A Site is the tenant root: pages, quizzes, domains, numbers and leads all belong to one."
+        title="Brands"
+        subtitle="Every Brand you operate. A Brand is the tenant root: website, quizzes, domains, numbers and leads all belong to one. Identity is edited on the Brand, not as a separate Brand Kit."
         actions={<NewSiteButton sources={sites.docs.map((s) => ({ id: Number(s.id), name: s.name, slug: s.slug }))} />}
       />
 
@@ -129,11 +129,11 @@ export default async function SitesPage({ searchParams }: { searchParams: Search
         {sites.docs.length === 0 ? (
           <EmptyState
             icon={<Globe className="h-[18px] w-[18px]" aria-hidden="true" />}
-            title={filtered ? 'No Sites match these filters' : 'No Sites yet'}
+            title={filtered ? 'No Brands match these filters' : 'No Brands yet'}
             message={
               filtered
                 ? 'Clear the search, status or vertical filter to see the full list.'
-                : 'A Site is the root of everything: its pages, quizzes, landing pages, domains, phone numbers and leads. Create the first one to begin.'
+                : 'A Brand is the root of everything: its website, quizzes, landing pages, domains, phone numbers and leads. Create the first one to begin.'
             }
             action={
               filtered ? (

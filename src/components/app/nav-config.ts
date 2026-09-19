@@ -12,6 +12,7 @@ import {
   Plug,
   Rocket,
   ScrollText,
+  Send,
   Settings,
   ShieldCheck,
   Users,
@@ -54,22 +55,14 @@ export type NavGroup = {
  */
 export const NAV: NavGroup[] = [
   { key: 'overview', label: 'Overview', href: '/admin/overview', icon: LayoutGrid },
-  // Leads has no children here on purpose. Its status views carry live counts,
-  // which a sidebar cannot show without a query on every page load, so they live
-  // in the page's own sub-navigation rail instead. Two lists of the same six
-  // links, one of them without the counts, would be worse than one.
-  { key: 'leads', label: 'Leads', href: '/admin/leads', icon: Inbox },
   {
-    key: 'sites',
-    label: 'Sites',
+    key: 'brands',
+    label: 'Brands',
     href: '/admin/sites',
-    icon: Globe,
-    children: [
-      { href: '/admin/sites', label: 'All Sites', icon: Globe, exact: true },
-      { href: '/admin/brands/domains', label: 'Domains', icon: Globe },
-      { href: '/admin/brands/brand-identities', label: 'Brand Kits', icon: Building2 },
-    ],
+    icon: Building2,
+    alsoActiveOn: ['/admin/sites'],
   },
+  { key: 'websites', label: 'Websites', href: '/admin/websites', icon: Globe },
   {
     key: 'quizzes',
     label: 'Quizzes',
@@ -77,25 +70,21 @@ export const NAV: NavGroup[] = [
     icon: HelpCircle,
     alsoActiveOn: ['/admin/quizzes'],
   },
-  {
-    key: 'pages',
-    label: 'Landing Pages',
-    href: '/admin/landing-pages',
-    icon: Rocket,
-    children: [
-      { href: '/admin/landing-pages', label: 'All Landing Pages', icon: Rocket, exact: true },
-      { href: '/admin/advertorials', label: 'Advertorials', icon: Megaphone },
-    ],
-  },
+  { key: 'pages', label: 'Landing Pages', href: '/admin/landing-pages', icon: Rocket },
+  { key: 'advertorials', label: 'Advertorials', href: '/admin/advertorials', icon: Megaphone },
+  { key: 'deployments', label: 'Deployments', href: '/admin/deployments', icon: Send },
+  { key: 'domains', label: 'Domains', href: '/admin/brands/domains', icon: Globe },
+  { key: 'leads', label: 'Leads', href: '/admin/leads', icon: Inbox },
   { key: 'analytics', label: 'Analytics', href: '/admin/analytics', icon: BarChart3, badge: 'Soon' },
   { key: 'integrity', label: 'Campaign Integrity', href: '/admin/integrity', icon: ShieldCheck, badge: 'Soon' },
   {
     key: 'tools',
-    label: 'Tools',
+    label: 'Integrations',
     href: '/admin/system',
     icon: Wrench,
     children: [
       { href: '/admin/system', label: 'System', icon: Activity, exact: true },
+      { href: '/admin/settings/integrations', label: 'Integrations', icon: Plug },
       { href: '/admin/plan', label: 'Agent Plan', icon: Bot },
       { href: '/admin/buildlog', label: 'Build Log', icon: ScrollText },
       { href: '/admin/handbook', label: 'Handbook', icon: BookOpen },

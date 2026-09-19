@@ -1,5 +1,13 @@
 # Evidence
 
+## W10 2026-09-19
+
+- `pnpm check:handbook`: 22 routes documented, 33 screens, 19 sidebar destinations, 0 missing, 0 mismatched
+- `pnpm typecheck`: pass
+- Nav no longer includes Brand Kits. Identity remains on Brand settings (`/admin/sites/<slug>/settings/general`).
+- `/admin/websites` and `/admin/deployments` query live collections with `overrideAccess: false`.
+
+
 ## W00 2026-09-19
 
 Git: branch `main`, HEAD `6736d0991e4b79340a44823e101fd1d1ee8dc675`, up to date with `origin/main`, clean tree before pack extract.

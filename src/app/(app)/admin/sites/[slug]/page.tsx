@@ -176,7 +176,7 @@ export default async function SiteOverviewPage({ params }: Props) {
           href={`/admin/sites/${slug}/settings/general`}
           className="text-[13px] text-white font-medium px-4 py-2 rounded-lg border border-[var(--color-border-strong)] hover:bg-[var(--color-surface-2)] inline-flex items-center gap-1.5"
         >
-          <Pencil className="w-3.5 h-3.5" /> Edit Site
+          <Pencil className="w-3.5 h-3.5" /> Edit Brand
         </Link>
         <Link
           href={livePreviewUrl}
@@ -203,7 +203,7 @@ export default async function SiteOverviewPage({ params }: Props) {
         <Card>
           <CardHeader
             right={
-              <Link href="/admin/landing-pages" className="text-[12px] text-info hover:underline">
+              <Link href="/admin/deployments" className="text-[12px] text-info hover:underline">
                 Manage deployments
               </Link>
             }

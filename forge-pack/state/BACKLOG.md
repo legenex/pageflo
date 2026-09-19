@@ -1,7 +1,7 @@
 # Backlog
 
 - [x] W00 Re-audit and reconcile operating contract
-- [ ] W10 PageFlo shell and Brand-first navigation
+- [x] W10 PageFlo shell and Brand-first navigation
 - [ ] W11 Brand/Site identity foundation
 - [ ] W12 Lead durability foundation
 - [ ] W20 Brand Website model and section editor
