@@ -22,7 +22,7 @@ export function NewSiteButton({ sources }: { sources: SourceSite[] }) {
         onClick={() => setOpen(true)}
         className="brand-gradient text-white font-medium text-[14px] px-4 py-2.5 rounded-lg inline-flex items-center gap-1.5 hover:opacity-90"
       >
-        <Plus className="w-4 h-4" /> New Site
+        <Plus className="w-4 h-4" /> New Brand
       </button>
       {open ? <CreateSiteWizard sources={sources} onClose={() => setOpen(false)} /> : null}
     </>
@@ -94,7 +94,7 @@ function CreateSiteWizard({ sources, onClose }: { sources: SourceSite[]; onClose
     >
       <div className="w-full max-w-[720px] rounded-2xl border border-[var(--color-border-strong)] bg-[var(--color-surface-1)] shadow-2xl shadow-black/50 max-h-[90vh] flex flex-col">
         <header className="px-6 py-4 border-b border-[var(--color-border)] flex items-center justify-between">
-          <h2 className="text-[16px] font-semibold text-white">New Site</h2>
+          <h2 className="text-[16px] font-semibold text-white">New Brand</h2>
           <button
             type="button"
             onClick={onClose}
@@ -110,7 +110,7 @@ function CreateSiteWizard({ sources, onClose }: { sources: SourceSite[]; onClose
         <form onSubmit={submit} className="flex-1 overflow-y-auto">
           <div className="px-6 py-5 space-y-4">
             <Grid2>
-              <Field label="Site name">
+              <Field label="Brand name">
                 <input
                   autoFocus
                   type="text"

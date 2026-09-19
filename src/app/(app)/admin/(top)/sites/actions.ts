@@ -11,6 +11,7 @@ import { homeBlocksForVertical, starterQuizSteps, starterLandingPage } from '@/l
 import { seedStarterFunnelsForBrand } from '@/lib/funnel-samples'
 import { VERTICALS } from '@/lib/verticals'
 import { env } from '@/lib/pageflo/env'
+import { HOSTED_PRIVACY_PATH, HOSTED_TERMS_PATH, hostedLegalUrls } from '@/lib/brand/hosted-legal'
 
 /**
  * The accepted vertical values, derived from the one list in
@@ -42,8 +43,9 @@ const CreateInput = z.discriminatedUnion('mode', [Blank, Duplicate, AITemplate])
 const DEFAULT_PAGES = [
   { slug: '/', template_key: 'home', title: 'Home', uses_shared_template: false },
   { slug: '/partners', template_key: 'partners', title: 'Our Partners', uses_shared_template: true },
-  { slug: '/privacy', template_key: 'privacy', title: 'Privacy Notice', uses_shared_template: true },
+  { slug: HOSTED_PRIVACY_PATH, template_key: 'privacy', title: 'Privacy Notice', uses_shared_template: true },
   { slug: '/privacy-policy', template_key: 'privacy-policy', title: 'Privacy Policy', uses_shared_template: true },
+  { slug: HOSTED_TERMS_PATH, template_key: 'terms', title: 'Terms of Service', uses_shared_template: true },
   { slug: '/terms-of-service', template_key: 'terms', title: 'Terms of Service', uses_shared_template: true },
   { slug: '/submitted', template_key: 'submitted', title: 'Thank you', uses_shared_template: true },
   { slug: '/thanks', template_key: 'thanks-dq', title: 'Thank you', uses_shared_template: true },
@@ -115,6 +117,7 @@ export async function createSite(rawInput: unknown): Promise<SuccessResult | Fai
     org_name: input.name,
     support_email: `support@${input.slug}.legenex.com`,
     brand: DEFAULT_BRAND,
+    legal: hostedLegalUrls(),
     default_tone: 'empathetic' as const,
   }
 
@@ -141,6 +144,10 @@ export async function createSite(rawInput: unknown): Promise<SuccessResult | Fai
       tagline: source.tagline ?? '',
       default_disclaimer_md: source.default_disclaimer_md ?? '',
       default_tone: source.default_tone ?? 'empathetic',
+      legal: {
+        ...((source.legal as Record<string, unknown> | null | undefined) ?? {}),
+        ...hostedLegalUrls(),
+      },
     }
     const sourcePages = await payload.find({
       collection: 'pages',
@@ -169,7 +176,7 @@ export async function createSite(rawInput: unknown): Promise<SuccessResult | Fai
         default_disclaimer: z.string(),
       })
       const ai = await invokeLLM({
-        system: `You design legal-vertical brand systems for an attorney lead-gen platform. Output one set of brand tokens that fits the vertical and brief. Color tokens must be valid hex codes. The disclaimer must be neutral, attorney-advertising-safe, no medical or legal advice. Do not use em dashes.`,
+        system: `You design brand identity for an acquisition brand. Output one set of brand tokens that fits the niche and brief. Color tokens must be valid hex codes. The disclaimer must be neutral, no medical or legal advice. Do not use em dashes.`,
         user: `Vertical: ${input.vertical}\nBrand name: ${input.name}\nBrief: ${input.brief}\n\nReturn brand direction.`,
         schema: Schema,
         schemaName: 'brand_direction',
@@ -191,7 +198,7 @@ export async function createSite(rawInput: unknown): Promise<SuccessResult | Fai
     } catch (err) {
       // AI failure: fall through with defaults so the Site still gets created.
       const msg = err instanceof Error ? err.message : 'unknown'
-      siteData.tagline = `${input.name} — see if you may qualify.`
+      siteData.tagline = `${input.name}: see if you may qualify.`
       siteData.brand = DEFAULT_BRAND
       console.warn('[createSite ai-template] LLM failed, using defaults:', msg)
     }
@@ -245,6 +252,26 @@ export async function createSite(rawInput: unknown): Promise<SuccessResult | Fai
       overrideAccess: true,
     })
   }
+
+  const createdSlugs = new Set(pages.map((p) => p.slug.replace(/^\//, '')))
+  const ensureLegalPage = async (slug: string, title: string, template_key: string) => {
+    if (createdSlugs.has(slug.replace(/^\//, ''))) return
+    await payload.create({
+      collection: 'pages',
+      data: {
+        site: siteId,
+        title,
+        slug,
+        status: 'published' as const,
+        template_key,
+        uses_shared_template: true,
+        published_at: new Date().toISOString(),
+      } as never,
+      overrideAccess: true,
+    })
+  }
+  await ensureLegalPage(HOSTED_PRIVACY_PATH, 'Privacy Notice', 'privacy')
+  await ensureLegalPage(HOSTED_TERMS_PATH, 'Terms of Service', 'terms')
 
   // 4. Empty TrackingConfig singleton
   await payload.create({

@@ -32,6 +32,7 @@ export type Vertical = {
 export const VERTICALS: Vertical[] = [
   { value: 'multi', label: 'Multi-vertical', group: 'General' },
   { value: 'financial-services', label: 'Financial Services', group: 'General' },
+  { value: 'debt', label: 'Debt', group: 'General' },
   { value: 'insurance', label: 'Insurance', group: 'General' },
   { value: 'home-services', label: 'Home Services', group: 'General' },
   { value: 'health', label: 'Health & Wellness', group: 'General' },

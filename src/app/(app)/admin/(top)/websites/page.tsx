@@ -50,10 +50,12 @@ export default async function WebsitesPage() {
     const row = counts.get(key) ?? { all: 0, published: 0, privacy: false, terms: false }
     row.all += 1
     if (page.status === 'published') row.published += 1
-    const slug = String(page.slug ?? '')
-    const template = String(page.template ?? '')
-    if (slug === 'privacy' || template === 'privacy' || template === 'privacy-policy') row.privacy = true
-    if (slug === 'terms' || template === 'terms') row.terms = true
+    const slug = String(page.slug ?? '').replace(/^\//, '')
+    const template = String(page.template_key ?? page.template ?? '')
+    if (slug === 'privacy' || slug === 'privacy-policy' || template === 'privacy' || template === 'privacy-policy') {
+      row.privacy = true
+    }
+    if (slug === 'terms' || slug === 'terms-of-service' || template === 'terms') row.terms = true
     counts.set(key, row)
   }
 

@@ -47,6 +47,7 @@ import * as migration_20260814_120000_leads_idempotency_key from './20260814_120
 import * as migration_20260814_160000_lp_deployment_publish_state from './20260814_160000_lp_deployment_publish_state'
 import * as migration_20260901_220000_integration_config_from_name_default from './20260901_220000_integration_config_from_name_default'
 import * as migration_20260901_233000_sites_vertical_general from './20260901_233000_sites_vertical_general'
+import * as migration_20260919_120000_sites_vertical_debt from './20260919_120000_sites_vertical_debt'
 
 export const migrations = [
   {
@@ -221,5 +222,10 @@ export const migrations = [
     up: migration_20260901_233000_sites_vertical_general.up,
     down: migration_20260901_233000_sites_vertical_general.down,
     name: '20260901_233000_sites_vertical_general',
+  },
+  {
+    up: migration_20260919_120000_sites_vertical_debt.up,
+    down: migration_20260919_120000_sites_vertical_debt.down,
+    name: '20260919_120000_sites_vertical_debt',
   },
 ];

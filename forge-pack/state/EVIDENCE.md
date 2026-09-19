@@ -1,5 +1,11 @@
 # Evidence
 
+## W11 2026-09-19
+
+- `pnpm typecheck`: pass
+- `pnpm test:release`: 31 passed, 0 failed (includes `20260919_120000_sites_vertical_debt`)
+- Clone path in `createSite` still creates a new preview domain and does not copy Leads or custom domains.
+
 ## W10 2026-09-19
 
 - `pnpm check:handbook`: 22 routes documented, 33 screens, 19 sidebar destinations, 0 missing, 0 mismatched
