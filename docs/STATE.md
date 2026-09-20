@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 20 September 2026, W41 bulk deploy.
+Last updated: 20 September 2026, W43 Leads UI.
 
 ---
 
@@ -24,7 +24,7 @@ Last updated: 20 September 2026, W41 bulk deploy.
 | Execution memory | `forge-pack/state/` |
 | Release mode | **Autonomous ordinary Plesk releases.** Implement, validate, commit, push, and the section 6 Plesk sequence after gates pass are pre-authorized (discovery 12.4). Human gates in `docs/HUMAN-GATES.md` still apply. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current wave | W41 complete in the repository (not released). Next: W43. Host TLS still UNPROVEN (no SSH from this Codespace). |
+| Current wave | W43 complete in the repository (not released). Next: W50. Host TLS still UNPROVEN (no SSH from this Codespace). |
 | Active human gates | None currently blocking application work. Wildcard ACME CNAME is live. Ordinary Plesk release waits on SSH. |
 | Active blockers | This environment is a GitHub Codespace without `~/.ssh/pageflo_deploy`. PageFlo DNS points at the Plesk IP. HTTPS SNI still serves `crashclaim.co`. |
 
@@ -549,6 +549,10 @@ human gates. See `docs/HUMAN-GATES.md`.
 ---
 
 ## Change log
+
+### 20 September 2026, W43 Leads UI and delivery worker
+
+`/admin/leads` is a real operator surface over stored leads: search, status, consent, HLR, CAPI and delivery_log. The lead-delivery BullMQ worker starts from Next instrumentation on the Node runtime so `legalos-dev.service` consumes the queue without a second systemd unit. `pnpm test:leads-ui` 16 passed.
 
 ### 20 September 2026, W41 bulk deploy and preview URLs
 

@@ -139,7 +139,7 @@ fact.
 | 6.13 | End-to-end lead capture through a real browser | **LIVE** | `pnpm test:e2e`, 34 assertions, Chromium |
 | 6.14 | **Lead processing survives a downstream outage** | **PARTIAL** | The pipeline runs **synchronously inside the request**. `bullmq` is a declared dependency with no worker; Redis is used only for a health-check ping. A slow or failing downstream extends the visitor's request. Timeouts bound it, but there is no retry queue and no replay after a crash. Phase 6. |
 | 6.15 | Every rejected lead is retained with a stable machine reason | **UNKNOWN / NEEDS AUDIT** | Step results are traced. Whether every rejection path persists a durable, queryable reason has not been established. |
-| 6.16 | Operator UI for leads | **PARTIAL** | `/admin/leads` is a `Placeholder` deep-linking to raw Payload `/cms`. Data exists; the operator surface does not. |
+| 6.16 | Operator UI for leads | **LIVE** | `/admin/leads` lists stored leads with search, status, consent and delivery derived from `delivery_log`. Detail tabs show answers, HLR, CAPI and delivery history. `pnpm test:leads-ui`. |
 | 6.17 | Global do-not-contact suppression across every intake path | **PLANNED** | No implementation. |
 | 6.18 | Configurable per-campaign validation rules | **PLANNED** | Validation is currently fixed in the pipeline, not configured per deployment. |
 
