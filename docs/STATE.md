@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 20 September 2026, W60 local matrix green; production TLS and Plesk release still UNPROVEN from this Codespace.
+Last updated: 20 September 2026, W60 production release, TLS, and acceptance on GX10-01.
 
 ---
 
@@ -24,9 +24,9 @@ Last updated: 20 September 2026, W60 local matrix green; production TLS and Ples
 | Execution memory | `forge-pack/state/` |
 | Release mode | **Autonomous ordinary Plesk releases.** Implement, validate, commit, push, and the section 6 Plesk sequence after gates pass are pre-authorized (discovery 12.4). Human gates in `docs/HUMAN-GATES.md` still apply. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current wave | W50 complete. W60 local validation is green on this Codespace. Production TLS, Plesk release, and live PageFlo host proofs remain UNPROVEN until GX10-01 can `ssh pageflo`. |
-| Active human gates | None currently blocking application work. Wildcard ACME CNAME is live. Ordinary Plesk release and host TLS wait on SSH from GX10-01. |
-| Active blockers | This environment is GitHub Codespace `symmetrical-guide-5g75r9vw9xxcvrr6`, hostname `codespaces-d8809b`, not GX10-01. `ssh pageflo` fails: `~/.ssh/pageflo_deploy` is absent. PageFlo DNS points at the Plesk IP. HTTPS SNI still serves `crashclaim.co`. |
+| Current wave | W60 complete on GX10-01. Production HEAD `b54e8bd`. |
+| Active human gates | None blocking V1. Do not flip `PAGEFLO_LEGACY_HOST_REDIRECT`. Legal publication facts and live buyer activation remain standing gates, not V1 blockers. |
+| Active blockers | None for internal V1. Standing later work: legal entity facts for `/privacy` on the marketing host, EB-1 MVA tier service, unversioned `legalos-warm.sh`. |
 
 ## Compatibility identifiers
 
@@ -146,6 +146,26 @@ security, tenancy, migration, secret, and compatibility invariants are
 preserved.
 
 ---
+
+## Production truth, measured 20 September 2026 on GX10-01
+
+| | |
+|---|---|
+| Control host | `gx10-01`, user `legenex`, `CODESPACES` empty |
+| Production host | `vps-3ae59fb7` / `51.81.202.161`, reached with `ssh pageflo` as root |
+| Released SHA | `b54e8bd` via Plesk `legalos.git` then `scripts/release.sh` |
+| Service | `legalos-dev.service` active; local health 200 in 2s after restart |
+| `https://app.pageflo.io/api/pageflo/health` | 200 `{"ok":true,"app":"legalos"}` |
+| `https://os.legenex.com/api/legalos/health` | 200 `{"ok":true,"app":"legalos"}` |
+| `pageflo.io` TLS | Let's Encrypt, SAN `pageflo.io` + `www.pageflo.io` |
+| `app.pageflo.io` TLS | Let's Encrypt, SAN `app.pageflo.io` |
+| `*.preview.pageflo.io` TLS | Let's Encrypt DNS-01, SAN `*.preview.pageflo.io` + `preview.pageflo.io`, proven with `random-check.preview.pageflo.io` |
+| `test.preview.legenex.com` TLS | still valid, SAN `*.preview.legenex.com` |
+| Default SNI | still `crashclaim.co`; PageFlo vhosts are `pageflo.io.conf`, `pageflo-app.pageflo.io.conf`, `preview.pageflo.io.conf` |
+| `PAGEFLO_LEGACY_HOST_REDIRECT` | unset. `os.legenex.com/` still 200, not a redirect to `app.pageflo.io` |
+| Live Brand | Dont Settle on both `dont-settle.preview.pageflo.io` and `dont-settle.preview.legenex.com` |
+| Live-preflight | 3 live deployments, 0 would fail re-publish |
+| Path check | 3 deployments, 0 unresolvable |
 
 ## Production truth, measured 1 September 2026
 
@@ -389,8 +409,9 @@ breakdown.
   suggests.
 - **Funnel collections are not wired into per-Site scoping.** Their access is
   plain `isAuthenticated`, not the `siteScoped*` helpers used everywhere else.
-- **No queue.** `bullmq` is a declared dependency with no worker. The lead
-  pipeline runs synchronously inside the request.
+- **Lead delivery is queued when Redis is up.** Persist returns to the visitor;
+  the BullMQ worker started from Node instrumentation finishes downstream. In-request
+  fan-out remains the fallback when Redis is down.
 - **No ESLint config.** `pnpm lint` prompts interactively and exits 1.
 - **No CI.** Nothing runs the validation matrix except a person or an agent.
 - **No automated database backups.** Only what `scripts/release.sh` takes during
@@ -488,24 +509,6 @@ and phase 11, the production cutover.
 
 ## Active blockers
 
-- **`pageflo.io` / `app.pageflo.io` DNS is not pointed at production.** Measured
-  2 September 2026 from this codespace: `pageflo.io` resolves to `192.64.119.75`
-  (a Namecheap parking page, not `51.81.202.161`), `www.pageflo.io` resolves to
-  Namecheap parking IPs, and `app.pageflo.io` does not resolve at all. Nothing on
-  the production host can be configured for these hosts (new Plesk domain, TLS
-  issuance) until an operator repoints DNS, and any DNS change is a standing
-  human gate (`AGENTS.md` section 12). Required records, once ready to cut over:
-  `pageflo.io` A record to `51.81.202.161`; `www.pageflo.io` A (or CNAME) to the
-  same; `app.pageflo.io` A record to the same. Do not remove `os.legenex.com`'s
-  DNS or flip `PAGEFLO_LEGACY_HOST_REDIRECT` until the new hosts are verified
-  end to end.
-- **This codespace has no SSH path to production.** `~/.ssh/` does not exist
-  here at all (a fresh codespace; the `legalos` host alias and
-  `legalos_deploy` key `CLAUDE.md` describes were never provisioned into it).
-  No production inspection, Plesk change, or `scripts/release.sh` run was
-  possible this session as a result; every check in this entry ran against the
-  local codespace only. GitHub push access (`gh auth status`) works normally
-  and is unaffected.
 - **Legal publication facts are not configured.** `/privacy` fails closed and
   its footer link is absent until `PAGEFLO_LEGAL_ENTITY`,
   `PAGEFLO_LEGAL_ADDRESS`, `PAGEFLO_PRIVACY_CONTACT`,
@@ -534,21 +537,48 @@ and phase 11, the production cutover.
 
 ## Next major milestone
 
-The production domain cutover: `pageflo.io`, `www.pageflo.io` and
-`app.pageflo.io` as Plesk domains on the existing host, reverse-proxied to the
-same application, with certificates issued and the three `PAGEFLO_*` host
-variables set in the production `.env`.
-
-`os.legenex.com` stays exactly as it is until the new hosts are verified end to
-end. `PAGEFLO_LEGACY_HOST_REDIRECT` is the last switch to flip, because setting
-it to `true` is what removes the rollback path.
-
-Changing the production `.env`, adding Plesk domains and any DNS change are all
-human gates. See `docs/HUMAN-GATES.md`.
+Internal V1 is production-verified. The remaining optional cutover switch is
+`PAGEFLO_LEGACY_HOST_REDIRECT=true`, which 308s `os.legenex.com` to
+`app.pageflo.io` and removes the rollback path. Do not flip it until an
+operator asks. Later work: dedicated VPS (phases 10-11), legal entity facts,
+EB-1.
 
 ---
 
 ## Change log
+
+### 20 September 2026, W60 production on GX10-01
+
+Ran on `gx10-01` as `legenex` with `ssh pageflo`. Fast-forwarded local `main`
+to `96ae0d2`, then shipped three follow-up commits:
+
+- `0a0e8a0` reuse the live `preview.legenex.com` acme-dns account for DNS-01
+- `4a9043e` pass certdir to the existing nginx reload hook
+- `b54e8bd` duplicate BullMQ Redis connections and return after queue so quiz
+  submit is not blocked
+
+Plesk sequence used twice (first `4a9043e`, then `b54e8bd`):
+
+```
+cd /var/www/vhosts/legenex.com/os.legenex.com
+plesk ext git --fetch -domain os.legenex.com -name legalos.git
+plesk ext git --deploy -domain os.legenex.com -name legalos.git
+scripts/release.sh
+```
+
+First release applied 4 migrations (ledger 31 -> 35). Second applied 0.
+`scripts/provision-pageflo-hosts.sh` issued HTTP-01 for `pageflo.io`+`www` and
+`app.pageflo.io`, DNS-01 for `*.preview.pageflo.io`. Idempotent rerun skipped
+issue. Crashclaim remains default SNI. `PAGEFLO_LEGACY_HOST_REDIRECT` unset.
+
+Live proofs: app and legacy health 200; wildcard SAN on
+`random-check.preview.pageflo.io`; `test.preview.legenex.com` still valid;
+Dont Settle Brand, quiz, LPs, privacy/terms on both preview suffixes; console
+routes 200 after super-admin login. No live buyer activated.
+
+Local gates on GX10-01: `pnpm test` green, isolation 49, identity 33, e2e 34,
+release 31, certs 78, console 327, typecheck, verify:schema, lint:tokens,
+check:handbook.
 
 ### 20 September 2026, W60 local matrix
 

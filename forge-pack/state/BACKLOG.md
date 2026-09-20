@@ -15,4 +15,4 @@
 - [x] W42 Domains and PageFlo preview host support
 - [x] W43 Leads UI and delivery observability
 - [x] W50 End-to-end integration and migration compatibility
-- [ ] W60 Full QA, release and final verification
+- [x] W60 Full QA, release and final verification

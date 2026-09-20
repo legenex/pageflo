@@ -1,5 +1,36 @@
 # Evidence
 
+## W60 production 2026-09-20 (GX10-01)
+
+HEAD: `b54e8bd`
+Host: hostname `gx10-01`, user `legenex`, `CODESPACES` empty, repo `/home/legenex/Documents/Projects/PageFlo` tracking `origin/main`.
+Production: `ssh pageflo` -> `vps-3ae59fb7` as root.
+
+Plesk:
+```
+cd /var/www/vhosts/legenex.com/os.legenex.com
+plesk ext git --fetch -domain os.legenex.com -name legalos.git
+plesk ext git --deploy -domain os.legenex.com -name legalos.git
+scripts/release.sh
+```
+First release (`4a9043e`): 4 migrations, ledger 31 -> 35, schema 25+1, healthy after 2s.
+Second release (`b54e8bd`): 0 migrations, healthy after 2s.
+
+Live:
+- `https://app.pageflo.io/api/pageflo/health` 200 `{"ok":true,"app":"legalos"}`
+- `https://os.legenex.com/api/legalos/health` 200
+- `random-check.preview.pageflo.io` cert SAN `*.preview.pageflo.io`, `preview.pageflo.io`
+- `preview.pageflo.io` valid TLS
+- `test.preview.legenex.com` valid TLS `*.preview.legenex.com`
+- unmatched SNI `crashclaim.co`
+- `www.pageflo.io` 308 -> `https://pageflo.io/`
+- `os.legenex.com/` 200, not redirected
+- Dont Settle 200 on both preview suffixes including `/s/dont-settle`, `/c`, `/c/dont-settle`, `/privacy`, `/terms`
+- live-preflight 3 live / 0 fail; check:paths 0 unresolvable
+- admin Brand-first routes 200 after login
+
+Local: typecheck, `pnpm test`, isolation 49, identity 33, e2e 34, release 31, certs 78, console 327, durability 13, idempotency 23, verify:schema, lint:tokens, check:handbook 0 missing.
+
 ## W60 local 2026-09-20 (Codespace, not GX10-01)
 
 HEAD after host-provision and worker-boot fixes: see `git rev-parse HEAD`.

@@ -1,23 +1,26 @@
 # Handoff
 
-Current phase: Wave 06. W60 local gates are green. Production TLS and the Plesk release are blocked on SSH from this environment.
-HEAD: see `git rev-parse HEAD`.
+Current phase: Wave 06. W60 complete on GX10-01.
+HEAD: `b54e8bd` on `main`, matches origin and production `legalos.git`.
 Tests run this session:
+- `pnpm typecheck` pass
 - `pnpm test` all green
-- `pnpm test:certs` 73 passed (includes provision-pageflo-hosts.sh source contract)
+- `pnpm test:certs` 78 passed
 - `pnpm test:isolation` 49 passed
 - `pnpm test:identity` 33 passed
-- `pnpm test:e2e` 34 passed (after a fresh production build)
+- `pnpm test:e2e` 34 passed
 - `pnpm test:release` 31 passed
-- `pnpm test:leads-ui` 17 passed
+- `pnpm test:durability` 13 passed
+- `pnpm test:idempotency` 23 passed
 - `pnpm test:console` 327 passed
-- `pnpm typecheck` pass
-- `next build` compiled successfully after the worker-boot split
-Known blockers: this session is GitHub Codespace `symmetrical-guide-5g75r9vw9xxcvrr6` (hostname `codespaces-d8809b`, user `codespace`), not GX10-01. `ssh pageflo` fails because `~/.ssh/pageflo_deploy` is absent. Production TLS still presents `crashclaim.co` for app.pageflo.io and `*.preview.pageflo.io`. ACME CNAME is live. No Plesk release of W31-W50 plus the two host/build fixes has run.
-Production: `https://os.legenex.com/api/legalos/health` 200. DNS for pageflo.io / www / app / preview / *.preview points at 51.81.202.161. Do not flip `PAGEFLO_LEGACY_HOST_REDIRECT`.
-Next action: resume on GX10-01 and `ssh pageflo`. Then Plesk fetch/deploy of current main, `scripts/release.sh`, then `scripts/provision-pageflo-hosts.sh` as root, then prove:
+- production `pnpm check:live-preflight`: 3 live, 0 would fail re-publish
+- production `pnpm check:paths`: 3 deployments, 0 unresolvable
+Known blockers: none for internal V1. Do not flip `PAGEFLO_LEGACY_HOST_REDIRECT`.
+Production:
 - `https://app.pageflo.io/api/pageflo/health` 200
 - `https://os.legenex.com/api/legalos/health` 200
-- `*.preview.pageflo.io` SAN via an arbitrary hostname such as `random-check.preview.pageflo.io`
-- `preview.pageflo.io` and `test.preview.legenex.com` still valid
-Important files: `scripts/provision-pageflo-hosts.sh`, `src/instrumentation.ts`, `src/instrumentation.node.ts`, `src/lib/advertorial-deployment.ts`, `src/lib/bulk-deploy.ts`.
+- `*.preview.pageflo.io` SAN proven via `random-check.preview.pageflo.io`
+- `preview.pageflo.io` and `test.preview.legenex.com` valid TLS
+- unmatched SNI still `crashclaim.co`
+Next action: none for V1. Optional later: `PAGEFLO_LEGACY_HOST_REDIRECT`, legal entity facts, EB-1, dedicated VPS.
+Important files: `scripts/provision-pageflo-hosts.sh`, `src/queues/redis.ts`, `src/lib/lead-pipeline/run.ts`.

@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-09-20 W60
+
+GX10-01 `ssh pageflo`. Plesk fetch/deploy + `scripts/release.sh` of `b54e8bd`. PageFlo TLS issued. Required live health and SAN proofs pass. Dont Settle Brand/quiz/LPs serve on both preview suffixes. Console Brand-first routes 200. Local matrix green including e2e 34 and console 327. `PAGEFLO_LEGACY_HOST_REDIRECT` not set.
+
 ## 2026-09-20 W20 W42
 
 Website pages keep a `published_blocks` snapshot; public render prefers it when present. Preview routing accepts `{slug}.preview.pageflo.io` as an alias of `{slug}.preview.legenex.com`. New Brands mint both. Host fallbacks: app.pageflo.io, pageflo.io, os.legenex.com. TLS issue for the new names is blocked on SSH and on a DNS-01 CNAME for the PageFlo preview wildcard.
