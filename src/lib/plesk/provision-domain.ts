@@ -505,7 +505,9 @@ const PROTECTED_VHOSTS = new Set([
   'preview.legenex.com',
   'preview.pageflo.io',
   'app.pageflo.io',
+  'pageflo-app.pageflo.io',
   'pageflo.io',
+  'www.pageflo.io',
   'test.checkmyclaim.co',
 ])
 

@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 20 September 2026, W50 repo verification; W60 blocked on SSH.
+Last updated: 20 September 2026, host-provision script corrected; W60 still blocked on SSH from this Codespace.
 
 ---
 
@@ -24,9 +24,9 @@ Last updated: 20 September 2026, W50 repo verification; W60 blocked on SSH.
 | Execution memory | `forge-pack/state/` |
 | Release mode | **Autonomous ordinary Plesk releases.** Implement, validate, commit, push, and the section 6 Plesk sequence after gates pass are pre-authorized (discovery 12.4). Human gates in `docs/HUMAN-GATES.md` still apply. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current wave | W50 complete in the repository. W60 needs production TLS and the Plesk release. Host access from this Codespace is missing. |
-| Active human gates | None currently blocking application work. Wildcard ACME CNAME is live. Ordinary Plesk release waits on SSH. |
-| Active blockers | This environment is a GitHub Codespace without `~/.ssh/pageflo_deploy`. PageFlo DNS points at the Plesk IP. HTTPS SNI still serves `crashclaim.co`. |
+| Current wave | W50 complete in the repository. Host-provision script on main is corrected. W60 still needs production TLS, the Plesk release, and live proofs. |
+| Active human gates | None currently blocking application work. Wildcard ACME CNAME is live. Ordinary Plesk release and host TLS wait on SSH from GX10-01. |
+| Active blockers | This environment is GitHub Codespace `symmetrical-guide-5g75r9vw9xxcvrr6`, hostname `codespaces-d8809b`, not GX10-01. `ssh pageflo` fails: `~/.ssh/pageflo_deploy` is absent. PageFlo DNS points at the Plesk IP. HTTPS SNI still serves `crashclaim.co`. |
 
 ## Compatibility identifiers
 
@@ -549,6 +549,14 @@ human gates. See `docs/HUMAN-GATES.md`.
 ---
 
 ## Change log
+
+### 20 September 2026, PageFlo host-provision script
+
+`scripts/provision-pageflo-hosts.sh` was not safe to run as written. A rerun always wrote HTTP-only bootstrap (dropping HTTPS), `--force`d HTTP-01 first (Let's Encrypt rate-limit risk), swallowed ACME failures with `|| true`, skipped `--server letsencrypt`, did not verify apex/www/app SANs, and listened on `*:443` which would miss production traffic if crashclaim binds `IP:443`.
+
+Corrected to: skip reissue when the installed cert already has the required SANs; HTTP-01 for `pageflo.io`+`www.pageflo.io` and `app.pageflo.io`; DNS-01 for `*.preview.pageflo.io` and `preview.pageflo.io`; refuse a cert whose SAN lacks `*.preview.pageflo.io`; write `pageflo-app.pageflo.io.conf` so unmatched SNI stays `crashclaim.co`; join crashclaim's listen socket; `nginx -t` before every reload with vhost rollback on failure; leave `preview.legenex.com` and `os.legenex.com` untouched; do not set `PAGEFLO_LEGACY_HOST_REDIRECT`. `pnpm test:certs` 73 passed. `pnpm typecheck` passed.
+
+This session is still the GitHub Codespace, not GX10-01. `ssh -o BatchMode=yes pageflo` is Permission denied (publickey). No production release or live TLS issue has run. `https://os.legenex.com/api/legalos/health` 200. `app.pageflo.io` HTTPS still presents `crashclaim.co`.
 
 ### 20 September 2026, W50 verification matrix
 

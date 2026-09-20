@@ -20,6 +20,11 @@
  * hosts. No filesystem, no network, no server: `planProvisioning` is pure, and
  * that is the point — the old code could only be checked by running a release.
  */
+import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+
 import { planProvisioning, type CertFacts, type ProvisionPlan } from '../src/lib/plesk/provision-domain.ts'
 
 let pass = 0
@@ -184,6 +189,84 @@ console.log('\n— negative control: the old logic must fail these same checks �
   ok('NEGATIVE CONTROL: old logic did not recognise wildcard coverage (caught)',
     legacyPreview.action !== 'covered-by-wildcard')
 }
+
+/* -------------------------------------------------------------------------- */
+/*  PageFlo control-plane host script (source contract)                        */
+/* -------------------------------------------------------------------------- */
+/**
+ * `scripts/provision-pageflo-hosts.sh` runs as root on the Plesk box. These
+ * checks cannot issue a certificate, but they can refuse a script that would
+ * steal default SNI, skip SAN proof, reload nginx without `nginx -t`, force a
+ * reissue on every run, or treat HTTP-01 of test.preview.pageflo.io as a
+ * wildcard.
+ */
+const SCRIPT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const HOST_SCRIPT = path.join(SCRIPT_ROOT, 'scripts/provision-pageflo-hosts.sh')
+const script = readFileSync(HOST_SCRIPT, 'utf8')
+const scriptNoComments = script
+  .split('\n')
+  .filter((line) => !/^\s*#/.test(line))
+  .join('\n')
+
+console.log('\n— provision-pageflo-hosts.sh source contract —')
+
+{
+  const syntax = spawnSync('bash', ['-n', HOST_SCRIPT], { encoding: 'utf8' })
+  ok('bash -n passes', syntax.status === 0, syntax.stderr || syntax.stdout)
+}
+
+ok('issues HTTP-01 for pageflo.io', script.includes('pageflo.io www.pageflo.io') && script.includes('--webroot'))
+ok('issues HTTP-01 for app.pageflo.io', script.includes('app.pageflo.io') && script.includes('issue_http01'))
+ok('uses Let\'s Encrypt, not the acme.sh default CA', script.includes('--server "$LE_SERVER"') || script.includes('--server letsencrypt'))
+ok('issues DNS-01 for the preview wildcard', script.includes('--dns dns_acmedns'))
+ok('wildcard issue includes *.preview.pageflo.io',
+  script.includes('*.${base}') || script.includes('*.preview.pageflo.io'))
+ok('wildcard issue includes preview.pageflo.io itself',
+  script.includes('preview.pageflo.io'))
+ok('refuses a cert whose SAN lacks *.preview.pageflo.io',
+  script.includes('*.${base}') && script.includes('require_sans'))
+ok('writes pageflo-app.pageflo.io.conf, not app.pageflo.io.conf',
+  /VHOST_APP="[^"]*pageflo-app\.pageflo\.io\.conf"/.test(script) &&
+    !/VHOST_APP="[^"]*\/app\.pageflo\.io\.conf"/.test(script))
+ok('never leaves app.pageflo.io.conf on disk',
+  script.includes('app.pageflo.io.conf') && script.includes('STRAY_VHOSTS'))
+ok('never leaves test.preview.pageflo.io.conf to outrank the wildcard',
+  script.includes('test.preview.pageflo.io.conf') && script.includes('STRAY_VHOSTS'))
+
+{
+  const crash = 'crashclaim.co.conf'
+  const safe = ['pageflo.io.conf', 'pageflo-app.pageflo.io.conf', 'preview.pageflo.io.conf']
+  const steal = 'app.pageflo.io.conf'
+  ok('crashclaim.co.conf sorts first among PageFlo vhost filenames',
+    [...safe, crash].sort()[0] === crash)
+  ok('app.pageflo.io.conf would sort before crashclaim.co.conf (that is why it is stray)',
+    steal < crash)
+}
+
+ok('reloads nginx only via a helper that runs nginx -t first',
+  script.includes('nginx -t') && script.includes('systemctl reload nginx') &&
+    script.includes('reload_nginx'))
+ok('does not systemctl reload nginx outside reload_nginx / the cert hook',
+  !scriptNoComments
+    .replace(/reload_nginx\(\) \{[\s\S]*?\n\}/, '')
+    .replace(/ensure_reload_hook\(\) \{[\s\S]*?\n\}/, '')
+    .includes('systemctl reload nginx'))
+ok('does not --force on the first HTTP-01 issue',
+  /issue_http01\(\) \{[\s\S]*?\n\}/.exec(script)?.[0].includes('--force') === false)
+ok('does not swallow ACME failures with || true',
+  !/acme\.sh[\s\S]{0,200}\|\| true/.test(scriptNoComments))
+ok('does not set PAGEFLO_LEGACY_HOST_REDIRECT',
+  !scriptNoComments.includes('PAGEFLO_LEGACY_HOST_REDIRECT'))
+ok('does not write preview.legenex.com or os.legenex.com vhosts',
+  !/write_vhost .*preview\.legenex\.com/.test(script) &&
+    !scriptNoComments.includes('os.legenex.com.conf'))
+ok('joins crashclaim listen socket instead of listen 443 vs IP:443',
+  script.includes('infer_listen') && script.includes('crashclaim.co.conf'))
+ok('restores vhost files when nginx -t fails',
+  script.includes('restore_backups') && script.includes('nginx -t failed'))
+ok('skips reissue when the installed cert already has the required SAN',
+  script.includes('already has a valid certificate; skipping issue'))
+ok('does not declare default_server', !scriptNoComments.includes('default_server'))
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)
