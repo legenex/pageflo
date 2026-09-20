@@ -258,6 +258,13 @@ try {
   const booted = await waitForServer()
   t(booted, `the production build boots and answers${booted ? '' : '\n' + serverLog.join('').slice(-1200)}`)
   if (!booted) throw new Error('the app did not start')
+  // First /api/leads compiles the pipeline. Without this, the first funnel's
+  // destination wait can expire on a cold GX10 while the POST is still open.
+  await fetch(`${ORIGIN}/api/leads`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', host: HOST },
+    body: '{}',
+  }).catch(() => null)
 
   /* ------------------------------------------------------------- the browser */
 
@@ -365,8 +372,12 @@ try {
     await page.locator('[data-quiz-submit]').click()
 
     // The destination.
-    await page.waitForSelector('[data-quiz-endpoint]', { timeout: 15_000 }).catch(() => null)
-    t((await page.locator('[data-quiz-endpoint]').count()) === 1, `${label}: the destination renders after submitting`)
+    await page.waitForSelector('[data-quiz-endpoint]', { timeout: 30_000 }).catch(() => null)
+    const endpointCount = await page.locator('[data-quiz-endpoint]').count()
+    const destDebug = endpointCount === 1
+      ? ''
+      : ` (url=${page.url()} posts=${leadPosts.length} node=${await page.locator('[data-quiz-root]').getAttribute('data-quiz-node-type')} text=${JSON.stringify(((await page.locator('body').innerText()) ?? '').slice(0, 180))})`
+    t(endpointCount === 1, `${label}: the destination renders after submitting${destDebug}`)
 
     // Settle, so a late duplicate would be counted rather than missed.
     await page.waitForTimeout(2000)

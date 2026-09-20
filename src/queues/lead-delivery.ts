@@ -22,7 +22,7 @@ export const enqueueLeadDelivery = async (leadId: number): Promise<'queued' | 'u
   const q = getQueue()
   if (!q) return 'unavailable'
   try {
-    await q.add(
+    const added = q.add(
       'deliver',
       { leadId },
       {
@@ -33,6 +33,10 @@ export const enqueueLeadDelivery = async (leadId: number): Promise<'queued' | 'u
         removeOnFail: 5000,
       },
     )
+    const timeout = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('enqueue timeout')), 2000)
+    })
+    await Promise.race([added, timeout])
     return 'queued'
   } catch {
     return 'unavailable'

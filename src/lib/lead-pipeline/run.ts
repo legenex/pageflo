@@ -216,7 +216,7 @@ export const runLeadPipeline = async (
     return { ok: false, lead_id: null, event_id, steps, error: 'lead write failed' }
     }
     if (leadId != null) {
-      await enqueueLeadDelivery(leadId)
+      const queued = await enqueueLeadDelivery(leadId)
       if (leadAfterPersistHook) {
         try {
           await leadAfterPersistHook(leadId)
@@ -224,6 +224,13 @@ export const runLeadPipeline = async (
           steps.push({ step: 'delivery.queued', ok: true, detail: 'interrupted after persist' })
           return { ok: true, lead_id: leadId, event_id, steps }
         }
+      }
+      // A queued job is the in-process worker's to finish. Returning here keeps
+      // the visitor off the submit spinner while Slack/CAPI/webhooks run, and
+      // stops this request from racing the worker on the same lead row.
+      if (queued === 'queued') {
+        steps.push({ step: 'delivery.queued', ok: true, detail: `lead ${leadId}` })
+        return { ok: true, lead_id: leadId, event_id, steps }
       }
     }
   }

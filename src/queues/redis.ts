@@ -1,22 +1,33 @@
 import Redis from 'ioredis'
 
-let shared: Redis | null | undefined
+let base: Redis | null | undefined
 
 export const redisUrl = (): string => process.env.REDIS_URL ?? ''
 
-export const getQueueRedis = (): Redis | null => {
+const getBase = (): Redis | null => {
   const url = redisUrl()
   if (!url) return null
-  if (shared !== undefined) return shared
+  if (base !== undefined) return base
   try {
-    shared = new Redis(url, {
+    base = new Redis(url, {
       maxRetriesPerRequest: null,
       enableReadyCheck: true,
       lazyConnect: false,
     })
-    return shared
+    return base
   } catch {
-    shared = null
+    base = null
     return null
   }
+}
+
+/**
+ * BullMQ Queue and Worker must not share one ioredis instance. A Worker
+ * uses blocking commands; Queue.add on the same connection then hangs, and
+ * the visitor never leaves the submit spinner.
+ */
+export const getQueueRedis = (): Redis | null => {
+  const conn = getBase()
+  if (!conn) return null
+  return conn.duplicate()
 }

@@ -7,6 +7,7 @@ import {
   runLeadPipeline,
   setLeadAfterPersistHook,
 } from '../src/lib/lead-pipeline/run.ts'
+import { getQueueRedis } from '../src/queues/redis.ts'
 
 let pass = 0
 let fail = 0
@@ -25,6 +26,15 @@ const logOf = (lead: { delivery_log?: Array<{ step?: string }> | null }): string
   (lead.delivery_log ?? []).map((entry) => String(entry.step ?? ''))
 
 const main = async (): Promise<void> => {
+  const redisA = getQueueRedis()
+  const redisB = getQueueRedis()
+  t(
+    !redisA || redisA !== redisB,
+    'BullMQ Queue and Worker do not share one ioredis instance',
+  )
+  await redisA?.quit().catch(() => null)
+  await redisB?.quit().catch(() => null)
+
   const payload = await getPayload({ config })
   const site = await payload.create({
     collection: 'sites',
