@@ -39,8 +39,10 @@ const worker = readFileSync(new URL('../src/workers/lead-delivery.ts', import.me
 t(worker.includes('deliverStoredLead'), 'the worker delivers a stored lead, it does not recapture one')
 
 const boot = readFileSync(new URL('../src/instrumentation.ts', import.meta.url), 'utf8')
-t(boot.includes('ensureLeadDeliveryWorker'), 'the Next node process starts the lead-delivery worker')
-t(boot.includes("NEXT_RUNTIME !== 'nodejs'") || boot.includes("NEXT_RUNTIME === 'nodejs'"), 'the worker only starts on the Node runtime')
+const nodeBoot = readFileSync(new URL('../src/instrumentation.node.ts', import.meta.url), 'utf8')
+t(boot.includes("NEXT_RUNTIME === 'nodejs'"), 'the worker only starts on the Node runtime')
+t(boot.includes('instrumentation.node'), 'Node-only worker boot is a separate module the Edge compile cannot follow')
+t(nodeBoot.includes('ensureLeadDeliveryWorker'), 'the Next node process starts the lead-delivery worker')
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)

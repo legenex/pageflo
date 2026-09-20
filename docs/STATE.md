@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 20 September 2026, host-provision script corrected; W60 still blocked on SSH from this Codespace.
+Last updated: 20 September 2026, host-provision and Node worker boot fixed; W60 still blocked on SSH from this Codespace.
 
 ---
 
@@ -549,6 +549,10 @@ human gates. See `docs/HUMAN-GATES.md`.
 ---
 
 ## Change log
+
+### 20 September 2026, lead-delivery worker no longer breaks `next build`
+
+W43 started the BullMQ worker from `src/instrumentation.ts`. Webpack still followed that dynamic import into the Edge compile, which then tried to resolve Node `crypto`/`fs` through Payload. `pnpm exec next build` failed. Split Node boot into `src/instrumentation.node.ts`, start it only when `NEXT_RUNTIME === 'nodejs'`, externalize `bullmq` and `ioredis`, and load `deliverStoredLead` inside the job. Fresh production build compiled; `pnpm test:e2e` 34 passed; `pnpm test:leads-ui` 17 passed; `pnpm typecheck` passed.
 
 ### 20 September 2026, PageFlo host-provision script
 

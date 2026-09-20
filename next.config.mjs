@@ -43,7 +43,7 @@ const nextConfig = {
   // Playwright drives a real Chromium binary and resolves it from its own
   // package directory at runtime. Bundling it would rewrite those paths and
   // break the launch, so it stays external and is required from node_modules.
-  serverExternalPackages: ['playwright'],
+  serverExternalPackages: ['playwright', 'bullmq', 'ioredis'],
   images: {
     // `hostname: '**'` was here, which makes /_next/image?url=https://<anything>
     // an unauthenticated server-side fetch of an attacker-chosen host on every

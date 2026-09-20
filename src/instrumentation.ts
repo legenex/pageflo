@@ -7,7 +7,8 @@
  * consumer without a second host-side unit.
  */
 export async function register(): Promise<void> {
-  if (process.env.NEXT_RUNTIME !== 'nodejs') return
-  const { ensureLeadDeliveryWorker } = await import('@/workers/lead-delivery')
-  ensureLeadDeliveryWorker()
+  if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const { registerNodeInstrumentation } = await import('./instrumentation.node')
+    await registerNodeInstrumentation()
+  }
 }
