@@ -500,7 +500,14 @@ export const provisionDomainInPlesk = async (args: { host: string }): Promise<Pr
  *
  * Neither is a tenant domain, so no legitimate tenant teardown needs them gone.
  */
-const PROTECTED_VHOSTS = new Set(['crashclaim.co', 'preview.legenex.com', 'test.checkmyclaim.co'])
+const PROTECTED_VHOSTS = new Set([
+  'crashclaim.co',
+  'preview.legenex.com',
+  'preview.pageflo.io',
+  'app.pageflo.io',
+  'pageflo.io',
+  'test.checkmyclaim.co',
+])
 
 export const unprovisionDomainInPlesk = async (args: { pleskDomainId: string }): Promise<{ ok: boolean; error?: string }> => {
   const host = args.pleskDomainId.trim().toLowerCase()

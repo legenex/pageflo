@@ -63,7 +63,7 @@ export default async function WebsitesPage() {
     <Page>
       <PageHeader
         title="Websites"
-        subtitle="Each Brand owns a normal multi-page website, separate from reusable funnel masters."
+        subtitle="Each Brand owns a normal multi-page website, separate from reusable funnel masters. Section edits autosave as draft. Publish is the only way a live page changes."
       />
       <Card className="overflow-hidden">
         {sites.docs.length === 0 ? (

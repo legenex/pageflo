@@ -46,22 +46,23 @@ export const ENV_SPECS = {
   /** Public origin of the operator application, e.g. https://app.pageflo.io. */
   serverUrl: { key: 'PAGEFLO_SERVER_URL', legacyKey: 'NEXT_PUBLIC_SERVER_URL' },
   /** Marketing site host, e.g. pageflo.io. */
-  marketingHost: { key: 'PAGEFLO_MARKETING_HOST', legacyKey: null, fallback: '' },
+  marketingHost: { key: 'PAGEFLO_MARKETING_HOST', legacyKey: null, fallback: 'pageflo.io' },
   /** Application host, e.g. app.pageflo.io. */
-  appHost: { key: 'PAGEFLO_APP_HOST', legacyKey: null, fallback: '' },
+  appHost: { key: 'PAGEFLO_APP_HOST', legacyKey: null, fallback: 'app.pageflo.io' },
   /**
    * Hosts that served the application before the rebrand and must keep working.
    * Comma separated. During migration this holds os.legenex.com.
    * LEGALOS_FALLBACK_HOST is the single-host predecessor.
    */
-  legacyAppHosts: { key: 'PAGEFLO_LEGACY_APP_HOSTS', legacyKey: 'LEGALOS_FALLBACK_HOST' },
+  legacyAppHosts: { key: 'PAGEFLO_LEGACY_APP_HOSTS', legacyKey: 'LEGALOS_FALLBACK_HOST', fallback: 'os.legenex.com' },
   /**
    * When 'true', a legacy app host permanently redirects to the app host
    * instead of serving. Flipped only after the new domain is verified.
    */
   legacyHostRedirect: { key: 'PAGEFLO_LEGACY_HOST_REDIRECT', legacyKey: null, fallback: 'false' },
 
-  previewDomain: { key: 'PAGEFLO_PREVIEW_DOMAIN', legacyKey: 'LEGALOS_PREVIEW_DOMAIN' },
+  previewDomain: { key: 'PAGEFLO_PREVIEW_DOMAIN', legacyKey: null, fallback: 'preview.pageflo.io' },
+  legacyPreviewDomain: { key: 'PAGEFLO_LEGACY_PREVIEW_DOMAIN', legacyKey: 'LEGALOS_PREVIEW_DOMAIN', fallback: 'preview.legenex.com' },
   cnameTarget: { key: 'PAGEFLO_CNAME_TARGET', legacyKey: 'LEGALOS_CNAME_TARGET' },
   aTarget: { key: 'PAGEFLO_A_TARGET', legacyKey: 'LEGALOS_A_TARGET' },
   extraOrigins: { key: 'PAGEFLO_EXTRA_ORIGINS', legacyKey: 'LEGALOS_EXTRA_ORIGINS' },

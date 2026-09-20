@@ -48,6 +48,7 @@ import * as migration_20260814_160000_lp_deployment_publish_state from './202608
 import * as migration_20260901_220000_integration_config_from_name_default from './20260901_220000_integration_config_from_name_default'
 import * as migration_20260901_233000_sites_vertical_general from './20260901_233000_sites_vertical_general'
 import * as migration_20260919_120000_sites_vertical_debt from './20260919_120000_sites_vertical_debt'
+import * as migration_20260920_120000_pages_published_blocks from './20260920_120000_pages_published_blocks'
 
 export const migrations = [
   {
@@ -227,5 +228,10 @@ export const migrations = [
     up: migration_20260919_120000_sites_vertical_debt.up,
     down: migration_20260919_120000_sites_vertical_debt.down,
     name: '20260919_120000_sites_vertical_debt',
+  },
+  {
+    up: migration_20260920_120000_pages_published_blocks.up,
+    down: migration_20260920_120000_pages_published_blocks.down,
+    name: '20260920_120000_pages_published_blocks',
   },
 ];

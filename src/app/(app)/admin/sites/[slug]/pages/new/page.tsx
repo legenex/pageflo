@@ -30,7 +30,7 @@ export default async function NewSitePage({ params }: Props) {
     limit: 1,
     overrideAccess: true,
   })
-  const primaryHost = (dom.docs[0]?.host as string | undefined) || `${slug}.preview.legenex.com`
+  const primaryHost = (dom.docs[0]?.host as string | undefined) || `${slug}.preview.pageflo.io`
 
   const templateOptions = [
     { label: 'Custom (author your own blocks)', value: 'custom' },

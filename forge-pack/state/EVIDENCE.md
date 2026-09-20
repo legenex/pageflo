@@ -1,5 +1,19 @@
 # Evidence
 
+## W20 W42 2026-09-20
+
+- DNS: pageflo.io, app.pageflo.io, preview.pageflo.io, www.pageflo.io, test.preview.pageflo.io -> 51.81.202.161
+- TLS: app.pageflo.io SNI is crashclaim.co (fail). os.legenex.com health 200. test.preview.legenex.com TLS valid.
+- SSH: root@51.81.202.161 Permission denied (publickey)
+- `pnpm typecheck` pass
+- `pnpm test:release` 31 passed
+- `pnpm test:rebrand` 38
+- `pnpm test:certs` 50
+- `pnpm test:trusted-host` 47
+- `pnpm test:preview-hosts` 12
+- `pnpm test:site-builder` 10
+- `pnpm check:paths` 0 unresolved
+
 ## W22 2026-09-20
 
 - `pnpm test:compositions`: 636 passed, 0 failed

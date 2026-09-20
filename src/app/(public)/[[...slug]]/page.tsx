@@ -5,6 +5,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getPayload, type Where } from 'payload'
 import config from '@payload-config'
 import { resolveSiteByHost } from '@/lib/site-resolver'
+import { resolvePublicBlocks } from '@/lib/site-builder/sections'
 import { classifyHost, isMarketingHost, appOrigin, marketingOrigin } from '@/lib/pageflo/hosts'
 import { legalFacts } from '@/lib/pageflo/legal'
 import {
@@ -596,6 +597,7 @@ type RenderPageDoc = {
   shared_template_overrides?: Record<string, string> | null
   title: string
   body_blocks?: unknown[]
+  published_blocks?: unknown[]
   hidden_blocks?: string[] | null
   block_meta?: Record<string, { hide_mobile?: boolean; hide_desktop?: boolean }> | null
   schema_json?: Record<string, unknown> | null
@@ -634,7 +636,7 @@ async function RenderPage({
   // Custom blocks path: substitute {{site.*}} server-side then dispatch.
   // Filter out blocks the page author has marked as hidden in the builder.
   const hidden = new Set(Array.isArray(page.hidden_blocks) ? page.hidden_blocks : [])
-  const pageBlocks = ((page.body_blocks ?? []) as Block[]).filter(
+  const pageBlocks = ((resolvePublicBlocks(page) ?? []) as Block[]).filter(
     (b) => !b.id || !hidden.has(b.id),
   )
 

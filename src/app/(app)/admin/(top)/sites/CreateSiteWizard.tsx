@@ -51,7 +51,7 @@ function CreateSiteWizard({ sources, onClose }: { sources: SourceSite[]; onClose
     return () => clearTimeout(handle)
   }, [name, slugTouched])
 
-  const previewHost = slug ? `${slug}.preview.legenex.com` : '—'
+  const previewHost = slug ? `${slug}.preview.pageflo.io` : '—'
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault()

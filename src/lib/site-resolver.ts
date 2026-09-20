@@ -1,7 +1,7 @@
 import { getPayload } from 'payload'
 
 import { domainEligibility, type DomainLike } from './domain-eligibility'
-import { isReservedHost } from './pageflo/hosts'
+import { isPreviewHost, isReservedHost, previewAliasHosts } from './pageflo/hosts'
 import { envFlag } from '@/lib/pageflo/env'
 
 /*
@@ -112,16 +112,22 @@ export const resolveSiteByHost = async (rawHost: string | null | undefined): Pro
 
   const payload = await payloadClient()
 
-  // 1. Direct host match on Domain.
+  const lookupHosts = [host, ...previewAliasHosts(host)]
+  // 1. Direct host match on Domain, then the other preview suffix if this is a
+  // Brand preview host. Existing rows stay on preview.legenex.com; the PageFlo
+  // suffix must resolve them without a production data rewrite.
   const direct = await payload.find({
     collection: 'domains',
-    where: { host: { equals: host } },
-    limit: 1,
+    where: lookupHosts.length === 1 ? { host: { equals: host } } : { host: { in: lookupHosts } },
+    limit: lookupHosts.length,
     overrideAccess: true,
   })
+  const matched =
+    direct.docs.find((row) => String((row as { host?: string }).host ?? '') === host) ??
+    direct.docs[0]
 
-  if (direct.docs.length > 0) {
-    const domain = direct.docs[0]
+  if (matched) {
+    const domain = matched
     // Unassigned domain in the pool: do not resolve (treat as 404).
     if (!domain.site) return null
     if (!admit(domain as DomainLike, host)) return null
@@ -147,7 +153,13 @@ export const resolveSiteByHost = async (rawHost: string | null | undefined): Pro
     const primaryDoc = primaryRow.docs[0]
     const primaryUsable = Boolean(primaryDoc) && admit(primaryDoc as DomainLike, String(primaryDoc?.host ?? ''))
     const primaryHost = primaryUsable ? (primaryDoc?.host ?? null) : host
-    const redirectTo = primaryUsable && !domain.primary && primaryHost && primaryHost !== host ? primaryHost : null
+    const servedHost = String((domain as { host?: string }).host ?? '')
+    const previewToPreview =
+      isPreviewHost(host) && (isPreviewHost(servedHost) || isPreviewHost(String(primaryHost ?? '')))
+    const redirectTo =
+      !previewToPreview && primaryUsable && !domain.primary && primaryHost && primaryHost !== host
+        ? primaryHost
+        : null
     const entry: CacheEntry = { siteId, primaryHost, redirectTo, expiresAt: now + CACHE_TTL_MS }
     HOST_CACHE.set(host, entry)
     return entry

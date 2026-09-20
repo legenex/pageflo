@@ -476,6 +476,15 @@ export const Pages: CollectionConfig = {
     { name: 'og_image_url', type: 'text' },
     { name: 'schema_json', type: 'json', admin: { description: 'JSON-LD payload for this page.' } },
     {
+      name: 'published_blocks',
+      type: 'json',
+      admin: {
+        description:
+          'Last explicitly published body_blocks snapshot. The public site reads this when present so builder autosave cannot mutate a live page.',
+        readOnly: true,
+      },
+    },
+    {
       name: 'hidden_blocks',
       type: 'json',
       admin: {

@@ -103,6 +103,17 @@ why the release health gate points at `/api/legalos/health` instead. Pointing
 the gate at `self-check` once made a successful release exit 1 and advised an
 operator to reverse it.
 
+DNS measured 20 September 2026 from this Codespace: `pageflo.io`,
+`app.pageflo.io`, `preview.pageflo.io`, `www.pageflo.io` and
+`test.preview.pageflo.io` all resolve to `51.81.202.161`. HTTPS for those
+PageFlo names is not yet valid: unmatched SNI still presents `crashclaim.co`.
+`https://os.legenex.com/api/legalos/health` and
+`https://test.preview.legenex.com` remain valid. Host-side vhost and HTTP-01
+issue for the new names is `scripts/provision-pageflo-hosts.sh`, which must run
+as root on the Plesk box. Wildcard TLS for `*.preview.pageflo.io` still needs
+the `_acme-challenge.preview.pageflo.io` CNAME used by acme-dns, which is a
+DNS change beyond the A records already created.
+
 `mo.legenex.com`, the hostname most historical documentation names, is **no
 longer a Plesk domain**.
 
@@ -249,7 +260,8 @@ The PageFlo names the cutover adds:
 | `PAGEFLO_APP_HOST` | none, new | which host serves the console and authentication |
 | `PAGEFLO_LEGACY_APP_HOSTS` | `LEGALOS_FALLBACK_HOST` | hosts that served the console before the rebrand |
 | `PAGEFLO_LEGACY_HOST_REDIRECT` | none, new | when `true`, a legacy host 308s to the app host |
-| `PAGEFLO_PREVIEW_DOMAIN` | `LEGALOS_PREVIEW_DOMAIN` | preview subdomain pattern |
+| `PAGEFLO_PREVIEW_DOMAIN` | none, new default `preview.pageflo.io` | canonical preview subdomain pattern |
+| `PAGEFLO_LEGACY_PREVIEW_DOMAIN` | `LEGALOS_PREVIEW_DOMAIN` | legacy preview suffix `preview.legenex.com`, still served |
 | `PAGEFLO_CNAME_TARGET` | `LEGALOS_CNAME_TARGET` | what tenant CNAMEs point at |
 | `PAGEFLO_A_TARGET` | `LEGALOS_A_TARGET` | A record for apex tenants |
 | `PAGEFLO_EXTRA_ORIGINS` | `LEGALOS_EXTRA_ORIGINS` | additional CSRF origins |

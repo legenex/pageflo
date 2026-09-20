@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-09-20 W20 W42
+
+Website pages keep a `published_blocks` snapshot; public render prefers it when present. Preview routing accepts `{slug}.preview.pageflo.io` as an alias of `{slug}.preview.legenex.com`. New Brands mint both. Host fallbacks: app.pageflo.io, pageflo.io, os.legenex.com. TLS issue for the new names is blocked on SSH and on a DNS-01 CNAME for the PageFlo preview wildcard.
+
 ## 2026-09-20 W22
 
 All twenty `sq_*` quiz templates now have a structural composition. Unknown ids still fall back to the default card. Preview and live share `QuizSurface`. `pnpm test:compositions` 636 passed. `pnpm test:flow` 205 passed. `pnpm typecheck` pass.

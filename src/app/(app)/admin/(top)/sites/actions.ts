@@ -10,8 +10,8 @@ import { invokeLLM } from '@/lib/ai/invoke'
 import { homeBlocksForVertical, starterQuizSteps, starterLandingPage } from '@/lib/starter-content'
 import { seedStarterFunnelsForBrand } from '@/lib/funnel-samples'
 import { VERTICALS } from '@/lib/verticals'
-import { env } from '@/lib/pageflo/env'
-import { HOSTED_PRIVACY_PATH, HOSTED_TERMS_PATH, hostedLegalUrls } from '@/lib/brand/hosted-legal'
+import { hostedLegalUrls, HOSTED_PRIVACY_PATH, HOSTED_TERMS_PATH } from '@/lib/brand/hosted-legal'
+import { previewHostForSlug, previewRoots } from '@/lib/pageflo/hosts'
 
 /**
  * The accepted vertical values, derived from the one list in
@@ -43,6 +43,8 @@ const CreateInput = z.discriminatedUnion('mode', [Blank, Duplicate, AITemplate])
 const DEFAULT_PAGES = [
   { slug: '/', template_key: 'home', title: 'Home', uses_shared_template: false },
   { slug: '/partners', template_key: 'partners', title: 'Our Partners', uses_shared_template: true },
+  { slug: '/about', template_key: 'custom', title: 'About', uses_shared_template: false },
+  { slug: '/contact', template_key: 'custom', title: 'Contact', uses_shared_template: false },
   { slug: HOSTED_PRIVACY_PATH, template_key: 'privacy', title: 'Privacy Notice', uses_shared_template: true },
   { slug: '/privacy-policy', template_key: 'privacy-policy', title: 'Privacy Policy', uses_shared_template: true },
   { slug: HOSTED_TERMS_PATH, template_key: 'terms', title: 'Terms of Service', uses_shared_template: true },
@@ -65,7 +67,7 @@ const DEFAULT_BRAND = {
 
 const PHONE_BANK = ['(833) 555-0411', '(833) 555-0422', '(833) 555-0433', '(833) 555-0444', '(833) 555-0455']
 
-const previewHostFor = (slug: string): string => `${slug}.${env('previewDomain') || 'preview.legenex.com'}`
+const previewHostFor = (slug: string): string => previewHostForSlug(slug)
 
 const slugify = (input: string): string =>
   input
@@ -226,6 +228,21 @@ export async function createSite(rawInput: unknown): Promise<SuccessResult | Fai
     } as never,
     overrideAccess: true,
   })
+  for (const root of previewRoots()) {
+    const host = previewHostForSlug(input.slug, root)
+    if (host === previewHost) continue
+    await payload.create({
+      collection: 'domains',
+      data: {
+        site: siteId,
+        host,
+        kind: 'preview',
+        primary: false,
+        status: 'active',
+      } as never,
+      overrideAccess: true,
+    })
+  }
   invalidateHostCache()
 
   // 3. Create the default Pages. For a fresh (non-duplicated) Site we seed the

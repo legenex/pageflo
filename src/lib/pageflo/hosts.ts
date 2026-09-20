@@ -140,6 +140,50 @@ export const canonicalHostRedirect = (rawHost: string | null | undefined): strin
  * canonical sign-in URL. Falls back to the configured server URL and finally to
  * localhost so a development environment is never handed an empty string.
  */
+/** Canonical preview root, e.g. preview.pageflo.io. */
+export const previewRoot = (): string => normalizeHost(env('previewDomain')) || 'preview.pageflo.io'
+
+/** Legacy preview root that must keep serving during the cutover. */
+export const legacyPreviewRoot = (): string =>
+  normalizeHost(env('legacyPreviewDomain')) || 'preview.legenex.com'
+
+/** Every preview suffix a Brand may answer on. Canonical first. */
+export const previewRoots = (): string[] => {
+  const roots = [previewRoot(), legacyPreviewRoot()].filter(Boolean)
+  return [...new Set(roots)]
+}
+
+export const previewHostForSlug = (slug: string, root = previewRoot()): string => {
+  const clean = slug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '')
+  return clean ? `${clean}.${root}` : root
+}
+
+export const isPreviewHost = (rawHost: string | null | undefined): boolean => {
+  const host = normalizeHost(rawHost)
+  return previewRoots().some((root) => host === root || host.endsWith(`.${root}`))
+}
+
+/**
+ * The same Brand on the other preview suffix, if this host is a preview host.
+ * Used so `{slug}.preview.pageflo.io` resolves a row stored as
+ * `{slug}.preview.legenex.com` and the reverse, without a data backfill.
+ */
+export const previewAliasHosts = (rawHost: string | null | undefined): string[] => {
+  const host = normalizeHost(rawHost)
+  const aliases: string[] = []
+  for (const root of previewRoots()) {
+    const suffix = `.${root}`
+    if (!host.endsWith(suffix) || host === root) continue
+    const slug = host.slice(0, -suffix.length)
+    if (!slug || slug.includes('.')) continue
+    for (const other of previewRoots()) {
+      if (other === root) continue
+      aliases.push(`${slug}.${other}`)
+    }
+  }
+  return aliases
+}
+
 export const appOrigin = (): string => {
   const configured = env('serverUrl').trim().replace(/\/$/, '')
   if (configured) return configured

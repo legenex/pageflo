@@ -37,7 +37,7 @@ export default async function EditPageRoute({ params }: Props) {
     limit: 1,
     overrideAccess: true,
   })
-  const primaryHost = (dom.docs[0]?.host as string | undefined) || `${slug}.preview.legenex.com`
+  const primaryHost = (dom.docs[0]?.host as string | undefined) || `${slug}.preview.pageflo.io`
 
   // Site pages list — feeds the LinkPicker in the builder so href fields
   // can offer the Site's own pages as a dropdown instead of asking the
