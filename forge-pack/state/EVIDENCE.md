@@ -1,5 +1,34 @@
 # Evidence
 
+## W60 local 2026-09-20 (Codespace, not GX10-01)
+
+HEAD after host-provision and worker-boot fixes: see `git rev-parse HEAD`.
+Environment: GitHub Codespace `symmetrical-guide-5g75r9vw9xxcvrr6`, hostname `codespaces-d8809b`. Not GX10-01.
+
+Local gates:
+- `pnpm typecheck` pass
+- `pnpm test` all green
+- `pnpm test:isolation` 49
+- `pnpm test:identity` 33
+- `pnpm test:e2e` 34 (fresh production build)
+- `pnpm test:release` 31
+- `pnpm test:certs` 73
+- `pnpm test:console` 327
+- `pnpm lint:tokens` pass
+- `pnpm check:handbook` 22 routes, 19 sidebar destinations
+- `pnpm check:paths` 0 unresolved (local DB)
+- `pnpm verify:schema` 25 collections + 1 global
+- `next build` compiled after worker-boot split
+
+Production (this environment):
+- `https://os.legenex.com/api/legalos/health` 200 `{"ok":true,"app":"legalos"}`
+- DNS: pageflo.io, www, app, preview, `random-check.preview.pageflo.io` -> 51.81.202.161
+- TLS: unmatched SNI still `crashclaim.co`. `app.pageflo.io` HTTPS not valid.
+- `ssh pageflo` Permission denied (publickey); `~/.ssh/pageflo_deploy` absent
+- Plesk fetch/deploy + `scripts/release.sh`: UNPROVEN
+- `scripts/provision-pageflo-hosts.sh` live run: UNPROVEN
+- `PAGEFLO_LEGACY_HOST_REDIRECT` not set
+
 ## W20 W42 2026-09-20
 
 - DNS: pageflo.io, app.pageflo.io, preview.pageflo.io, www.pageflo.io, test.preview.pageflo.io -> 51.81.202.161

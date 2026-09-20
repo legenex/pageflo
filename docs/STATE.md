@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 20 September 2026, host-provision and Node worker boot fixed; W60 still blocked on SSH from this Codespace.
+Last updated: 20 September 2026, W60 local matrix green; production TLS and Plesk release still UNPROVEN from this Codespace.
 
 ---
 
@@ -24,7 +24,7 @@ Last updated: 20 September 2026, host-provision and Node worker boot fixed; W60 
 | Execution memory | `forge-pack/state/` |
 | Release mode | **Autonomous ordinary Plesk releases.** Implement, validate, commit, push, and the section 6 Plesk sequence after gates pass are pre-authorized (discovery 12.4). Human gates in `docs/HUMAN-GATES.md` still apply. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current wave | W50 complete in the repository. Host-provision script on main is corrected. W60 still needs production TLS, the Plesk release, and live proofs. |
+| Current wave | W50 complete. W60 local validation is green on this Codespace. Production TLS, Plesk release, and live PageFlo host proofs remain UNPROVEN until GX10-01 can `ssh pageflo`. |
 | Active human gates | None currently blocking application work. Wildcard ACME CNAME is live. Ordinary Plesk release and host TLS wait on SSH from GX10-01. |
 | Active blockers | This environment is GitHub Codespace `symmetrical-guide-5g75r9vw9xxcvrr6`, hostname `codespaces-d8809b`, not GX10-01. `ssh pageflo` fails: `~/.ssh/pageflo_deploy` is absent. PageFlo DNS points at the Plesk IP. HTTPS SNI still serves `crashclaim.co`. |
 
@@ -549,6 +549,10 @@ human gates. See `docs/HUMAN-GATES.md`.
 ---
 
 ## Change log
+
+### 20 September 2026, W60 local matrix
+
+Ran the W60 repository gate on this Codespace. `pnpm test`, isolation 49, identity 33, e2e 34, release 31, certs 73, console 327, typecheck, lint:tokens, check:handbook, check:paths, verify:schema, and a successful `next build` after the worker-boot split. Console walk now covers Websites and Deployments and expects Brand-first copy (`Brands` in the drawer, `No Brands match these filters`). Production release and PageFlo TLS remain UNPROVEN: this is still Codespace `symmetrical-guide-5g75r9vw9xxcvrr6`, not GX10-01, and `ssh pageflo` has no key.
 
 ### 20 September 2026, lead-delivery worker no longer breaks `next build`
 

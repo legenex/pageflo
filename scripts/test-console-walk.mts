@@ -113,12 +113,13 @@ const isAllowedConsoleError = (text: string): boolean =>
 const CONSOLE_ROUTES: Array<{ path: string; label: string }> = [
   { path: '/admin/overview', label: 'Overview' },
   { path: '/admin/leads', label: 'Leads' },
-  { path: '/admin/sites', label: 'Sites' },
+  { path: '/admin/sites', label: 'Brands' },
+  { path: '/admin/websites', label: 'Websites' },
   { path: '/admin/brands/domains', label: 'Domains' },
-  { path: '/admin/brands/brand-identities', label: 'Brand Kits' },
   { path: '/admin/quizzes', label: 'Quizzes' },
   { path: '/admin/landing-pages', label: 'Landing Pages' },
   { path: '/admin/advertorials', label: 'Advertorials' },
+  { path: '/admin/deployments', label: 'Deployments' },
   { path: '/admin/analytics', label: 'Analytics' },
   { path: '/admin/integrity', label: 'Campaign Integrity' },
   { path: '/admin/system', label: 'System' },
@@ -568,8 +569,8 @@ const main = async (): Promise<void> => {
     if ((await opener.count()) > 0) {
       await opener.click()
       await page.waitForTimeout(250)
-      const sitesLink = page.getByRole('link', { name: /^Sites$/ }).first()
-      t((await sitesLink.count()) > 0, 'mobile: the drawer lists Sites')
+      const brandsLink = page.getByRole('link', { name: /^Brands$/ }).first()
+      t((await brandsLink.count()) > 0, 'mobile: the drawer lists Brands')
       await page.keyboard.press('Escape')
       await page.waitForTimeout(250)
       t(await opener.isVisible(), 'mobile: Escape closes the drawer and the opener returns')
@@ -633,7 +634,7 @@ const main = async (): Promise<void> => {
       await search.fill('zzz-no-such-site')
       await page.waitForTimeout(900)
       const body = await page.locator('body').innerText()
-      t(/No Sites match these filters/i.test(body), 'sites: a search with no matches shows the empty state')
+      t(/No Brands match these filters/i.test(body), 'sites: a search with no matches shows the empty state')
     }
     await page.close()
   }
