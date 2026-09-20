@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 20 September 2026, W40 Brand auto-reskin.
+Last updated: 20 September 2026, W41 bulk deploy.
 
 ---
 
@@ -24,7 +24,7 @@ Last updated: 20 September 2026, W40 Brand auto-reskin.
 | Execution memory | `forge-pack/state/` |
 | Release mode | **Autonomous ordinary Plesk releases.** Implement, validate, commit, push, and the section 6 Plesk sequence after gates pass are pre-authorized (discovery 12.4). Human gates in `docs/HUMAN-GATES.md` still apply. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current wave | W40 complete in the repository (not released). Next: W41. Host TLS still UNPROVEN (no SSH from this Codespace). |
+| Current wave | W41 complete in the repository (not released). Next: W43. Host TLS still UNPROVEN (no SSH from this Codespace). |
 | Active human gates | None currently blocking application work. Wildcard ACME CNAME is live. Ordinary Plesk release waits on SSH. |
 | Active blockers | This environment is a GitHub Codespace without `~/.ssh/pageflo_deploy`. PageFlo DNS points at the Plesk IP. HTTPS SNI still serves `crashclaim.co`. |
 
@@ -549,6 +549,10 @@ human gates. See `docs/HUMAN-GATES.md`.
 ---
 
 ## Change log
+
+### 20 September 2026, W41 bulk deploy and preview URLs
+
+The Deployments page can create draft deployments of one master across many Brands. Each Brand is an isolated attempt. Review shows `{slug}.preview.pageflo.io` URLs. Drafts are not live. `pnpm test:bulk-deploy` 15 passed.
 
 ### 20 September 2026, W40 Brand auto-reskin
 

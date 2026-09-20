@@ -16,7 +16,9 @@ import {
   Tr,
   type Tone,
 } from '@/components/pageflo/primitives'
+import { BulkDeployForm } from '@/components/pageflo/BulkDeployForm'
 import { getCurrentUser } from '@/lib/auth'
+import { previewUrlForBrandPath } from '@/lib/bulk-deploy'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Deployments' }
@@ -27,6 +29,7 @@ type Row = {
   kind: string
   brand: string
   path: string
+  preview: string
   state: string
   tone: Tone
 }
@@ -44,6 +47,13 @@ const hostOf = (raw: Record<string, unknown>): string => {
   return domain?.host ? `${domain.host}${path === '/' ? '' : path}` : 'no domain bound'
 }
 
+const previewOf = (raw: Record<string, unknown>): string => {
+  const site = raw.site && typeof raw.site === 'object' ? (raw.site as { slug?: string }) : null
+  const path = typeof raw.path === 'string' ? raw.path : '/'
+  if (!site?.slug) return ''
+  return previewUrlForBrandPath(site.slug, path)
+}
+
 const stateOf = (status: unknown): { state: string; tone: Tone } => {
   const s = String(status ?? 'draft')
   if (s === 'live' || s === 'published' || s === 'active') return { state: 'Live', tone: 'pos' }
@@ -58,11 +68,31 @@ export default async function DeploymentsPage() {
   const payload = await getPayload({ config })
   const scoped = { user, overrideAccess: false } as const
 
-  const [quizDeployments, lpDeployments, advertorialDeployments] = await Promise.all([
-    payload.find({ collection: 'funnel-quiz-deployments', limit: 200, depth: 1, sort: '-updatedAt', ...scoped }),
-    payload.find({ collection: 'funnel-lp-deployments', limit: 200, depth: 1, sort: '-updatedAt', ...scoped }),
-    payload.find({ collection: 'funnel-advertorial-deployments', limit: 200, depth: 1, sort: '-updatedAt', ...scoped }),
-  ])
+  const [quizDeployments, lpDeployments, advertorialDeployments, quizzes, landingPages, advertorials, sites] =
+    await Promise.all([
+      payload.find({ collection: 'funnel-quiz-deployments', limit: 200, depth: 1, sort: '-updatedAt', ...scoped }),
+      payload.find({ collection: 'funnel-lp-deployments', limit: 200, depth: 1, sort: '-updatedAt', ...scoped }),
+      payload.find({ collection: 'funnel-advertorial-deployments', limit: 200, depth: 1, sort: '-updatedAt', ...scoped }),
+      payload.find({ collection: 'funnel-quizzes', limit: 200, depth: 0, sort: 'name', ...scoped }),
+      payload.find({ collection: 'funnel-landing-pages', limit: 200, depth: 0, sort: 'name', ...scoped }),
+      payload.find({ collection: 'funnel-advertorials', limit: 200, depth: 0, sort: 'title', ...scoped }),
+      payload.find({ collection: 'sites', limit: 200, depth: 0, sort: 'name', ...scoped }),
+    ])
+
+  const masters = [
+    ...quizzes.docs.map((d) => ({ id: String(d.id), name: String(d.name || d.id), kind: 'quiz' as const })),
+    ...landingPages.docs.map((d) => ({ id: String(d.id), name: String(d.name || d.id), kind: 'lp' as const })),
+    ...advertorials.docs.map((d) => ({
+      id: String(d.id),
+      name: String((d as { title?: string }).title || d.id),
+      kind: 'advertorial' as const,
+    })),
+  ]
+  const brands = sites.docs.map((d) => ({
+    id: String(d.id),
+    slug: String(d.slug || ''),
+    name: String(d.name || d.slug || d.id),
+  }))
 
   const rows: Row[] = [
     ...quizDeployments.docs.map((raw) => {
@@ -74,6 +104,7 @@ export default async function DeploymentsPage() {
         kind: 'Quiz',
         brand: nameOf(d.site, 'Unassigned'),
         path: hostOf(d),
+        preview: previewOf(d),
         state: st.state,
         tone: st.tone,
       }
@@ -87,6 +118,7 @@ export default async function DeploymentsPage() {
         kind: 'Landing Page',
         brand: nameOf(d.site, 'Unassigned'),
         path: hostOf(d),
+        preview: previewOf(d),
         state: st.state,
         tone: st.tone,
       }
@@ -100,6 +132,7 @@ export default async function DeploymentsPage() {
         kind: 'Advertorial',
         brand: nameOf(d.site, 'Unassigned'),
         path: hostOf(d),
+        preview: previewOf(d),
         state: st.state,
         tone: st.tone,
       }
@@ -112,6 +145,13 @@ export default async function DeploymentsPage() {
         title="Deployments"
         subtitle="A deployment binds a master asset to a Brand, domain and path. Public copy stays on the master."
       />
+      <Card className="mb-6 p-5">
+        <h2 className="mb-1 text-[15px] font-semibold text-ink">Bulk deploy</h2>
+        <p className="mb-4 text-[13px] text-mute">
+          Create draft deployments of one master across Brands. A failure on one Brand does not stop the others. Drafts are not live until you publish them.
+        </p>
+        <BulkDeployForm masters={masters} brands={brands} />
+      </Card>
       <Card className="overflow-hidden">
         {rows.length === 0 ? (
           <EmptyState
@@ -137,6 +177,7 @@ export default async function DeploymentsPage() {
                   <Th>Kind</Th>
                   <Th>Brand</Th>
                   <Th>Path</Th>
+                  <Th>Preview</Th>
                   <Th>State</Th>
                 </Tr>
               </thead>
@@ -148,6 +189,15 @@ export default async function DeploymentsPage() {
                     <Td>{row.brand}</Td>
                     <Td>
                       <Mono>{row.path}</Mono>
+                    </Td>
+                    <Td>
+                      {row.preview ? (
+                        <a href={row.preview} className="font-mono text-[12px] text-ink underline-offset-2 hover:underline">
+                          {row.preview}
+                        </a>
+                      ) : (
+                        <span className="text-mute">—</span>
+                      )}
                     </Td>
                     <Td>
                       <StatusPill label={row.state} tone={row.tone} />
