@@ -14,6 +14,7 @@ import { T, genId, brandShortName, Btn, Input, Textarea, Select, Label, Pill, Ic
 import { resolveTokens } from '../lp/render'
 import { selectableOptions } from '@/lib/selectable'
 import { advDefaultBottomSection, advSlugify } from './seed-data'
+import { advertorialChrome } from '@/lib/advertorial-templates'
 import {
   createAdvertorial as svCreateAdvertorial,
   saveAdvertorial as svSaveAdvertorial,
@@ -1707,6 +1708,7 @@ const AdvPreviewView = ({ advertorial, brands, deployments, quizDeployments, qui
   const primary = effectiveBrand?.colors?.primary || '#1d8df6';
   const accent = effectiveBrand?.colors?.accent || primary;
   const callDigits = (effectiveBrand?.contact?.callNumber || '').replace(/[^\d+]/g, '');
+  const chrome = advertorialChrome(advertorial.templateId);
 
   return <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
     {/* Builder preview chrome (only visible inside admin) */}
@@ -1737,7 +1739,7 @@ const AdvPreviewView = ({ advertorial, brands, deployments, quizDeployments, qui
     </div>
 
     {/* The actual rendered advertorial (what the visitor sees) */}
-    <div className="adv-public-root" style={{ flex: 1, overflowY: 'auto', backgroundColor: '#fff' }}>
+    <div className="adv-public-root" data-adv-template={chrome.id} style={{ flex: 1, overflowY: 'auto', backgroundColor: chrome.pageBackground }}>
       <style>{`
         /* Advertorial mobile responsive
            The article body already uses clamp() for padding/font-size, so we
@@ -1798,11 +1800,12 @@ const AdvPreviewView = ({ advertorial, brands, deployments, quizDeployments, qui
       </div>
 
       {/* Article body - always Inter on white, brand-agnostic typography */}
-      <article style={{
-        maxWidth: 760, margin: '0 auto',
+      <article data-adv-template={chrome.id} style={{
+        maxWidth: chrome.articleMaxWidth, margin: '0 auto',
         padding: 'clamp(32px, 5vw, 64px) clamp(20px, 4vw, 32px)',
-        backgroundColor: '#fff',
-        fontFamily: ADV_ARTICLE_FONT
+        backgroundColor: chrome.id === 'whistleblower' ? '#111827' : '#fff',
+        color: chrome.id === 'whistleblower' ? '#e5e7eb' : undefined,
+        fontFamily: chrome.articleFont
       }}>
         {advertorial.sections.map(s => <React.Fragment key={s.id}>{advRenderSection(s, effectiveBrand, effectiveQuizDep)}</React.Fragment>)}
       </article>
