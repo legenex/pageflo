@@ -377,10 +377,10 @@ t(!decideTransition('live', 'live', okPre).ok, 'a no-op transition is refused ra
   t(lpDeploymentFingerprint({ ...row, status: 'paused' }) === base, 'status is the OTHER axis and must not move the fingerprint, or pausing would read as an edit')
   t(lpDeploymentFingerprint({ ...row, updatedAt: 'later' }) === base, 'timestamps are not content')
   t(lpDeploymentFingerprint({ ...row, path: '/c/mva-2' }) !== base, 'the path is')
-  t(lpDeploymentFingerprint({ ...row, content_overrides: { hero_headline: 'Changed', hero_sub: 'Two' } }) !== base, 'so is the copy')
+  t(lpDeploymentFingerprint({ ...row, quiz: 10 }) !== base, 'the bound quiz is')
   t(
-    lpDeploymentFingerprint({ ...row, content_overrides: { hero_sub: 'Two', hero_headline: 'One' } }) === base,
-    'key ORDER in a jsonb bag is not an edit — JSON.stringify preserves insertion order and Postgres does not',
+    lpDeploymentFingerprint({ ...row, content_overrides: { hero_headline: 'Changed', hero_sub: 'Two' } }) === base,
+    'legacy deployment copy is not a content change — public render ignores it',
   )
   t(lpDeploymentFingerprint({ ...row, domain: { id: 4 } }) === base, 'a populated relationship and a bare id are one row, so depth must not move the fingerprint')
   t(lpDeploymentFingerprint({ ...row, quiz_deployment_id: '' }) === base, "an empty text column and an absent one both mean 'not set'")
@@ -904,25 +904,22 @@ const BOUND_LP_DEP = { ...GOOD_LP_DEP, quiz: 70 }
     deployment: { ...BOUND_LP_DEP, content_overrides: { [headline.id]: 'A real headline' } },
     landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: GOOD_FLOW,
   })
-  t(r.ok, `a deployment with valid overrides passes${r.ok ? '' : ' — ' + r.blocking.map((c) => c.id).join(',')}`)
+  t(r.ok, `legacy deployment copy is ignored and does not block a valid master${r.ok ? '' : ' — ' + r.blocking.map((c) => c.id).join(',')}`)
 }
 {
-  // Copy written into the quiz card is copy the visitor never sees, because the
-  // card is replaced. It must not be storable, and the preflight is the last
-  // place that can say so.
   const inside = LP_TPL.quizMount.slotIds[0]
   const r = await lpDeploymentPreflight(CTX(), {
     deployment: { ...BOUND_LP_DEP, content_overrides: { [inside]: 'copy nobody will read' } },
     landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: GOOD_FLOW,
   })
-  t(!r.ok && r.blocking.some((c) => c.id === 'overrides'), 'an override inside the quiz card is refused')
+  t(r.ok, 'legacy copy inside the quiz card is ignored rather than treated as master copy')
 }
 {
   const r = await lpDeploymentPreflight(CTX(), {
-    deployment: { ...GOOD_LP_DEP, content_overrides: { s99_nope_1: 'ghost copy' } },
-    landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: null,
+    deployment: { ...BOUND_LP_DEP, content_overrides: { s99_nope_1: 'ghost copy' } },
+    landingPage: GOOD_LP, site: SITE, domain: null, quizDeployment: null, quiz: GOOD_FLOW,
   })
-  t(!r.ok && r.blocking.some((c) => c.id === 'overrides'), 'an override naming no slot blocks publication — it is copy that will never appear')
+  t(r.ok, 'a leftover deployment override naming no slot is ignored — copy lives on the master')
 }
 {
   const r = await lpDeploymentPreflight(CTX(), {

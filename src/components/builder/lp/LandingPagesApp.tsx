@@ -837,11 +837,10 @@ const LPPreviewModal = ({ previewState, templates, brands, deployments, quizzes,
   const brand = brands.find((b) => b.id === selectedBrandId)
 
   /*
-   * The same merge `resolveLpDeployment` precomputes as `composedOverrides`:
-   * the template's own copy with the deployment's copy on top. Merging it
-   * differently here would make this a preview of a page that does not exist.
+   * The same map `resolveLpDeployment` precomputes as `composedOverrides`:
+   * the master's slot copy. Deployment content overrides are not applied.
    */
-  const slotOverrides = { ...(template.slotOverrides || {}), ...(deployment?.contentOverrides || {}) }
+  const slotOverrides = { ...(template.slotOverrides || {}) }
   const quiz = deployment ? quizzes.find((q) => q.id === deployment.quizId) || null : null
 
   /*

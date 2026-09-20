@@ -1,9 +1,9 @@
 # Handoff
 
-Current phase: Wave 04. W32 complete in repo. Next: W40 Deployment and Brand auto-reskin.
-Last verified HEAD: W32 (quiz builder uses validateQuizFlow; deployments refuse quiz-logic payloads). Previous: `8d8d937` W31 public advertorial renderer.
-Tests run: `pnpm test:quiz-master-runtime` 20 passed. `pnpm test:master-semantics` 9 passed. `pnpm test:flow` 205 passed. `pnpm test:compositions` 636 passed. `pnpm typecheck` pass.
+Current phase: Wave 04. W40 complete in repo. Next: W41 bulk deploy and preview routing.
+Last verified HEAD: W40 Brand auto-reskin (Check A Case vs Don't Settle; deployment copy ignored at render).
+Tests run: `pnpm test:brand-reskin` 19 passed. `pnpm typecheck` pass. `pnpm test:publish` 245 passed, 1 failed (pre-existing site-resolver regex, not W40).
 Known blockers: this session is GitHub Codespace `symmetrical-guide-5g75r9vw9xxcvrr6`, not GX10-01. `ssh pageflo` fails: `~/.ssh/pageflo_deploy` absent. Production TLS for `app.pageflo.io` and `*.preview.pageflo.io` still presents `crashclaim.co`. ACME CNAME is live.
 Production: `https://os.legenex.com/api/legalos/health` 200. No PageFlo work released this session. Do not flip `PAGEFLO_LEGACY_HOST_REDIRECT`.
-Next action: W40 one master deploys under Check A Case and Don't Settle with Brand identity reskin and no deployment copy divergence. When SSH exists, provision certs then Plesk release.
-Important files: `src/lib/master-safety.ts`, `src/components/builder/quiz/QuizBuilderApp.tsx`, `src/lib/advertorial-deployment.ts`, `scripts/provision-pageflo-hosts.sh`.
+Next action: W41 bulk multi-brand deploy with isolated failures and preview URL per deployment. When SSH exists, provision certs then Plesk release of W31-W40.
+Important files: `src/lib/lp-deployment.ts`, `src/lib/master-safety.ts`, `src/seed/sites.ts`, `scripts/provision-pageflo-hosts.sh`.

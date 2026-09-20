@@ -10,7 +10,7 @@
 - [x] W30 Website import and AI editing
 - [x] W31 Landing Page and Advertorial fidelity
 - [x] W32 Master Quiz builder/runtime completion
-- [ ] W40 Deployment and Brand auto-reskin
+- [x] W40 Deployment and Brand auto-reskin
 - [ ] W41 Bulk deploy and preview routing
 - [x] W42 Domains and PageFlo preview host support
 - [ ] W43 Leads UI and delivery observability

@@ -57,11 +57,8 @@ export type PublicLpDeployment = {
    */
   quizId: string
   /**
-   * This deployment's own copy, keyed by the template's slot ids.
-   *
-   * Overrides only. A slot with no entry renders the stock template's wording,
-   * so one landing page under three brands can say three different things
-   * without three copies of the markup existing anywhere.
+   * Legacy column. New writes are refused. Public render ignores this bag so
+   * two brands cannot diverge on copy from one master.
    */
   contentOverrides: Record<string, string>
 }
@@ -343,15 +340,10 @@ const resolveLpDeploymentUncached = async (
       slotOverrides: templateSlotOverrides,
     },
     /**
-     * What the renderer is actually given: the template's own copy with this
-     * deployment's copy on top.
-     *
-     * Merged here rather than in the renderer because there is exactly one
-     * right answer and more than one renderer entry point. A slot present in
-     * neither map draws the reference's wording, so a corrected template still
-     * reaches every deployment that has not overridden that slot.
+     * Master copy only. Deployment content_overrides are a legacy column and
+     * are not applied: Brand identity reskins the page, copy stays on the master.
      */
-    composedOverrides: { ...templateSlotOverrides, ...normalizeOverrides(doc.content_overrides) },
+    composedOverrides: templateSlotOverrides,
     brand: siteToBrand(siteDoc as unknown as Record<string, unknown>, domainList),
     quiz,
     siteId,

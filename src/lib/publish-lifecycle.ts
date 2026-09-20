@@ -448,7 +448,6 @@ export const lpDeploymentPreflight = async (
      */
     const overrides = {
       ...((landingPage?.slot_overrides ?? {}) as Record<string, string>),
-      ...((deployment.content_overrides ?? {}) as Record<string, string>),
     }
     if (ported) {
       const slotted = asSlotted(ported)

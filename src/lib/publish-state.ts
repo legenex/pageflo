@@ -44,7 +44,6 @@ const LP_FINGERPRINTED_FIELDS = [
   'quiz_deployment_id',
   'embedded_quiz_template_id',
   'embedded_progress_form',
-  'content_overrides',
   'destination_overrides',
   'utm',
   'pixels',

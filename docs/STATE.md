@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 20 September 2026, W32 quiz builder/runtime.
+Last updated: 20 September 2026, W40 Brand auto-reskin.
 
 ---
 
@@ -24,7 +24,7 @@ Last updated: 20 September 2026, W32 quiz builder/runtime.
 | Execution memory | `forge-pack/state/` |
 | Release mode | **Autonomous ordinary Plesk releases.** Implement, validate, commit, push, and the section 6 Plesk sequence after gates pass are pre-authorized (discovery 12.4). Human gates in `docs/HUMAN-GATES.md` still apply. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current wave | W32 complete in the repository (not released). Next: W40. Host TLS still UNPROVEN (no SSH from this Codespace). |
+| Current wave | W40 complete in the repository (not released). Next: W41. Host TLS still UNPROVEN (no SSH from this Codespace). |
 | Active human gates | None currently blocking application work. Wildcard ACME CNAME is live. Ordinary Plesk release waits on SSH. |
 | Active blockers | This environment is a GitHub Codespace without `~/.ssh/pageflo_deploy`. PageFlo DNS points at the Plesk IP. HTTPS SNI still serves `crashclaim.co`. |
 
@@ -549,6 +549,10 @@ human gates. See `docs/HUMAN-GATES.md`.
 ---
 
 ## Change log
+
+### 20 September 2026, W40 Brand auto-reskin
+
+One master now reskins under Check A Case and Don't Settle from Brand identity. Public LP render uses master slot copy only. Incoming deployment content overrides are refused. Don't Settle is a seeded Brand. `pnpm test:brand-reskin` 19 passed.
 
 ### 20 September 2026, W32 master quiz builder and runtime
 

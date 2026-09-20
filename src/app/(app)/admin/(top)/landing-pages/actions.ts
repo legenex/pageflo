@@ -146,31 +146,26 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
     const template = canonicalTemplateId('lp', lpDoc.template_id)
     if (!template.ok) return { ok: false, error: `landing page template: ${template.error}` }
 
-    // Deployment copy is validated against the template it deploys, here, at the
-    // point the operator can still fix it. An override naming a slot that does
-    // not exist is copy that will never appear on the page; accepting it
-    // silently is how a deployment ends up saying something nobody can find in
-    // the editor.
     const raw = (dep.contentOverrides ?? {}) as Record<string, unknown>
+    const incoming: Record<string, string> = {}
     for (const [k, v] of Object.entries(raw)) {
-      if (typeof v === 'string') overrides[k] = v
-      else return { ok: false, error: `content override "${k}" is not text` }
+      if (typeof v === 'string' && v !== '') incoming[k] = v
+      else if (v != null && v !== '') return { ok: false, error: `content override "${k}" is not text` }
     }
-    // Through the registry, not by indexing the library's own map. The map is a
-    // second lookup with a second idea of which ids exist, which is what the
-    // registry exists to remove - and `pnpm test:registry` fails on any module
-    // outside it that reaches for one.
+    if (Object.keys(incoming).length > 0) {
+      const { refuseDeploymentCopyOverride } = await import('@/lib/master-safety')
+      return refuseDeploymentCopyOverride()
+    }
+    // Master copy lives on the landing page. Validate THAT, not a deployment bag.
     const entry = resolveTemplate('lp', template.id)
     const ported = entry.ok && entry.template.kind === 'lp' ? entry.template.template : null
+    const masterSlots = (lpDoc.slot_overrides ?? {}) as Record<string, unknown>
+    for (const [k, v] of Object.entries(masterSlots)) {
+      if (typeof v === 'string') overrides[k] = v
+    }
     if (ported) {
-      // Incremental saves stay possible: the go-live transition below runs the
-      // full preflight, which demands completeness over the merged copy.
       const v = validateOverrides(asSlotted(ported), overrides, { requireComplete: false })
       if (!v.ok) return { ok: false, error: v.problems.map((p) => p.detail).join('; ') }
-    } else if (Object.keys(overrides).length > 0) {
-      // A legacy identity template has no slots: its copy travels as nodes on
-      // the page itself. Overrides would silently do nothing.
-      return { ok: false, error: `template "${template.id}" has no content slots to override` }
     }
   }
 
@@ -282,7 +277,6 @@ export async function saveDeployment(args: { deployment: Record<string, unknown>
     quiz: quizId,
     embedded_quiz_template_id: embeddedTemplateId,
     embedded_progress_form: (dep.embeddedProgressForm as string) || null,
-    content_overrides: overrides,
     // Null rather than {} so "this placement overrides nothing" is one value
     // rather than two, matching what the quiz side stores.
     destination_overrides: Object.keys(destinationOverrides).length > 0 ? destinationOverrides : null,
