@@ -257,6 +257,15 @@ ok('does not swallow ACME failures with || true',
   !/acme\.sh[\s\S]{0,200}\|\| true/.test(scriptNoComments))
 ok('does not set PAGEFLO_LEGACY_HOST_REDIRECT',
   !scriptNoComments.includes('PAGEFLO_LEGACY_HOST_REDIRECT'))
+ok('reuses the live preview.legenex.com acme-dns account for DNS-01',
+  script.includes('load_acmedns_creds') &&
+    script.includes('*.preview.legenex.com_ecc') &&
+    script.includes('ACMEDNS_USERNAME'))
+ok('DNS-01 issue cannot hang on acme.sh interactive register',
+  script.includes('</dev/null'))
+ok('refuses DNS-01 when ACMEDNS credentials are missing instead of registering',
+  script.includes('cannot reuse the live acme-dns account') &&
+    script.includes('ACMEDNS credentials were not present'))
 ok('does not write preview.legenex.com or os.legenex.com vhosts',
   !/write_vhost .*preview\.legenex\.com/.test(script) &&
     !scriptNoComments.includes('os.legenex.com.conf'))

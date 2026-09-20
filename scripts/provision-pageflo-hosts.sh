@@ -97,6 +97,28 @@ HOOK
   chmod 700 "$RELOAD_HOOK"
 }
 
+# The existing *.preview.legenex.com cert stores ACMEDNS_* on its domain conf.
+# account.conf does not. A new preview.pageflo.io issue would otherwise register
+# a fresh acme-dns account and block on `read`. Reuse the live account: both
+# wildcards already CNAME to the same acme-dns subdomain.
+load_acmedns_creds() {
+  local conf="$ACME_HOME/*.preview.legenex.com_ecc/*.preview.legenex.com.conf"
+  if [ ! -f "$conf" ]; then
+    die "missing $conf; cannot reuse the live acme-dns account for DNS-01"
+  fi
+  # shellcheck disable=SC1090
+  set -a
+  # Source only the four ACMEDNS assignments. The rest of the domain conf is
+  # acme.sh internals for a different certificate.
+  eval "$(grep -E '^ACMEDNS_(BASE_URL|USERNAME|PASSWORD|SUBDOMAIN)=' "$conf")"
+  set +a
+  if [ -z "${ACMEDNS_USERNAME:-}" ] || [ -z "${ACMEDNS_PASSWORD:-}" ] || [ -z "${ACMEDNS_SUBDOMAIN:-}" ]; then
+    die "ACMEDNS credentials were not present on the live preview.legenex.com cert"
+  fi
+  export ACMEDNS_BASE_URL ACMEDNS_USERNAME ACMEDNS_PASSWORD ACMEDNS_SUBDOMAIN
+  log "loaded acme-dns account from preview.legenex.com (values not printed)"
+}
+
 load_acme_account() {
   if [ -f "$ACME_HOME/account.conf" ]; then
     set -a
@@ -104,6 +126,7 @@ load_acme_account() {
     . "$ACME_HOME/account.conf"
     set +a
   fi
+  load_acmedns_creds
 }
 
 cert_files_ok() {
@@ -190,8 +213,9 @@ issue_wildcard_dns01() {
     return
   fi
   set +e
+  # stdin closed so a missing-cred path cannot block on acme.sh's `read`.
   "$ACME_SH" --issue --server "$LE_SERVER" --dns dns_acmedns \
-    -d "$wild" -d "$base" --keylength ec-256
+    -d "$wild" -d "$base" --keylength ec-256 </dev/null
   local code=$?
   set -e
   if acme_issue_ok "$code"; then
@@ -224,7 +248,7 @@ force_wildcard_dns01() {
     return
   fi
   "$ACME_SH" --issue --server "$LE_SERVER" --dns dns_acmedns \
-    -d "$wild" -d "$base" --keylength ec-256 --force
+    -d "$wild" -d "$base" --keylength ec-256 --force </dev/null
 }
 
 write_http_bootstrap() {
