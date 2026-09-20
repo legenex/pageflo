@@ -13,6 +13,7 @@ import { canonicalTemplateId } from '@/lib/template-registry'
 import { resolveQuizTemplateSelection } from '@/lib/template-records/select'
 import { relationId, requireDeploymentSiteAdmin } from '@/lib/authz'
 import { setQuizDeploymentStatus } from '@/app/(app)/admin/(top)/publish-actions'
+import { deploymentCarriesQuizLogic, refuseDeploymentQuizLogic } from '@/lib/master-safety'
 
 const PATH = '/admin/quizzes'
 
@@ -158,6 +159,8 @@ export async function saveQuizDeployment(args: { deployment: Record<string, unkn
 
   const siteId = numFromBrandId(dep.brandId)
   const isExisting = typeof dep.id === 'string' && /^\d+$/.test(dep.id)
+
+  if (deploymentCarriesQuizLogic(dep)) return refuseDeploymentQuizLogic()
 
   // The three funnel deployment collections are `isAuthenticated` on every verb,
   // so `overrideAccess: false` alone lets any logged-in user write any tenant's

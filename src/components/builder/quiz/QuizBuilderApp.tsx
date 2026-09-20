@@ -40,6 +40,7 @@ import { BrandQuickEdit } from '../brand/BrandQuickEdit'
 import {
   DESTINATION_KEYS, DESTINATION_LABELS, resolveDestination, destinationOrigin, isSafeDestinationUrl,
 } from '@/lib/quiz-destinations'
+import { validateQuizFlow } from '@/lib/quiz-flow'
 
 /**
  * Save status indicator. The builder autosaves, so the useful signal is not "is
@@ -827,7 +828,26 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
   const selectedNode = currentQuiz?.nodes.find((n) => n.id === selectedNodeId)
   const previewNode = currentQuiz?.nodes.find((n) => n.id === previewNodeId)
   const customFields = currentQuiz?.customFields || []
-  const graphIssues = useMemo(() => (currentQuiz ? lintQuizGraph(currentQuiz) : []), [currentQuiz])
+  const graphIssues = useMemo(() => {
+    if (!currentQuiz) return []
+    const lint = lintQuizGraph(currentQuiz)
+    let flow = []
+    try {
+      const v = validateQuizFlow(currentQuiz)
+      flow = v.checks.flatMap((c) => [...c.errors, ...c.warnings])
+    } catch {
+      flow = [{ level: 'error', code: 'flow_validator', message: 'The flow validator could not run on this quiz.' }]
+    }
+    const seen = new Set(lint.map((i) => `${i.code}:${i.message}`))
+    const extra = []
+    for (const issue of flow) {
+      const k = `${issue.code}:${issue.message}`
+      if (seen.has(k)) continue
+      seen.add(k)
+      extra.push(issue)
+    }
+    return [...lint, ...extra]
+  }, [currentQuiz])
 
   const getQuiz = useCallback((id) => quizzesRef.current.find((q) => q.id === id), [])
 

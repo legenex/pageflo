@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 20 September 2026, W31 public advertorial renderer.
+Last updated: 20 September 2026, W32 quiz builder/runtime.
 
 ---
 
@@ -24,7 +24,7 @@ Last updated: 20 September 2026, W31 public advertorial renderer.
 | Execution memory | `forge-pack/state/` |
 | Release mode | **Autonomous ordinary Plesk releases.** Implement, validate, commit, push, and the section 6 Plesk sequence after gates pass are pre-authorized (discovery 12.4). Human gates in `docs/HUMAN-GATES.md` still apply. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current wave | W31 complete in the repository (not released). Next: W32. Host TLS still UNPROVEN (no SSH from this Codespace). |
+| Current wave | W32 complete in the repository (not released). Next: W40. Host TLS still UNPROVEN (no SSH from this Codespace). |
 | Active human gates | None currently blocking application work. Wildcard ACME CNAME is live. Ordinary Plesk release waits on SSH. |
 | Active blockers | This environment is a GitHub Codespace without `~/.ssh/pageflo_deploy`. PageFlo DNS points at the Plesk IP. HTTPS SNI still serves `crashclaim.co`. |
 
@@ -549,6 +549,10 @@ human gates. See `docs/HUMAN-GATES.md`.
 ---
 
 ## Change log
+
+### 20 September 2026, W32 master quiz builder and runtime
+
+The quiz builder now runs `validateQuizFlow` while authoring, the same validator publish uses. Saving a quiz deployment that carries nodes, steps, tiers or custom fields is refused. Visual template choice on a deployment is not treated as logic. `pnpm test:quiz-master-runtime` 20 passed. `pnpm test:flow` 205 passed. `pnpm test:compositions` 636 passed.
 
 ### 20 September 2026, W31 public advertorial renderer
 

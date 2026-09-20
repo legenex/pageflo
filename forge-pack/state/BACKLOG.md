@@ -9,7 +9,7 @@
 - [x] W22 Quiz composition renderer repair
 - [x] W30 Website import and AI editing
 - [x] W31 Landing Page and Advertorial fidelity
-- [ ] W32 Master Quiz builder/runtime completion
+- [x] W32 Master Quiz builder/runtime completion
 - [ ] W40 Deployment and Brand auto-reskin
 - [ ] W41 Bulk deploy and preview routing
 - [x] W42 Domains and PageFlo preview host support

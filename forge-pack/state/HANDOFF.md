@@ -1,9 +1,9 @@
 # Handoff
 
-Current phase: Wave 03. W31 complete in repo. Next: W32 Master Quiz builder/runtime, then W40.
-Last verified HEAD after this unit: see `git rev-parse HEAD` (W31 public advertorial renderer, not yet released).
-Tests run: `pnpm test:lp-advertorial-fidelity` 22 passed, 0 failed. `pnpm typecheck` pass. `pnpm test:publish` 245 passed, 1 failed (pre-existing source regex in site-resolver, not caused by W31).
-Known blockers: this session is GitHub Codespace `symmetrical-guide-5g75r9vw9xxcvrr6`, not GX10-01. `ssh pageflo` fails: `~/.ssh/pageflo_deploy` is absent. Production TLS for `app.pageflo.io` and `*.preview.pageflo.io` still presents `crashclaim.co`.
-Production: `https://os.legenex.com/api/legalos/health` 200 `{"ok":true,"app":"legalos"}`. DNS A records for pageflo.io / app / preview / wildcard names point at `51.81.202.161`. `_acme-challenge.preview.pageflo.io` CNAME to `7bd5dcb7-ec33-4647-af4e-042ab69c40b9.auth.acme-dns.io.` is live. Host issuance still needs SSH as root and `scripts/provision-pageflo-hosts.sh`. Do not flip `PAGEFLO_LEGACY_HOST_REDIRECT`.
-Next action: W32 quiz builder/runtime completion. When SSH exists, run provision script, prove app.pageflo.io health 200, prove `*.preview.pageflo.io` SAN, then ordinary Plesk release of W31+.
-Important files: `src/lib/advertorial-deployment.ts`, `src/components/public/advertorial/AdvertorialRuntime.tsx`, `src/lib/advertorial-templates.ts`, `scripts/provision-pageflo-hosts.sh`.
+Current phase: Wave 04. W32 complete in repo. Next: W40 Deployment and Brand auto-reskin.
+Last verified HEAD: W32 (quiz builder uses validateQuizFlow; deployments refuse quiz-logic payloads). Previous: `8d8d937` W31 public advertorial renderer.
+Tests run: `pnpm test:quiz-master-runtime` 20 passed. `pnpm test:master-semantics` 9 passed. `pnpm test:flow` 205 passed. `pnpm test:compositions` 636 passed. `pnpm typecheck` pass.
+Known blockers: this session is GitHub Codespace `symmetrical-guide-5g75r9vw9xxcvrr6`, not GX10-01. `ssh pageflo` fails: `~/.ssh/pageflo_deploy` absent. Production TLS for `app.pageflo.io` and `*.preview.pageflo.io` still presents `crashclaim.co`. ACME CNAME is live.
+Production: `https://os.legenex.com/api/legalos/health` 200. No PageFlo work released this session. Do not flip `PAGEFLO_LEGACY_HOST_REDIRECT`.
+Next action: W40 one master deploys under Check A Case and Don't Settle with Brand identity reskin and no deployment copy divergence. When SSH exists, provision certs then Plesk release.
+Important files: `src/lib/master-safety.ts`, `src/components/builder/quiz/QuizBuilderApp.tsx`, `src/lib/advertorial-deployment.ts`, `scripts/provision-pageflo-hosts.sh`.
