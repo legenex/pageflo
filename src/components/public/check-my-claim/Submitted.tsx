@@ -17,8 +17,7 @@ import {
   PageHeader,
 } from './_shared'
 
-const HERO_IMG =
-  'https://media.base44.com/images/public/699c8efa75d8857518d34273/09cab419e_ImportantCall-DesignCMC.png'
+const HERO_IMG = '/check-my-claim/important-call.png'
 
 export default function Submitted() {
   const search = useSearchParams()

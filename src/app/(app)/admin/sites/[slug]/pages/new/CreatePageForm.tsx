@@ -6,9 +6,10 @@ import { Loader2, Sparkles, FileText, FileCode2, Upload } from 'lucide-react'
 import { createPage } from '../actions'
 import { createPageFromUrl } from './ai-clone-action'
 import { createPageFromHtml } from './html-import-action'
+import { importWordpressSite } from './wordpress-import-action'
 
 type Option = { label: string; value: string }
-type Mode = 'manual' | 'ai' | 'import'
+type Mode = 'manual' | 'ai' | 'import' | 'wordpress'
 type ImportMode = 'structured-fields' | 'structured'
 
 const fileToDataUrl = (file: File): Promise<string> =>
@@ -96,6 +97,24 @@ export function CreatePageForm({
         router.refresh()
         return
       }
+      if (mode === 'wordpress') {
+        if (!sourceUrl.trim()) {
+          setError('WordPress site URL is required.')
+          return
+        }
+        const res = await importWordpressSite({
+          siteId,
+          siteSlug,
+          origin: sourceUrl.trim(),
+        })
+        if (!res.ok) {
+          setError(res.error)
+          return
+        }
+        router.push(`/admin/sites/${siteSlug}/pages`)
+        router.refresh()
+        return
+      }
       if (mode === 'import') {
         if (!htmlFile) {
           setError('Upload the .html file you want to import.')
@@ -148,6 +167,22 @@ export function CreatePageForm({
       <div className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface-1)] card-edge overflow-hidden">
         <div className="px-6 py-5 space-y-4">
           <ModeTabs mode={mode} onChange={setMode} disabled={pending} />
+
+          {mode === 'wordpress' ? (
+            <Field label="WordPress site URL">
+              <input
+                autoFocus
+                type="url"
+                value={sourceUrl}
+                onChange={(e) => setSourceUrl(e.target.value)}
+                placeholder="https://example.com"
+                required
+                disabled={pending}
+                className={inputClass}
+              />
+              <Help>Imports published pages from /wp-json/wp/v2/pages as drafts. Existing slugs are skipped.</Help>
+            </Field>
+          ) : null}
 
           {mode === 'ai' ? (
             <Field label="Source URL">
@@ -264,8 +299,8 @@ export function CreatePageForm({
                 setSlug(e.target.value)
               }}
               placeholder={mode === 'ai' ? '/cloned-from-url' : mode === 'import' ? '/imported-page' : '/about-us'}
-              required
-              disabled={pending}
+              required={mode !== 'wordpress'}
+              disabled={pending || mode === 'wordpress'}
               className={`${inputClass} font-mono`}
             />
             <Help>
@@ -349,10 +384,10 @@ export function CreatePageForm({
             type="submit"
             disabled={
               pending ||
-              !slug.trim() ||
+              (mode !== 'wordpress' && !slug.trim()) ||
               (mode === 'manual'
                 ? !title.trim()
-                : mode === 'ai'
+                : mode === 'ai' || mode === 'wordpress'
                   ? !sourceUrl.trim()
                   : !htmlFile)
             }
@@ -364,12 +399,16 @@ export function CreatePageForm({
                 ? 'Cloning with AI…'
                 : mode === 'import'
                   ? 'Importing…'
-                  : 'Creating…'
+                  : mode === 'wordpress'
+                    ? 'Importing WordPress…'
+                    : 'Creating…'
               : mode === 'ai'
                 ? 'Clone with AI'
                 : mode === 'import'
                   ? 'Import HTML'
-                  : 'Create Page'}
+                  : mode === 'wordpress'
+                    ? 'Import WordPress drafts'
+                    : 'Create Page'}
           </button>
         </footer>
       </div>
@@ -382,9 +421,10 @@ function ModeTabs({ mode, onChange, disabled }: { mode: Mode; onChange: (m: Mode
     { id: 'manual', label: 'Blank page', icon: FileText, desc: 'Start with a blank page and author sections yourself.' },
     { id: 'ai', label: 'Clone with AI', icon: Sparkles, desc: 'Paste a URL — Claude rebuilds it as editable blocks.' },
     { id: 'import', label: 'Import HTML / CSS', icon: FileCode2, desc: 'Upload a .html (and optional .css) you already have.' },
+    { id: 'wordpress', label: 'Import WordPress', icon: Upload, desc: 'Pull published wp-json pages in as PageFlo drafts.' },
   ]
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-2">
       {tabs.map((t) => {
         const Icon = t.icon
         const active = mode === t.id

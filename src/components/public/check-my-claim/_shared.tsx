@@ -5,10 +5,8 @@ import type { ReactNode } from 'react'
 
 /* ----------------------------- Assets / Tokens ---------------------------- */
 
-export const LOGO_PRIMARY =
-  'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/699c8efa75d8857518d34273/440596289_PrimaryLogo_CheckMyClaim.png'
-export const LOGO_ALT =
-  'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/699c8efa75d8857518d34273/5fbaf5c73_PrimaryLogo_CheckMyClaim.png'
+export const LOGO_PRIMARY = '/check-my-claim/logo-primary.png'
+export const LOGO_ALT = '/check-my-claim/logo-alt.png'
 
 export const PHONE_PRIMARY_DISPLAY = '(844) 738 1035'
 export const PHONE_PRIMARY_TEL = '+18447381035'
