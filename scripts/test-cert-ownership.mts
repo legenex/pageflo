@@ -246,6 +246,11 @@ ok('never leaves test.preview.pageflo.io.conf to outrank the wildcard',
 ok('reloads nginx only via a helper that runs nginx -t first',
   script.includes('nginx -t') && script.includes('systemctl reload nginx') &&
     script.includes('reload_nginx'))
+ok('passes certdir to the existing legalos reload hook',
+  script.includes('--reloadcmd "$RELOAD_HOOK $dir"'))
+ok('does not overwrite an existing legalos-reload-nginx-cert.sh',
+  script.includes('using existing $RELOAD_HOOK') &&
+    script.includes('Never overwrite it'))
 ok('does not systemctl reload nginx outside reload_nginx / the cert hook',
   !scriptNoComments
     .replace(/reload_nginx\(\) \{[\s\S]*?\n\}/, '')

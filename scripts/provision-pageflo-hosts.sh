@@ -83,7 +83,10 @@ infer_listen() {
 }
 
 ensure_reload_hook() {
+  # Production already has this hook; it requires the cert directory as $1.
+  # Never overwrite it. acme.sh --reloadcmd must pass that argument.
   if [ -e "$RELOAD_HOOK" ]; then
+    log "using existing $RELOAD_HOOK"
     return
   fi
   if [ "$DRY_RUN" -eq 1 ]; then
@@ -91,7 +94,13 @@ ensure_reload_hook() {
     return
   fi
   cat >"$RELOAD_HOOK" <<'HOOK'
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+CERTDIR="${1:-}"
+if [ -n "$CERTDIR" ]; then
+  chmod 600 "$CERTDIR/privkey.pem" 2>/dev/null || true
+  chmod 644 "$CERTDIR/fullchain.pem" 2>/dev/null || true
+fi
 nginx -t && systemctl reload nginx
 HOOK
   chmod 700 "$RELOAD_HOOK"
@@ -170,7 +179,7 @@ install_issued() {
   "$ACME_SH" --install-cert -d "$domain" "${extra[@]}" \
     --fullchain-file "$dir/fullchain.pem" \
     --key-file "$dir/privkey.pem" \
-    --reloadcmd "$RELOAD_HOOK"
+    --reloadcmd "$RELOAD_HOOK $dir"
   cert_files_ok "$dir" || die "acme.sh install-cert left $dir without cert files"
 }
 
@@ -396,6 +405,7 @@ ensure_http01_host() {
 
   if http01_ready "$dir" "$main" "$@"; then
     log "$main already has a valid certificate; skipping issue"
+    install_issued "$main" "$dir"
     write_vhost "$vhost" "$names" "$dir"
     return
   fi
@@ -423,6 +433,7 @@ ensure_preview_wildcard() {
 
   if http01_ready "$dir" "$wild" "$base"; then
     log "$wild already has a valid certificate; skipping issue"
+    install_issued "$wild" "$dir"
     write_vhost "$VHOST_PREVIEW" "${base} ${wild}" "$dir"
     return
   fi
