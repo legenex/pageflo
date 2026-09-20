@@ -14,7 +14,7 @@ import { T, genId, brandShortName, Btn, Input, Textarea, Select, Label, Pill, Ic
 import { resolveTokens } from '../lp/render'
 import { selectableOptions } from '@/lib/selectable'
 import { advDefaultBottomSection, advSlugify } from './seed-data'
-import { advertorialChrome } from '@/lib/advertorial-templates'
+import { AdvertorialRuntime } from '@/components/public/advertorial/AdvertorialRuntime'
 import {
   createAdvertorial as svCreateAdvertorial,
   saveAdvertorial as svSaveAdvertorial,
@@ -1704,11 +1704,12 @@ const AdvPreviewView = ({ advertorial, brands, deployments, quizDeployments, qui
   const effectiveBrand = effectiveDeployment ? brands.find(b => b.id === effectiveDeployment.brandId) : brands.find(b => b.id === selectedBrandId);
   const effectiveQuizDep = effectiveDeployment ? quizDeployments.find(qd => qd.id === effectiveDeployment.quizDeploymentId) : null;
 
-  const brandBg = effectiveBrand?.colors?.background || '#0a1628';
-  const primary = effectiveBrand?.colors?.primary || '#1d8df6';
-  const accent = effectiveBrand?.colors?.accent || primary;
-  const callDigits = (effectiveBrand?.contact?.callNumber || '').replace(/[^\d+]/g, '');
-  const chrome = advertorialChrome(advertorial.templateId);
+  const quizLink = effectiveQuizDep
+    ? { domain: effectiveQuizDep.domain, path: effectiveQuizDep.path, name: effectiveQuizDep.quizName }
+    : null
+  const embedQuiz = (effectiveDeployment?.ctaMode === 'embed' && effectiveQuizDep)
+    ? <AdvEmbeddedQuizPreview brand={effectiveBrand} quizDeployment={effectiveQuizDep} quiz={quizzes?.find?.(q => q.id === effectiveQuizDep.quizId)} />
+    : null
 
   return <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
     {/* Builder preview chrome (only visible inside admin) */}
@@ -1738,135 +1739,19 @@ const AdvPreviewView = ({ advertorial, brands, deployments, quizDeployments, qui
       <div style={{ fontSize: 11, color: T.textMute, fontFamily: '"JetBrains Mono", monospace' }}>{advGetWordCount(advertorial)} words</div>
     </div>
 
-    {/* The actual rendered advertorial (what the visitor sees) */}
-    <div className="adv-public-root" data-adv-template={chrome.id} style={{ flex: 1, overflowY: 'auto', backgroundColor: chrome.pageBackground }}>
-      <style>{`
-        /* Advertorial mobile responsive
-           The article body already uses clamp() for padding/font-size, so we
-           only need to fix the sticky-header CTAs and the bottom CTA card
-           buttons on small screens. */
-        @media (max-width: 640px) {
-          .adv-public-root .adv-header {
-            flex-wrap: wrap !important;
-            padding: 12px 18px !important;
-            gap: 10px !important;
-          }
-          .adv-public-root .adv-header > *:nth-child(1) {
-            flex-basis: 100%;
-          }
-          .adv-public-root .adv-header > *:nth-child(2),
-          .adv-public-root .adv-header > *:nth-child(3) {
-            flex: 1;
-            min-height: 44px;
-            justify-content: center;
-          }
-          .adv-public-root .adv-cta-buttons {
-            flex-direction: column !important;
-          }
-          .adv-public-root .adv-cta-buttons a {
-            width: 100% !important;
-            justify-content: center !important;
-            min-height: 48px;
-          }
-          .adv-public-root h1 { font-size: clamp(26px, 7vw, 32px) !important; }
-          .adv-public-root h2 { font-size: clamp(22px, 6vw, 28px) !important; }
-        }
-      `}</style>
-      {/* Brand-themed header. No nav. Just logo (left) + phone link + brand CTA (right). */}
-      <div className="adv-header" style={{
-        backgroundColor: '#fff', borderBottom: '1px solid #e5e7eb',
-        padding: '14px 28px', display: 'flex', alignItems: 'center', gap: 14,
-        fontFamily: ADV_ARTICLE_FONT, maxWidth: 1200, margin: '0 auto'
-      }}>
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-          {effectiveBrand?.logoUrl ? <img loading="lazy" decoding="async" src={effectiveBrand.logoUrl} alt={effectiveBrand.displayName} style={{ height: 28 }} /> :
-            <div style={{ fontSize: 16, color: '#0f172a', fontWeight: 800, letterSpacing: '-0.01em', fontFamily: ADV_ARTICLE_FONT, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{ width: 26, height: 26, borderRadius: 5, backgroundColor: primary, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{effectiveBrand?.shortName?.[0] || effectiveBrand?.displayName?.[0] || 'B'}</div>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textTransform: 'uppercase', letterSpacing: '0.04em', fontSize: 13.5 }}>{effectiveBrand?.displayName}</span>
-            </div>}
-        </div>
-        <a href={`tel:${callDigits}`} style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6,
-          color: '#0f172a', fontSize: 14, fontWeight: 600, textDecoration: 'none',
-          fontFamily: ADV_ARTICLE_FONT, whiteSpace: 'nowrap'
-        }}><Phone size={14} /> {effectiveBrand?.contact?.callNumber}</a>
-        <a href={effectiveQuizDep ? `https://${effectiveQuizDep.domain}${effectiveQuizDep.path}` : `tel:${callDigits}`} style={{
-          padding: '9px 18px',
-          background: `linear-gradient(135deg, ${primary} 0%, ${accent} 100%)`,
-          color: '#fff', borderRadius: 999, fontSize: 13, fontWeight: 700, textDecoration: 'none',
-          display: 'inline-flex', alignItems: 'center', gap: 6, letterSpacing: '-0.005em',
-          boxShadow: `0 6px 16px -6px ${primary}77`, whiteSpace: 'nowrap'
-        }}>{effectiveBrand?.cta?.label || 'See if you qualify'} <ArrowRight size={14} /></a>
-      </div>
-
-      {/* Article body - always Inter on white, brand-agnostic typography */}
-      <article data-adv-template={chrome.id} style={{
-        maxWidth: chrome.articleMaxWidth, margin: '0 auto',
-        padding: 'clamp(32px, 5vw, 64px) clamp(20px, 4vw, 32px)',
-        backgroundColor: chrome.id === 'whistleblower' ? '#111827' : '#fff',
-        color: chrome.id === 'whistleblower' ? '#e5e7eb' : undefined,
-        fontFamily: chrome.articleFont
-      }}>
-        {advertorial.sections.map(s => <React.Fragment key={s.id}>{advRenderSection(s, effectiveBrand, effectiveQuizDep)}</React.Fragment>)}
-      </article>
-
-      {/* Bottom: either the brand-themed button CTA OR an embedded quiz,
-          based on the deployment's ctaMode setting. */}
-      {(effectiveDeployment?.ctaMode === 'embed' && effectiveQuizDep)
-        ? <AdvEmbeddedQuizPreview brand={effectiveBrand} quizDeployment={effectiveQuizDep} quiz={quizzes?.find?.(q => q.id === effectiveQuizDep.quizId)} />
-        : <AdvBrandBottomCTA brand={effectiveBrand} quizDeployment={effectiveQuizDep} />}
-
-      {/* Full footer: logo + prefer-to-call + copyright/links, then disclaimer paragraph */}
-      <footer style={{
-        backgroundColor: '#0a1322', color: 'rgba(255,255,255,0.6)',
-        fontFamily: ADV_ARTICLE_FONT, fontSize: 13, lineHeight: 1.55,
-        paddingTop: 36, paddingBottom: 28
-      }}>
-        <div style={{
-          maxWidth: 1100, margin: '0 auto',
-          padding: '0 clamp(20px, 4vw, 32px)',
-          display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap'
-        }}>
-          {/* Logo column */}
-          <div style={{ flex: '1 1 200px', minWidth: 160 }}>
-            {effectiveBrand?.logoUrl ? <img loading="lazy" decoding="async" src={effectiveBrand.logoUrl} alt={effectiveBrand.displayName} style={{ height: 26, filter: 'brightness(0) invert(1)' }} /> :
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#fff', fontWeight: 700, fontSize: 13, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                <div style={{ width: 22, height: 22, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.1)', border: `1px solid ${primary}55`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: primary, fontSize: 11, fontWeight: 800 }}>{effectiveBrand?.shortName?.[0] || effectiveBrand?.displayName?.[0] || 'B'}</div>
-                {effectiveBrand?.displayName}
-              </div>}
-          </div>
-
-          {/* Center: prefer to call us */}
-          <div style={{ flex: '1 1 200px', textAlign: 'center' }}>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', marginBottom: 6 }}>Prefer to call us?</div>
-            <a href={`tel:${callDigits}`} style={{ fontSize: 17, color: '#fff', fontWeight: 700, textDecoration: 'none', letterSpacing: '-0.01em' }}>{effectiveBrand?.contact?.callNumber}</a>
-          </div>
-
-          {/* Right: copyright + legal links */}
-          <div style={{ flex: '1 1 200px', textAlign: 'right', fontSize: 12, color: 'rgba(255,255,255,0.55)' }}>
-            <div style={{ marginBottom: 6 }}>{advResolveTokens(effectiveBrand?.legal?.copyright || '', effectiveBrand, effectiveQuizDep)}</div>
-            <div style={{ display: 'inline-flex', gap: 14, justifyContent: 'flex-end' }}>
-              {effectiveBrand?.legal?.termsUrl && <a href={effectiveBrand.legal.termsUrl} style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'none' }}>Terms &amp; Conditions</a>}
-              {effectiveBrand?.legal?.privacyUrl && <a href={effectiveBrand.legal.privacyUrl} style={{ color: 'rgba(255,255,255,0.55)', textDecoration: 'none' }}>Privacy Policy</a>}
-            </div>
-          </div>
-        </div>
-
-        {/* Disclaimer paragraph */}
-        {effectiveBrand?.legal?.disclaimer && <div style={{
-          maxWidth: 1100, margin: '24px auto 0',
-          padding: '20px clamp(20px, 4vw, 32px) 0',
-          borderTop: '1px solid rgba(255,255,255,0.08)',
-          fontSize: 11.5, lineHeight: 1.6, color: 'rgba(255,255,255,0.45)',
-          fontFamily: ADV_ARTICLE_FONT
-        }}>
-          <span style={{ fontWeight: 700, color: 'rgba(255,255,255,0.65)', letterSpacing: '0.04em' }}>DISCLAIMER:&nbsp;</span>
-          {advResolveTokens(effectiveBrand.legal.disclaimer, effectiveBrand, effectiveQuizDep)}
-        </div>}
-      </footer>
+    {/* Same renderer the public route uses. */}
+    <div style={{ flex: 1, overflowY: 'auto' }}>
+      <AdvertorialRuntime
+        advertorial={advertorial}
+        brand={effectiveBrand}
+        quizLink={quizLink}
+        ctaMode={effectiveDeployment?.ctaMode === 'embed' && embedQuiz ? 'embed' : 'button'}
+        embedSlot={embedQuiz}
+      />
     </div>
   </div>;
 };
+
 // ============================================================================
 // MAIN APP - wired to Payload via server actions. Advertorials + deployments
 // are real records (seeded once, then fully editable). Brands come from Sites

@@ -9,6 +9,8 @@ import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { invokeLLM } from '@/lib/ai/invoke'
 import { relationId, requireDeploymentSiteAdmin } from '@/lib/authz'
+import { checkPathAvailable } from '@/lib/path-claims'
+import { normalizeDeploymentPath } from '@/lib/quiz-deployment-path'
 
 const PATH = '/admin/advertorials'
 
@@ -112,6 +114,18 @@ export async function saveAdvertorialDeployment(args: { deployment: Record<strin
     }
   }
 
+  const path = normalizeDeploymentPath(typeof dep.path === 'string' ? dep.path : '')
+  const status = typeof dep.status === 'string' && dep.status ? dep.status : 'draft'
+  const availability = await checkPathAvailable(payload, {
+    siteId: gate.siteId,
+    domainId,
+    path,
+    kind: 'advertorial-deployment',
+    excludeId: isExisting ? String(dep.id) : undefined,
+    live: status === 'live',
+  })
+  if (!availability.ok) return { ok: false, error: availability.error }
+
   const data = {
     name: dep.name || '',
     advertorial: dep.advertorialId && /^\d+$/.test(String(dep.advertorialId)) ? Number(dep.advertorialId) : null,
@@ -119,10 +133,10 @@ export async function saveAdvertorialDeployment(args: { deployment: Record<strin
     // client — see authz.ts: DERIVE, NEVER ACCEPT.
     site: gate.siteId,
     domain: domainId,
-    path: dep.path || '',
+    path,
     quiz_deployment_id: dep.quizDeploymentId || '',
     cta_mode: dep.ctaMode || 'button',
-    status: dep.status || 'draft',
+    status,
     utm: dep.utm ?? {},
     pixels: dep.pixels ?? {},
   }

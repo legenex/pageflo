@@ -175,6 +175,7 @@ t(
 }
 t(CLAIM_PRECEDENCE.page < CLAIM_PRECEDENCE['quiz-deployment'], 'the precedence table puts authored content first')
 t(CLAIM_PRECEDENCE['quiz-deployment'] < CLAIM_PRECEDENCE['lp-deployment'], 'and quiz deployments before LP deployments, as the router resolves them')
+t(CLAIM_PRECEDENCE['lp-deployment'] < CLAIM_PRECEDENCE['advertorial-deployment'], 'and LP deployments before advertorial deployments, as the router resolves them')
 
 /* ------------------------------------------------------ checkPathAvailable */
 
@@ -241,6 +242,28 @@ t(
   })).ok,
   'saving a DRAFT onto a taken path is allowed — publishing it is where the claim is taken',
 )
+{
+  const p = stubPayload({
+    'funnel-lp-deployments': [{ id: 9, site: 1, domain: null, path: '/c/pain', status: 'live', name: 'Pain LP' }],
+  })
+  t(
+    !(await checkPathAvailable(p, { siteId: 1, domainId: null, path: '/c/pain', kind: 'advertorial-deployment', live: true })).ok,
+    'a live landing-page deployment blocks an advertorial on the same path',
+  )
+}
+{
+  const p = stubPayload({
+    'funnel-advertorial-deployments': [{ id: 4, site: 1, domain: null, path: '/a/story', status: 'live', name: 'Story' }],
+  })
+  t(
+    !(await checkPathAvailable(p, { siteId: 1, domainId: null, path: '/a/story', kind: 'advertorial-deployment', live: true })).ok,
+    'two live advertorials cannot share a site-wide path',
+  )
+  t(
+    (await checkPathAvailable(p, { siteId: 1, domainId: null, path: '/a/story', kind: 'advertorial-deployment', excludeId: '4', live: true })).ok,
+    're-saving the same advertorial deployment does not collide with itself',
+  )
+}
 
 /* -------------------------------------------------------------- transitions */
 

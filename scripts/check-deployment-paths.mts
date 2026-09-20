@@ -35,6 +35,7 @@ const main = async () => {
   for (const [collection, kind] of [
     ['funnel-quiz-deployments', 'quiz'],
     ['funnel-lp-deployments', 'lp'],
+    ['funnel-advertorial-deployments', 'advertorial'],
   ] as const) {
     const res = await payload.find({ collection, limit: 0, depth: 0, overrideAccess: true })
     for (const d of res.docs as unknown as Record<string, unknown>[]) {
@@ -78,8 +79,14 @@ const main = async () => {
     } else {
       fixable++
       if (APPLY) {
+        const collection =
+          r.kind === 'quiz'
+            ? 'funnel-quiz-deployments'
+            : r.kind === 'advertorial'
+              ? 'funnel-advertorial-deployments'
+              : 'funnel-lp-deployments'
         await payload.update({
-          collection: r.kind === 'quiz' ? 'funnel-quiz-deployments' : 'funnel-lp-deployments',
+          collection,
           id: r.id,
           data: { path: norm },
           overrideAccess: true,

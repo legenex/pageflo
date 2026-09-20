@@ -3,9 +3,10 @@ import type { Payload } from 'payload'
 /**
  * Does authored content already own this public path?
  *
- * Funnel deployments (quizzes, landing pages) are resolved late in the public
- * router, after Pages, shared legal templates and site-scoped Landing Pages. A
- * deployment must therefore refuse any path one of those already serves.
+ * Funnel deployments (quizzes, landing pages, advertorials) are resolved late
+ * in the public router, after Pages, shared legal templates and site-scoped
+ * Landing Pages. A deployment must therefore refuse any path one of those
+ * already serves.
  *
  * The check lives here, shared by every deployment resolver, for a reason that
  * is not obvious: the router is not the only caller. `generateMetadata` runs

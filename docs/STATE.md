@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 20 September 2026, W22 quiz composition coverage.
+Last updated: 20 September 2026, W31 public advertorial renderer.
 
 ---
 
@@ -24,9 +24,9 @@ Last updated: 20 September 2026, W22 quiz composition coverage.
 | Execution memory | `forge-pack/state/` |
 | Release mode | **Autonomous ordinary Plesk releases.** Implement, validate, commit, push, and the section 6 Plesk sequence after gates pass are pre-authorized (discovery 12.4). Human gates in `docs/HUMAN-GATES.md` still apply. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current wave | W20 and W42 application work landed. TLS for app.pageflo.io UNPROVEN (no SSH). Next: W30 after host certs or in parallel. |
-| Active human gates | DNS cutover for `*.preview.pageflo.io` if not already live. Other red gates unchanged. |
-| Active blockers | SSH to `51.81.202.161` denied (no deploy key). PageFlo DNS points at the Plesk IP. HTTPS SNI still serves `crashclaim.co`. Wildcard preview TLS needs `_acme-challenge.preview.pageflo.io` CNAME (DNS gate). |
+| Current wave | W31 complete in the repository (not released). Next: W32. Host TLS still UNPROVEN (no SSH from this Codespace). |
+| Active human gates | None currently blocking application work. Wildcard ACME CNAME is live. Ordinary Plesk release waits on SSH. |
+| Active blockers | This environment is a GitHub Codespace without `~/.ssh/pageflo_deploy`. PageFlo DNS points at the Plesk IP. HTTPS SNI still serves `crashclaim.co`. |
 
 ## Compatibility identifiers
 
@@ -549,6 +549,10 @@ human gates. See `docs/HUMAN-GATES.md`.
 ---
 
 ## Change log
+
+### 20 September 2026, W31 public advertorial renderer
+
+Advertorial templates now have distinct header and footer structures, not only fonts and grounds. The public catch-all resolves `funnel-advertorial-deployments` and renders through `AdvertorialRuntime`, the same component the builder preview mounts. Path claims include advertorial deployments. Saving a live advertorial deployment refuses a colliding path. `pnpm test:lp-advertorial-fidelity` 22 passed. `pnpm typecheck` passed. Production was not released: this Codespace has no `pageflo_deploy` key. `https://os.legenex.com/api/legalos/health` still 200. PageFlo host names still present `crashclaim.co`.
 
 ### 2 September 2026, responsive QA close-out and codespace continuation
 

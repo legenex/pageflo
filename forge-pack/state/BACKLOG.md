@@ -8,7 +8,7 @@
 - [x] W21 Master asset/version semantics
 - [x] W22 Quiz composition renderer repair
 - [x] W30 Website import and AI editing
-- [ ] W31 Landing Page and Advertorial fidelity
+- [x] W31 Landing Page and Advertorial fidelity
 - [ ] W32 Master Quiz builder/runtime completion
 - [ ] W40 Deployment and Brand auto-reskin
 - [ ] W41 Bulk deploy and preview routing

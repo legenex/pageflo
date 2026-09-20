@@ -1,13 +1,14 @@
 /**
  * One answer to "who owns this URL", for every kind of thing that can own one.
  *
- * A Site serves four kinds of content at a path — `Pages`, site-scoped
- * `LandingPages`, funnel quiz deployments and funnel LP deployments — and until
- * now each decided path collisions differently or not at all. The public router
- * had a precedence order, `public-path-claims.ts` encoded part of it for the two
- * deployment resolvers, and the SAVE paths encoded none of it: two deployments
- * could be created on `/c/pain` with nothing said, and which one a visitor got
- * was decided by `docs[0]` — insertion order.
+ * A Site serves five kinds of content at a path — `Pages`, site-scoped
+ * `LandingPages`, funnel quiz deployments, funnel LP deployments and funnel
+ * advertorial deployments — and until now each decided path collisions
+ * differently or not at all. The public router had a precedence order,
+ * `public-path-claims.ts` encoded part of it for the two deployment resolvers,
+ * and the SAVE paths encoded none of it: two deployments could be created on
+ * `/c/pain` with nothing said, and which one a visitor got was decided by
+ * `docs[0]` — insertion order.
  *
  * Three rules, and each exists because its absence was a real failure:
  *
@@ -38,15 +39,16 @@ import type { Payload } from 'payload'
 import { normalizeDeploymentPath } from './quiz-deployment-path'
 import { SHARED_TEMPLATE_PATHS } from './public-path-claims'
 
-export type ClaimKind = 'page' | 'landing-page' | 'quiz-deployment' | 'lp-deployment' | 'shared-legal'
+export type ClaimKind = 'page' | 'landing-page' | 'quiz-deployment' | 'lp-deployment' | 'advertorial-deployment' | 'shared-legal'
 
 /**
  * Who beats whom when two records claim one URL.
  *
  * Lower is stronger. This is the public router's own order: it resolves a Page,
  * then a site-scoped LandingPage, then a shared legal template, then a quiz
- * deployment, then an LP deployment. Encoding it as data rather than as the
- * shape of an if-chain is what lets the save path and the serve path agree.
+ * deployment, then an LP deployment, then an advertorial deployment. Encoding
+ * it as data rather than as the shape of an if-chain is what lets the save
+ * path and the serve path agree.
  */
 export const CLAIM_PRECEDENCE: Record<ClaimKind, number> = {
   page: 0,
@@ -54,6 +56,7 @@ export const CLAIM_PRECEDENCE: Record<ClaimKind, number> = {
   'shared-legal': 2,
   'quiz-deployment': 3,
   'lp-deployment': 4,
+  'advertorial-deployment': 5,
 }
 
 export type PathClaim = {
@@ -155,7 +158,7 @@ const relId = (v: unknown): number | null => {
 const str = (v: unknown): string => (typeof v === 'string' ? v : '')
 
 /**
- * Every claim a Site holds, from all five sources.
+ * Every claim a Site holds, from all six sources.
  *
  * `overrideAccess: true` throughout and deliberately: this answers a question
  * about the SITE, not about the caller, and a caller who can see only some of
@@ -243,6 +246,19 @@ export const collectSiteClaims = async (payload: Payload, siteId: number): Promi
       effectivePath: effectivePath(str(d.path)),
       live: d.status === 'live',
       label: `the landing-page deployment "${str(d.name) || d.id}"`,
+    })
+  }
+
+  for (const d of await safeFind('funnel-advertorial-deployments', { site: { equals: siteId } })) {
+    claims.push({
+      kind: 'advertorial-deployment',
+      id: String(d.id),
+      siteId,
+      domainId: relId(d.domain),
+      rawPath: str(d.path),
+      effectivePath: effectivePath(str(d.path)),
+      live: d.status === 'live',
+      label: `the advertorial deployment "${str(d.name) || d.id}"`,
     })
   }
 

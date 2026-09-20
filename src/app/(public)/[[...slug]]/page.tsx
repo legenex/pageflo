@@ -20,7 +20,13 @@ import {
   lpDeploymentMeta,
   type ResolvedLpDeployment,
 } from '@/lib/lp-deployment'
+import {
+  resolveAdvertorialDeployment,
+  advertorialDeploymentMeta,
+  type ResolvedAdvertorialDeployment,
+} from '@/lib/advertorial-deployment'
 import { LivePreview as LandingPageSections } from '@/components/builder/lp/render'
+import { AdvertorialRuntime } from '@/components/public/advertorial/AdvertorialRuntime'
 import { renderTemplateVars, applyTemplateOverrides, deepRenderTemplateVars, type SiteForTemplate } from '@/lib/template-vars'
 import { resolvePhoneForPath } from '@/lib/resolve-phone'
 import { getCurrentUser, isBoundToSite } from '@/lib/auth'
@@ -244,8 +250,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
   const dep = await resolveQuizDeployment(Number(resolved.siteId), host, path, false)
   const lp = dep ? null : await resolveLpDeployment(Number(resolved.siteId), host, path, false)
+  const adv = dep || lp ? null : await resolveAdvertorialDeployment(Number(resolved.siteId), host, path, false)
 
-  if (!dep && !lp) {
+  if (!dep && !lp && !adv) {
     // Nothing authored at this path. A shared legal template or a fallback
     // still renders, so the brand name is better than no title at all: an
     // untitled page is what a search engine and a link preview both punish.
@@ -254,8 +261,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       : {}
   }
 
-  const meta = dep ? quizDeploymentMeta(dep) : lpDeploymentMeta(lp!)
-  const brandName = dep ? dep.brand.displayName : lp!.brand.displayName
+  const meta = dep ? quizDeploymentMeta(dep) : lp ? lpDeploymentMeta(lp) : advertorialDeploymentMeta(adv!)
+  const brandName = dep ? dep.brand.displayName : lp ? lp.brand.displayName : adv!.brand.displayName
   return {
     title: meta.title,
     description: meta.description,
@@ -561,6 +568,14 @@ export default async function PublicCatchAll({ params, searchParams }: Props) {
   if (lpDep) {
     const tc = await loadTrackingConfig(site.id)
     return <RenderLpDeployment resolved={lpDep} tc={tc} site={site} />
+  }
+
+  // 6b. Try a funnel advertorial deployment. After LP so a path claimed by both
+  // is resolved in the same order generateMetadata uses.
+  const advDep = await resolveAdvertorialDeployment(Number(siteId), host ?? '', path, isAdminPreview)
+  if (advDep) {
+    const tc = await loadTrackingConfig(site.id)
+    return <RenderAdvertorialDeployment resolved={advDep} tc={tc} site={site} />
   }
 
   // 7. Try BlogPosts under /blog/<slug>.
@@ -899,6 +914,49 @@ function RenderLpDeployment({
         // `quizCtx = null` infers as `null`. The cast documents that the shape is
         // enforced by the resolver above, not by this component's signature.
         quizCtx={quizCtx as never}
+      />
+    </>
+  )
+}
+
+function RenderAdvertorialDeployment({
+  resolved,
+  tc,
+  site,
+}: {
+  resolved: ResolvedAdvertorialDeployment
+  tc: TrackingConfigShape | null
+  site: SiteForTemplate & { id: string | number; name?: string | null }
+}) {
+  const siteSlug = (site as { slug?: string }).slug ?? resolved.siteSlug
+  const embedQuiz =
+    resolved.deployment.ctaMode === 'embed' && resolved.quiz ? (
+      <QuizRuntime
+        quiz={resolved.quiz.quiz}
+        brand={resolved.quiz.brand}
+        deployment={resolved.quiz.deployment}
+        site={{ slug: siteSlug, name: site.name ?? null }}
+        embed
+      />
+    ) : null
+
+  const legal = resolved.brand.legal
+  const disclaimer = legal.disclaimer || legal.defaultDisclaimer || ''
+  const brandForRender = {
+    ...resolved.brand,
+    legal: { ...legal, disclaimer, defaultDisclaimer: legal.defaultDisclaimer || disclaimer },
+    cta: { label: resolved.brand.contact.callCtaText },
+  }
+
+  return (
+    <>
+      <SiteScripts tc={tc} hasForm={Boolean(embedQuiz)} />
+      <AdvertorialRuntime
+        advertorial={resolved.advertorial}
+        brand={brandForRender}
+        quizLink={resolved.quizLink}
+        ctaMode={resolved.deployment.ctaMode}
+        embedSlot={embedQuiz}
       />
     </>
   )
