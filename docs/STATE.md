@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 20 September 2026, W43 Leads UI.
+Last updated: 20 September 2026, W50 repo verification; W60 blocked on SSH.
 
 ---
 
@@ -24,7 +24,7 @@ Last updated: 20 September 2026, W43 Leads UI.
 | Execution memory | `forge-pack/state/` |
 | Release mode | **Autonomous ordinary Plesk releases.** Implement, validate, commit, push, and the section 6 Plesk sequence after gates pass are pre-authorized (discovery 12.4). Human gates in `docs/HUMAN-GATES.md` still apply. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current wave | W43 complete in the repository (not released). Next: W50. Host TLS still UNPROVEN (no SSH from this Codespace). |
+| Current wave | W50 complete in the repository. W60 needs production TLS and the Plesk release. Host access from this Codespace is missing. |
 | Active human gates | None currently blocking application work. Wildcard ACME CNAME is live. Ordinary Plesk release waits on SSH. |
 | Active blockers | This environment is a GitHub Codespace without `~/.ssh/pageflo_deploy`. PageFlo DNS points at the Plesk IP. HTTPS SNI still serves `crashclaim.co`. |
 
@@ -549,6 +549,10 @@ human gates. See `docs/HUMAN-GATES.md`.
 ---
 
 ## Change log
+
+### 20 September 2026, W50 verification matrix
+
+`pnpm test` passed end to end. Also `pnpm test:isolation` 49, `pnpm test:identity` 33, `pnpm test:e2e` 34, `pnpm test:release` 31, `pnpm typecheck`. One pre-existing `test:publish` source regex was aligned to the multiline `redirectTo` assignment. Production release and PageFlo TLS remain UNPROVEN: this Codespace has no `pageflo_deploy` key.
 
 ### 20 September 2026, W43 Leads UI and delivery worker
 

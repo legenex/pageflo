@@ -1055,7 +1055,7 @@ const BOUND_LP_DEP = { ...GOOD_LP_DEP, quiz: 70 }
   // eligible host 307 every visitor onto a refused one.
   t(/primaryUsable/.test(body), 'the canonical primary is checked for eligibility as well')
   t(
-    /const redirectTo = primaryUsable && /.test(body),
+    /!previewToPreview && primaryUsable &&/.test(body),
     'and an ineligible primary is never used as a redirect target',
   )
   t(

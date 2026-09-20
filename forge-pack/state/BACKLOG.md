@@ -14,5 +14,5 @@
 - [x] W41 Bulk deploy and preview routing
 - [x] W42 Domains and PageFlo preview host support
 - [x] W43 Leads UI and delivery observability
-- [ ] W50 End-to-end integration and migration compatibility
+- [x] W50 End-to-end integration and migration compatibility
 - [ ] W60 Full QA, release and final verification
