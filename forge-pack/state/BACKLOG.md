@@ -6,7 +6,7 @@
 - [x] W12 Lead durability foundation
 - [ ] W20 Brand Website model and section editor
 - [x] W21 Master asset/version semantics
-- [ ] W22 Quiz composition renderer repair
+- [x] W22 Quiz composition renderer repair
 - [ ] W30 Website import and AI editing
 - [ ] W31 Landing Page and Advertorial fidelity
 - [ ] W32 Master Quiz builder/runtime completion

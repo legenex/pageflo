@@ -1,5 +1,9 @@
 # Progress
 
+## 2026-09-20 W22
+
+All twenty `sq_*` quiz templates now have a structural composition. Unknown ids still fall back to the default card. Preview and live share `QuizSurface`. `pnpm test:compositions` 636 passed. `pnpm test:flow` 205 passed. `pnpm typecheck` pass.
+
 ## 2026-09-19 W21
 
 Master delete of quizzes and advertorials now refuses while deployments exist. New landing-page deployment copy writes are refused; operators must edit or clone the master. Legacy `content_overrides` rows still render so live pages do not silently change. `pnpm test:master-semantics` 5 passed. `pnpm typecheck` pass.

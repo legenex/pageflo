@@ -1,8 +1,8 @@
 # Handoff
 
 Current phase: Wave 02 in progress.
-Current unit: W21 done. Next: W22 quiz composition renderer, W20 Brand website editor.
-Last verified state: W12 `383bcec`. W21 typecheck and test:master-semantics passed.
-Known failure: production SSH alias `legalos` missing. `app.pageflo.io` DNS UNPROVEN. Ordinary Plesk release of src changes is UNPROVEN.
-Next action: W22 quiz template structural degrees of freedom using `docs/quiz-renderer-architecture.md`. Do not only retoken colors. W20 can run in parallel on website editor files.
-Important files: `docs/quiz-renderer-architecture.md`, `src/components/public/quiz/QuizRuntime.tsx`, `src/lib/quiz-templates/`.
+Current unit: W22 done. Next: W20 Brand website model and section editor.
+Last verified state: W21 `868ecce`. W22 `pnpm test:compositions` 636 passed, `pnpm test:flow` 205 passed, `pnpm typecheck` pass.
+Known failure: production SSH alias `legalos` missing. `app.pageflo.io` DNS UNPROVEN. Ordinary Plesk release UNPROVEN.
+Next action: W20. Brand-owned multi-page website with section add/reorder/edit/hide/delete and draft/publish. Then W30.
+Important files: `src/app/(app)/admin/sites/[slug]/pages/`, `src/lib/builder/`, `src/collections/Pages.ts`.

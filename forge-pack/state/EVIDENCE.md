@@ -1,5 +1,12 @@
 # Evidence
 
+## W22 2026-09-20
+
+- `pnpm test:compositions`: 636 passed, 0 failed
+- `pnpm test:flow`: 205 passed, 0 failed
+- `pnpm typecheck`: pass
+- Every `QUIZ_TEMPLATES` id is claimed and `resolveCompositionForRender` reports no default-card fallback
+
 ## W12 2026-09-19
 
 - `pnpm typecheck`: pass

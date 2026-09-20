@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 19 September 2026, Wave 00 contract reconciliation.
+Last updated: 20 September 2026, W22 quiz composition coverage.
 
 ---
 
@@ -24,7 +24,7 @@ Last updated: 19 September 2026, Wave 00 contract reconciliation.
 | Execution memory | `forge-pack/state/` |
 | Release mode | **Autonomous ordinary Plesk releases.** Implement, validate, commit, push, and the section 6 Plesk sequence after gates pass are pre-authorized (discovery 12.4). Human gates in `docs/HUMAN-GATES.md` still apply. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current wave | W00 complete. Next: Wave 01 (W10, W11, W12). |
+| Current wave | Wave 02. W21 done. W22 quiz compositions claimed for all 20 templates. Next: W20. |
 | Active human gates | DNS cutover for `*.preview.pageflo.io` if not already live. Other red gates unchanged. |
 | Active blockers | Production SSH alias `legalos` is not configured in this Codespace. `app.pageflo.io` did not resolve from this environment on 19 September 2026. See Wave 00 re-audit. |
 

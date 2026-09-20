@@ -18,12 +18,26 @@
 import type { QuizComposition } from './types'
 
 import { authorityConsole } from './authority-console'
+import { answerFirst } from './answer-first'
+import { cardDeck } from './card-deck'
+import { caseDossier } from './case-dossier'
 import { caseFileConsole } from './case-file-console'
+import { caseRouter } from './case-router'
+import { deadlineTimeline } from './deadline-timeline'
+import { decisionPath } from './decision-path'
 import { defaultCard } from './default'
 import { directPanel } from './direct-panel'
 import { editorialInline } from './editorial-inline'
 import { evidenceChecklist } from './evidence-checklist'
 import { fullscreenFocus } from './fullscreen-focus'
+import { guidedConversation } from './guided-conversation'
+import { incidentScene } from './incident-scene'
+import { insurerContext } from './insurer-context'
+import { networkVetting } from './network-vetting'
+import { quizFirst } from './quiz-first'
+import { recoverySoft } from './recovery-soft'
+import { sixtySecond } from './sixty-second'
+import { timelineJourney } from './timeline-journey'
 
 /**
  * Order matters only for reporting. A duplicate claim is a startup-visible
@@ -32,11 +46,25 @@ import { fullscreenFocus } from './fullscreen-focus'
  */
 export const QUIZ_COMPOSITIONS: readonly QuizComposition[] = [
   authorityConsole,
+  answerFirst,
+  cardDeck,
+  caseDossier,
   caseFileConsole,
+  caseRouter,
+  deadlineTimeline,
+  decisionPath,
   directPanel,
   editorialInline,
   evidenceChecklist,
   fullscreenFocus,
+  guidedConversation,
+  incidentScene,
+  insurerContext,
+  networkVetting,
+  quizFirst,
+  recoverySoft,
+  sixtySecond,
+  timelineJourney,
   defaultCard,
 ]
 
@@ -80,10 +108,9 @@ export const resolveComposition = (templateId: unknown): CompositionResolution =
 /**
  * The render path: it must draw something, and it says when it guessed.
  *
- * Unclaimed is not an error here — the default composition is a real design (it
- * is what fourteen of the twenty draw as today), not a placeholder — so
- * `usedFallback` reports "this id has no structural composition YET" rather
- * than "this id is broken".
+ * Unclaimed is not an error here. Every current `sq_*` id is claimed by a
+ * structural composition. The default card remains the fallback for unknown
+ * ids so a visitor never 404s over a bad stored key.
  */
 export const resolveCompositionForRender = (templateId: unknown): {
   composition: QuizComposition

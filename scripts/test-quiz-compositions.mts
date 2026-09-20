@@ -34,6 +34,7 @@
 import { readFileSync, readdirSync } from 'node:fs'
 
 import { COMPOSITION_CLAIMS, CLAIMED_TEMPLATE_IDS } from '../src/lib/quiz-compositions/claims.ts'
+import { resolveCompositionForRender } from '../src/lib/quiz-compositions/registry.ts'
 import { QUIZ_TEMPLATES, QUIZ_TEMPLATE_BY_ID } from '../src/lib/quiz-templates/model.ts'
 import { registryHealth, resolveForRender } from '../src/lib/template-registry.ts'
 
@@ -128,11 +129,11 @@ for (const key of Object.keys(COMPOSITION_CLAIMS)) {
   )
 }
 
-// Every id the registry knows must draw SOMETHING, claimed or not: an unclaimed
-// id falls to the default composition, which is a real design rather than a
-// placeholder. This is the check that keeps "nothing 404s" true.
 for (const tpl of QUIZ_TEMPLATES) {
   t(resolveForRender('quiz', tpl.id).template.id === tpl.id, `${tpl.id} resolves to itself in the registry`)
+  t(CLAIMED_TEMPLATE_IDS.includes(tpl.id), `${tpl.id} has a structural composition, not only the default card`)
+  const drawn = resolveCompositionForRender(tpl.id)
+  t(!drawn.usedFallback && drawn.composition.key !== 'default_card', `${tpl.id} draws through ${drawn.composition.key}, not the default card`)
 }
 
 // The legacy ids must still land on a canonical template, which is what makes

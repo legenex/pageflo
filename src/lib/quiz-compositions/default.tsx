@@ -3,7 +3,8 @@
 /**
  * The shared card, as a composition.
  *
- * This is what fourteen of the twenty still draw as, and it is a real design
+ * Fallback for unknown ids. Every current `sq_*` template has its own
+ * structural composition. This remains a real design rather than a placeholder:
  * rather than a placeholder: a single card on the page ground, the template's
  * own progress form at the top, the question stack, the answers in the layout
  * the answer form implies, and a nav row. It is the honest baseline the
