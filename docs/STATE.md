@@ -547,6 +547,10 @@ EB-1.
 
 ## Change log
 
+### 24 September 2026, Rescue Wave 2B
+
+Visitor pages no longer leak authoring junk. Shared legal titles run through `renderTemplateVars`. Consent HTML (TCPA links) renders as links via `safeConsentHtml`. Quiz progress rails use visitor-facing question copy. LP compose treats `(800) 000-0000`, `Dynamic figure`, and `This deployment` as reference placeholders on live. `pnpm test:publish` 282, `pnpm test:slots` 957, `pnpm typecheck`.
+
 ### 24 September 2026, Rescue Wave 2A
 
 Live funnel deployments now pin master copy at publish. Public quiz, LP and advertorial resolvers read `published_snapshot` until explicit republish. Resume of a paused row keeps the pin. Advertorial go-live runs `setAdvertorialDeploymentStatus` with preflight. Advertorial Archive sets `status=archived` and leaves deployments. Quiz master Publish goes through `setQuizPublished`. Quiz and advertorial lists print `effectiveDeploymentUrl`. Migration `20260924_120000_deployment_published_snapshot` backfills live rows. `pnpm typecheck`, `pnpm test:publish` 272, `pnpm test:release` 35, `pnpm test:quiz-master-runtime` 20.

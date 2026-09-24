@@ -640,6 +640,27 @@ const sliceStream = (
  * placeholders still in it — the exact outcome the group exists to prevent.
  * Retyping the placeholder verbatim does not count for the same reason.
  */
+/**
+ * Copy the handoff used as a stand-in for missing data.
+ *
+ * These strings are legitimate in the REFERENCE (keepReferencePlaceholders)
+ * and must never reach a visitor. Phone-shaped ones resolve to the brand
+ * number; the rest compose as empty so supply groups can omit the section.
+ */
+export const isReferencePlaceholder = (value: string): boolean => {
+  const t = value.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!t) return true
+  if (/^\(?800\)?[\s.-]*000[\s.-]*0000$/i.test(t)) return true
+  if (/^dynamic figure$/i.test(t)) return true
+  if (/^this deployment:?$/i.test(t)) return true
+  if (/\[logo slot\]/i.test(t)) return true
+  if (/^\$\s*[—–\-]+$/.test(t)) return true
+  return false
+}
+
+const isPhonePlaceholder = (value: string): boolean =>
+  /\(?800\)?[\s.-]*000[\s.-]*0000/i.test(value.replace(/<[^>]+>/g, ' '))
+
 const hasOperatorContent = (slot: LpSlot | undefined, overrides: LpSlotOverrides): boolean => {
   if (!slot) return false
   if (!Object.prototype.hasOwnProperty.call(overrides, slot.id)) return false
@@ -647,6 +668,7 @@ const hasOperatorContent = (slot: LpSlot | undefined, overrides: LpSlotOverrides
   if (typeof raw !== 'string') return false
   const value = raw.trim()
   if (value === '') return false
+  if (isReferencePlaceholder(value)) return false
   return value !== slot.default.trim() && value !== (slot.liveDefault ?? '').trim()
 }
 
@@ -795,9 +817,12 @@ const renderSlotValues = (
     // except where that copy was an annotation the design was making to itself,
     // or a placeholder inside a supply group's card — both clean to nothing, so
     // an unfilled one is BLANK rather than the design's stand-in for content.
-    const stock = opts.keepReferencePlaceholders ? slot.default : slot.liveDefault ?? slot.default
+    let stock = opts.keepReferencePlaceholders ? slot.default : slot.liveDefault ?? slot.default
+    if (!opts.keepReferencePlaceholders && isReferencePlaceholder(stock)) {
+      stock = isPhonePlaceholder(stock) ? '{{brand.callNumber}}' : ''
+    }
 
-    if (raw === undefined || raw === slot.default || raw === stock) {
+    if (raw === undefined || raw === slot.default || raw === stock || (!opts.keepReferencePlaceholders && typeof raw === 'string' && isReferencePlaceholder(raw))) {
       values.push(stock)
       continue
     }

@@ -39,6 +39,7 @@ import {
 } from '@/lib/quiz-graph'
 import { isNodeVisible } from '@/components/builder/quiz/seed-data'
 import { decideTier, rejectedTierMessage } from '@/lib/quiz-webhook/tier'
+import { visitorFacingStepLabel } from '@/lib/quiz-visitor-copy'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type AnyQuiz = any
@@ -55,6 +56,8 @@ export type QuizMode = 'live' | 'preview' | 'still'
  * and advance without ever painting a question card.
  */
 export const INVISIBLE_NODE_TYPES = new Set(['decision', 'webhook', 'verification', 'transition'])
+
+
 
 /**
  * The subset of those that make a server call before advancing. Both node types
@@ -136,9 +139,11 @@ export const visibleStepView = (
   for (let i = 0; i < steps.length; i += 1) {
     const node = resolveNodeForStep(quiz, steps[i]?.key, tier ?? null)
     if (!node) continue
-    if (INVISIBLE_NODE_TYPES.has(node.type)) continue
+    if (INVISIBLE_NODE_TYPES.has(node.type) || node.type === 'endpoint') continue
     if (!isNodeVisible(node)) continue
-    entries.push({ at: i, label: String(steps[i]?.label ?? '') })
+    const label = visitorFacingStepLabel(node, steps[i])
+    if (!label) continue
+    entries.push({ at: i, label })
   }
   // A quiz whose every row is a routing node has no journey to report. One step
   // of one is the honest answer; zero would make every percentage NaN.

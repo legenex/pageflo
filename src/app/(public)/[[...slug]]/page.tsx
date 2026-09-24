@@ -226,7 +226,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const url = deploymentUrl(host, path)
 
   if (pageDoc) {
-    const title = pageDoc.meta_title || [pageDoc.title, brandFallback].filter(Boolean).join(' | ') || brandFallback
+    const titleRaw = pageDoc.meta_title || [pageDoc.title, brandFallback].filter(Boolean).join(' | ') || brandFallback
+    const title = renderTemplateVars(titleRaw || '', { name: brandFallback })
     const description = pageDoc.meta_description || undefined
     const image = pageDoc.og_image_url || undefined
     return {
@@ -255,6 +256,21 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const adv = dep || lp ? null : await resolveAdvertorialDeployment(Number(resolved.siteId), host, path, false)
 
   if (!dep && !lp && !adv) {
+    const legalKey = sharedTemplateKeyForPath(path)
+    if (legalKey) {
+      const tpl = await payload.find({
+        collection: 'shared-legal-templates',
+        where: { template_key: { equals: legalKey } },
+        limit: 1,
+        overrideAccess: true,
+      }).catch(() => ({ docs: [] as Array<{ default_meta_title?: string | null }> }))
+      const legalTitle = renderTemplateVars(tpl.docs[0]?.default_meta_title || legalKey, { name: brandFallback })
+      return legalTitle
+        ? { title: legalTitle, alternates: { canonical: url }, openGraph: { type: 'website', title: legalTitle, url, siteName: brandFallback } }
+        : brandFallback
+          ? { title: brandFallback, alternates: { canonical: url }, openGraph: { type: 'website', title: brandFallback, url, siteName: brandFallback } }
+          : {}
+    }
     // Nothing authored at this path. A shared legal template or a fallback
     // still renders, so the brand name is better than no title at all: an
     // untitled page is what a search engine and a link preview both punish.
@@ -537,7 +553,8 @@ export default async function PublicCatchAll({ params, searchParams }: Props) {
       const t = tpl.docs[0]
       if (t) {
         const rendered = renderTemplateVars(t.body_markdown_with_vars, site)
-        return <SharedTemplatePage title={t.default_meta_title ?? key} markdown={rendered} site={site} path={path} />
+        const title = renderTemplateVars(t.default_meta_title ?? key, site)
+        return <SharedTemplatePage title={title} markdown={rendered} site={site} path={path} />
       }
     }
   }
@@ -652,7 +669,7 @@ async function RenderPage({
         renderTemplateVars(t.body_markdown_with_vars, site),
         page.shared_template_overrides ?? undefined,
       )
-      return <SharedTemplatePage title={page.title} markdown={rendered} site={site} path={path} />
+      return <SharedTemplatePage title={renderTemplateVars(page.title, site)} markdown={rendered} site={site} path={path} />
     }
   }
 

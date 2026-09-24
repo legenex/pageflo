@@ -53,6 +53,10 @@ import {
   parseDeploymentSnapshot,
   shouldCapturePublishedSnapshot,
 } from '../src/lib/deployment-snapshot.ts'
+import { isReferencePlaceholder } from '../src/lib/lp-slots/model.ts'
+import { visitorFacingStepLabel } from '../src/lib/quiz-visitor-copy.ts'
+import { safeConsentHtml } from '../src/lib/safe-consent-html.ts'
+import { renderTemplateVars } from '../src/lib/template-vars.ts'
 
 let passed = 0
 let failed = 0
@@ -1209,6 +1213,19 @@ const BOUND_LP_DEP = { ...GOOD_LP_DEP, quiz: 70 }
 
   const advHooks = readFileSync(new URL('../src/collections/FunnelAdvertorialDeployments.ts', import.meta.url), 'utf8')
   t(advHooks.includes('publishRequiresPreflight: true'), 'advertorial deployments require the preflight marker to go live')
+}
+
+{
+  t(isReferencePlaceholder('(800) 000-0000'), 'stock 800 placeholder is not visitor copy')
+  t(isReferencePlaceholder('Dynamic figure'), 'Dynamic figure is not visitor copy')
+  t(isReferencePlaceholder('This deployment:'), 'This deployment is not visitor copy')
+  t(!isReferencePlaceholder('See if you may qualify'), 'real copy is not a placeholder')
+  t(visitorFacingStepLabel({ question: 'How were you injured?' }, { label: 'Injury Type12121212' }) === 'How were you injured?', 'progress rail uses the question, not the graph name')
+  t(visitorFacingStepLabel({ type: 'endpoint' }, { label: '/submitted (Qualified)' }) === '', 'internal destination paths stay off the rail')
+  t(safeConsentHtml('See our <a href="/tcpa">TCPA consent</a>.').includes('<a href="/tcpa">TCPA consent</a>'), 'consent HTML keeps a safe relative link')
+  t(!safeConsentHtml('See our <a href="/tcpa">TCPA consent</a>.').includes('&lt;a'), 'consent HTML is not escaped as text')
+  t(!safeConsentHtml('<a href="javascript:alert(1)">x</a>').includes('javascript:'), 'javascript hrefs are dropped')
+  t(renderTemplateVars('Terms of Service | {{site.name}}', { name: 'Dont Settle' }) === 'Terms of Service | Dont Settle', 'legal titles resolve site.name')
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

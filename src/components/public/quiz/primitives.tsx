@@ -37,6 +37,7 @@ import { QuizProgress } from '@/components/public/quiz/forms/progress'
 import type { Surface } from '@/lib/lp-nodes/surface'
 import type { QuizFieldVariant, QuizPrimitives } from '@/lib/quiz-compositions/types'
 import type { QuizTheme } from '@/lib/quiz-templates/theme'
+import { safeConsentHtml } from '@/lib/safe-consent-html'
 
 const surfaceOf = (theme: QuizTheme, surface?: Surface): Surface => surface ?? theme.surface
 
@@ -388,9 +389,10 @@ const Consent: QuizPrimitives['Consent'] = ({ view, theme, surface, style }) => 
   if (view.phase !== 'form' || !view.legal.tcpa) return null
   const s = surfaceOf(theme, surface)
   return (
-    <div style={{ fontSize: 11, color: s.muted, marginTop: 12, lineHeight: 1.45, fontFamily: theme.fonts.body, ...style }}>
-      {view.legal.tcpa}
-    </div>
+    <div
+      style={{ fontSize: 11, color: s.muted, marginTop: 12, lineHeight: 1.45, fontFamily: theme.fonts.body, ...style }}
+      dangerouslySetInnerHTML={{ __html: safeConsentHtml(view.legal.tcpa) }}
+    />
   )
 }
 

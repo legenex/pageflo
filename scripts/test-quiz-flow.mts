@@ -248,8 +248,12 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
     'and exactly one primitive prints it, on a form node only',
   )
   t(
-    (primitives.match(/\{view\.legal\.tcpa\}/g) ?? []).length === 1,
-    'the consent line is printed in exactly one place',
+    (primitives.match(/view\.legal\.tcpa/g) ?? []).length === 2,
+    'the consent line is printed in exactly one place (guard + render)',
+  )
+  t(
+    primitives.includes('safeConsentHtml(view.legal.tcpa)'),
+    'consent HTML is rendered, not escaped as text',
   )
 
   // `types.ts` DECLARES `legal.tcpa` on the view model, which is not rendering

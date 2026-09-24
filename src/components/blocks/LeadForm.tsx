@@ -10,6 +10,7 @@ import {
   firePixelEvents,
   submitLead,
 } from '@/lib/lead-capture-client'
+import { safeConsentHtml } from '@/lib/safe-consent-html'
 
 type FormFieldDef = {
   name: string
@@ -234,7 +235,10 @@ export function LeadForm({ block, site }: { block: LeadFormBlock; site: Site }) 
             ))}
 
             {block.consent_md ? (
-              <p style={{ fontSize: 12, color: 'var(--site-ink-muted)', lineHeight: 1.5, marginTop: 4 }}>{block.consent_md}</p>
+              <p
+                style={{ fontSize: 12, color: 'var(--site-ink-muted)', lineHeight: 1.5, marginTop: 4 }}
+                dangerouslySetInnerHTML={{ __html: safeConsentHtml(block.consent_md) }}
+              />
             ) : null}
 
             <button
