@@ -67,7 +67,7 @@ export const buildDnsRecords = (host: string): DnsRecord[] => {
           name: host,
           value: aTarget,
           required: true,
-          note: `Points your root domain at ${PRODUCT_NAME}. Serves the site AND verifies ownership. Apex domains use an A record, not a CNAME.`,
+          note: `Points your root domain at ${PRODUCT_NAME} so we can verify ownership. The hostname serves visitors only after verification and a certificate are in place. Apex domains use an A record, not a CNAME.`,
         },
       ]
     }
@@ -91,7 +91,7 @@ export const buildDnsRecords = (host: string): DnsRecord[] => {
       name: host,
       value: cnameTarget,
       required: true,
-      note: `Points this subdomain at ${PRODUCT_NAME}. Serves the site AND verifies ownership.`,
+      note: `Points this subdomain at ${PRODUCT_NAME} so we can verify ownership. The hostname serves visitors only after verification and a certificate are in place.`,
     },
   ]
 }
