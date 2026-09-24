@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 24 September 2026. Rescue Wave 2A on `main`. W60 "V1 complete" is withdrawn.
+Last updated: 24 September 2026. Rescue Wave 2 released to production at `5d642c0`. Follow-up commits on GitHub through `43c45fa`. W60 "V1 complete" is withdrawn.
 
 ---
 

@@ -1,7 +1,10 @@
 # Handoff
 
-Current phase: Rescue Wave 2 in progress. W60 "complete" is withdrawn.
-HEAD: `5d642c0` on `main` (Wave 2A snapshot pin, 2B visitor copy, 2C Home/tenancy/stale-action, 2E DNS copy). Production release of that SHA is in flight. Super-admin `team@legenex.com` password was reset; credentials at `/home/legenex/.pageflo-admin-credentials` (mode 600).
+Current phase: Rescue Wave 2 released. W60 "complete" is withdrawn.
+Production SHA: `5d642c0` (snapshot pin, visitor copy, Home/tenancy, DNS copy). GitHub `main` is ahead at `43c45fa` (production smoke + Brand TCPA settings). Super-admin reset complete; credentials at `/home/legenex/.pageflo-admin-credentials` (mode 600).
+Acceptance Brand: `pageflo-rescue-acceptance-944138` Ready, Home 200, quiz `/s/...` live 200.
+Independent: Security PASS, Funnel PASS, Bugsy P0-001/007/009 PASS. Critic/Final QA not re-run as a full FAIL/PASS gate.
+Remaining: LP/advertorial/lead on the new Brand, Wave 3 settings remainder, full A-J browser suite, custom-domain DNS human gate.
 Tests run this session:
 - `pnpm typecheck` pass
 - `pnpm test` all green
