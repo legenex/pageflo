@@ -8,6 +8,7 @@ import { normalizeDeploymentPath } from './quiz-deployment-path'
 import { normalizeDestinations, type DestinationMap } from './quiz-destinations'
 import { isClaimedByAuthoredContent, pathVariantsFor } from './public-path-claims'
 import { parseDeploymentSnapshot, type QuizMasterSnap } from './deployment-snapshot'
+import { sanitizePublicQuiz } from './quiz-visitor-copy'
 
 export { normalizeDeploymentPath }
 
@@ -345,17 +346,19 @@ const hydrateQuizDeployment = async (
     // `deployment.templateId` is already canonical — resolved once above — so
     // there is no second resolution here to disagree with the first.
     deployment,
-    quiz: quizSnap
-      ? quizFromSnap(quizSnap)
-      : {
-          id: String(quizDoc.id),
-          name: String(quizDoc.name ?? ''),
-          slug: String(quizDoc.slug ?? ''),
-          tiers: asArray(quizDoc.tiers),
-          steps: asArray(quizDoc.steps),
-          nodes: asArray(quizDoc.nodes),
-          customFields: asArray(quizDoc.custom_fields),
-        },
+    quiz: sanitizePublicQuiz(
+      quizSnap
+        ? quizFromSnap(quizSnap)
+        : {
+            id: String(quizDoc.id),
+            name: String(quizDoc.name ?? ''),
+            slug: String(quizDoc.slug ?? ''),
+            tiers: asArray(quizDoc.tiers),
+            steps: asArray(quizDoc.steps),
+            nodes: asArray(quizDoc.nodes),
+            customFields: asArray(quizDoc.custom_fields),
+          },
+    ),
     brand: baseBrand,
     siteId,
     siteSlug: String(siteDoc.slug ?? ''),

@@ -54,7 +54,7 @@ import {
   shouldCapturePublishedSnapshot,
 } from '../src/lib/deployment-snapshot.ts'
 import { isReferencePlaceholder } from '../src/lib/lp-slots/model.ts'
-import { visitorFacingStepLabel } from '../src/lib/quiz-visitor-copy.ts'
+import { sanitizePublicQuiz, visitorFacingStepLabel } from '../src/lib/quiz-visitor-copy.ts'
 import { safeConsentHtml } from '../src/lib/safe-consent-html.ts'
 import { renderTemplateVars } from '../src/lib/template-vars.ts'
 
@@ -1222,6 +1222,20 @@ const BOUND_LP_DEP = { ...GOOD_LP_DEP, quiz: 70 }
   t(!isReferencePlaceholder('See if you may qualify'), 'real copy is not a placeholder')
   t(visitorFacingStepLabel({ question: 'How were you injured?' }, { label: 'Injury Type12121212' }) === 'How were you injured?', 'progress rail uses the question, not the graph name')
   t(visitorFacingStepLabel({ type: 'endpoint' }, { label: '/submitted (Qualified)' }) === '', 'internal destination paths stay off the rail')
+  {
+    const pub = sanitizePublicQuiz({
+      steps: [
+        { key: 'injury', label: 'Injury Type12121212' },
+        { key: 'thanks', label: '/submitted (Qualified)' },
+      ],
+      nodes: [
+        { stepKey: 'injury', type: 'question', question: 'How were you injured?' },
+        { stepKey: 'thanks', type: 'endpoint' },
+      ],
+    })
+    t(pub.steps[0].label === 'How were you injured?', 'public quiz JSON replaces the graph name')
+    t(pub.steps[1].label === '', 'public quiz JSON blanks endpoint path labels')
+  }
   t(safeConsentHtml('See our <a href="/tcpa">TCPA consent</a>.').includes('<a href="/tcpa">TCPA consent</a>'), 'consent HTML keeps a safe relative link')
   t(!safeConsentHtml('See our <a href="/tcpa">TCPA consent</a>.').includes('&lt;a'), 'consent HTML is not escaped as text')
   t(!safeConsentHtml('<a href="javascript:alert(1)">x</a>').includes('javascript:'), 'javascript hrefs are dropped')
