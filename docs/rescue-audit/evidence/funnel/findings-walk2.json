@@ -1,0 +1,114 @@
+[
+  {
+    "id": "FUN-OBS-LP-DEP-LIST",
+    "severity": "info",
+    "title": "LP deployments tab rows",
+    "detail": "[{\"id\":\"27\",\"status\":\"live\",\"text\":\"RO2 Rescue Odin 20260923 · Human Recovery Story LIVE https://rescue-odin-20260923.preview.pageflo.io/c/rescue-odin-20260923 Template: Human Recovery Story · Rescue Odin 20260923 · Quiz: MVA Tiered Quiz T4 · legacy bindin\"},{\"id\":\"26\",\"status\":\"live\",\"text\":\"RSB Rescue Sec B · Human Recovery Story LIVE https://rescue-sec-b-20260923.preview.pageflo.io/c/rescue-sec-b-20260923 Template: Human Recovery Story · Rescue Sec B · Quiz: MVA Tiered Quiz T4 · legacy binding Preview Edit\"},{\"id\":\"25\",\"status\":\"live\",\"text\":\"RSA Rescue Sec A · Human Recovery Story LIVE https://rescue-sec-a-20260923.preview.pageflo.io/c/rescue-sec-a-20260923 Template: Human Recovery Story · Rescue Sec A · Quiz: MVA Tiered Quiz T4 · legacy binding Preview Edit\"},{\"id\":\"24\",\"status\":\"live\",\"text\":\"RF2 Rescue Funnel 20260923 · Human Recovery Story LIVE https://rescue-funnel-20260923.preview.pageflo.io/c/rescue-funnel-20260923 Template: Human Recovery Story · Rescue Funnel 20260923 · Quiz: MVA Tiered Quiz T4 · legac\"},{\"id\":\"23\",\"status\":\"live\",\"text\":\"RQ2 Rescue QA 20260924 · Human Recovery Story LIVE https://rescue-qa-20260923.preview.pageflo.io/c/rescue-qa-20260923 Template: Human Recovery Story · Rescue QA 20260924 · Quiz: MVA Tiered Quiz T4 · legacy binding Previe\"},{\"id\":\"22\",\"status\":\"live\",\"text\":\"ACH Accident Compensation Helper · Human Recovery Story LIVE https://accident-compensation-helper.preview.pageflo.io/c/accident-compensation-helper Template: Human Recovery Story · Accident Compensation Helper · Quiz: MV\"},{\"id\":\"21\",\"status\":\"live\",\"text\":\"Dont Settle · Human Recovery Story LIVE https://dont-settle.preview.legenex.com/c/dont-settle Template: Human Recovery Story · Dont Settle · Quiz: MVA Tiered Quiz 2 Tier Preview Edit\"},{\"id\":\"19\",\"status\":\"live\",\"text\":\"Dont Settle - Authority Network LIVE PREVIEW URL https://dont-settle.preview.legenex.com/c Template: Authority Network · Dont Settle · Quiz: MVA Tiered Quiz 2 Tier Preview Edit\"}]",
+    "at": "2026-09-24T20:09:15.744Z"
+  },
+  {
+    "id": "FUN-P1-001",
+    "severity": "P1",
+    "title": "LP deployments Duplicate control",
+    "detail": "cloneDep=0 pausePublish=8 delete=8",
+    "at": "2026-09-24T20:09:15.750Z"
+  },
+  {
+    "id": "FUN-OBS-LP-DEP-EDITOR",
+    "severity": "info",
+    "title": "LP deployment editor general",
+    "detail": "{\"url\":\"https://app.pageflo.io/admin/landing-pages\",\"h1\":\"Was your accident worth more than they told you?\",\"buttons\":[\"Expand Integrations\",\"Expand Settings\",\"Expand all\",\"Account menu\",\"Collapse sidebar\",\"Open navigation\",\"Preview\",\"Publish checks\",\"Delete\",\"Cancel\",\"Save Deployment\",\"General\",\"Destination URL's\",\"Tracking & Pixels\",\"Edit this brand's colours without leaving the builder\",\"Auto / Motorcycle Accident✓\",\"Commercial / Semi Accident›\",\"Passenger / Rideshare / Pedestrian Accident›\",\"At Work / Other / I Wasn’t Injured›\",\"Continue →\",\"← Back\",\"Preview\",\"Select\",\"Auto / Motorcycle Accident\",\"Commercial / Semi Accident\",\"Passenger / Rideshare / Pedestrian Accident\",\"At Work / Other / I Wasn’t Injured\",\"← Back\",\"Request callback\",\"Preview\",\"Select\",\"Request review\",\"01Auto / Motorcycle AccidentSELECTED\",\"02Commercial / Semi Accident\",\"03Passenger / Rideshare / Pedestrian Accident\",\"04At Work / Other / I Wasn’t Injured\",\"Begin case review →\",\"Begin case review →\",\"Preview\",\"Select\",\"SELECTED Car or motorcycleTwo or more passenger vehicles\",\"Commercial truckSemi, delivery, company vehicle\",\"RideshareDriver or passenger during a trip\",\"PedestrianStruck while walking or crossing\",\"Bicycle or e-bikeRiding when a vehicle was involved\",\"Multi-vehicle incidentPile-up or chain-reaction crash\",\"Workplace or otherOn the job, or something else\",\"Not sureDescribe it in the quiz instead\",\"Auto / Motorcycle Accident\",\"Commercial / Semi Accident\"],\"fields\":[{\"name\":\"\",\"ph\":\"eg CMC Recovery Story / Truck Campaign\",\"type\":\"input\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"select\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"select\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"select\"},{\"name\":\"\",\"ph\":\"/c/your-path\",\"type\":\"input\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"select\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"select\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"select\"}],\"labels\":[],\"seo\":false}",
+    "at": "2026-09-24T20:09:17.567Z"
+  },
+  {
+    "id": "FUN-P1-002",
+    "severity": "P1",
+    "title": "LP deployments have no SEO title/description/OG fields",
+    "detail": "derived from hero/slots + brand",
+    "at": "2026-09-24T20:09:17.567Z"
+  },
+  {
+    "id": "FUN-OBS-LP-TAB",
+    "severity": "info",
+    "title": "64-lp-deployment-destinations",
+    "detail": "PageFlo\nOverview\nBrands\nWebsites\nQuizzes\nLanding Pages\nAdvertorials\nDeployments\nDomains\nLeads\nAnalytics\nSOON\nCampaign Integrity\nSOON\nIntegrations\nSettings\nExpand all\nC\ncapture\nOwner · all brands\n22:09\nGMT+2\nOpen raw Payload admin →\nADMIN / FUNNELS / LANDING PAGES / DEPLOYMENT\nRescue Funnel 20260923 · Human Recovery Story\nPreview\nPublish checks\nDelete\nCancel\nSave Deployment\nrescue-funnel-20260923.preview.pageflo.io/c/rescue-funnel-20260923\nHuman Recovery Story · Rescue Funnel 20260923 · LIVE\nGeneral\nDestination URL's\nTracking & Pixels\nDestination URL's\nThe quiz embedded in this page sends people to a destination by NAME, so this placement can route somewhere different from the brand default w",
+    "at": "2026-09-24T20:09:18.074Z"
+  },
+  {
+    "id": "FUN-OBS-LP-TAB",
+    "severity": "info",
+    "title": "65-lp-deployment-tracking",
+    "detail": "PageFlo\nOverview\nBrands\nWebsites\nQuizzes\nLanding Pages\nAdvertorials\nDeployments\nDomains\nLeads\nAnalytics\nSOON\nCampaign Integrity\nSOON\nIntegrations\nSettings\nExpand all\nC\ncapture\nOwner · all brands\n22:09\nGMT+2\nOpen raw Payload admin →\nADMIN / FUNNELS / LANDING PAGES / DEPLOYMENT\nRescue Funnel 20260923 · Human Recovery Story\nPreview\nPublish checks\nDelete\nCancel\nSave Deployment\nrescue-funnel-20260923.preview.pageflo.io/c/rescue-funnel-20260923\nHuman Recovery Story · Rescue Funnel 20260923 · LIVE\nGeneral\nDestination URL's\nTracking & Pixels\nUTM defaults\nUsed when no UTM parameters are present in the URL. Parameters captured from the visitor's link always win.\nSOURCE\nMEDIUM\nCAMPAIGN\nPixels & CAPI pr",
+    "at": "2026-09-24T20:09:18.575Z"
+  },
+  {
+    "id": "REN-OBS-LP-PREVIEW",
+    "severity": "info",
+    "title": "LP deployment in-app preview",
+    "detail": "{\"h1\":[\"Healing should be your only job right now. The claim shouldn’t become a second injury.\"],\"quiz\":true,\"urlBar\":\"Preview: Human Recovery StoryDEPLOYMENThttps://rescue-funnel-20260923.preview.pageflo.io/c/rescue-funnel-20260923 Close\"}",
+    "at": "2026-09-24T20:09:20.508Z"
+  },
+  {
+    "id": "REN-OBS-QUIZ-TEMPLATES",
+    "severity": "info",
+    "title": "Quiz templates tab",
+    "detail": "PageFlo\nOverview\nBrands\nWebsites\nQuizzes\nLanding Pages\nAdvertorials\nDeployments\nDomains\nLeads\nAnalytics\nSOON\nCampaign Integrity\nSOON\nIntegrations\nSettings\nExpand all\nC\ncapture\nOwner · all brands\n22:09\nGMT+2\nOpen raw Payload admin →\nQuizzes\nThe visual library. Manage what a deployment can be rendered in; every preview is a real render, not a picture of one.\nNew Template\nNew with Claude\nQuiz Flows\nTemplates\nDeployments\nQuiz template library\nEvery visual template a quiz deployment can be rendered in. A template owns layout, progress, answer form and icons; colour always comes from the brand. Disabling one keeps existing pages rendering and only removes it from new choices.\nPREVIEW AS\nNeutral (no brand)\nAccident Compensation Helper\nDont Settle\nRescue Funnel 20260923\nRescue Odin 20260923\nRescue QA 20260924\nRescue Sec A\nRescue Sec B\n20 templates\n·\n20 selectable\nAccident state\nThe assessment\n2 ",
+    "at": "2026-09-24T20:09:25.769Z"
+  },
+  {
+    "id": "FUN-OBS-QUIZ-DEP-LIST",
+    "severity": "info",
+    "title": "Quiz deployments tab rows",
+    "detail": "[{\"id\":\"24\",\"status\":\"live\",\"text\":\"RO2 Rescue Odin 20260923 · MVA Tiered Quiz LIVE STANDALONE Quiz First https://rescue-odin-20260923.preview.pageflo.io/s/rescue-odin-20260923 quiz: MVA Tiered Quiz T4 · brand: Rescue Odin 20260923 Preview Edit\"},{\"id\":\"23\",\"status\":\"live\",\"text\":\"RSB Rescue Sec B · MVA Tiered Quiz LIVE STANDALONE Quiz First https://rescue-sec-b-20260923.preview.pageflo.io/s/rescue-sec-b-20260923 quiz: MVA Tiered Quiz T4 · brand: Rescue Sec B Preview Edit\"},{\"id\":\"22\",\"status\":\"live\",\"text\":\"RSA Rescue Sec A · MVA Tiered Quiz LIVE STANDALONE Quiz First https://rescue-sec-a-20260923.preview.pageflo.io/s/rescue-sec-a-20260923 quiz: MVA Tiered Quiz T4 · brand: Rescue Sec A Preview Edit\"},{\"id\":\"21\",\"status\":\"live\",\"text\":\"RF2 Rescue Funnel 20260923 · MVA Tiered Quiz LIVE STANDALONE Quiz First https://rescue-funnel-20260923.preview.pageflo.io/s/rescue-funnel-20260923 quiz: MVA Tiered Quiz T4 · brand: Rescue Funnel 20260923 Preview Edit\"},{\"id\":\"20\",\"status\":\"live\",\"text\":\"RQ2 Rescue QA 20260924 · MVA Tiered Quiz LIVE STANDALONE Quiz First https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923 quiz: MVA Tiered Quiz T4 · brand: Rescue QA 20260924 Preview Edit\"},{\"id\":\"19\",\"status\":\"live\",\"text\":\"ACH Accident Compensation Helper · MVA Tiered Quiz LIVE STANDALONE Quiz First https://accident-compensation-helper.preview.pageflo.io/s/accident-compensation-helper quiz: MVA Tiered Quiz T4 · brand: Accident Compensation Helper Preview Edit\"},{\"id\":\"18\",\"status\":\"live\",\"text\":\"Dont Settle · MVA Tiered Quiz LIVE STANDALONE Timeline Journey https://dont-settle.preview.legenex.com/s/dont-settle quiz: MVA Tiered Quiz T4 · brand: Dont Settle Preview Edit\"}]",
+    "at": "2026-09-24T20:09:27.076Z"
+  },
+  {
+    "id": "FUN-OBS-QUIZ-DEP-DUP",
+    "severity": "info",
+    "title": "Quiz deployment duplicate",
+    "detail": "count=7",
+    "at": "2026-09-24T20:09:27.079Z"
+  },
+  {
+    "id": "FUN-OBS-QUIZ-DEP-EDITOR",
+    "severity": "info",
+    "title": "Quiz deployment editor",
+    "detail": "{\"url\":\"https://app.pageflo.io/admin/quizzes\",\"h1\":\"\",\"buttons\":[\"Expand Integrations\",\"Expand Settings\",\"Expand all\",\"Account menu\",\"Collapse sidebar\",\"Open navigation\",\"Back\",\"Back\",\"Save\",\"Save & Exit\",\"General\",\"Destination URL's\",\"Tracking & Pixels\",\"Edit this brand's colours without leaving the builder\",\"EmbedJust the quiz card, drops into any landing page\",\"Standalone PageFull page with header, body sections, footer\",\"AAuto / Motorcycle Accident\",\"BCommercial / Semi Accident\",\"CPassenger / Rideshare / Pedestrian\",\"DAt Work / Other\",\"← Back\",\"Preview\",\"Select\",\"Auto / Motorcycle Accident\",\"Commercial / Semi Accident\",\"Passenger / Rideshare / Pedestrian\",\"At Work / Other\",\"← Back\",\"Preview\",\"Select\",\"Auto / Motorcycle Accident\",\"Commercial / Semi Accident\",\"Passenger / Rideshare / Pedestrian\",\"At Work / Other\",\"← Back\",\"Preview\",\"Select\",\"Auto / Motorcycle AccidentRecorded\",\"Commercial / Semi Accident\",\"Passenger / Rideshare / Pedestrian\",\"At Work / Other\",\"← Back\",\"Preview\",\"Select\",\"Auto / Motorcycle Accident›\",\"Commercial / Semi Accident›\",\"Passenger / Rideshare / Pedestrian›\",\"At Work / Other›\",\"← Back\",\"Preview\"],\"fields\":[{\"name\":\"\",\"ph\":\"MVA · pain angle · paid social\",\"type\":\"input\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"select\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"select\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"select\"},{\"name\":\"\",\"ph\":\"/s/mva\",\"type\":\"input\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"select\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"select\"}],\"labels\":[],\"seo\":false}",
+    "at": "2026-09-24T20:09:28.865Z"
+  },
+  {
+    "id": "FUN-P1-004",
+    "severity": "P1",
+    "title": "Quiz deployments have no SEO/OG fields",
+    "detail": "derived from first question + brand",
+    "at": "2026-09-24T20:09:28.865Z"
+  },
+  {
+    "id": "FUN-OBS-QUIZ-TAB",
+    "severity": "info",
+    "title": "74-quiz-deployment-destinations",
+    "detail": "PageFlo\nOverview\nBrands\nWebsites\nQuizzes\nLanding Pages\nAdvertorials\nDeployments\nDomains\nLeads\nAnalytics\nSOON\nCampaign Integrity\nSOON\nIntegrations\nSettings\nExpand all\nC\ncapture\nOwner · all brands\n22:09\nGMT+2\nOpen raw Payload admin →\nBack\nDeployment\nrescue-funnel-20260923.preview.pageflo.io/s/rescue-funnel-20260923\nMVA Tiered Quiz T4 · Rescue Funnel 20260923 · standalone · Quiz First\nBack\nSave\nSave & Exit\nGeneral\nDestination URL's\nTracking & Pixels\nDestination URL's\nQuiz nodes point at a destination by name, so this deployment can send traffic somewhere different from the brand's default without editing the quiz flow. Leave a field blank to inherit.\nTHANK YOU PAGE\nSITE DEFAULT\nresolves to /sub",
+    "at": "2026-09-24T20:09:29.393Z"
+  },
+  {
+    "id": "FUN-OBS-QUIZ-TAB",
+    "severity": "info",
+    "title": "75-quiz-deployment-tracking",
+    "detail": "PageFlo\nOverview\nBrands\nWebsites\nQuizzes\nLanding Pages\nAdvertorials\nDeployments\nDomains\nLeads\nAnalytics\nSOON\nCampaign Integrity\nSOON\nIntegrations\nSettings\nExpand all\nC\ncapture\nOwner · all brands\n22:09\nGMT+2\nOpen raw Payload admin →\nBack\nDeployment\nrescue-funnel-20260923.preview.pageflo.io/s/rescue-funnel-20260923\nMVA Tiered Quiz T4 · Rescue Funnel 20260923 · standalone · Quiz First\nBack\nSave\nSave & Exit\nGeneral\nDestination URL's\nTracking & Pixels\nUTM defaults\nUsed when no UTM parameters are passed in the URL. Parameters captured from the visitor's link always override these.\nSOURCE\nMEDIUM\nCAMPAIGN\nPixels & CAPI providers\nClient-side pixels and their server-side conversion APIs for this deplo",
+    "at": "2026-09-24T20:09:29.938Z"
+  },
+  {
+    "id": "REN-OBS-QUIZ-PREVIEW",
+    "severity": "info",
+    "title": "Quiz in-app preview",
+    "detail": "PageFlo\nOverview\nBrands\nWebsites\nQuizzes\nLanding Pages\nAdvertorials\nDeployments\nDomains\nLeads\nAnalytics\nSOON\nCampaign Integrity\nSOON\nIntegrations\nSettings\nExpand all\nC\ncapture\nOwner · all brands\n22:09\nGMT+2\nOpen raw Payload admin →\nBack to Quizzes\nBRAND:\nAccident Compensation Helper\nDont Settle\nRescue Funnel 20260923\nRescue Odin 20260923\nRescue QA 20260924\nRescue Sec A\nRescue Sec B\nDEPLOY:\n- none -\nSTANDALONE\nSHARED\nstep 1/16\nEditorial Inline\nBack\nReset\nAccident Compensation Helper\nCLICK HERE TO CALL\nWelcome / Accident Type\nThe assessment\n1 / 14\nTake the 30 Second Quiz to Start the Process of Seeing How Much Your Claim Could Be Worth\nGet The Maximum Cash Payout For Your Accident Injury!!!\nHo",
+    "at": "2026-09-24T20:09:34.994Z"
+  },
+  {
+    "id": "AUD-CRASH2",
+    "severity": "P0",
+    "title": "walk2 threw",
+    "detail": "locator.click: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('button').filter({ hasText: /^Deployments$/ }).first()\u001b[22m\n\n    at main (/home/legenex/Documents/Projects/PageFlo/docs/rescue-audit/evidence/funnel/_walk2.mjs:191:79)\n    at async file:///home/legenex/Documents/Projects/PageFlo/docs/rescue-audit/evidence/funnel/_walk2.mjs:336:1",
+    "at": "2026-09-24T20:10:03.216Z"
+  }
+]

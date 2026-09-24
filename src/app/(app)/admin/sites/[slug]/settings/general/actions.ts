@@ -141,6 +141,27 @@ export async function setSiteStatus(args: {
     return { ok: false, error: `cannot go from ${current} to ${args.to}` }
   }
 
+  if (args.to === 'active') {
+    const home = await payload.find({
+      collection: 'pages',
+      where: {
+        and: [
+          { site: { equals: authz.siteId } },
+          { slug: { equals: '/' } },
+          { status: { equals: 'published' } },
+        ],
+      },
+      limit: 1,
+      overrideAccess: true,
+    })
+    if (!home.docs[0]) {
+      return {
+        ok: false,
+        error: 'this Brand has no published Home page. Add a Home at / before publishing the Brand.',
+      }
+    }
+  }
+
   await payload.update({
     collection: 'sites',
     id: authz.siteId,

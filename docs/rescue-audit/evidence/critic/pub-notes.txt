@@ -1,0 +1,45 @@
+PUB 200 https://app.pageflo.io/sign-in title="Sign in · PageFlo Console" h1="Sign in to PageFlo" visMust=[]
+  body: PageFlo Sign in to PageFlo Sites · Landing Pages · Advertorials · Quizzes · Brand Kits · Domains · Deployments · Leads EMAIL PASSWORD Sign in Forgot password? Back to site © 2026 Legenex · PageFlo
+SHOT pub-signin
+PUB 200 https://dont-settle.preview.pageflo.io/ title="Home | Dont Settle" h1="See if you may qualify for a mass tort claim." visMust=[]
+  body: Dont Settle How it works Our partners FAQ Check my case Free case review See if you may qualify for a mass tort claim. Answer a few quick questions and a partner attorney will review your situation at no cost. Start my free review FREE CASE REVIEW See if you qualify in two minutes. No payment information. No obligation. A partner attorney reviews your situation at no cost. By submitting your information you agree to be contacted by Dont Settle and our partner law firms by phone, text, and email 
+SHOT pub-ds-home
+PUB 200 https://dont-settle.preview.pageflo.io/privacy title="Privacy Notice | Dont Settle" h1="Privacy Notice" visMust=[]
+  body: Dont Settle How it works Our partners FAQ Check my case Privacy Notice Privacy Notice Last updated: September 24, 2026 Dont Settle ("we", "us") respects your privacy. This notice explains what information we collect when you use Dont Settle, how we use it, and the choices you have. Information we collect Information you submit through forms and questionnaires, including name, email, phone number, state, and answers about your situation. Information collected automatically, such as IP address, br
+SHOT pub-ds-privacy
+PUB 200 https://dont-settle.preview.pageflo.io/terms title="Dont Settle" h1="Terms of Service | {{site.name}}" visMust=["{{site.name}}"]
+  body: Dont Settle How it works Our partners FAQ Check my case Terms of Service | {{site.name}} Terms of Service Last updated: September 24, 2026 These Terms govern your use of Dont Settle, operated by Dont Settle. By using this site you agree to these Terms. 1. No legal advice Nothing on this site is legal advice. We are not a law firm. Submitting a form does not create an attorney-client relationship. Past results do not guarantee future outcomes. 2. Use of the site You agree to use Dont Settle only 
+SHOT pub-ds-terms
+PUB 200 https://dont-settle.preview.pageflo.io/s/dont-settle title="Dont Settle · MVA Tiered Quiz | Dont Settle" h1="NO-H1" visMust=[]
+  body: Dont Settle CLICK HERE TO CALL Welcome / Accident Type Accident Branch Accident State Accident Date Accident Details Injury Type12121212 Treatment Received Treatment Time Fault Attorney Status Insurance Status Qualified Lead Form DQ Lead Form /submitted (Qualified) /thanks (DQ) Take the 30 Second Quiz to Start the Process of Seeing How Much Your Claim Could Be Worth Get The Maximum Cash Payout For Your Accident Injury!!! How Were You Injured? Select The Type Of Accident You Were Involved In: Aut
+SHOT pub-ds-quiz
+PUB 200 https://dont-settle.preview.pageflo.io/c title="Vetted motor-vehicle attorneys. One structured review process. Every state. | Dont Settle" h1="Vetted motor-vehicle attorneys. One structured review process. Every state." visMust=[]
+  body: Dont Settle CASE REVIEW LINE · 24/7 (800) 000-0000 Request review INDEPENDENT ATTORNEY-MATCHING NETWORK Vetted motor-vehicle attorneys. One structured review process. Every state. We are not a law firm. We operate a screened network of independent personal-injury attorneys and match accident victims to the right one for their case — at no cost, with no obligation. Network-wide RECOVERIES 50 states COVERAGE MAP BELOW 24–48h TYPICAL MATCH TIME STRUCTURED CASE ASSESSMENT CONFIDENTIAL · STEP 1 OF 7 
+SHOT pub-ds-lp-c
+PUB 200 https://dont-settle.preview.pageflo.io/c/dont-settle title="Healing should be your only job right now. The claim shouldn’t become a second injury. | Dont Settle" h1="Healing should be your only job right now. The claim shouldn’t become a second injury." visMust=[]
+  body: Dont Settle Talk to someone · (833) 555-0444 YOU DIDN’T ASK FOR THIS Healing should be your only job right now. The claim shouldn’t become a second injury. If you were hurt in a crash, you deserve to know what support you’re entitled to — without pressure, paperwork battles, or a single upfront dollar. Take the 30 Second Quiz to Start the Process of Seeing How Much Your Claim Could Be Worth Get The Maximum Cash Payout For Your Accident Injury!!! How Were You Injured? Select The Type Of Accident 
+SHOT pub-ds-lp
+PUB 200 https://dont-settle.preview.pageflo.io/adv/letter title="The Settlement Letter That Sat on Their Fridge for Three Weeks | Dont Settle" h1="The Settlement Letter That Sat on Their Fridge for Three Weeks" visMust=[]
+  body: D DONT SETTLE (833) 555-0444 CLICK HERE TO CALL ACCIDENT CLAIMS The Settlement Letter That Sat on Their Fridge for Three Weeks By Anna Lopez · 3 min read The offer arrived eleven days after the crash. It sat on their fridge for three weeks. That delay is the only reason they did not lose $63,000. Mike and Donna had been hit by a distracted driver on a Saturday morning grocery run. Both had whiplash. Donna had a wrist sprain. The insurance company moved fast. Within two weeks they had an offer in
+SHOT pub-ds-adv
+PUB 200 https://dont-settle.preview.legenex.com/ title="Home | Dont Settle" h1="See if you may qualify for a mass tort claim." visMust=[]
+  body: Dont Settle How it works Our partners FAQ Check my case Free case review See if you may qualify for a mass tort claim. Answer a few quick questions and a partner attorney will review your situation at no cost. Start my free review FREE CASE REVIEW See if you qualify in two minutes. No payment information. No obligation. A partner attorney reviews your situation at no cost. By submitting your information you agree to be contacted by Dont Settle and our partner law firms by phone, text, and email 
+SHOT pub-ds-legacy-home
+PUB 404 https://accident-compensation-helper.preview.pageflo.io/ title="" h1="Page not found" visMust=[]
+  body: Page not found The page you are looking for does not exist or has moved. Go back home
+SHOT pub-ach-home
+PUB 200 https://accident-compensation-helper.preview.pageflo.io/s/accident-compensation-helper title="Accident Compensation Helper · MVA Tiered Quiz | Accident Compensation Helper" h1="NO-H1" visMust=[]
+  body: Accident Compensation Helper CLICK HERE TO CALL 7% TAKE THE 30 SECOND QUIZ TO START THE PROCESS OF SEEING HOW MUCH YOUR CLAIM COULD BE WORTH Get The Maximum Cash Payout For Your Accident Injury!!! How Were You Injured? Select The Type Of Accident You Were Involved In: Auto / Motorcycle Accident Commercial / Semi Accident Passenger / Rideshare / Pedestrian Accident At Work / Other / I Wasn't Injured
+SHOT pub-ach-quiz
+PUB 404 https://check-a-case.preview.pageflo.io/ title="" h1="Page not found" visMust=[]
+  body: Page not found The page you are looking for does not exist or has moved. Go back home
+SHOT pub-cac-home
+PUB 200 https://rescue-qa-20260923.preview.pageflo.io/ title="Home | Rescue QA 20260924" h1="Were you in an accident? See if you qualify." visMust=[]
+  body: Rescue QA 20260924 How it works Our partners FAQ Check my case Free claim check Were you in an accident? See if you qualify. A two-minute claim check matches you with a personal injury attorney at no cost. Check my claim FREE CASE REVIEW Check your claim in two minutes. No payment information. No obligation. A partner attorney reviews your situation at no cost. By submitting your information you agree to be contacted by Rescue QA 20260924 and our partner law firms by phone, text, and email regar
+SHOT pub-newbrand-home
+PUB 200 https://rescue-qa-20260923.preview.pageflo.io/privacy title="Privacy Notice | Rescue QA 20260924" h1="Privacy Notice" visMust=[]
+  body: Rescue QA 20260924 How it works Our partners FAQ Check my case Privacy Notice Privacy Notice Last updated: September 24, 2026 Rescue QA 20260924 ("we", "us") respects your privacy. This notice explains what information we collect when you use Rescue QA 20260924, how we use it, and the choices you have. Information we collect Information you submit through forms and questionnaires, including name, email, phone number, state, and answers about your situation. Information collected automatically, s
+SHOT pub-newbrand-privacy
+PUB 200 https://rescue-qa-20260923.preview.legenex.com/ title="Home | Rescue QA 20260924" h1="Were you in an accident? See if you qualify." visMust=[]
+  body: Rescue QA 20260924 How it works Our partners FAQ Check my case Free claim check Were you in an accident? See if you qualify. A two-minute claim check matches you with a personal injury attorney at no cost. Check my claim FREE CASE REVIEW Check your claim in two minutes. No payment information. No obligation. A partner attorney reviews your situation at no cost. By submitting your information you agree to be contacted by Rescue QA 20260924 and our partner law firms by phone, text, and email regar
+SHOT pub-newbrand-legacy

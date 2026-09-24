@@ -45,7 +45,7 @@ export default async function SiteLayout({
   return (
     <>
       <SiteSidebar
-        site={{ slug: site.slug, name: site.name, brand: site.brand ?? undefined }}
+        site={{ slug: site.slug, name: site.name, status: site.status, brand: site.brand ?? undefined }}
         livePreviewUrl={livePreviewUrl}
         userEmail={user?.email ?? ''}
       />

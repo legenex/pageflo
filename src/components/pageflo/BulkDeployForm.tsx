@@ -58,7 +58,7 @@ export function BulkDeployForm({ masters, brands }: { masters: Master[]; brands:
   }
 
   const review = Array.isArray(plan) ? plan : []
-  const planError = Array.isArray(plan) ? '' : plan.error
+  const planError = Array.isArray(plan) || (!path.trim() && selected.length === 0) ? '' : plan.error
 
   return (
     <div className="grid gap-5">

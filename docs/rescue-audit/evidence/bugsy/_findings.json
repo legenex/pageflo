@@ -1,0 +1,55 @@
+{
+  "defects": [
+    {
+      "id": "BUG-P0-001",
+      "severity": "P0",
+      "area": "Auth",
+      "steps": [
+        "Open https://app.pageflo.io/sign-in",
+        "Submit production SUPER_ADMIN_EMAIL / SUPER_ADMIN_PASSWORD"
+      ],
+      "expected": "Redirect into /admin/",
+      "actual": "Remained on sign-in. Form said: The email or password provided is incorrect.",
+      "evidence": [
+        "docs/rescue-audit/evidence/bugsy/01-sign-in.png",
+        "docs/rescue-audit/evidence/bugsy/02-sign-in-failed.png"
+      ],
+      "urls": [
+        "https://app.pageflo.io/sign-in"
+      ],
+      "likelyRootCause": "Production auth rejection or CSRF/serverURL cookie mismatch between app.pageflo.io and os.legenex.com."
+    },
+    {
+      "severity": "P0",
+      "area": "QA walk",
+      "steps": [
+        "Run production operator walk"
+      ],
+      "expected": "Walk completes",
+      "actual": "Error: login failed",
+      "evidence": [
+        "docs/rescue-audit/evidence/bugsy/_notes.txt"
+      ],
+      "urls": [
+        "https://app.pageflo.io/sign-in"
+      ],
+      "likelyRootCause": "Uncaught exception in the walk or a trapping UI.",
+      "id": "BUG-P0-002"
+    }
+  ],
+  "observations": [],
+  "actionPosts": [
+    {
+      "t": "2026-09-24T20:03:47.107Z",
+      "url": "https://app.pageflo.io/sign-in",
+      "status": 200,
+      "method": "POST",
+      "action": "40975fc7d62eed955c88fa1fa3ce895f68e6bccf41",
+      "body": "0:{\"a\":\"$@1\",\"f\":\"\",\"b\":\"17z-Hx8tI7tm_5idwg_52\"}\n1:{\"ok\":false,\"error\":\"The email or password provided is incorrect.\"}\n",
+      "page": "https://app.pageflo.io/sign-in"
+    }
+  ],
+  "consoleErrors": [],
+  "pageErrors": [],
+  "failedRequests": []
+}

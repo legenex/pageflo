@@ -1,0 +1,25 @@
+{
+  "agent": "odin",
+  "when": "2026-09-24T20:10:00Z",
+  "login": {
+    "console": "https://app.pageflo.io/sign-in",
+    "super_admin_email_from_prod_env": "team@legenex.com",
+    "super_admin_env_password_authenticates": false,
+    "payload_error": "The email or password provided is incorrect.",
+    "used": "capture@legenex.com (BUILDLOG_CAPTURE_* from the same production .env)"
+  },
+  "brand_created": {
+    "name": "Rescue Odin 20260923",
+    "slug": "rescue-odin-20260923",
+    "site_id": 22,
+    "status": "draft"
+  },
+  "audit_custom_domain": {
+    "host": "rescue-odin-20260923.example",
+    "id": 83,
+    "status": "pending",
+    "ssl_status": "pending",
+    "site_id": 22,
+    "dns_changed": false
+  }
+}

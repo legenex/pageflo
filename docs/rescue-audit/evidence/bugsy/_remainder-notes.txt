@@ -1,0 +1,61 @@
+[2026-09-24T20:11:43.965Z] CONSOLE Failed to load resource: the server responded with a status of 404 ()
+[2026-09-24T20:11:44.792Z] VISIT 404 https://accident-compensation-helper.preview.pageflo.io/ title="" text=
+[2026-09-24T20:11:44.825Z] SHOT 201-ach-home-pageflo.png https://accident-compensation-helper.preview.pageflo.io/
+[2026-09-24T20:11:46.317Z] CONSOLE Failed to load resource: the server responded with a status of 404 ()
+[2026-09-24T20:11:47.146Z] VISIT 404 https://accident-compensation-helper.preview.legenex.com/ title="" text=
+[2026-09-24T20:11:47.166Z] SHOT 202-ach-home-legenex.png https://accident-compensation-helper.preview.legenex.com/
+[2026-09-24T20:11:48.721Z] VISIT 200 https://accident-compensation-helper.preview.pageflo.io/s/accident-compensation-helper title="Accident Compensation Helper · MVA Tiered Quiz | Accident Compensation Helper" text=Accident Compensation Helper CLICK HERE TO CALL 7% TAKE THE 30 SECOND QUIZ TO START THE PROCESS OF SEEING HOW MUCH YOUR CLAIM COULD BE WORTH Get The Maximum Cash Payout For Your Accident Injury!!! How Were You Injured? Select The Type Of Accident You Were Invo
+[2026-09-24T20:11:48.752Z] SHOT 203-ach-quiz.png https://accident-compensation-helper.preview.pageflo.io/s/accident-compensation-helper
+[2026-09-24T20:11:50.470Z] VISIT 200 https://accident-compensation-helper.preview.pageflo.io/c/accident-compensation-helper title="Healing should be your only job right now. The claim shouldn’t become a second injury. | Accident Compensation Helper" text=Accident Compensation Helper Accident Compensation Helper Talk to someone · (833) 555-0433 YOU DIDN’T ASK FOR THIS Healing should be your only job right now. The claim shouldn’t become a second injury. If you were hurt in a crash, you deserve to know what supp
+[2026-09-24T20:11:50.637Z] SHOT 204-ach-lp.png https://accident-compensation-helper.preview.pageflo.io/c/accident-compensation-helper
+[2026-09-24T20:11:52.671Z] VISIT 200 https://dont-settle.preview.pageflo.io/ title="Home | Dont Settle" text=Dont Settle How it works Our partners FAQ Check my case Free case review See if you may qualify for a mass tort claim. Answer a few quick questions and a partner attorney will review your situation at no cost. Start my free review FREE CASE REVIEW See if you q
+[2026-09-24T20:11:52.989Z] SHOT 205-ds-home-pageflo.png https://dont-settle.preview.pageflo.io/
+[2026-09-24T20:11:54.969Z] VISIT 200 https://dont-settle.preview.legenex.com/ title="Home | Dont Settle" text=Dont Settle How it works Our partners FAQ Check my case Free case review See if you may qualify for a mass tort claim. Answer a few quick questions and a partner attorney will review your situation at no cost. Start my free review FREE CASE REVIEW See if you q
+[2026-09-24T20:11:55.293Z] SHOT 206-ds-home-legenex.png https://dont-settle.preview.legenex.com/
+[2026-09-24T20:11:56.876Z] VISIT 200 https://dont-settle.preview.pageflo.io/adv/letter title="The Settlement Letter That Sat on Their Fridge for Three Weeks | Dont Settle" text=D DONT SETTLE (833) 555-0444 CLICK HERE TO CALL ACCIDENT CLAIMS The Settlement Letter That Sat on Their Fridge for Three Weeks By Anna Lopez · 3 min read The offer arrived eleven days after the crash. It sat on their fridge for three weeks. That delay is the o
+[2026-09-24T20:11:56.986Z] SHOT 207-ds-adv.png https://dont-settle.preview.pageflo.io/adv/letter
+[2026-09-24T20:11:58.558Z] VISIT 200 https://dont-settle.preview.pageflo.io/c title="Vetted motor-vehicle attorneys. One structured review process. Every state. | Dont Settle" text=Dont Settle CASE REVIEW LINE · 24/7 (800) 000-0000 Request review INDEPENDENT ATTORNEY-MATCHING NETWORK Vetted motor-vehicle attorneys. One structured review process. Every state. We are not a law firm. We operate a screened network of independent personal-inj
+[2026-09-24T20:11:58.716Z] SHOT 208-ds-lp-c.png https://dont-settle.preview.pageflo.io/c
+[2026-09-24T20:12:00.298Z] VISIT 200 https://dont-settle.preview.pageflo.io/terms title="Dont Settle" text=Dont Settle How it works Our partners FAQ Check my case Terms of Service | {{site.name}} Terms of Service Last updated: September 24, 2026 These Terms govern your use of Dont Settle, operated by Dont Settle. By using this site you agree to these Terms. 1. No l
+[2026-09-24T20:12:00.374Z] SHOT 209-ds-terms.png https://dont-settle.preview.pageflo.io/terms
+[2026-09-24T20:12:01.929Z] VISIT 200 https://dont-settle.preview.pageflo.io/privacy title="Privacy Notice | Dont Settle" text=Dont Settle How it works Our partners FAQ Check my case Privacy Notice Privacy Notice Last updated: September 24, 2026 Dont Settle ("we", "us") respects your privacy. This notice explains what information we collect when you use Dont Settle, how we use it, and
+[2026-09-24T20:12:02.028Z] SHOT 210-ds-privacy.png https://dont-settle.preview.pageflo.io/privacy
+[2026-09-24T20:12:04.255Z] SHOT 211-quiz2-start.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:04.291Z] clicked Auto/Motorcycle
+[2026-09-24T20:12:05.137Z] SHOT 212-quiz2-after-type.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:05.139Z] selects=1
+[2026-09-24T20:12:05.155Z] state options sample=["- Select -","Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut"]
+[2026-09-24T20:12:05.677Z] next count=1 disabled=true text=Next →
+[2026-09-24T20:12:06.638Z] SHOT 213-quiz2-after-next.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:06.641Z] after next Rescue QA 20260924 CLICK HERE TO CALL 27% When Did The Accident Happen? Select the month and year when the accident happened. YEAR Select year 2026 2025 2024 2023 2022 MONTH Select month January February March April May June July August September October November December ← Back Next →
+[2026-09-24T20:12:06.646Z] loop 0 cards=0 snippet=Rescue QA 20260924 CLICK HERE TO CALL 27% When Did The Accident Happen? Select the month and year when the accident happened. YEAR Select year 2026 2025 2024 20
+[2026-09-24T20:12:07.408Z] SHOT 214-quiz2-loop-0.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:07.413Z] loop 1 cards=0 snippet=Rescue QA 20260924 CLICK HERE TO CALL 27% When Did The Accident Happen? Select the month and year when the accident happened. YEAR Select year 2026 2025 2024 20
+[2026-09-24T20:12:08.164Z] SHOT 215-quiz2-loop-1.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:08.168Z] loop 2 cards=0 snippet=Rescue QA 20260924 CLICK HERE TO CALL 27% When Did The Accident Happen? Select the month and year when the accident happened. YEAR Select year 2026 2025 2024 20
+[2026-09-24T20:12:08.916Z] SHOT 216-quiz2-loop-2.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:08.920Z] loop 3 cards=0 snippet=Rescue QA 20260924 CLICK HERE TO CALL 27% When Did The Accident Happen? Select the month and year when the accident happened. YEAR Select year 2026 2025 2024 20
+[2026-09-24T20:12:09.667Z] SHOT 217-quiz2-loop-3.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:09.672Z] loop 4 cards=0 snippet=Rescue QA 20260924 CLICK HERE TO CALL 27% When Did The Accident Happen? Select the month and year when the accident happened. YEAR Select year 2026 2025 2024 20
+[2026-09-24T20:12:10.427Z] SHOT 218-quiz2-loop-4.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:10.431Z] loop 5 cards=0 snippet=Rescue QA 20260924 CLICK HERE TO CALL 27% When Did The Accident Happen? Select the month and year when the accident happened. YEAR Select year 2026 2025 2024 20
+[2026-09-24T20:12:11.175Z] SHOT 219-quiz2-loop-5.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:11.179Z] loop 6 cards=0 snippet=Rescue QA 20260924 CLICK HERE TO CALL 27% When Did The Accident Happen? Select the month and year when the accident happened. YEAR Select year 2026 2025 2024 20
+[2026-09-24T20:12:11.910Z] SHOT 220-quiz2-loop-6.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:11.913Z] loop 7 cards=0 snippet=Rescue QA 20260924 CLICK HERE TO CALL 27% When Did The Accident Happen? Select the month and year when the accident happened. YEAR Select year 2026 2025 2024 20
+[2026-09-24T20:12:12.659Z] SHOT 221-quiz2-loop-7.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:12.663Z] loop 8 cards=0 snippet=Rescue QA 20260924 CLICK HERE TO CALL 27% When Did The Accident Happen? Select the month and year when the accident happened. YEAR Select year 2026 2025 2024 20
+[2026-09-24T20:12:13.407Z] SHOT 222-quiz2-loop-8.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:13.411Z] loop 9 cards=0 snippet=Rescue QA 20260924 CLICK HERE TO CALL 27% When Did The Accident Happen? Select the month and year when the accident happened. YEAR Select year 2026 2025 2024 20
+[2026-09-24T20:12:14.150Z] SHOT 223-quiz2-loop-9.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:14.174Z] SHOT 224-quiz2-end.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:12:14.176Z] END Rescue QA 20260924 CLICK HERE TO CALL 27% When Did The Accident Happen? Select the month and year when the accident happened. YEAR Select year 2026 2025 2024 2023 2022 MONTH Select month January February March April May June July August September October November December ← Back Next →
+[2026-09-24T20:12:14.983Z] PLACEHOLDERS https://rescue-qa-20260923.preview.pageflo.io/ [] emdash=false
+[2026-09-24T20:12:15.743Z] PLACEHOLDERS https://dont-settle.preview.pageflo.io/ [] emdash=true
+[2026-09-24T20:12:16.205Z] PLACEHOLDERS https://dont-settle.preview.pageflo.io/c/dont-settle [] emdash=true
+[2026-09-24T20:12:16.666Z] PLACEHOLDERS https://rescue-qa-20260923.preview.pageflo.io/c/rescue-qa-20260923 [] emdash=true
+[2026-09-24T20:12:17.041Z] CONSOLE Failed to load resource: the server responded with a status of 404 ()
+[2026-09-24T20:12:17.861Z] VISIT 404 https://accident-compensation-helper.preview.pageflo.io/ title="Accident Compensation Helper" text=Page not found The page you are looking for does not exist or has moved. Go back home
+[2026-09-24T20:12:17.876Z] SHOT 225-ach-home-mobile.png https://accident-compensation-helper.preview.pageflo.io/
+[2026-09-24T20:12:19.382Z] VISIT 200 https://rescue-qa-20260923.preview.pageflo.io/about title="About | Rescue QA 20260924" text=This page has no content blocks yet.
+[2026-09-24T20:12:19.408Z] SHOT 226-qa-about-mobile.png https://rescue-qa-20260923.preview.pageflo.io/about

@@ -6,6 +6,7 @@ import {
   previewRoot,
   previewRoots,
 } from '../src/lib/pageflo/hosts.ts'
+import { brandServesOnHost } from '../src/lib/site-visibility.ts'
 
 let pass = 0
 let fail = 0
@@ -43,6 +44,15 @@ t(classifyHost('app.pageflo.io') === 'app', 'app.pageflo.io is reserved as the a
 t(classifyHost('os.legenex.com') === 'legacy-app', 'os.legenex.com remains the legacy application host')
 t(classifyHost('acme.preview.pageflo.io') === 'tenant', 'preview hosts resolve as tenants, not reserved console hosts')
 t(classifyHost('pageflo.io') === 'marketing', 'pageflo.io is the marketing host')
+
+t(brandServesOnHost('active', 'claims.example.com') === true, 'an active Brand serves on a custom host')
+t(brandServesOnHost('draft', 'acme.preview.pageflo.io') === true, 'a draft Brand serves on its PageFlo preview host')
+t(brandServesOnHost('draft', 'acme.preview.legenex.com') === true, 'a draft Brand serves on the legacy preview host')
+t(brandServesOnHost('paused', 'acme.preview.pageflo.io') === true, 'a paused Brand is still previewable')
+t(brandServesOnHost('draft', 'claims.example.com') === false, 'a draft Brand does not serve on a custom domain')
+t(brandServesOnHost('paused', 'claims.example.com') === false, 'a paused Brand does not serve on a custom domain')
+t(brandServesOnHost('archived', 'acme.preview.pageflo.io') === false, 'an archived Brand never serves')
+t(brandServesOnHost('active', 'acme.preview.pageflo.io') === true, 'an active Brand still serves on preview')
 
 console.log(`\n${pass} passed, ${fail} failed`)
 process.exit(fail === 0 ? 0 : 1)

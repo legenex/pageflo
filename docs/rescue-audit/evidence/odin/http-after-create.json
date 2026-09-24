@@ -1,0 +1,52 @@
+{
+  "https://rescue-odin-20260923.preview.pageflo.io/api/legalos/self-check": {
+    "status": 200,
+    "ctype": "application/json",
+    "body": "{\"ok\":true,\"app\":\"legalos\",\"host\":\"rescue-odin-20260923.preview.pageflo.io\",\"site_id\":\"22\",\"primary_host\":\"rescue-odin-20260923.preview.pageflo.io\",\"eligible\":true,\"time\":\"2026-09-24T20:08:51.753Z\"}"
+  },
+  "https://rescue-odin-20260923.preview.legenex.com/api/legalos/self-check": {
+    "status": 200,
+    "ctype": "application/json",
+    "body": "{\"ok\":true,\"app\":\"legalos\",\"host\":\"rescue-odin-20260923.preview.legenex.com\",\"site_id\":\"22\",\"primary_host\":\"rescue-odin-20260923.preview.pageflo.io\",\"eligible\":true,\"time\":\"2026-09-24T20:08:52.739Z\"}"
+  },
+  "https://rescue-odin-20260923.preview.pageflo.io/": {
+    "status": 404,
+    "ctype": "text/html; charset=utf-8",
+    "body": "<!DOCTYPE html><html id=\"__next_error__\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/webpack-e72bfd9aad86a4b7.js\"/><script src=\"/_next/static/chunks/abc5f43a-eb614b7c482855bb.js\" async=\"\"></script><script src=\"/_next/static/chunks/4144-2fba5af8841c4663.js\" async=\"\"></script><script src=\"/_next/static/chunks/main-app-047b4c6c6f196ce0.js\" async=\"\"></script><script sr"
+  },
+  "https://rescue-odin-20260923.preview.legenex.com/": {
+    "status": 404,
+    "ctype": "text/html; charset=utf-8",
+    "body": "<!DOCTYPE html><html id=\"__next_error__\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/webpack-e72bfd9aad86a4b7.js\"/><script src=\"/_next/static/chunks/abc5f43a-eb614b7c482855bb.js\" async=\"\"></script><script src=\"/_next/static/chunks/4144-2fba5af8841c4663.js\" async=\"\"></script><script src=\"/_next/static/chunks/main-app-047b4c6c6f196ce0.js\" async=\"\"></script><script sr"
+  },
+  "https://rescue-odin-20260923.preview.pageflo.io/?preview=1": {
+    "status": 404,
+    "ctype": "text/html; charset=utf-8",
+    "body": "<!DOCTYPE html><html id=\"__next_error__\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/webpack-e72bfd9aad86a4b7.js\"/><script src=\"/_next/static/chunks/abc5f43a-eb614b7c482855bb.js\" async=\"\"></script><script src=\"/_next/static/chunks/4144-2fba5af8841c4663.js\" async=\"\"></script><script src=\"/_next/static/chunks/main-app-047b4c6c6f196ce0.js\" async=\"\"></script><script sr"
+  },
+  "https://rescue-odin-20260923.preview.pageflo.io/?site=rescue-odin-20260923": {
+    "status": 404,
+    "ctype": "text/html; charset=utf-8",
+    "body": "<!DOCTYPE html><html id=\"__next_error__\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/webpack-e72bfd9aad86a4b7.js\"/><script src=\"/_next/static/chunks/abc5f43a-eb614b7c482855bb.js\" async=\"\"></script><script src=\"/_next/static/chunks/4144-2fba5af8841c4663.js\" async=\"\"></script><script src=\"/_next/static/chunks/main-app-047b4c6c6f196ce0.js\" async=\"\"></script><script sr"
+  },
+  "https://dont-settle.preview.pageflo.io/api/legalos/self-check": {
+    "status": 200,
+    "ctype": "application/json",
+    "body": "{\"ok\":true,\"app\":\"legalos\",\"host\":\"dont-settle.preview.pageflo.io\",\"site_id\":\"16\",\"primary_host\":\"dont-settle.preview.legenex.com\",\"eligible\":true,\"time\":\"2026-09-24T20:08:57.838Z\"}"
+  },
+  "https://dont-settle.preview.legenex.com/api/legalos/self-check": {
+    "status": 200,
+    "ctype": "application/json",
+    "body": "{\"ok\":true,\"app\":\"legalos\",\"host\":\"dont-settle.preview.legenex.com\",\"site_id\":\"16\",\"primary_host\":\"dont-settle.preview.legenex.com\",\"eligible\":true,\"time\":\"2026-09-24T20:08:58.782Z\"}"
+  },
+  "https://accident-compensation-helper.preview.pageflo.io/api/legalos/self-check": {
+    "status": 200,
+    "ctype": "application/json",
+    "body": "{\"ok\":true,\"app\":\"legalos\",\"host\":\"accident-compensation-helper.preview.pageflo.io\",\"site_id\":\"17\",\"primary_host\":\"accident-compensation-helper.preview.pageflo.io\",\"eligible\":true,\"time\":\"2026-09-24T20:08:59.713Z\"}"
+  },
+  "https://accident-compensation-helper.preview.pageflo.io/": {
+    "status": 404,
+    "ctype": "text/html; charset=utf-8",
+    "body": "<!DOCTYPE html><html id=\"__next_error__\"><head><meta charSet=\"utf-8\"/><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"/><link rel=\"preload\" as=\"script\" fetchPriority=\"low\" href=\"/_next/static/chunks/webpack-e72bfd9aad86a4b7.js\"/><script src=\"/_next/static/chunks/abc5f43a-eb614b7c482855bb.js\" async=\"\"></script><script src=\"/_next/static/chunks/4144-2fba5af8841c4663.js\" async=\"\"></script><script src=\"/_next/static/chunks/main-app-047b4c6c6f196ce0.js\" async=\"\"></script><script sr"
+  }
+}

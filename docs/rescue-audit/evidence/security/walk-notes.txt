@@ -1,0 +1,89 @@
+operator=capture@legenex.com (fallback: production SUPER_ADMIN_PASSWORD does not authenticate team@legenex.com)
+--- unauthenticated REST / public probes ---
+HTTP GET /api/funnel-lp-deployments 403 https://app.pageflo.io/api/funnel-lp-deployments?limit=5 body={"errors":[{"message":"You are not allowed to perform this action."}]}
+HTTP GET /api/funnel-quiz-deployments 403 https://app.pageflo.io/api/funnel-quiz-deployments?limit=5 body={"errors":[{"message":"You are not allowed to perform this action."}]}
+HTTP GET /api/funnel-advertorial-deployments 403 https://app.pageflo.io/api/funnel-advertorial-deployments?limit=5 body={"errors":[{"message":"You are not allowed to perform this action."}]}
+HTTP GET /api/funnel-landing-pages 403 https://app.pageflo.io/api/funnel-landing-pages?limit=5 body={"errors":[{"message":"You are not allowed to perform this action."}]}
+HTTP GET /api/funnel-quizzes 403 https://app.pageflo.io/api/funnel-quizzes?limit=5 body={"errors":[{"message":"You are not allowed to perform this action."}]}
+HTTP GET /api/sites 403 https://app.pageflo.io/api/sites?limit=5 body={"errors":[{"message":"You are not allowed to perform this action."}]}
+HTTP GET /api/leads 405 https://app.pageflo.io/api/leads?limit=5 body=
+HTTP GET /api/users 403 https://app.pageflo.io/api/users?limit=5 body={"errors":[{"message":"You are not allowed to perform this action."}]}
+HTTP GET /api/audit-log 403 https://app.pageflo.io/api/audit-log?limit=5 body={"errors":[{"message":"You are not allowed to perform this action."}]}
+HTTP GET /api/tracking-configs 403 https://app.pageflo.io/api/tracking-configs?limit=5 body={"errors":[{"message":"You are not allowed to perform this action."}]}
+HTTP GET /api/domains 403 https://app.pageflo.io/api/domains?limit=5 body={"errors":[{"message":"You are not allowed to perform this action."}]}
+HTTP GET /api/media 403 https://app.pageflo.io/api/media?limit=5 body={"errors":[{"message":"You are not allowed to perform this action."}]}
+HTTP GET /cms 200 https://app.pageflo.io/cms body=<!DOCTYPE html><html data-theme="light" dir="LTR" lang="en"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="/_next/static/css/c866c20983544658.css" data-precedence="next"/><link rel="stylesheet" href="
+HTTP GET /admin/deployments 307 https://app.pageflo.io/admin/deployments body=<!DOCTYPE html><html id="__next_error__"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/webpack-e72bfd9aad86a4b7.js"/><script src="/_next/static/chunk
+HTTP GET /api/pageflo/health 200 https://app.pageflo.io/api/pageflo/health body={"ok":true,"app":"legalos","time":"2026-09-24T20:04:15.117Z"}
+HTTP GET /api/graphql 404 https://app.pageflo.io/api/graphql body={"ok":false,"error":"GraphQL is disabled on this deployment; use the REST API at /api/<collection>."}
+HTTP POST /api/leads no host site_slug 400 https://app.pageflo.io/api/leads body={"ok":false,"error":"could not resolve site"}
+HTTP POST /api/leads spoof x-pageflo-host 400 https://app.pageflo.io/api/leads body={"ok":false,"error":"could not resolve site"}
+HTTP GET preview ?site= unauth 307 https://app.pageflo.io/?site=rescue-sec-a-20260923 body=<!DOCTYPE html><html id="__next_error__"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/webpack-e72bfd9aad86a4b7.js"/><script src="/_next/static/chunk
+HTTP GET preview ?site=&preview=1 unauth 307 https://app.pageflo.io/?site=rescue-sec-a-20260923&preview=1 body=<!DOCTYPE html><html id="__next_error__"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" as="script" fetchPriority="low" href="/_next/static/chunks/webpack-e72bfd9aad86a4b7.js"/><script src="/_next/static/chunk
+--- sign-in ---
+SHOT 01-sign-in https://app.pageflo.io/sign-in
+sign-in title: Sign in · PageFlo Console
+after submit: https://app.pageflo.io/admin/overview
+SHOT 02-after-login https://app.pageflo.io/admin/overview
+session cookies: payload-token=<redacted len=265>
+--- brands list before create ---
+SHOT 03-brands-before https://app.pageflo.io/admin/sites
+brand rescue-sec-a-20260923 already listed: false
+brand rescue-sec-b-20260923 already listed: false
+SHOT 04a-wizard https://app.pageflo.io/admin/sites
+SHOT 04a-filled https://app.pageflo.io/admin/sites
+SHOT 04a-after https://app.pageflo.io/admin/sites/rescue-sec-a-20260923
+CREATE rescue-sec-a-20260923 landed=true url=https://app.pageflo.io/admin/sites/rescue-sec-a-20260923 err=none
+SHOT 04b-wizard https://app.pageflo.io/admin/sites
+SHOT 04b-filled https://app.pageflo.io/admin/sites
+SHOT 04b-after https://app.pageflo.io/admin/sites/rescue-sec-b-20260923
+CREATE rescue-sec-b-20260923 landed=true url=https://app.pageflo.io/admin/sites/rescue-sec-b-20260923 err=none
+brand-a=created brand-b=created
+SHOT 05-brands-after https://app.pageflo.io/admin/sites
+brands-after has A: true
+brands-after has B: true
+--- deployments UI (ARCH-P1-006) ---
+SHOT 06-deployments https://app.pageflo.io/admin/deployments
+deployments has A: true
+deployments has B: true
+deployments brand-like tokens: Brand, brand, Rescue Sec A, Rescue Sec B, BRAND
+deployments length=3913 has Bulk: true
+--- landing pages / quizzes / advertorials builders ---
+SHOT 07-landing-pages https://app.pageflo.io/admin/landing-pages
+lp builder has A: false
+lp builder has B: false
+lp builder snippet: PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all C capture Owner · all brands 22:06 GMT+2 Open raw Payload admin → Landing Pages One brandless library of templates, and the deployments that put them on a brand's domain. New blank template New template with Claude Templates 13 Deploy
+SHOT 08-quizzes https://app.pageflo.io/admin/quizzes
+quiz builder has A: true
+quiz builder has B: true
+SHOT 09-advertorials https://app.pageflo.io/admin/advertorials
+SHOT 10-domains https://app.pageflo.io/admin/brands/domains
+domains has A: true
+domains has B: true
+SHOT 11-leads https://app.pageflo.io/admin/leads
+leads snippet: PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all C capture Owner · all brands 22:06 GMT+2 Open raw Payload admin → Leads Every captured lead with its answers, acquisition path, consent evidence and delivery trace. 1 leads Export CSV 
+SHOT 12-cms-lp-deployments https://app.pageflo.io/cms/collections/funnel-lp-deployments
+cms url: https://app.pageflo.io/cms/collections/funnel-lp-deployments
+cms snippet: PageFlo UsersSitesShared Legal TemplatesAudit LogsIntegration Config Sites Domains Site Content PagesQuizzesLanding PagesBlog PostsNumbersTracking ConfigsMedia Funnel Builder Landing Page Templates Funnel LP Deployments Funnel QuizzesFunnel Quiz DeploymentsQuiz TemplatesFunnel AdvertorialsFunnel Advertorial Deployments Leads Leads System Build Log 
+--- authenticated REST (super_admin; expect global lists) ---
+AUTH 403 /api/funnel-lp-deployments?limit=50&depth=1 totalDocs=0 uniqueSiteRefs=n/a sample=
+AUTH 403 /api/funnel-quiz-deployments?limit=50&depth=1 totalDocs=0 uniqueSiteRefs=n/a sample=
+AUTH 403 /api/funnel-advertorial-deployments?limit=50&depth=1 totalDocs=0 uniqueSiteRefs=n/a sample=
+AUTH 403 /api/funnel-landing-pages?limit=20 totalDocs=0 uniqueSiteRefs=n/a sample=
+AUTH 403 /api/funnel-quizzes?limit=20 totalDocs=0 uniqueSiteRefs=n/a sample=
+AUTH 403 /api/sites?limit=50 totalDocs=0 uniqueSiteRefs=n/a sample=
+AUTH 403 /api/domains?limit=50 totalDocs=0 uniqueSiteRefs=n/a sample=
+AUTH 405 /api/leads?limit=5 non-json
+AUTH 403 /api/users?limit=5 totalDocs=0 uniqueSiteRefs=n/a sample=
+AUTH 403 /api/audit-log?limit=5 totalDocs=0 uniqueSiteRefs=n/a sample=
+AUTH 403 /api/tracking-configs?limit=5 totalDocs=0 uniqueSiteRefs=n/a sample=
+--- draft brand anonymous preview hosts ---
+PREVIEW 404 https://rescue-sec-a-20260923.preview.pageflo.io/ <!DOCTYPE html><html id="__next_error__"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" as="script" fetchPrio
+PREVIEW 404 https://rescue-sec-a-20260923.preview.legenex.com/ <!DOCTYPE html><html id="__next_error__"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" as="script" fetchPrio
+PREVIEW 404 https://rescue-sec-b-20260923.preview.pageflo.io/ <!DOCTYPE html><html id="__next_error__"><head><meta charSet="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="preload" as="script" fetchPrio
+SHOT 13-authed-site-query https://app.pageflo.io/?site=rescue-sec-a-20260923
+authed ?site= url=https://app.pageflo.io/?site=rescue-sec-a-20260923 snippet=Rescue Sec A How it works Our partners FAQ Check my case Free claim check Were you in an accident? See if you qualify. A two-minute claim check matches you with a personal injury attorney at no cost. Check my claim FREE CASE REVIEW Check your claim i
+SHOT 14-brand-a-overview https://app.pageflo.io/admin/sites/rescue-sec-a-20260923
+brand A overview url=https://app.pageflo.io/admin/sites/rescue-sec-a-20260923 snippet=Back to PageFlo RS Rescue Sec A rescue-sec-a-20260923 View Live Site Overview Pages Blog Numbers SETTINGS General Domains Paths SEO Tracking Users Danger Zone C capture capture@legenex.com RS Rescue Sec A rescue-sec-a-20260923.preview.pageflo.io Partial Publish brand Test Capture Edit Brand View Liv
+SHOT 15-brand-b-overview https://app.pageflo.io/admin/sites/rescue-sec-b-20260923
+brand B overview url=https://app.pageflo.io/admin/sites/rescue-sec-b-20260923 snippet=Back to PageFlo RS Rescue Sec B rescue-sec-b-20260923 View Live Site Overview Pages Blog Numbers SETTINGS General Domains Paths SEO Tracking Users Danger Zone C capture capture@legenex.com RS Rescue Sec B rescue-sec-b-20260923.preview.pageflo.io Partial Publish brand Test Capture Edit Brand View Liv

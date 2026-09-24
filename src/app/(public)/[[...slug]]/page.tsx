@@ -7,6 +7,7 @@ import config from '@payload-config'
 import { resolveSiteByHost } from '@/lib/site-resolver'
 import { resolvePublicBlocks } from '@/lib/site-builder/sections'
 import { classifyHost, isMarketingHost, appOrigin, marketingOrigin } from '@/lib/pageflo/hosts'
+import { brandIsArchived, brandServesOnHost } from '@/lib/site-visibility'
 import { legalFacts } from '@/lib/pageflo/legal'
 import {
   resolveQuizDeployment,
@@ -184,9 +185,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     depth: 0,
   }).catch(() => null) as { name?: string | null; status?: string } | null
 
-  // A draft or archived Site serves nothing, so it must not advertise a title
-  // either. Anything else would put an unpublished brand into a link preview.
-  if (!site || site.status === 'draft' || site.status === 'archived') return {}
+  // Archived Brands never advertise. Draft/paused Brands may advertise on a
+  // preview host (that is the point of the preview URL) and must not on a
+  // custom domain.
+  if (!site || brandIsArchived(site.status) || !brandServesOnHost(site.status, host)) return {}
 
   const brandFallback = site.name || undefined
 
@@ -433,9 +435,15 @@ export default async function PublicCatchAll({ params, searchParams }: Props) {
   const isAdminPreview = ownsThisSite && (Boolean(previewSiteSlug) || previewMode)
   const maySeeUnpublished = ownsThisSite
 
-  if (site.status === 'archived') notFound()
-  if (site.status === 'draft' && !maySeeUnpublished) notFound()
-  if (site.status === 'paused' && !maySeeUnpublished) {
+  if (brandIsArchived(site.status)) notFound()
+  const publiclyVisible = brandServesOnHost(site.status, host)
+  if (!publiclyVisible && !maySeeUnpublished) {
+    if (site.status === 'paused') {
+      return <PausedSite name={site.name ?? 'This site'} />
+    }
+    notFound()
+  }
+  if (site.status === 'paused' && !publiclyVisible && maySeeUnpublished) {
     return <PausedSite name={site.name ?? 'This site'} />
   }
 

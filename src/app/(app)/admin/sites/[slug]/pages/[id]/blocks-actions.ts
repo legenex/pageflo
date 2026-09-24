@@ -9,10 +9,9 @@ type Block = Record<string, unknown> & { id?: string; blockType?: string }
 type Result = { ok: true } | { ok: false; error: string }
 
 // Persists body_blocks + page metadata in one shot. The builder debounces on
-// the client and calls this on every edit burst, so this just trusts the
-// payload's structure and writes it as-is. body_blocks IS what the public
-// BlockRenderer reads, so any save here is immediately visible on the public
-// URL (on next page render).
+// the client and calls this on every edit burst. Public render reads
+// published_blocks when present; autosave must not copy the working buffer
+// onto that snapshot. Only an explicit commitLive (Publish) does.
 export async function savePageBodyBlocks(args: {
   pageId: number | string
   siteSlug: string
@@ -27,6 +26,8 @@ export async function savePageBodyBlocks(args: {
   block_meta?: Record<string, { hide_mobile?: boolean; hide_desktop?: boolean }>
   publish_at?: string | null
   schema_json?: string | null
+  /** Copy body_blocks onto published_blocks. Autosave must leave this false. */
+  commitLive?: boolean
 }): Promise<Result> {
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: 'unauthenticated' }
@@ -82,7 +83,7 @@ export async function savePageBodyBlocks(args: {
         meta_description: args.meta_description?.trim() || null,
         og_image_url: args.og_image_url?.trim() || null,
         body_blocks: Array.isArray(args.body_blocks) ? args.body_blocks : [],
-        ...(args.status === 'published'
+        ...(args.commitLive && args.status === 'published'
           ? {
               published_blocks: Array.isArray(args.body_blocks) ? args.body_blocks : [],
               published_at: new Date().toISOString(),

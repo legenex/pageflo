@@ -16,6 +16,10 @@ Status: closed 2026-09-20. Work resumed on GX10-01 (`hostname gx10-01`, user `le
 
 Status: closed 2026-09-20. All listed PageFlo names resolve to `51.81.202.161`. TLS issued, see B-W42-01.
 
+## B-RESCUE-01 Production super-admin password drift
+
+Status: open. Human gate. `SUPER_ADMIN_PASSWORD` in `/var/www/vhosts/legenex.com/os.legenex.com/.env` does not match the stored hash for `team@legenex.com`. REST login 401. Five failures lock the row. Capture super-admin still works. Do not rotate from an agent. Operator must reset `team@legenex.com` through an approved credential change.
+
 ## Standing, not V1
 
 - Legal publication facts for marketing `/privacy` (business decision).

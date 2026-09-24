@@ -1,0 +1,24 @@
+Critic production notes 2026-09-24. No secrets.
+
+LOGIN
+- Local PAGEFLO_REPO/.env is preview@localhost. Fails against app.pageflo.io (incorrect password).
+- Production SUPER_ADMIN_EMAIL domain legenex.com, local-part team.
+- Production SUPER_ADMIN_PASSWORD from host .env does not authenticate (API 401 incorrect).
+- Playwright then showed lockout. users.login_attempts reached 5. last_login_at null.
+- Did not rotate password. Did not use other super-admins.
+
+PROD FACTS
+- SHA b54e8bd, legalos-dev active, health 200 app=legalos.
+- PAGEFLO_* unset. LEGALOS_PREVIEW_DOMAIN=preview.legenex.com. NEXT_PUBLIC_SERVER_URL=https://os.legenex.com.
+- sites: dont-settle active; accident-compensation-helper active but no Home page; check-a-case absent; rescue-qa-20260923 created draft then activated by another agent.
+- domains: preview only, ssl_status unknown, zero custom.
+- unmatched SNI CN=crashclaim.co
+- journal: Failed to find Server Action "x"
+
+PUBLIC DEFECTS (screenshots in this directory)
+- /terms H1 {{site.name}}
+- /s/dont-settle graph leak Injury Type12121212 /submitted (Qualified)
+- /c (800) 000-0000, Dynamic figure, This deployment
+- ACH / 404
+- check-a-case 404
+- draft Brand preview 404 until status=active

@@ -27,7 +27,7 @@ export function SiteSidebar({
   livePreviewUrl,
   userEmail,
 }: {
-  site: { slug: string; name: string; brand?: { primary?: string | null; accent?: string | null; logo_url?: string | null } | null }
+  site: { slug: string; name: string; status?: string | null; brand?: { primary?: string | null; accent?: string | null; logo_url?: string | null } | null }
   livePreviewUrl: string
   userEmail: string
 }) {
@@ -90,7 +90,7 @@ export function SiteSidebar({
           className="brand-gradient mt-4 w-full text-white font-semibold text-[13px] px-3 py-2.5 rounded-lg inline-flex items-center justify-center gap-1.5 hover:opacity-90 transition-opacity"
         >
           <ExternalLink className="w-3.5 h-3.5" />
-          View Live Site
+          {site.status === 'active' ? 'View Live Site' : 'Preview site'}
         </Link>
       </div>
 

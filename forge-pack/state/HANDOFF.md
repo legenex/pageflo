@@ -1,7 +1,7 @@
 # Handoff
 
-Current phase: Wave 06. W60 complete on GX10-01.
-HEAD: `b54e8bd` on `main`, matches origin and production `legalos.git`.
+Current phase: POST-V1 rescue audit. W60 "complete" is withdrawn.
+HEAD: local Wave 1 repairs on `main` after `0818c76`. Production still `b54e8bd` until the Plesk sequence runs.
 Tests run this session:
 - `pnpm typecheck` pass
 - `pnpm test` all green

@@ -1,0 +1,15 @@
+SHOT 01-sign-in https://app.pageflo.io/sign-in
+sign-in title: Sign in · PageFlo Console
+sign-in h1: Sign in to PageFlo
+after submit: https://app.pageflo.io/sign-in
+LOGIN FAILED form said: This user is locked due to having too many failed login attempts.
+SHOT 01b-sign-in-failed https://app.pageflo.io/sign-in
+
+# Follow-up (no password values)
+# Creds read from production host .env SUPER_ADMIN_EMAIL/PASSWORD (not PAGEFLO_REPO/.env).
+# Email local-part=team domain=legenex.com. Password unquoted alnum len=20.
+# POST https://app.pageflo.io/api/users/login -> 401 The email or password provided is incorrect.
+# users.id=1 login_attempts=5 lock_until set last_login_at null.
+# Local PAGEFLO_REPO/.env email domain=localhost, not equal to production.
+# Console routes unauthenticated 307 to /sign-in.
+# Public capture continued in pub-notes.txt / _pub.mts.

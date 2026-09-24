@@ -1,0 +1,18 @@
+LOGIN OK
+rescue-qa-20260923 publish buttons after click 1
+SHOT 30-published-rescue-qa-20260923 https://app.pageflo.io/admin/sites/rescue-qa-20260923
+rescue-qa-20260923 AFTER Back to PageFlo RQ Rescue QA 20260924 rescue-qa-20260923 View Live Site Overview Pages Blog Numbers SETTINGS General Domains Paths SEO Tracking Users Danger Zone C capture capture@legenex.com RQ Rescue QA 20260924 rescue-qa-20260923.preview.pageflo.io Ready Pause brand Test Capture Edit Brand View Live Site 12 Active Pages 2 Domains 0 Leads (30d) excluding test captures 2 Live funnels serving this Site now Live funnels on this Site Manage deployments Rescue QA 20260924 · Human Recovery Story /c/
+accident-compensation-helper publish buttons after click 1
+SHOT 30-published-accident-compensation-helper https://app.pageflo.io/admin/sites/accident-compensation-helper
+accident-compensation-helper AFTER Back to PageFlo AC Accident Compensation Helper accident-compensation-helper View Live Site Overview Pages Blog Numbers SETTINGS General Domains Paths SEO Tracking Users Danger Zone C capture capture@legenex.com AC Accident Compensation Helper accident-compensation-helper.preview.pageflo.io Ready Pause brand Test Capture Edit Brand View Live Site 8 Active Pages 2 Domains 0 Leads (30d) excluding test captures 2 Live funnels serving this Site now Live funnels on this Site Manage deployments Accide
+AFTERPUB https://rescue-qa-20260923.preview.pageflo.io/ http=200 title="Home | Rescue QA 20260924"
+AFTERPUB https://rescue-qa-20260923.preview.legenex.com/ http=200 title="Home | Rescue QA 20260924"
+AFTERPUB https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923 http=200 title="Rescue QA 20260924 · MVA Tiered Quiz | Rescue QA 20260924"
+AFTERPUB https://rescue-qa-20260923.preview.pageflo.io/c/rescue-qa-20260923 http=200 title="Healing should be your only job right now. The claim shouldn’t become a second injury. | Rescue QA 20260924"
+AFTERPUB https://accident-compensation-helper.preview.pageflo.io/ http=404 title=""
+AFTERPUB https://accident-compensation-helper.preview.pageflo.io/s/accident-compensation-helper http=200 title="Accident Compensation Helper · MVA Tiered Quiz | Accident Compensation Helper"
+LIVE_HREF https://rescue-qa-20260923.preview.pageflo.io
+QUIZ_PREVIEW_COUNT 0
+AD_PREVIEW_COUNT 0
+LP_PREVIEW_COUNT 0
+SHOT 31-domains-again https://app.pageflo.io/admin/brands/domains

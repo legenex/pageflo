@@ -2187,6 +2187,7 @@ export function PageBlocksBuilderApp({ pageId, siteSlug, siteId, primaryHost, si
         block_meta: next.blockMeta,
         publish_at: next.publishAt || null,
         schema_json: next.schemaJson || null,
+        commitLive: next.commitLive === true,
       }))
       setSaving(false)
       if (res.ok) { pendingRollbacks.current = []; return }
@@ -2243,7 +2244,7 @@ export function PageBlocksBuilderApp({ pageId, siteSlug, siteId, primaryHost, si
   // The status pill is the operator's answer to "is this page live", so the flip
   // is registered for rollback: a save that never lands must not leave it
   // claiming a page was published or taken down when it was not.
-  const setStatusX = (v) => { const previous = status; setStatus(v); bump({ status: v }, () => setStatus(previous)) }
+  const setStatusX = (v) => { const previous = status; setStatus(v); bump({ status: v, commitLive: v === 'published' }, () => setStatus(previous)) }
   const setMetaTitleX = (v) => { setMetaTitle(v); bump({ metaTitle: v }) }
   const setMetaDescX = (v) => { setMetaDescription(v); bump({ metaDescription: v }) }
   const setOgUrlX = (v) => { setOgImageUrl(v); bump({ ogImageUrl: v }) }
@@ -2416,7 +2417,7 @@ export function PageBlocksBuilderApp({ pageId, siteSlug, siteId, primaryHost, si
     const previous = status
     const next = status === 'published' ? 'draft' : 'published'
     setStatus(next)
-    bump({ status: next }, () => setStatus(previous))
+    bump({ status: next, commitLive: next === 'published' }, () => setStatus(previous))
   }
 
   const previewPath = slug.startsWith('/') ? slug : `/${slug}`

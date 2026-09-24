@@ -1,0 +1,17 @@
+id|host|kind|status|ssl_status|primary|site_id|plesk_domain_id|last_checked_at
+70|dont-settle.preview.legenex.com|preview|active|unknown|t|16||
+71|accident-compensation-helper.preview.pageflo.io|preview|active|unknown|t|17||
+72|accident-compensation-helper.preview.legenex.com|preview|active|unknown|f|17||
+73|rescue-qa-20260923.preview.pageflo.io|preview|active|unknown|t|18||
+74|rescue-qa-20260923.preview.legenex.com|preview|active|unknown|f|18||
+75|rescue-funnel-20260923.preview.pageflo.io|preview|active|unknown|t|19||
+76|rescue-funnel-20260923.preview.legenex.com|preview|active|unknown|f|19||
+77|rescue-sec-a-20260923.preview.pageflo.io|preview|active|unknown|t|20||
+78|rescue-sec-a-20260923.preview.legenex.com|preview|active|unknown|f|20||
+79|rescue-sec-b-20260923.preview.pageflo.io|preview|active|unknown|t|21||
+80|rescue-sec-b-20260923.preview.legenex.com|preview|active|unknown|f|21||
+81|rescue-odin-20260923.preview.pageflo.io|preview|active|unknown|t|22||
+82|rescue-odin-20260923.preview.legenex.com|preview|active|unknown|f|22||
+83|rescue-odin-20260923.example|custom|pending|pending|f|22||2026-09-24 20:09:23.574+00
+(14 rows)
+

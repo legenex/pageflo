@@ -1,0 +1,102 @@
+{
+  "agent": "security-reviewer",
+  "date": "2026-09-24",
+  "production": "https://app.pageflo.io",
+  "login": {
+    "attempted": "team@legenex.com from production SUPER_ADMIN_PASSWORD",
+    "result": "rejected; ensureSuperAdmin is create-if-missing",
+    "uiOperator": "capture@legenex.com"
+  },
+  "brandsCreated": ["rescue-sec-a-20260923", "rescue-sec-b-20260923"],
+  "archP1006": {
+    "confirmed": true,
+    "code": "funnel-*-deployments access isAuthenticated on all verbs; reads not site-scoped",
+    "ui": "/admin/deployments lists every Brand including Rescue Sec A and B",
+    "rest": "GET /api/funnel-lp-deployments authenticated totalDocs=8 across 7 brands; unauthenticated 403"
+  },
+  "defects": [
+    {
+      "id": "SEC-P0-001",
+      "title": "Funnel deployments are not site-scoped on read",
+      "mapsTo": "ARCH-P1-006",
+      "severity": "P0"
+    },
+    {
+      "id": "SEC-P0-002",
+      "title": "Brandless masters are globally writable by any authenticated user",
+      "severity": "P0"
+    },
+    {
+      "id": "SEC-P1-001",
+      "title": "Users.status does not block Payload login",
+      "severity": "P1"
+    },
+    {
+      "id": "SEC-P1-002",
+      "title": "AuditLog.create is () => true",
+      "severity": "P1"
+    },
+    {
+      "id": "SEC-P1-003",
+      "title": "listSiteMedia overrideAccess true without isBoundToSite",
+      "severity": "P1"
+    },
+    {
+      "id": "SEC-P1-004",
+      "title": "TrackingConfigs secrets readable at analyst scope",
+      "severity": "P1"
+    },
+    {
+      "id": "SEC-P1-005",
+      "title": "Authenticated /api/leads site_slug is not binding-checked",
+      "severity": "P1"
+    },
+    {
+      "id": "SEC-P1-006",
+      "title": "Unauthenticated-origin SVG/image upload to public/uploads",
+      "severity": "P1"
+    },
+    {
+      "id": "SEC-P1-007",
+      "title": "Production SUPER_ADMIN_PASSWORD does not authenticate team@",
+      "severity": "P1"
+    },
+    {
+      "id": "SEC-P1-008",
+      "title": "New Brands seed live funnel deployments without preflight",
+      "mapsTo": "ARCH-P1-007",
+      "severity": "P1"
+    },
+    {
+      "id": "SEC-P1-009",
+      "title": "Payload cors is *",
+      "severity": "P1"
+    },
+    {
+      "id": "SEC-P1-010",
+      "title": "legal-templates affected-sites is any-auth + overrideAccess",
+      "severity": "P1"
+    },
+    {
+      "id": "SEC-P2-001",
+      "title": "/cms is a second admin over isAuthenticated collections",
+      "severity": "P2"
+    },
+    {
+      "id": "SEC-P2-002",
+      "title": "CSRF/serverURL still includes os.legenex.com",
+      "severity": "P2"
+    }
+  ],
+  "holds": [
+    "anonymous REST 403",
+    "GraphQL disabled",
+    "trustedHost on /api/leads and quiz-webhook",
+    "anonymous preview 404 for draft Brands",
+    "per-site layout isBoundToSite",
+    "Leads UI siteScopedRead",
+    "deployment write tenancy hook",
+    "template-guards",
+    "pnpm test:authz 69/0"
+  ]
+}

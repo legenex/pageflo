@@ -183,7 +183,7 @@ export default async function SiteOverviewPage({ params }: Props) {
           target="_blank"
           className="brand-gradient text-white font-semibold text-[13px] px-4 py-2 rounded-lg inline-flex items-center gap-1.5 hover:opacity-90"
         >
-          <ExternalLink className="w-3.5 h-3.5" /> View Live Site
+          <ExternalLink className="w-3.5 h-3.5" /> {site.status === 'active' ? 'View Live Site' : 'Preview site'}
         </Link>
       </header>
 

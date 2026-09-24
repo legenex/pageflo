@@ -1,0 +1,97 @@
+signin url=https://app.pageflo.io/sign-in title="Sign in · PageFlo Console" h1="Sign in to PageFlo"
+SHOT 01-signin https://app.pageflo.io/sign-in
+after-submit url=https://app.pageflo.io/admin/overview title="PageFlo Console" h1="Overview"
+SHOT 02-after-login https://app.pageflo.io/admin/overview
+LOGIN OK
+overview url=https://app.pageflo.io/admin/overview title="PageFlo Console" h1="Overview"
+overview http=200
+SHOT nav-overview https://app.pageflo.io/admin/overview
+brands url=https://app.pageflo.io/admin/sites title="Brands" h1="Brands"
+brands http=200
+SHOT nav-brands https://app.pageflo.io/admin/sites
+PAGEERROR Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+websites url=https://app.pageflo.io/admin/websites title="Websites" h1="Websites"
+websites http=200
+SHOT nav-websites https://app.pageflo.io/admin/websites
+quizzes url=https://app.pageflo.io/admin/quizzes title="PageFlo Console" h1="Quizzes"
+quizzes http=200
+SHOT nav-quizzes https://app.pageflo.io/admin/quizzes
+landing-pages url=https://app.pageflo.io/admin/landing-pages title="PageFlo Console" h1="Landing Pages"
+landing-pages http=200
+SHOT nav-landing-pages https://app.pageflo.io/admin/landing-pages
+advertorials url=https://app.pageflo.io/admin/advertorials title="PageFlo Console" h1="Advertorials"
+advertorials http=200
+SHOT nav-advertorials https://app.pageflo.io/admin/advertorials
+PAGEERROR Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+deployments url=https://app.pageflo.io/admin/deployments title="Deployments" h1="Deployments"
+deployments http=200
+SHOT nav-deployments https://app.pageflo.io/admin/deployments
+domains url=https://app.pageflo.io/admin/brands/domains title="Domains" h1="Domains"
+domains http=200
+SHOT nav-domains https://app.pageflo.io/admin/brands/domains
+PAGEERROR Minified React error #418; visit https://react.dev/errors/418?args[]=text&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+leads url=https://app.pageflo.io/admin/leads title="PageFlo Console" h1="Leads"
+leads http=200
+SHOT nav-leads https://app.pageflo.io/admin/leads
+brand-identities url=https://app.pageflo.io/admin/brands/brand-identities title="PageFlo Console" h1="Brand Identities"
+brand-identities http=200
+SHOT nav-brand-identities https://app.pageflo.io/admin/brands/brand-identities
+settings url=https://app.pageflo.io/admin/settings title="Settings" h1="Settings"
+settings http=200
+SHOT nav-settings https://app.pageflo.io/admin/settings
+settings-integrations url=https://app.pageflo.io/admin/settings/integrations title="PageFlo Console" h1="Integrations"
+settings-integrations http=200
+SHOT nav-settings-integrations https://app.pageflo.io/admin/settings/integrations
+settings-users url=https://app.pageflo.io/admin/settings/users title="PageFlo Console" h1="Users"
+settings-users http=200
+SHOT nav-settings-users https://app.pageflo.io/admin/settings/users
+settings-system url=https://app.pageflo.io/admin/settings/system title="System health" h1="System health"
+settings-system http=200
+SHOT nav-settings-system https://app.pageflo.io/admin/settings/system
+profile url=https://app.pageflo.io/admin/profile title="Profile" h1="Profile"
+profile http=200
+SHOT nav-profile https://app.pageflo.io/admin/profile
+analytics url=https://app.pageflo.io/admin/analytics title="Analytics" h1="Analytics"
+analytics http=200
+SHOT nav-analytics https://app.pageflo.io/admin/analytics
+analytics has Soon state
+integrity url=https://app.pageflo.io/admin/integrity title="Campaign Integrity" h1="Campaign Integrity"
+integrity http=200
+SHOT nav-integrity https://app.pageflo.io/admin/integrity
+integrity has Soon state
+cms url=https://app.pageflo.io/cms title="Dashboard · PageFlo" h1=""
+cms http=200
+SHOT nav-cms https://app.pageflo.io/cms
+BRAND_LIST_SNIP PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all C capture Owner · all brands 21:59 GMT+2 Open raw Payload admin → Brands Every Brand you operate. A Brand is the tenant root: website, quizzes, domains, numbers and leads all belong to one. Identity is edited on the Brand, not as a separate Brand Kit. New Brand All 2 Active 1 Draft 1 Paused 0 Archived 0 All verticals Multi-vertical Financial Services Debt Insurance Home Services Health & Wellness Education Automotive Solar & Energy B2B & SaaS Other Mass Tort Motor Vehicle Accident Workers Comp Personal Injury Medical Malpractice Class Action SITE PRIMARY DOMAIN VERTICAL DELIVERY STATUS UPDATED PREVIEW AC Accident Compensation 
+SHOT 03-create-brand-open https://app.pageflo.io/admin/sites
+CREATE_BRAND_BUTTON clicked
+CREATE_BRAND FORM FIELDS NOT VISIBLE
+SHOT 06-add-domain-modal https://app.pageflo.io/admin/brands/domains
+SHOT 07-add-domain-invalid https://app.pageflo.io/admin/brands/domains
+INVALID_HOST_UI PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all C capture Owner · all brands 21:59 GMT+2 Open raw Payload admin → Domains Every hostname pointed at a Site: add one, verify its DNS, set the primary, move it between brands or remove it. Add Domain Add Domain The domain joins the unassigned pool. Attach it to a brand from the brand's settings. HOSTNAME Hostname only — no protocol, n
+PAGEERROR Minified React error #418; visit https://react.dev/errors/418?args[]=HTML&args[]= for the full message or use the non-minified dev environment for full errors and additional helpful warnings.
+DEPLOYMENTS_SNIP PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all C capture Owner · all brands 21:59 GMT+2 Open raw Payload admin → Deployments A deployment binds a master asset to a Brand, domain and path. Public copy stays on the master. Bulk deploy Create draft deployments of one master across Brands. A failure on one Brand does not stop the others. Drafts are not live until you publish them. Kind Quiz Landing Page Advertorial Master MVA Tiered Quiz 2 Tier MVA Tiered Quiz 2 Tier (copy) MVA Tiered Quiz 2 Tier (copy) MVA Tiered Quiz T4 New Quiz Path Brands Accident Compensation Helper accident-compensation-helper Dont Settle dont-settle a deployment needs a path; "/" belongs to the Brand website Create drafts ASSET KIND BRAND PATH PREVIEW STATE MVA Tiered Quiz T4 Quiz Accident Compensation Helper accident-compensation-helper.preview.pageflo.io/s/accident-compensation-helper https://accident-compensation-helper.preview.pageflo.io/s/accident-compensation-helper Live MVA Tiered Quiz T4 Quiz Dont Settle dont-settle.preview.legenex.com/s/dont-settle https://dont-settle.preview.pageflo.io
+QUIZZES_SNIP PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all C capture Owner · all brands 21:59 GMT+2 Open raw Payload admin → Quizzes Flow logic. The questions, routing, tier conditions. New Quiz Flow Quiz Flows Templates Deployments Active 3 Archived 2 New Quiz DRAFT 1 steps · 0 variants · 1 tiers Preview Edit MVA Tiered Quiz 2 Tier LIVE 16 steps · 16 variants · 3 tiers Preview Edit MVA Tiered Quiz T4 LIVE 18 steps · 23 variants · 4 tiers · 2 deployments (2 live) · Accident Compensation Helper, Dont Settle Preview Edit dev
+LP_SNIP PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all C capture Owner · all brands 21:59 GMT+2 Open raw Payload admin → Landing Pages One brandless library of templates, and the deployments that put them on a brand's domain. New blank template New template with Claude Templates 12 Deployments 3 60-Second Check STOCK ENABLED LP09 Pain First 0 deployments /sixty_second_check · sixty_second_check · slot copy Preview Edit Disable Answer First STOCK ENABLED LP10 Pain First 0 deployments /answer_first · answer_first · slot copy Preview Edit Disable Authority Network STOCK ENABLED LP03 Pain First 1 deployment /authority_network · authority_network · slot copy Preview Edit Disable Case T
+AD_SNIP PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all C capture Owner · all brands 21:59 GMT+2 Open raw Payload admin → Advertorials Native-style story pages that warm cold Facebook traffic before the quiz. Advertorials Deployments All Status Published Draft Archived All Templates Personal Story News Authority Whistleblower Investigative Listicle All Lengths Short Medium Long Epic Bulk Simplify New with AI New Advertorial 8 ADVERTORIALS The Phone Call Insurance Companies Pray You'll Take PUBLISHED News Authority Short 203 words 0 deployments /the-call-they-want-you-to-take Preview Edit Untitled Advertorial DRAFT Personal Story Short 36 words 0 deployments /untitled-advertorial Pr
+FIRST_BRAND_HREF /admin/sites/accident-compensation-helper
+WALK_THREW locator.click: Timeout 20000ms exceeded.
+Call log:
+[2m  - waiting for locator('a[href*="/admin/sites/"]').first()[22m
+[2m    - locator resolved to <a href="/admin/sites/accident-compensation-helper" class="block truncate text-[13.5px] font-semibold text-ink">Accident Compensation Helper</a>[22m
+[2m  - attempting click action[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is not visible[22m
+[2m    - retrying click action[22m
+[2m    - waiting 20ms[22m
+[2m    2 × waiting for element to be visible, enabled and stable[22m
+[2m      - element is not visible[22m
+[2m    - retrying click action[22m
+[2m      - waiting 100ms[22m
+[2m    39 × waiting for element to be visible, enabled and stable[22m
+[2m       - element is not visible[22m
+[2m     - retrying click action[22m
+[2m       - waiting 500ms[22m
+
+    at /tmp/pageflo-rescue-bossman/walk.mjs:239:21
+SHOT zz-failure https://app.pageflo.io/admin/sites

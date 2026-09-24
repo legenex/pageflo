@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 20 September 2026, W60 production release, TLS, and acceptance on GX10-01.
+Last updated: 24 September 2026. POST-V1 rescue audit. W60 "V1 complete" is withdrawn.
 
 ---
 
@@ -24,9 +24,9 @@ Last updated: 20 September 2026, W60 production release, TLS, and acceptance on 
 | Execution memory | `forge-pack/state/` |
 | Release mode | **Autonomous ordinary Plesk releases.** Implement, validate, commit, push, and the section 6 Plesk sequence after gates pass are pre-authorized (discovery 12.4). Human gates in `docs/HUMAN-GATES.md` still apply. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current wave | W60 complete on GX10-01. Production HEAD `b54e8bd`. |
-| Active human gates | None blocking V1. Do not flip `PAGEFLO_LEGACY_HOST_REDIRECT`. Legal publication facts and live buyer activation remain standing gates, not V1 blockers. |
-| Active blockers | None for internal V1. Standing later work: legal entity facts for `/privacy` on the marketing host, EB-1 MVA tier service, unversioned `legalos-warm.sh`. |
+| Current wave | **Rescue audit. V1 is not complete.** Production HEAD `b54e8bd`. GitHub has audit + Wave 1 repairs on `main`. |
+| Active human gates | Reset `team@legenex.com` password (production `.env` does not match the DB hash). Do not flip `PAGEFLO_LEGACY_HOST_REDIRECT`. Do not change public DNS. Live buyer activation remains gated. |
+| Active blockers | Operator-facing P0s documented in `docs/rescue-audit/DEFECT-REGISTER.md`. Preview of draft Brands, domain picker eligibility, seed-as-live, and website autosave snapshot are Wave 1 repairs. |
 
 ## Compatibility identifiers
 

@@ -1,0 +1,47 @@
+[2026-09-24T20:09:45.697Z] GOTO https://app.pageflo.io/sign-in
+[2026-09-24T20:09:48.874Z] SHOT 101-pub-signin.png https://app.pageflo.io/sign-in
+[2026-09-24T20:09:48.874Z]   status=200 title="Sign in · PageFlo Console" text=PageFlo Sign in to PageFlo Sites · Landing Pages · Advertorials · Quizzes · Brand Kits · Domains · Deployments · Leads EMAIL PASSWORD Sign in Forgot password? Back to site © 2026 Legenex · PageFlo
+[2026-09-24T20:09:49.379Z] SHOT 102-pub-signin-empty.png https://app.pageflo.io/sign-in
+[2026-09-24T20:09:49.380Z] GOTO https://app.pageflo.io/cms/forgot
+[2026-09-24T20:09:50.968Z] SHOT 103-pub-forgot.png https://app.pageflo.io/cms/forgot
+[2026-09-24T20:09:50.968Z]   status=200 title="Forgot Password · PageFlo" text=
+[2026-09-24T20:09:50.970Z] GOTO https://app.pageflo.io/cms/login
+[2026-09-24T20:09:52.263Z] SHOT 104-pub-cms-login.png https://app.pageflo.io/cms/login
+[2026-09-24T20:09:52.263Z]   status=200 title="Login · PageFlo" text=Email * Password * Forgot password? Login
+[2026-09-24T20:09:52.948Z] CONSOLE Failed to load resource: the server responded with a status of 401 ()
+[2026-09-24T20:09:54.870Z] SHOT 105-pub-cms-login-result.png https://app.pageflo.io/cms/login
+[2026-09-24T20:09:54.871Z] CMS login after=https://app.pageflo.io/cms/login text=Email * Password * Forgot password? Login The email or password provided is incorrect.
+[2026-09-24T20:09:54.871Z] GOTO https://os.legenex.com/sign-in
+[2026-09-24T20:09:57.739Z] SHOT 106-pub-legacy-signin.png https://os.legenex.com/sign-in
+[2026-09-24T20:09:57.740Z]   status=200 title="Sign in · PageFlo Console" text=PageFlo Sign in to PageFlo Sites · Landing Pages · Advertorials · Quizzes · Brand Kits · Domains · Deployments · Leads EMAIL PASSWORD Sign in Forgot password? Back to site © 2026 Legenex · PageFlo
+[2026-09-24T20:09:57.742Z] GOTO https://rescue-qa-20260923.preview.pageflo.io/
+[2026-09-24T20:10:00.667Z] SHOT 107-qa-home-pageflo.png https://rescue-qa-20260923.preview.pageflo.io/
+[2026-09-24T20:10:00.667Z]   status=200 title="Home | Rescue QA 20260924" text=Rescue QA 20260924 How it works Our partners FAQ Check my case Free claim check Were you in an accident? See if you qualify. A two-minute claim check matches you with a personal injury attorney at no cost. Check my claim FREE CASE REVIEW Check your claim in two minutes. No paymen
+[2026-09-24T20:10:00.667Z] GOTO https://rescue-qa-20260923.preview.legenex.com/
+[2026-09-24T20:10:03.456Z] SHOT 108-qa-home-legenex.png https://rescue-qa-20260923.preview.legenex.com/
+[2026-09-24T20:10:03.456Z]   status=200 title="Home | Rescue QA 20260924" text=Rescue QA 20260924 How it works Our partners FAQ Check my case Free claim check Were you in an accident? See if you qualify. A two-minute claim check matches you with a personal injury attorney at no cost. Check my claim FREE CASE REVIEW Check your claim in two minutes. No paymen
+[2026-09-24T20:10:03.456Z] GOTO https://rescue-qa-20260923.preview.pageflo.io/about
+[2026-09-24T20:10:05.087Z] SHOT 109-qa-about-pageflo.png https://rescue-qa-20260923.preview.pageflo.io/about
+[2026-09-24T20:10:05.087Z]   status=200 title="About | Rescue QA 20260924" text=This page has no content blocks yet.
+[2026-09-24T20:10:05.087Z] GOTO https://rescue-qa-20260923.preview.pageflo.io/privacy
+[2026-09-24T20:10:06.840Z] SHOT 110-qa-privacy.png https://rescue-qa-20260923.preview.pageflo.io/privacy
+[2026-09-24T20:10:06.840Z]   status=200 title="Privacy Notice | Rescue QA 20260924" text=Rescue QA 20260924 How it works Our partners FAQ Check my case Privacy Notice Privacy Notice Last updated: September 24, 2026 Rescue QA 20260924 ("we", "us") respects your privacy. This notice explains what information we collect when you use Rescue QA 20260924, how we use it, an
+[2026-09-24T20:10:06.840Z] GOTO https://rescue-qa-20260923.preview.pageflo.io/terms
+[2026-09-24T20:10:08.599Z] SHOT 111-qa-terms.png https://rescue-qa-20260923.preview.pageflo.io/terms
+[2026-09-24T20:10:08.599Z]   status=200 title="Terms of Service | Rescue QA 20260924" text=Rescue QA 20260924 How it works Our partners FAQ Check my case Terms of Service Terms of Service Last updated: September 24, 2026 These Terms govern your use of Rescue QA 20260924, operated by Rescue QA 20260924. By using this site you agree to these Terms. 1. No legal advice Not
+[2026-09-24T20:10:08.599Z] GOTO https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:10:10.325Z] SHOT 112-qa-quiz-pageflo.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:10:10.325Z]   status=200 title="Rescue QA 20260924 · MVA Tiered Quiz | Rescue QA 20260924" text=Rescue QA 20260924 CLICK HERE TO CALL 7% TAKE THE 30 SECOND QUIZ TO START THE PROCESS OF SEEING HOW MUCH YOUR CLAIM COULD BE WORTH Get The Maximum Cash Payout For Your Accident Injury!!! How Were You Injured? Select The Type Of Accident You Were Involved In: Auto / Motorcycle Acc
+[2026-09-24T20:10:10.325Z] GOTO https://rescue-qa-20260923.preview.legenex.com/s/rescue-qa-20260923
+[2026-09-24T20:10:11.967Z] SHOT 113-qa-quiz-legenex.png https://rescue-qa-20260923.preview.legenex.com/s/rescue-qa-20260923
+[2026-09-24T20:10:11.967Z]   status=200 title="Rescue QA 20260924 · MVA Tiered Quiz | Rescue QA 20260924" text=Rescue QA 20260924 CLICK HERE TO CALL 7% TAKE THE 30 SECOND QUIZ TO START THE PROCESS OF SEEING HOW MUCH YOUR CLAIM COULD BE WORTH Get The Maximum Cash Payout For Your Accident Injury!!! How Were You Injured? Select The Type Of Accident You Were Involved In: Auto / Motorcycle Acc
+[2026-09-24T20:10:11.968Z] GOTO https://rescue-qa-20260923.preview.pageflo.io/c/rescue-qa-20260923
+[2026-09-24T20:10:13.935Z] SHOT 114-qa-lp-pageflo.png https://rescue-qa-20260923.preview.pageflo.io/c/rescue-qa-20260923
+[2026-09-24T20:10:13.935Z]   status=200 title="Healing should be your only job right now. The claim shouldn’t become a second injury. | Rescue QA 20260924" text=Rescue QA 20260924 Rescue QA 20260924 Talk to someone · (833) 555-0422 YOU DIDN’T ASK FOR THIS Healing should be your only job right now. The claim shouldn’t become a second injury. If you were hurt in a crash, you deserve to know what support you’re entitled to — without pressur
+[2026-09-24T20:10:13.935Z] GOTO https://rescue-qa-20260923.preview.legenex.com/c/rescue-qa-20260923
+[2026-09-24T20:10:15.745Z] SHOT 115-qa-lp-legenex.png https://rescue-qa-20260923.preview.legenex.com/c/rescue-qa-20260923
+[2026-09-24T20:10:15.745Z]   status=200 title="Healing should be your only job right now. The claim shouldn’t become a second injury. | Rescue QA 20260924" text=Rescue QA 20260924 Rescue QA 20260924 Talk to someone · (833) 555-0422 YOU DIDN’T ASK FOR THIS Healing should be your only job right now. The claim shouldn’t become a second injury. If you were hurt in a crash, you deserve to know what support you’re entitled to — without pressur
+[2026-09-24T20:10:17.685Z] SHOT 116-qa-quiz-start.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:10:17.689Z] QUIZ step=0 Rescue QA 20260924 CLICK HERE TO CALL 7% TAKE THE 30 SECOND QUIZ TO START THE PROCESS OF SEEING HOW MUCH YOUR CLAIM COULD BE WORTH Get The Maximum Cash Payout For Your Accident Injury!!! How Were You Injured? Select The 
+[2026-09-24T20:10:18.677Z] SHOT 117-qa-quiz-step-0.png https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923
+[2026-09-24T20:10:18.679Z] QUIZ step=1 Rescue QA 20260924 CLICK HERE TO CALL 20% What State Did The Accident Happen In? Type to search for the state Select the state from the dropdown - Select - Alabama Alaska Arizona Arkansas California Colorado Connecticut 

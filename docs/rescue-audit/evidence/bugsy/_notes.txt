@@ -1,0 +1,11 @@
+[2026-09-24T20:03:41.245Z] START bugsy walk marker=RESCUE-QA-mufymblp email=team@legenex.com
+[2026-09-24T20:03:41.324Z] GOTO https://app.pageflo.io/sign-in
+[2026-09-24T20:03:46.509Z] SHOT 01-sign-in.png https://app.pageflo.io/sign-in
+[2026-09-24T20:03:46.516Z] title=Sign in · PageFlo Console h1=Sign in to PageFlo
+[2026-09-24T20:03:47.107Z] ACTION 200 id=40975fc7d62eed955c88fa1f https://app.pageflo.io/sign-in body=0:{"a":"$@1","f":"","b":"17z-Hx8tI7tm_5idwg_52"} 1:{"ok":false,"error":"The email or password provided is incorrect."} 
+[2026-09-24T20:04:28.040Z] after login: https://app.pageflo.io/sign-in
+[2026-09-24T20:04:28.103Z] SHOT 02-sign-in-failed.png https://app.pageflo.io/sign-in
+[2026-09-24T20:04:28.103Z] DEFECT BUG-P0-001 [P0] Auth: Remained on sign-in. Form said: The email or password provided is incorrect.
+[2026-09-24T20:04:28.103Z] FATAL Error: login failed
+[2026-09-24T20:04:28.169Z] SHOT 03-fatal.png https://app.pageflo.io/sign-in
+[2026-09-24T20:04:28.169Z] DEFECT BUG-P0-002 [P0] QA walk: Error: login failed

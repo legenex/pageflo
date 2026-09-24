@@ -1,0 +1,93 @@
+[
+  {
+    "id": "FUN-OBS-ADV-LIST-ACTIONS",
+    "severity": "info",
+    "title": "Advertorial list verbs",
+    "detail": "archive=9 duplicate=9",
+    "at": "2026-09-24T20:11:20.821Z"
+  },
+  {
+    "id": "FUN-OBS-ADV-DEP-TAB",
+    "severity": "info",
+    "title": "Advertorial builder deployments tab",
+    "detail": "url=https://app.pageflo.io/admin/advertorials PageFlo\nOverview\nBrands\nWebsites\nQuizzes\nLanding Pages\nAdvertorials\nDeployments\nDomains\nLeads\nAnalytics\nSOON\nCampaign Integrity\nSOON\nIntegrations\nSettings\nExpand all\nC\ncapture\nOwner · all brands\n22:11\nGMT+2\nOpen raw Payload admin →\nAdvertorials\nLive URLs. An advertorial deployed at a brand domain and path.\nAdvertorials\nDeployments\nNew Deployment\nThe Settlement Letter That Sat on Their . Dont Settle\nLIVE\nDomain missing, falling back to preview URL\nhttps://dont-settle.preview.legenex.com/adv/letter\nadvertorial: The Settlement Letter That Sat on Their ...\n·\nbrand: Dont Settle\n·\nquiz: dont-settle.preview.legenex.com/s/dont-settle\nPreview\nEdit\ndev",
+    "at": "2026-09-24T20:11:21.882Z"
+  },
+  {
+    "id": "AUD-SECTION",
+    "severity": "P1",
+    "title": "adv-master",
+    "detail": "locator.click: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /^Edit$/i }).nth(1)\u001b[22m\n",
+    "at": "2026-09-24T20:11:45.007Z"
+  },
+  {
+    "id": "SET-OBS-PAGE-EDITOR",
+    "severity": "info",
+    "title": "Home page editor",
+    "detail": "{\"url\":\"https://app.pageflo.io/admin/sites/rescue-funnel-20260923/pages/202\",\"h1\":\"Were you in an accident? See if you qualify.\",\"buttons\":[\"Account menu\",\"Desktop\",\"Tablet\",\"Mobile\",\"Preview\",\"Unpublish\",\"Add\",\"Navigation Header\",\"HeroWere you in an accident? See if you qualify.\",\"Lead FormCheck your claim in two minutes.\",\"Trust Strip\",\"Services GridWhat kind of accident were you in?\",\"How It WorksThree steps to a free claim review\",\"Recent WinsRecent recoveries\",\"FAQCommon questions\",\"Final CTACheck your claim in two minutes.\",\"Site Footer\",\"Check my claim\",\"Page settings ›\",\"Ask AI to rewrite this section\",\"Save\",\"Advanced▸ Show\",\"Add link\"],\"fields\":[{\"name\":\"first_name\",\"ph\":\"First name\",\"type\":\"text\"},{\"name\":\"last_name\",\"ph\":\"Last name\",\"type\":\"text\"},{\"name\":\"email\",\"ph\":\"Email\",\"type\":\"email\"},{\"name\":\"phone\",\"ph\":\"Phone\",\"type\":\"tel\"},{\"name\":\"state\",\"ph\":\"State\",\"type\":\"text\"},{\"name\":\"zip\",\"ph\":\"ZIP\",\"type\":\"text\"},{\"name\":\"attr_utm_source\",\"ph\":\"\",\"type\":\"hidden\"},{\"name\":\"attr_utm_medium\",\"ph\":\"\",\"type\":\"hidden\"},{\"name\":\"attr_utm_campaign\",\"ph\":\"\",\"type\":\"hidden\"},{\"name\":\"attr_utm_term\",\"ph\":\"\",\"type\":\"hidden\"},{\"name\":\"attr_utm_content\",\"ph\":\"\",\"type\":\"hidden\"},{\"name\":\"attr_gclid\",\"ph\":\"\",\"type\":\"hidden\"},{\"name\":\"attr_fbclid\",\"ph\":\"\",\"type\":\"hidden\"},{\"name\":\"attr_ttclid\",\"ph\":\"\",\"type\":\"hidden\"},{\"name\":\"attr_referrer\",\"ph\":\"\",\"type\":\"hidden\"},{\"name\":\"attr_landing_path\",\"ph\":\"\",\"type\":\"hidden\"},{\"name\":\"attr_session_id\",\"ph\":\"\",\"type\":\"hidden\"},{\"name\":\"attr_fbc\",\"ph\":\"\",\"type\":\"hidden\"},{\"name\":\"attr_fbp\",\"ph\":\"\",\"type\":\"hidden\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"checkbox\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"checkbox\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"input\"},{\"name\":\"\",\"ph\":\"/page-slug or https://…\",\"type\":\"input\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"input\"},{\"name\":\"\",\"ph\":\"/page-slug or https://…\",\"type\":\"input\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"input\"},{\"name\":\"\",\"ph\":\"/page-slug or https://…\",\"type\":\"input\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"input\"},{\"name\":\"\",\"ph\":\"/page-slug or https://…\",\"type\":\"input\"},{\"name\":\"\",\"ph\":\"\",\"type\":\"checkbox\"}],\"seo\":true,\"snippet\":\"Back to PageFlo\\nRF\\nRescue Funnel 20260923\\nrescue-funnel-20260923\\nView Live Site\\nOverview\\nPages\\nBlog\\nNumbers\\n\\nSETTINGS\\n\\nGeneral\\nDomains\\nPaths\\nSEO\\nTracking\\nUsers\\nDanger Zone\\nC\\ncapture\\ncapture@legenex.com\\nADMIN / SITES / RESCUE-FUNNEL-20260923 / PAGES\\nHome\\nLIVE\\nPreview\\nUnpublish\\nSECTIONS · 10\\nAdd\\nNavigation Header\\nHero\\nWere you in an accident? See if you qualify.\\nLead Form\\nCheck your claim in two minutes.\\nTrust Strip\\nServices Grid\\nWhat kind of accident were you in?\\nHow It Works\\nThree steps to a free claim review\\nRecent Wins\\nRecent recoveries\\nFAQ\\nCommon questions\\nFinal CTA\\nCheck your claim in two minutes.\\nSite Footer\\nPUBLISHED\\nhttps://rescue-funnel-20260923.preview.pageflo.io/\\nClick any section to edit ›\\nEDITING · Navigation Header\\nHome\\nHow it works\\nOur partners\\nFAQ\\nCheck my case\\nFree claim ch\"}",
+    "at": "2026-09-24T20:11:50.558Z"
+  },
+  {
+    "id": "AUD-SECTION",
+    "severity": "P1",
+    "title": "brand-id",
+    "detail": "locator.click: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - waiting for locator('div').filter({ hasText: /^Rescue Funnel 20260923/ }).getByRole('button', { name: /Edit/i }).first()\u001b[22m\n",
+    "at": "2026-09-24T20:12:13.495Z"
+  },
+  {
+    "id": "REN-LIVE-OK",
+    "severity": "info",
+    "title": "Live https://dont-settle.preview.pageflo.io/",
+    "detail": "{\"status\":200,\"title\":\"Home | Dont Settle\",\"h1\":\"See if you may qualify for a mass tort claim.\",\"text\":\"Dont Settle\\nHow it works\\nOur partners\\nFAQ\\nCheck my case\\nFree case review\\nSee if you may qualify for a mass tort claim.\\n\\nAnswer a few quick questions and a partner attorney will review your situation at no cost.\\n\\nStart my free review\\n\\nFREE CASE REVIEW\\n\\nSee if you qualify in two minutes.\\n\\nNo payment i\",\"quiz\":true,\"phone\":true,\"privacy\":true}",
+    "at": "2026-09-24T20:12:18.304Z"
+  },
+  {
+    "id": "REN-LIVE-OK",
+    "severity": "info",
+    "title": "Live https://dont-settle.preview.pageflo.io/s/dont-settle",
+    "detail": "{\"status\":200,\"title\":\"Dont Settle · MVA Tiered Quiz | Dont Settle\",\"h1\":\"\",\"text\":\"Dont Settle\\nCLICK HERE TO CALL\\nWelcome / Accident Type\\nAccident Branch\\nAccident State\\nAccident Date\\nAccident Details\\nInjury Type12121212\\nTreatment Received\\nTreatment Time\\nFault\\nAttorney Status\\nInsurance Status\\nQualified Lead Form\\nDQ Lead Form\\n/submitted (Qualified)\\n/thanks (DQ)\\nTake the 30 Second Qu\",\"quiz\":false,\"phone\":false,\"privacy\":false}",
+    "at": "2026-09-24T20:12:20.536Z"
+  },
+  {
+    "id": "REN-LIVE-OK",
+    "severity": "info",
+    "title": "Live https://dont-settle.preview.pageflo.io/c/dont-settle",
+    "detail": "{\"status\":200,\"title\":\"Healing should be your only job right now. The claim shouldn’t become a second injury. | Dont Settle\",\"h1\":\"Healing should be your only job right now. The claim shouldn’t become a second injury.\",\"text\":\"Dont Settle\\nTalk to someone ·\\n(833) 555-0444\\nYOU DIDN’T ASK FOR THIS\\nHealing should be your only job right now. The claim shouldn’t become a second injury.\\n\\nIf you were hurt in a crash, you deserve to know what support you’re entitled to — without pressure, paperwork battles, or a single upfront dol\",\"quiz\":false,\"phone\":true,\"privacy\":true}",
+    "at": "2026-09-24T20:12:23.263Z"
+  },
+  {
+    "id": "REN-LIVE-OK",
+    "severity": "info",
+    "title": "Live https://dont-settle.preview.pageflo.io/adv/letter",
+    "detail": "{\"status\":200,\"title\":\"The Settlement Letter That Sat on Their Fridge for Three Weeks | Dont Settle\",\"h1\":\"The Settlement Letter That Sat on Their Fridge for Three Weeks\",\"text\":\"D\\nDONT SETTLE\\n(833) 555-0444\\nCLICK HERE TO CALL\\nACCIDENT CLAIMS\\nThe Settlement Letter That Sat on Their Fridge for Three Weeks\\nBy Anna Lopez · 3 min read\\n\\nThe offer arrived eleven days after the crash. It sat on their fridge for three weeks. That delay is the only reason they did not lose $63,000.\\n\\n\",\"quiz\":false,\"phone\":true,\"privacy\":false}",
+    "at": "2026-09-24T20:12:25.586Z"
+  },
+  {
+    "id": "REN-LIVE-OK",
+    "severity": "info",
+    "title": "Live https://dont-settle.preview.legenex.com/",
+    "detail": "{\"status\":200,\"title\":\"Home | Dont Settle\",\"h1\":\"See if you may qualify for a mass tort claim.\",\"text\":\"Dont Settle\\nHow it works\\nOur partners\\nFAQ\\nCheck my case\\nFree case review\\nSee if you may qualify for a mass tort claim.\\n\\nAnswer a few quick questions and a partner attorney will review your situation at no cost.\\n\\nStart my free review\\n\\nFREE CASE REVIEW\\n\\nSee if you qualify in two minutes.\\n\\nNo payment i\",\"quiz\":true,\"phone\":true,\"privacy\":true}",
+    "at": "2026-09-24T20:12:30.382Z"
+  },
+  {
+    "id": "REN-LIVE-OK",
+    "severity": "info",
+    "title": "Live https://dont-settle.preview.legenex.com/s/dont-settle",
+    "detail": "{\"status\":200,\"title\":\"Dont Settle · MVA Tiered Quiz | Dont Settle\",\"h1\":\"\",\"text\":\"Dont Settle\\nCLICK HERE TO CALL\\nWelcome / Accident Type\\nAccident Branch\\nAccident State\\nAccident Date\\nAccident Details\\nInjury Type12121212\\nTreatment Received\\nTreatment Time\\nFault\\nAttorney Status\\nInsurance Status\\nQualified Lead Form\\nDQ Lead Form\\n/submitted (Qualified)\\n/thanks (DQ)\\nTake the 30 Second Qu\",\"quiz\":false,\"phone\":false,\"privacy\":false}",
+    "at": "2026-09-24T20:12:32.345Z"
+  },
+  {
+    "id": "REN-LIVE-OK",
+    "severity": "info",
+    "title": "Live https://dont-settle.preview.legenex.com/c/dont-settle",
+    "detail": "{\"status\":200,\"title\":\"Healing should be your only job right now. The claim shouldn’t become a second injury. | Dont Settle\",\"h1\":\"Healing should be your only job right now. The claim shouldn’t become a second injury.\",\"text\":\"Dont Settle\\nTalk to someone ·\\n(833) 555-0444\\nYOU DIDN’T ASK FOR THIS\\nHealing should be your only job right now. The claim shouldn’t become a second injury.\\n\\nIf you were hurt in a crash, you deserve to know what support you’re entitled to — without pressure, paperwork battles, or a single upfront dol\",\"quiz\":false,\"phone\":true,\"privacy\":true}",
+    "at": "2026-09-24T20:12:35.117Z"
+  },
+  {
+    "id": "REN-LIVE-OK",
+    "severity": "info",
+    "title": "Live https://dont-settle.preview.legenex.com/adv/letter",
+    "detail": "{\"status\":200,\"title\":\"The Settlement Letter That Sat on Their Fridge for Three Weeks | Dont Settle\",\"h1\":\"The Settlement Letter That Sat on Their Fridge for Three Weeks\",\"text\":\"D\\nDONT SETTLE\\n(833) 555-0444\\nCLICK HERE TO CALL\\nACCIDENT CLAIMS\\nThe Settlement Letter That Sat on Their Fridge for Three Weeks\\nBy Anna Lopez · 3 min read\\n\\nThe offer arrived eleven days after the crash. It sat on their fridge for three weeks. That delay is the only reason they did not lose $63,000.\\n\\n\",\"quiz\":false,\"phone\":true,\"privacy\":false}",
+    "at": "2026-09-24T20:12:37.369Z"
+  }
+]

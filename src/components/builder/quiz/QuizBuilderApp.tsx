@@ -35,6 +35,8 @@ import {
 import { settleAction, commitOptimistic, failureMessage } from '../server-action'
 import { buildQuizEmbedSnippet, QUIZ_EMBED_INCOMPLETE } from '@/lib/quiz-embed'
 import { selectableOptions } from '@/lib/selectable'
+import { domainOptionLabel, isDomainSelectable } from '@/lib/domain-eligibility'
+import { toDomainLike } from '@/lib/deployment-url'
 import { TemplateGallery } from '@/components/builder/templates/TemplateGallery'
 import { BrandQuickEdit } from '../brand/BrandQuickEdit'
 import {
@@ -447,20 +449,19 @@ const DeploymentEditor = ({ deployment, isDraft, quizzes, brands, templates, onB
     toRecord: (q) => ({ id: q.id, label: q.name, status: q.isArchived ? 'archived' : q.isPublished ? 'published' : 'draft' }),
   })
 
-  // Only a domain that is active AND holds an active certificate can serve a
-  // funnel. Anything else is offered disabled rather than hidden, so "why is my
-  // domain not in the list" has an answer on screen.
+  // Same eligibility the public resolver uses. Preview hosts are selectable
+  // without ssl_status=active; custom hosts are not.
   const brandDomains = (brands.find((b) => b.id === draft.brandId)?.__domains ?? [])
   const domainOptions = selectableOptions({
     records: brandDomains,
     selectedId: draft.domain,
     toRecord: (d) => ({
       id: d.host,
-      label: `${d.host}${d.primary ? '  (primary)' : ''}${d.status !== 'active' ? `  - ${d.status}` : d.sslStatus !== 'active' ? '  - certificate pending' : ''}`,
+      label: domainOptionLabel(toDomainLike(d)),
       status: 'published',
-      meta: { ready: d.status === 'active' && d.sslStatus === 'active' },
+      meta: { ready: isDomainSelectable(toDomainLike(d)) },
     }),
-    isEligible: (_rec, d) => d.status === 'active' && d.sslStatus === 'active',
+    isEligible: (_rec, d) => isDomainSelectable(toDomainLike(d)),
   })
 
   const handleBack = () => { if (dirty) setLeaveReq(true); else onBack() }
