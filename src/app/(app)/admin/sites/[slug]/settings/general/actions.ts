@@ -68,10 +68,16 @@ export async function saveGeneralSettings(formData: FormData): Promise<{ ok: boo
   }
 
   const payload = await getPayload({ config })
+  const current = await payload.findByID({ collection: 'sites', id: siteId, depth: 0, overrideAccess: true })
+  const legal = {
+    ...(((current as { legal?: Record<string, unknown> | null }).legal) ?? {}),
+    tcpa_text: String(formData.get('tcpa_text') ?? ''),
+    default_disclaimer: String(formData.get('default_disclaimer_md') ?? ''),
+  }
   await payload.update({
     collection: 'sites',
     id: siteId,
-    data,
+    data: { ...data, legal },
     user: user as never,
     overrideAccess: false,
   })

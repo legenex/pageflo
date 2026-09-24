@@ -17,6 +17,7 @@ type Site = {
   default_phone?: string | null
   default_phone_tel?: string | null
   default_disclaimer_md?: string | null
+  tcpa_text?: string | null
   brand?: {
     logo_url?: string | null
     favicon_url?: string | null
@@ -201,6 +202,18 @@ export function GeneralForm({ site }: { site: Site }) {
           name="default_disclaimer_md"
           defaultValue={site.default_disclaimer_md ?? ''}
           rows={5}
+          className={`${inputClass} font-mono text-[13px]`}
+        />
+      </Card>
+
+      <Card title="TCPA consent">
+        <p className="text-[12px] text-[var(--color-ink-muted)] -mt-2">
+          Shown on lead forms. A Brand cannot publish a quiz without this or equivalent consent copy on the flow.
+        </p>
+        <textarea
+          name="tcpa_text"
+          defaultValue={site.tcpa_text ?? ''}
+          rows={4}
           className={`${inputClass} font-mono text-[13px]`}
         />
       </Card>

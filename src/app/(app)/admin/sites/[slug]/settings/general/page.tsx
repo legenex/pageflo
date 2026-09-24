@@ -38,6 +38,7 @@ export default async function GeneralSettingsPage({ params }: Props) {
           default_phone: site.default_phone,
           default_phone_tel: site.default_phone_tel,
           default_disclaimer_md: site.default_disclaimer_md,
+          tcpa_text: (site.legal as { tcpa_text?: string | null } | null)?.tcpa_text ?? null,
           brand: site.brand,
         }}
       />
