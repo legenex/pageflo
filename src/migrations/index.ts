@@ -49,6 +49,7 @@ import * as migration_20260901_220000_integration_config_from_name_default from 
 import * as migration_20260901_233000_sites_vertical_general from './20260901_233000_sites_vertical_general'
 import * as migration_20260919_120000_sites_vertical_debt from './20260919_120000_sites_vertical_debt'
 import * as migration_20260920_120000_pages_published_blocks from './20260920_120000_pages_published_blocks'
+import * as migration_20260924_120000_deployment_published_snapshot from './20260924_120000_deployment_published_snapshot'
 
 export const migrations = [
   {
@@ -233,5 +234,10 @@ export const migrations = [
     up: migration_20260920_120000_pages_published_blocks.up,
     down: migration_20260920_120000_pages_published_blocks.down,
     name: '20260920_120000_pages_published_blocks',
+  },
+  {
+    up: migration_20260924_120000_deployment_published_snapshot.up,
+    down: migration_20260924_120000_deployment_published_snapshot.down,
+    name: '20260924_120000_deployment_published_snapshot',
   },
 ];

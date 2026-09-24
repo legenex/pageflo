@@ -159,5 +159,13 @@ export const FunnelLpDeployments: CollectionConfig = {
         description: 'Digest of the publish-relevant fields at that moment. Unequal to the row today means the saved changes have not been through a preflight.',
       },
     },
+    {
+      name: 'published_snapshot',
+      type: 'json',
+      admin: {
+        readOnly: true,
+        description: 'Master copy captured at last publish. Public render reads this until republish.',
+      },
+    },
   ],
 }

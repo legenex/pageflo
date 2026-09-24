@@ -7,6 +7,7 @@ import { getQuizTemplateRecordByTemplateId } from './template-records'
 import { normalizeDeploymentPath } from './quiz-deployment-path'
 import { normalizeDestinations, type DestinationMap } from './quiz-destinations'
 import { isClaimedByAuthoredContent, pathVariantsFor } from './public-path-claims'
+import { parseDeploymentSnapshot, type QuizMasterSnap } from './deployment-snapshot'
 
 export { normalizeDeploymentPath }
 
@@ -221,6 +222,16 @@ const resolveQuizDeploymentUncached = async (
  * identical object. A second hydration path is how a quiz would end up themed
  * one way on its own page and another way inside a landing page.
  */
+const quizFromSnap = (snap: QuizMasterSnap) => ({
+  id: snap.id,
+  name: snap.name,
+  slug: snap.slug,
+  tiers: snap.tiers,
+  steps: snap.steps,
+  nodes: snap.nodes,
+  customFields: snap.customFields,
+})
+
 const hydrateQuizDeployment = async (
   payload: Awaited<ReturnType<typeof getPayload>>,
   doc: Record<string, unknown>,
@@ -240,6 +251,9 @@ const hydrateQuizDeployment = async (
   // 'live' - the archive action unpublishes for exactly this reason, and this
   // is the second half of that guarantee, enforced at read time.
   if (!includeUnpublished && (!quizDoc.is_published || quizDoc.is_archived)) return null
+
+  const pin = !includeUnpublished ? parseDeploymentSnapshot(doc.published_snapshot) : null
+  const quizSnap = pin?.kind === 'quiz' ? pin.master : pin?.kind === 'lp' ? pin.quizMaster : null
 
   const siteDoc = await payload
     .findByID({ collection: 'sites', id: siteId, depth: 0, overrideAccess: true })
@@ -280,7 +294,7 @@ const hydrateQuizDeployment = async (
    * statement about what NEW deployments may choose; taking every live page on
    * it down as a side effect is not something an operator asked for.
    */
-  const storedTemplateId = String(doc.template_id ?? '')
+  const storedTemplateId = pin?.kind === 'quiz' && pin.templateId ? pin.templateId : String(doc.template_id ?? '')
   const record = await resolveQuizTemplateRecordForRender(payload, storedTemplateId)
   if (!record) {
     console.warn(
@@ -310,7 +324,11 @@ const hydrateQuizDeployment = async (
     templateName: record.name,
     // Deployment choice, else the template record's default, else the renderer's.
     progressForm:
-      typeof doc.progress_form === 'string' && doc.progress_form ? doc.progress_form : record.progressForm,
+      pin?.kind === 'quiz' && pin.progressForm
+        ? pin.progressForm
+        : typeof doc.progress_form === 'string' && doc.progress_form
+          ? doc.progress_form
+          : record.progressForm,
     status: String(doc.status ?? 'draft'),
     embedPreviewBg: String(doc.embed_preview_bg ?? ''),
     bodySectionOverrides: Array.isArray(doc.body_section_overrides)
@@ -327,15 +345,17 @@ const hydrateQuizDeployment = async (
     // `deployment.templateId` is already canonical — resolved once above — so
     // there is no second resolution here to disagree with the first.
     deployment,
-    quiz: {
-      id: String(quizDoc.id),
-      name: String(quizDoc.name ?? ''),
-      slug: String(quizDoc.slug ?? ''),
-      tiers: asArray(quizDoc.tiers),
-      steps: asArray(quizDoc.steps),
-      nodes: asArray(quizDoc.nodes),
-      customFields: asArray(quizDoc.custom_fields),
-    },
+    quiz: quizSnap
+      ? quizFromSnap(quizSnap)
+      : {
+          id: String(quizDoc.id),
+          name: String(quizDoc.name ?? ''),
+          slug: String(quizDoc.slug ?? ''),
+          tiers: asArray(quizDoc.tiers),
+          steps: asArray(quizDoc.steps),
+          nodes: asArray(quizDoc.nodes),
+          customFields: asArray(quizDoc.custom_fields),
+        },
     brand: baseBrand,
     siteId,
     siteSlug: String(siteDoc.slug ?? ''),
@@ -368,6 +388,7 @@ export const resolveEmbeddedQuiz = cache(async (
     templateId: string
     progressForm: string | null
     includeUnpublished: boolean
+    publishedSnapshot?: unknown
   },
 ): Promise<ResolvedQuizDeployment | null> => {
   if (!args.quizId) return null
@@ -395,6 +416,7 @@ export const resolveEmbeddedQuiz = cache(async (
       body_section_overrides: null,
       utm: {},
       pixels: {},
+      published_snapshot: args.publishedSnapshot ?? null,
     },
     args.siteId,
     args.includeUnpublished,

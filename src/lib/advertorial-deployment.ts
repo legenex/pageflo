@@ -6,6 +6,7 @@ import { normalizeDeploymentPath } from './quiz-deployment-path'
 import { isClaimedByAuthoredContent, pathVariantsFor } from './public-path-claims'
 import { resolveQuizDeploymentById, type ResolvedQuizDeployment } from './quiz-deployment'
 import { advertorialChrome, type AdvertorialTemplateId } from './advertorial-templates'
+import { parseDeploymentSnapshot } from './deployment-snapshot'
 
 /**
  * Server-side resolution of a public funnel advertorial.
@@ -114,6 +115,9 @@ const resolveAdvertorialDeploymentUncached = async (
 
   if (!includeUnpublished && advDoc.status !== 'published') return null
 
+  const pin = !includeUnpublished ? parseDeploymentSnapshot(doc.published_snapshot) : null
+  const advSnap = pin?.kind === 'advertorial' ? pin.master : null
+
   const siteDoc = await payload
     .findByID({ collection: 'sites', id: siteId, depth: 0, overrideAccess: true })
     .catch(() => null)
@@ -135,7 +139,10 @@ const resolveAdvertorialDeploymentUncached = async (
     kind: typeof d.kind === 'string' ? d.kind : undefined,
   }))
 
-  const quizDeploymentId = String(doc.quiz_deployment_id ?? '')
+  const quizDeploymentId =
+    pin?.kind === 'advertorial' && pin.quizDeploymentId
+      ? pin.quizDeploymentId
+      : String(doc.quiz_deployment_id ?? '')
   const quiz = quizDeploymentId
     ? await resolveQuizDeploymentById(quizDeploymentId, siteId, includeUnpublished)
     : null
@@ -148,7 +155,7 @@ const resolveAdvertorialDeploymentUncached = async (
     ? { domain: quizHost, path: quiz.deployment.path, name: quiz.quiz.name }
     : null
 
-  const chrome = advertorialChrome(String(advDoc.template_id ?? ''))
+  const chrome = advertorialChrome(String(advSnap?.templateId || advDoc.template_id || ''))
 
   return {
     deployment: {
@@ -156,15 +163,20 @@ const resolveAdvertorialDeploymentUncached = async (
       name: String(doc.name ?? ''),
       path: normalizeDeploymentPath(String(doc.path ?? '')),
       status: String(doc.status ?? 'draft'),
-      ctaMode: doc.cta_mode === 'embed' ? 'embed' : 'button',
+      ctaMode:
+        pin?.kind === 'advertorial'
+          ? pin.ctaMode
+          : doc.cta_mode === 'embed'
+            ? 'embed'
+            : 'button',
       quizDeploymentId,
     },
     advertorial: {
-      id: String(advDoc.id),
-      title: String(advDoc.title ?? ''),
-      slug: String(advDoc.slug ?? ''),
+      id: advSnap?.id ?? String(advDoc.id),
+      title: advSnap?.title ?? String(advDoc.title ?? ''),
+      slug: advSnap?.slug ?? String(advDoc.slug ?? ''),
       templateId: chrome.id,
-      sections: Array.isArray(advDoc.sections) ? (advDoc.sections as unknown[]) : [],
+      sections: advSnap ? advSnap.sections : Array.isArray(advDoc.sections) ? (advDoc.sections as unknown[]) : [],
     },
     brand: siteToBrand(siteDoc as unknown as Record<string, unknown>, domainList),
     quiz,

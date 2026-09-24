@@ -608,6 +608,107 @@ export const lpDeploymentPreflight = async (
   return summarize(checks)
 }
 
+export type AdvertorialPreflightInput = {
+  deployment: Record<string, unknown>
+  advertorial: Record<string, unknown> | null
+  site: Record<string, unknown> | null
+  domain: Record<string, unknown> | null
+}
+
+/**
+ * Everything that must be true before an advertorial deployment serves traffic.
+ *
+ * Same shape as quiz/LP: authz, parent published, brand complete, domain,
+ * path. A linked quiz is optional — if the CTA quiz is missing the article
+ * still serves and the CTA falls back to phone — so a dead quiz id is a
+ * warning, not a block.
+ */
+export const advertorialDeploymentPreflight = async (
+  ctx: PreflightContext,
+  input: AdvertorialPreflightInput,
+): Promise<PreflightResult> => {
+  const checks: PreflightCheck[] = []
+  const { deployment, advertorial, site, domain } = input
+
+  const gate = requireSiteAdmin(ctx.user, ctx.siteId)
+  checks.push(gate.ok ? pass('authz', 'You administer this brand') : fail('authz', 'You administer this brand', gate.error))
+  if (!gate.ok) return summarize(checks)
+
+  const parentStatus = str(advertorial?.status)
+  checks.push(
+    parentStatus === 'published'
+      ? pass('parent', 'The advertorial itself is published')
+      : fail(
+          'parent',
+          'The advertorial itself is published',
+          parentStatus === 'archived' ? 'the advertorial is archived' : 'the advertorial is not published',
+        ),
+  )
+
+  checks.push(checkBrand(site))
+
+  const sections = arr(advertorial?.sections)
+  checks.push(
+    sections.length > 0
+      ? pass('body', 'The advertorial has article sections')
+      : fail('body', 'The advertorial has article sections', 'there is nothing to render'),
+  )
+
+  for (const [key, label] of [['utm', 'UTM configuration'], ['pixels', 'Pixel configuration']] as const) {
+    const v = deployment[key]
+    checks.push(
+      v == null || (typeof v === 'object' && !Array.isArray(v))
+        ? pass(key, `${label} is well formed`)
+        : fail(key, `${label} is well formed`, 'the stored value is not an object'),
+    )
+  }
+
+  const quizDeploymentId = str(deployment.quiz_deployment_id)
+  if (quizDeploymentId) {
+    const quizDep = await ctx.payload
+      .findByID({ collection: 'funnel-quiz-deployments', id: quizDeploymentId, depth: 0, overrideAccess: true })
+      .catch(() => null)
+    if (!quizDep) {
+      checks.push(
+        fail(
+          'cta-quiz',
+          'The linked quiz deployment exists',
+          `no quiz deployment "${quizDeploymentId}"`,
+          'warn',
+        ),
+      )
+    } else {
+      checks.push(
+        relationId(quizDep.site) === gate.siteId
+          ? pass('cta-quiz-tenant', 'The linked quiz belongs to this brand')
+          : fail('cta-quiz-tenant', 'The linked quiz belongs to this brand', 'it belongs to a different brand'),
+      )
+      checks.push(
+        String(quizDep.status ?? '') === 'live'
+          ? pass('cta-quiz-live', 'The linked quiz deployment is live', 'warn')
+          : fail(
+              'cta-quiz-live',
+              'The linked quiz deployment is live',
+              `it is ${String(quizDep.status ?? 'draft')}; the article will still serve and the CTA will fall back to phone`,
+              'warn',
+            ),
+      )
+    }
+  } else {
+    checks.push(pass('cta-quiz', 'No quiz CTA is required'))
+  }
+
+  checks.push(...(await domainAndPathChecks(ctx, {
+    siteId: gate.siteId,
+    domain,
+    path: str(deployment.path),
+    kind: 'advertorial-deployment',
+    excludeId: String(deployment.id ?? ''),
+  })))
+
+  return summarize(checks)
+}
+
 /* -------------------------------------------------- domain and path, shared */
 
 const domainAndPathChecks = async (
@@ -702,9 +803,11 @@ export const decideTransition = (
   from: DeploymentStatus,
   to: DeploymentStatus,
   preflight: PreflightResult | null,
+  opts?: { republish?: boolean },
 ): PublishOutcome => {
-  if (from === to) return refuse(`already ${to}`)
-  if (!canTransition(from, to)) return refuse(`cannot go from ${from} to ${to}`)
+  const republish = Boolean(opts?.republish) && from === 'live' && to === 'live'
+  if (from === to && !republish) return refuse(`already ${to}`)
+  if (!republish && !canTransition(from, to)) return refuse(`cannot go from ${from} to ${to}`)
 
   if (!GOES_LIVE.has(to)) return { ok: true, status: to, preflight: preflight ?? EMPTY_PREFLIGHT }
 

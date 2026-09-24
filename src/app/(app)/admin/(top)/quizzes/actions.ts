@@ -58,8 +58,14 @@ export async function saveQuiz(args: { id: string; patch: Record<string, unknown
   const user = await getCurrentUser()
   if (!user) return { ok: false, error: 'unauthenticated' }
   const payload = await getPayload({ config })
+  const patch = { ...(args.patch || {}) }
+  // Publish is its own verb. A generic save that wrote is_published bypassed
+  // setQuizPublished, which preflights every live deployment of this quiz.
+  delete patch.is_published
+  delete patch.is_archived
+  delete patch.archived_at
   try {
-    await payload.update({ collection: 'funnel-quizzes', id: args.id, data: args.patch, user, overrideAccess: false })
+    await payload.update({ collection: 'funnel-quizzes', id: args.id, data: patch, user, overrideAccess: false })
     revalidatePath(PATH)
     return { ok: true }
   } catch (err) {

@@ -66,6 +66,7 @@ const RELEASE_MIGRATIONS = [
   '20260813_220000_template_records',
   '20260813_230000_audit_log_user_nullable',
   '20260814_120000_leads_idempotency_key',
+  '20260924_120000_deployment_published_snapshot',
 ]
 
 const sh = (
@@ -195,6 +196,9 @@ try {
   t(up.ok, `the release's migrations apply to the previous schema${up.ok ? '' : '\n' + up.out.slice(-1500)}`)
   t(await hasColumn('payload_locked_documents_rels', 'funnel_lp_deployments_id'), 'and the columns are there')
   t(await hasColumn('integration_config', 'funnel_samples_seeded'), 'both of them')
+  t(await hasColumn('funnel_quiz_deployments', 'published_snapshot'), 'and the live-pin column on quiz deployments')
+  t(await hasColumn('funnel_lp_deployments', 'published_snapshot'), 'and on landing-page deployments')
+  t(await hasColumn('funnel_advertorial_deployments', 'published_snapshot'), 'and on advertorial deployments')
 
   const after = sh('pnpm', ['verify:schema'], { DATABASE_URI: scratchUri, NODE_ENV: 'production' })
   t(after.ok, `verify:schema now PASSES, before anything has been started${after.ok ? '' : '\n' + after.out.slice(-1500)}`)

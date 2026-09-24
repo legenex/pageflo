@@ -5,7 +5,7 @@ handoff between sessions and agents. It holds current factual state only.
 Anything not measured is labelled as such. During the internal V1 completion
 run, also update `forge-pack/state/`.
 
-Last updated: 24 September 2026. POST-V1 rescue audit. W60 "V1 complete" is withdrawn.
+Last updated: 24 September 2026. Rescue Wave 2A on `main`. W60 "V1 complete" is withdrawn.
 
 ---
 
@@ -24,9 +24,9 @@ Last updated: 24 September 2026. POST-V1 rescue audit. W60 "V1 complete" is with
 | Execution memory | `forge-pack/state/` |
 | Release mode | **Autonomous ordinary Plesk releases.** Implement, validate, commit, push, and the section 6 Plesk sequence after gates pass are pre-authorized (discovery 12.4). Human gates in `docs/HUMAN-GATES.md` still apply. |
 | CI | **None.** No `.github/` directory, no GitHub Actions workflow. |
-| Current wave | **Rescue audit. V1 is not complete.** Production HEAD `b54e8bd`. GitHub has audit + Wave 1 repairs on `main`. |
-| Active human gates | Reset `team@legenex.com` password (production `.env` does not match the DB hash). Do not flip `PAGEFLO_LEGACY_HOST_REDIRECT`. Do not change public DNS. Live buyer activation remains gated. |
-| Active blockers | Operator-facing P0s documented in `docs/rescue-audit/DEFECT-REGISTER.md`. Preview of draft Brands, domain picker eligibility, seed-as-live, and website autosave snapshot are Wave 1 repairs. |
+| Current wave | **Rescue Wave 2A shipped locally.** Wave 1 (`ba3b917`) is on GitHub and production. Wave 2A pins live funnel deployments to a published snapshot. Remaining P0s: live copy junk, ACH Home, admin password, server actions, tenancy, custom-domain application UX. |
+| Active human gates | Operator authorized reset of existing `team@legenex.com` (Wave 2C). Do not flip `PAGEFLO_LEGACY_HOST_REDIRECT`. Do not change public DNS or default SNI. Live buyer activation remains gated. |
+| Active blockers | Operator-facing P0s in `docs/rescue-audit/DEFECT-REGISTER.md`. Wave 1 closed preview-404 / picker / seed-live / autosave-snapshot. Wave 2A closes advertorial go-live, archive-as-delete, master-HEAD live serve, invented `/q/{id}` `/a/{id}` URLs. |
 
 ## Compatibility identifiers
 
@@ -546,6 +546,10 @@ EB-1.
 ---
 
 ## Change log
+
+### 24 September 2026, Rescue Wave 2A
+
+Live funnel deployments now pin master copy at publish. Public quiz, LP and advertorial resolvers read `published_snapshot` until explicit republish. Resume of a paused row keeps the pin. Advertorial go-live runs `setAdvertorialDeploymentStatus` with preflight. Advertorial Archive sets `status=archived` and leaves deployments. Quiz master Publish goes through `setQuizPublished`. Quiz and advertorial lists print `effectiveDeploymentUrl`. Migration `20260924_120000_deployment_published_snapshot` backfills live rows. `pnpm typecheck`, `pnpm test:publish` 272, `pnpm test:release` 35, `pnpm test:quiz-master-runtime` 20.
 
 ### 20 September 2026, W60 production on GX10-01
 

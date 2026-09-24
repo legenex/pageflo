@@ -46,6 +46,13 @@ import { PORTED_TEMPLATES } from '../src/lib/lp-templates/index.ts'
 import { classifyLpQuizBinding, LOSSY_QUIZ_DEPLOYMENT_FIELDS, NEEDS_A_DECISION } from '../src/lib/lp-quiz-binding.ts'
 
 import { canonicalTemplateId } from '../src/lib/template-registry.ts'
+import {
+  captureAdvertorialSnapshot,
+  captureLpSnapshot,
+  captureQuizSnapshot,
+  parseDeploymentSnapshot,
+  shouldCapturePublishedSnapshot,
+} from '../src/lib/deployment-snapshot.ts'
 
 let passed = 0
 let failed = 0
@@ -292,6 +299,9 @@ t(decideTransition('live', 'draft', badPre).ok, 'unpublishing is never gated eit
 t(!decideTransition('paused', 'live', badPre).ok, 'RESUME is gated, because the world moved while it was paused')
 t(!decideTransition('paused', 'live', null).ok, 'and going live with no preflight at all is refused')
 t(!decideTransition('live', 'live', okPre).ok, 'a no-op transition is refused rather than silently succeeding')
+t(decideTransition('live', 'live', okPre, { republish: true }).ok, 'explicit republish of a live row is allowed when preflight passes')
+t(!decideTransition('live', 'live', badPre, { republish: true }).ok, 'republish is still gated on preflight')
+t(!decideTransition('paused', 'paused', okPre, { republish: true }).ok, 'republish only applies to a live row')
 
 /* ------------------------------------------------------------ grouped refusals */
 
@@ -1136,6 +1146,69 @@ const BOUND_LP_DEP = { ...GOOD_LP_DEP, quiz: 70 }
     'checkQuizTemplateRecord tries the RAW id first (clones and AI ids are records, not registry entries)')
   t(fn.includes('getQuizTemplateRecordByTemplateId(payload, canonical.id)'),
     'and falls back to the canonical alias when the raw id misses')
+}
+
+/* -------------------------------- live pin: master HEAD is not what visitors get --- */
+{
+  const quiz = {
+    id: 9,
+    name: 'MVA',
+    slug: 'mva',
+    tiers: [{ id: 't1' }],
+    steps: [{ key: 'welcome', label: 'Welcome' }],
+    nodes: [{ id: 'n1', question: 'How were you injured?' }],
+    custom_fields: [{ key: 'phone' }],
+  }
+  const snap = captureQuizSnapshot({ template_id: 'sq_quiz_first', progress_form: 'rail' }, quiz, '2026-09-24T00:00:00.000Z')
+  t(snap?.kind === 'quiz', 'quiz snapshot names its kind')
+  t(snap?.master.nodes[0] && (snap.master.nodes[0] as { question: string }).question === 'How were you injured?', 'quiz snapshot copies the graph')
+  const parsed = parseDeploymentSnapshot(snap)
+  t(parsed?.kind === 'quiz' && parsed.master.steps.length === 1, 'quiz snapshot round-trips')
+
+  const edited = { ...quiz, nodes: [{ id: 'n1', question: 'CHANGED' }] }
+  const later = captureQuizSnapshot({ template_id: 'sq_quiz_first' }, edited)
+  t(later?.master.nodes[0] && (later.master.nodes[0] as { question: string }).question === 'CHANGED', 'HEAD capture sees the edit')
+  t(parsed?.kind === 'quiz' && (parsed.master.nodes[0] as { question: string }).question === 'How were you injured?', 'the live pin does not')
+
+  t(shouldCapturePublishedSnapshot({ goingTo: 'live', current: 'draft', existingSnapshot: null }), 'first go-live captures')
+  t(!shouldCapturePublishedSnapshot({ goingTo: 'live', current: 'paused', existingSnapshot: snap }), 'resume keeps the pin')
+  t(shouldCapturePublishedSnapshot({ goingTo: 'live', current: 'live', republish: true, existingSnapshot: snap }), 'republish recaptures')
+  t(!shouldCapturePublishedSnapshot({ goingTo: 'paused', current: 'live', existingSnapshot: snap }), 'pause does not recapture')
+  t(shouldCapturePublishedSnapshot({ goingTo: 'live', current: 'paused', existingSnapshot: null }), 'resume of a pre-pin row captures once')
+
+  const lpSnap = captureLpSnapshot(
+    { quiz: 9, embedded_quiz_template_id: 'sq_timeline_journey', quiz_deployment_id: '' },
+    { id: 3, name: 'Human Recovery', slug: 'hrs', template_id: 'human_recovery_story', angle: 'pain', sections: [], slot_overrides: { h1: 'Healing' } },
+    quiz,
+  )
+  t(lpSnap?.kind === 'lp' && lpSnap.master.slotOverrides.h1 === 'Healing', 'LP snapshot pins slot copy')
+  t(lpSnap?.quizMaster?.name === 'MVA', 'LP snapshot also pins the bound quiz graph')
+
+  const advSnap = captureAdvertorialSnapshot(
+    { cta_mode: 'embed', quiz_deployment_id: '21' },
+    { id: 4, title: 'The letter', slug: 'letter', template_id: 'personal_story', sections: [{ type: 'headline', content: 'Hello' }] },
+  )
+  t(advSnap?.kind === 'advertorial' && advSnap.master.sections.length === 1, 'advertorial snapshot pins sections')
+  t(parseDeploymentSnapshot({ kind: 'nope' }) === null, 'unknown snapshot kind is absent, not thrown')
+}
+
+{
+  const quizBuilder = readFileSync(new URL('../src/components/builder/quiz/QuizBuilderApp.tsx', import.meta.url), 'utf8')
+  t(!quizBuilder.includes('preview.legenex.com/q/'), 'quiz list no longer invents /q/{id} URLs')
+  t(quizBuilder.includes('effectiveDeploymentUrl'), 'quiz list prints the real resolver URL')
+  t(quizBuilder.includes('setQuizPublished'), 'quiz master Publish goes through the gated action')
+
+  const advBuilder = readFileSync(new URL('../src/components/builder/advertorial/AdvertorialBuilderApp.tsx', import.meta.url), 'utf8')
+  t(!advBuilder.includes('preview.legenex.com/a/'), 'advertorial list no longer invents /a/{id} URLs')
+  t(advBuilder.includes('effectiveDeploymentUrl'), 'advertorial list prints the real resolver URL')
+  t(advBuilder.includes('svSetAdvertorialArchived'), 'advertorial Archive archives rather than deletes')
+  t(advBuilder.includes('setAdvertorialDeploymentStatus'), 'advertorial go-live has a gated publish door')
+
+  const quizSave = readFileSync(new URL('../src/app/(app)/admin/(top)/quizzes/actions.ts', import.meta.url), 'utf8')
+  t(quizSave.includes('delete patch.is_published'), 'generic quiz save cannot flip is_published')
+
+  const advHooks = readFileSync(new URL('../src/collections/FunnelAdvertorialDeployments.ts', import.meta.url), 'utf8')
+  t(advHooks.includes('publishRequiresPreflight: true'), 'advertorial deployments require the preflight marker to go live')
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

@@ -23,10 +23,10 @@ export const FunnelAdvertorialDeployments: CollectionConfig = {
   hooks: {
     // Tenant scoping on every door — access above is `isAuthenticated`, so the
     // hook is what stops a logged-in user writing another brand's deployment
-    // via raw REST or /cms. `publishRequiresPreflight: false` because
-    // advertorials have no preflight door; requiring one would make them
-    // unpublishable rather than safer.
-    beforeChange: [enforceDeploymentTenancy({ publishRequiresPreflight: false })],
+    // via raw REST or /cms. `publishRequiresPreflight: true`: going live
+    // outside `setAdvertorialDeploymentStatus` (the door that runs the
+    // preflight) is refused.
+    beforeChange: [enforceDeploymentTenancy({ publishRequiresPreflight: true })],
     afterChange: [auditAfterChange],
     beforeDelete: [enforceDeploymentTenancyOnDelete],
     afterDelete: [auditAfterDelete],
@@ -60,5 +60,29 @@ export const FunnelAdvertorialDeployments: CollectionConfig = {
     },
     { name: 'utm', type: 'json' },
     { name: 'pixels', type: 'json' },
+    {
+      name: 'published_snapshot',
+      type: 'json',
+      admin: {
+        readOnly: true,
+        description: 'Master article captured at last publish. Public render reads this until republish.',
+      },
+    },
+    {
+      name: 'last_published_at',
+      type: 'date',
+      admin: {
+        readOnly: true,
+        description: 'When this deployment last passed the publish preflight. Set only by the publish action.',
+      },
+    },
+    {
+      name: 'published_fingerprint',
+      type: 'text',
+      admin: {
+        readOnly: true,
+        description: 'Digest of the published pin. Unequal to HEAD means live is stale until republish.',
+      },
+    },
   ],
 }

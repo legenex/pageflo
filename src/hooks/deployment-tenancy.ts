@@ -63,16 +63,15 @@ const asRecord = (v: unknown): Record<string, unknown> =>
  * Create/update tenancy, plus (where the collection has a publish preflight)
  * the rule that going LIVE only happens through the door that ran it.
  *
- * @param publishRequiresPreflight `true` on `funnel-lp-deployments` and
- *   `funnel-quiz-deployments`, whose one gated publish door
- *   (`setLpDeploymentStatus` / `setQuizDeploymentStatus`) runs the full
- *   preflight and marks its write with `context: { pagefloPreflighted: true }`.
+ * @param publishRequiresPreflight `true` on all three funnel deployment
+ *   collections. The gated publish doors (`setLpDeploymentStatus`,
+ *   `setQuizDeploymentStatus`, `setAdvertorialDeploymentStatus`) run the
+ *   preflight and mark the write with `context: { pagefloPreflighted: true }`.
  *   A userful write that flips a non-live row to `live` WITHOUT that marker is
- *   a raw REST/`/cms` publish skipping the preflight, and is refused. `false`
- *   on advertorial deployments, which have no preflight door — refusing there
- *   would make advertorials unpublishable rather than safer. Going DOWN
- *   (live → paused/draft) is never gated: taking a failing page offline must
- *   not be blocked, and a row already live stays live through content edits.
+ *   a raw REST/`/cms` publish skipping the preflight, and is refused. Going
+ *   DOWN (live → paused/draft) is never gated: taking a failing page offline
+ *   must not be blocked. A row already live stays live through binding edits;
+ *   master copy is pinned in `published_snapshot` until republish.
  */
 export const enforceDeploymentTenancy =
   ({ publishRequiresPreflight }: { publishRequiresPreflight: boolean }): CollectionBeforeChangeHook =>

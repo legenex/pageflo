@@ -29,12 +29,19 @@ import config from '@payload-config'
 import { getCurrentUser } from '@/lib/auth'
 import { relationId } from '@/lib/authz'
 import {
+  advertorialDeploymentPreflight,
   decideTransition,
   lpDeploymentPreflight,
   quizDeploymentPreflight,
   type DeploymentStatus,
   type PublishOutcome,
 } from '@/lib/publish-lifecycle'
+import {
+  captureAdvertorialSnapshot,
+  captureLpSnapshot,
+  captureQuizSnapshot,
+  shouldCapturePublishedSnapshot,
+} from '@/lib/deployment-snapshot'
 import {
   groupPreflight,
   preflightSummary,
@@ -45,6 +52,7 @@ import { lpDeploymentFingerprint, lpPublishState, type PublishState } from '@/li
 
 const QUIZ_PATH = '/admin/quizzes'
 const LP_PATH = '/admin/landing-pages'
+const ADV_PATH = '/admin/advertorials'
 
 const load = async (payload, collection: string, id: unknown) => {
   const n = relationId(id)
@@ -111,6 +119,7 @@ const refusal = (error: string, status?: DeploymentStatus): PublishRefusalResult
 export async function setQuizDeploymentStatus(args: {
   id: string
   to: DeploymentStatus
+  republish?: boolean
 }): Promise<PublishResult> {
   const user = await getCurrentUser()
   if (!user) return refusal('unauthenticated')
@@ -134,16 +143,32 @@ export async function setQuizDeploymentStatus(args: {
   // A preflight is only REQUIRED to go live, but it is always RUN: an operator
   // pausing something wants to know why, and the checks are the answer.
   const current = statusOf(deployment)
-  const verdict: PublishOutcome = decideTransition(current, args.to, preflight)
+  const verdict: PublishOutcome = decideTransition(current, args.to, preflight, { republish: args.republish })
   // `status: current` is the load-bearing part of a refusal: the row did not
   // move, and a caller that showed the hoped-for state needs the real one to
   // put back rather than a guess.
   if (!verdict.ok) return { ...verdict, preflight, status: current }
 
+  const data: Record<string, unknown> = { status: verdict.status }
+  if (
+    shouldCapturePublishedSnapshot({
+      goingTo: verdict.status,
+      current,
+      republish: args.republish,
+      existingSnapshot: deployment.published_snapshot,
+    })
+  ) {
+    const snap = captureQuizSnapshot(deployment, quiz)
+    if (snap) {
+      data.published_snapshot = snap
+      data.last_published_at = snap.capturedAt
+    }
+  }
+
   await payload.update({
     collection: 'funnel-quiz-deployments',
     id: deployment.id,
-    data: { status: verdict.status },
+    data,
     user,
     overrideAccess: false,
     // The deployment-tenancy hook refuses a userful go-live that skipped the
@@ -232,6 +257,7 @@ export async function setQuizPublished(args: { id: string; published: boolean })
 export async function setLpDeploymentStatus(args: {
   id: string
   to: DeploymentStatus
+  republish?: boolean
 }): Promise<PublishResult> {
   const user = await getCurrentUser()
   if (!user) return refusal('unauthenticated')
@@ -266,7 +292,7 @@ export async function setLpDeploymentStatus(args: {
   )
 
   const current = statusOf(deployment)
-  const verdict = decideTransition(current, args.to, preflight)
+  const verdict = decideTransition(current, args.to, preflight, { republish: args.republish })
   if (!verdict.ok) return { ...verdict, preflight, status: current }
 
   /*
@@ -278,11 +304,23 @@ export async function setLpDeploymentStatus(args: {
    * alone on purpose: they preserve the last state that genuinely passed, which
    * is what lets a paused row say "last published Tuesday" instead of losing
    * the fact that it ever was.
+   *
+   * `published_snapshot` pins master copy. Resume of a paused row keeps the
+   * pin; only first go-live and explicit republish recapture HEAD.
    */
   const data: Record<string, unknown> = { status: verdict.status }
-  if (verdict.status === 'live') {
+  if (
+    shouldCapturePublishedSnapshot({
+      goingTo: verdict.status,
+      current,
+      republish: args.republish,
+      existingSnapshot: deployment.published_snapshot,
+    })
+  ) {
     data.last_published_at = new Date().toISOString()
     data.published_fingerprint = lpDeploymentFingerprint(deployment)
+    const snap = captureLpSnapshot(deployment, landingPage, quiz)
+    if (snap) data.published_snapshot = snap
   }
 
   await payload.update({
@@ -322,6 +360,64 @@ export async function setLandingPagePublished(args: { id: string; published: boo
   })
   revalidatePath(LP_PATH)
   return { ok: true, status: args.published ? 'live' : 'draft', preflight: empty }
+}
+
+/* ------------------------------------------------------------- advertorials */
+
+export async function setAdvertorialDeploymentStatus(args: {
+  id: string
+  to: DeploymentStatus
+  republish?: boolean
+}): Promise<PublishResult> {
+  const user = await getCurrentUser()
+  if (!user) return refusal('unauthenticated')
+  const payload = await getPayload({ config })
+
+  const deployment = await load(payload, 'funnel-advertorial-deployments', args.id)
+  if (!deployment) return refusal('deployment not found')
+
+  const siteId = relationId(deployment.site)
+  const [advertorial, site, domain] = await Promise.all([
+    load(payload, 'funnel-advertorials', deployment.advertorial),
+    load(payload, 'sites', siteId),
+    deployment.domain ? load(payload, 'domains', deployment.domain) : Promise.resolve(null),
+  ])
+
+  const preflight = await advertorialDeploymentPreflight(
+    { payload, user, siteId },
+    { deployment, advertorial, site, domain },
+  )
+
+  const current = statusOf(deployment)
+  const verdict = decideTransition(current, args.to, preflight, { republish: args.republish })
+  if (!verdict.ok) return { ...verdict, preflight, status: current }
+
+  const data: Record<string, unknown> = { status: verdict.status }
+  if (
+    shouldCapturePublishedSnapshot({
+      goingTo: verdict.status,
+      current,
+      republish: args.republish,
+      existingSnapshot: deployment.published_snapshot,
+    })
+  ) {
+    const snap = captureAdvertorialSnapshot(deployment, advertorial)
+    if (snap) {
+      data.published_snapshot = snap
+      data.last_published_at = snap.capturedAt
+    }
+  }
+
+  await payload.update({
+    collection: 'funnel-advertorial-deployments',
+    id: deployment.id,
+    data,
+    user,
+    overrideAccess: false,
+    context: { pagefloPreflighted: true },
+  })
+  revalidatePath(ADV_PATH)
+  return { ok: true, status: verdict.status, preflight }
 }
 
 /* ---------------------------------------------------------------- dry run */
@@ -384,6 +480,25 @@ export async function previewLpDeploymentPublish(args: { id: string }): Promise<
   const preflight = await lpDeploymentPreflight(
     { payload, user, siteId },
     { deployment, landingPage, site, domain, quizDeployment, quiz },
+  )
+  return { ok: true, preflight, groups: groupPreflight(preflight), summary: preflightSummary(preflight) }
+}
+
+export async function previewAdvertorialDeploymentPublish(args: { id: string }): Promise<PreflightPreview> {
+  const user = await getCurrentUser()
+  if (!user) return { ok: false, error: 'unauthenticated' }
+  const payload = await getPayload({ config })
+  const deployment = await load(payload, 'funnel-advertorial-deployments', args.id)
+  if (!deployment) return { ok: false, error: 'deployment not found' }
+  const siteId = relationId(deployment.site)
+  const [advertorial, site, domain] = await Promise.all([
+    load(payload, 'funnel-advertorials', deployment.advertorial),
+    load(payload, 'sites', siteId),
+    deployment.domain ? load(payload, 'domains', deployment.domain) : Promise.resolve(null),
+  ])
+  const preflight = await advertorialDeploymentPreflight(
+    { payload, user, siteId },
+    { deployment, advertorial, site, domain },
   )
   return { ok: true, preflight, groups: groupPreflight(preflight), summary: preflightSummary(preflight) }
 }

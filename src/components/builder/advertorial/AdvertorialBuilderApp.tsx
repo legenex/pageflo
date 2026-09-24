@@ -9,7 +9,7 @@
 // AI helper (artifact capability -> invokeLLM via server action) are adapted.
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
-import { AlertCircle, AlertTriangle, Archive, ArrowRight, BookOpen, Calendar, Check, ChevronLeft, ChevronRight, Copy, Edit3, Eye, FileEdit, FileSearch, FileText, FileWarning, GripVertical, Hash, Heading1, Heading2, ImageIcon, List, ListChecks, ListOrdered, Loader2, MousePointer, Newspaper, Phone, Plus, Power, PowerOff, Quote, Rocket, Save, ScrollText, Search, Settings, ShieldAlert, Sparkles, Tag, Trash2, User, Wand2, X } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Archive, ArrowRight, BookOpen, Calendar, Check, ChevronLeft, ChevronRight, Copy, Edit3, Eye, FileEdit, FileSearch, FileText, FileWarning, GripVertical, Hash, Heading1, Heading2, ImageIcon, List, ListChecks, ListOrdered, Loader2, MousePointer, Newspaper, Phone, Plus, Power, PowerOff, Quote, RefreshCw, Rocket, Save, ScrollText, Search, Settings, ShieldAlert, Sparkles, Tag, Trash2, User, Wand2, X } from 'lucide-react'
 import { T, genId, brandShortName, Btn, Input, Textarea, Select, Label, Pill, IconBtn, ConfirmDialog, Toast, Modal, PageHeader } from '../ui'
 import { resolveTokens } from '../lp/render'
 import { selectableOptions } from '@/lib/selectable'
@@ -19,12 +19,16 @@ import {
   createAdvertorial as svCreateAdvertorial,
   saveAdvertorial as svSaveAdvertorial,
   deleteAdvertorial as svDeleteAdvertorial,
+  setAdvertorialArchived as svSetAdvertorialArchived,
   saveAdvertorialDeployment as svSaveDeployment,
   deleteAdvertorialDeployment as svDeleteDeployment,
   aiAdvertorial,
   aiBulkSimplify,
 } from '@/app/(app)/admin/(top)/advertorials/actions'
+import { setAdvertorialDeploymentStatus } from '@/app/(app)/admin/(top)/publish-actions'
 import { settleAction, commitOptimistic, failureMessage } from '../server-action'
+import { displayDeploymentUrl, effectiveDeploymentUrl, toDomainLike } from '@/lib/deployment-url'
+import { domainOptionLabel, isDomainSelectable } from '@/lib/domain-eligibility'
 
 const ADV_TEMPLATES = [
   {
@@ -368,7 +372,7 @@ const AdvBrandListView = ({ brands, advertorials, deployments, onOpen, onCreate,
 // ============================================================================
 // DEPLOYMENT LIST VIEW
 // ============================================================================
-const AdvDeploymentListView = ({ deployments, advertorials, brands, domains, quizDeployments, onOpen, onCreate, onClone, onDelete, onToggleStatus, onPreview, onRename }) => {
+const AdvDeploymentListView = ({ deployments, advertorials, brands, domains, quizDeployments, onOpen, onCreate, onClone, onDelete, onToggleStatus, onRepublish, onPreview, onRename }) => {
   const [renamingId, setRenamingId] = useState(null);
   const [renameDraft, setRenameDraft] = useState('');
   const startRename = (d) => { setRenamingId(d.id); setRenameDraft(d.name || ''); };
@@ -393,7 +397,7 @@ const AdvDeploymentListView = ({ deployments, advertorials, brands, domains, qui
           const orphanedDomain = !!d.domainId && !refDomain;
           const domainStr = refDomain?.domain || d.domain || '';
           const qd = quizDeployments.find(x => x.id === d.quizDeploymentId);
-          const url = domainStr ? `https://${domainStr}${d.path || ''}` : `https://preview.legenex.com/a/${d.id}`;
+          const url = displayDeploymentUrl(effectiveDeploymentUrl({ boundHost: domainStr, brandDomains: brand?.__domains ?? [], path: d.path }));
           const depName = d.name || (ad ? `${ad.title?.slice(0, 40) || 'Untitled'} . ${brand?.displayName || 'No brand'}` : 'Untitled deployment');
           const primary = brand?.colors?.primary;
           const background = brand?.colors?.background;
@@ -439,6 +443,7 @@ const AdvDeploymentListView = ({ deployments, advertorials, brands, domains, qui
               <Btn variant="secondary" size="sm" icon={Eye} onClick={() => onPreview(d.id)} aria-label="Preview deployment">Preview</Btn>
               <Btn variant="primary" size="sm" icon={Edit3} onClick={() => onOpen(d.id)} aria-label="Edit deployment">Edit</Btn>
               <IconBtn icon={Copy} onClick={() => onClone(d.id)} aria-label="Duplicate deployment" />
+              {d.status === 'live' && <IconBtn icon={RefreshCw} onClick={() => onRepublish?.(d.id)} aria-label="Republish deployment" title="Push current master to live" />}
               <IconBtn icon={d.status === 'live' ? PowerOff : Power} onClick={() => onToggleStatus(d.id)} aria-label={d.status === 'live' ? 'Unpublish' : 'Publish'} />
               <IconBtn icon={Trash2} onClick={() => onDelete(d.id)} style={{ color: T.danger }} aria-label="Delete deployment" />
             </div>
@@ -1037,7 +1042,7 @@ const AdvertorialSettingsPanel = ({ advertorial, brands, onPatch, onClose }) => 
       <div>
         <Label>Slug (URL path)</Label>
         <Input mono value={advertorial.slug} onChange={(e) => onPatch({ slug: e.target.value })} placeholder="kebab-case-slug" />
-        <div style={{ fontSize: 11, color: T.textMute, marginTop: 4, fontFamily: '"JetBrains Mono", monospace' }}>Live URL: [domain]/a/{advertorial.slug}</div>
+        <div style={{ fontSize: 11, color: T.textMute, marginTop: 4, fontFamily: '"JetBrains Mono", monospace' }}>Slug is the article id. The public URL is the deployment path on the Brand host, shown on the Deployments tab.</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div>
@@ -1129,14 +1134,18 @@ const AdvDeploymentEditor = ({ deployment, isDraft, advertorials, brands, quizDe
             <Label>Domain</Label>
             <Select value={draft.domain || ''} onChange={(e) => patch({ domain: e.target.value })}>
               <option value="">- Pick a domain -</option>
-              {(brand?.domains || []).map(d => <option key={d} value={d}>{d}</option>)}
-              {brands.flatMap(b => b.domains).filter(d => !brand?.domains?.includes(d)).map(d => <option key={d} value={d}>{d}</option>)}
+              {(brand?.__domains || []).filter((d) => isDomainSelectable(toDomainLike(d)) || d.host === draft.domain).map((d) => (
+                <option key={d.host} value={d.host} disabled={!isDomainSelectable(toDomainLike(d))}>{domainOptionLabel(toDomainLike(d))}</option>
+              ))}
             </Select>
           </div>
           <div>
             <Label>Path</Label>
-            <Input mono value={draft.path || ''} onChange={(e) => patch({ path: e.target.value })} placeholder={`/a/${ad?.slug || 'slug'}`} />
-            <div style={{ fontSize: 10.5, color: T.textMute, marginTop: 4, fontFamily: '"JetBrains Mono", monospace' }}>Suggested: /a/{ad?.slug || 'your-slug'}</div>
+            <Input mono value={draft.path || ''} onChange={(e) => patch({ path: e.target.value })} placeholder={`/adv/${ad?.slug || 'slug'}`} />
+            <div style={{ fontSize: 10.5, color: T.textMute, marginTop: 4, fontFamily: '"JetBrains Mono", monospace' }}>Suggested: /adv/{ad?.slug || 'your-slug'}</div>
+            <div style={{ fontSize: 11, color: T.text, fontFamily: '"JetBrains Mono", monospace', marginTop: 8 }}>
+              {displayDeploymentUrl(effectiveDeploymentUrl({ boundHost: draft.domain, brandDomains: brand?.__domains ?? [], path: draft.path }))}
+            </div>
           </div>
         </div>
 
@@ -1866,12 +1875,11 @@ const AdvertorialBuilderApp = ({
     if (!ad) return
     setPendingDelete({
       title: 'Archive advertorial?',
-      message: `"${ad.title}" will be deleted. Any deployments using it are removed too.`,
+      message: `"${ad.title}" will be archived. Deployments stay in place and stop serving until the article is restored and published.`,
       onConfirm: async () => {
-        const res = await settleAction(svDeleteAdvertorial({ id }))
+        const res = await settleAction(svSetAdvertorialArchived({ id, archived: true }))
         if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); setPendingDelete(null); return }
-        setAdvertorials((prev) => prev.filter((a) => a.id !== id))
-        setDeployments((prev) => prev.filter((d) => d.advertorialId !== id))
+        setAdvertorials((prev) => prev.map((a) => (a.id === id ? { ...a, status: 'archived' } : a)))
         setPendingDelete(null)
       },
     })
@@ -2034,6 +2042,16 @@ const AdvertorialBuilderApp = ({
     })
   }
 
+  const republishDeployment = (id) => {
+    const d = deployments.find((x) => x.id === id)
+    if (!d) return
+    void commitOptimistic({
+      action: () => setAdvertorialDeploymentStatus({ id, to: 'live', republish: true }),
+      rollback: () => {},
+      onError: (message) => setToast({ message: `Could not republish: ${message}`, type: 'error' }),
+      onSuccess: () => setToast({ message: 'Live pin updated from current master.', type: 'success' }),
+    })
+  }
   const toggleDeploymentStatus = (id) => {
     const d = deployments.find((x) => x.id === id)
     if (!d) return
@@ -2042,7 +2060,7 @@ const AdvertorialBuilderApp = ({
     // The pause path. This used to fire the write and forget it entirely - not
     // even the server's own refusal was read - so the row showed PAUSED over a
     // deployment that was still live, which is the compliance exposure rather
-    // than a cosmetic one.
+    // than a cosmetic one. Go-live now runs advertorial preflight.
     void commitOptimistic({
       action: () => svSaveDeployment({ deployment: updated }),
       rollback: () => setDeployments((prev) => prev.map((x) => (x.id === id ? d : x))),
@@ -2171,6 +2189,7 @@ const AdvertorialBuilderApp = ({
         onClone={cloneDeployment}
         onDelete={deleteDeployment}
         onToggleStatus={toggleDeploymentStatus}
+        onRepublish={republishDeployment}
         onPreview={openPreviewFromDeployment}
         onRename={renameDeployment}
       />}

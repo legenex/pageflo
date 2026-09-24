@@ -11,6 +11,7 @@ import { invokeLLM } from '@/lib/ai/invoke'
 import { relationId, requireDeploymentSiteAdmin } from '@/lib/authz'
 import { checkPathAvailable } from '@/lib/path-claims'
 import { normalizeDeploymentPath } from '@/lib/quiz-deployment-path'
+import { setAdvertorialDeploymentStatus } from '@/app/(app)/admin/(top)/publish-actions'
 
 const PATH = '/admin/advertorials'
 
@@ -77,6 +78,29 @@ export async function deleteAdvertorial(args: { id: string }) {
   }
 }
 
+/**
+ * Archive preserves the advertorial and every deployment of it.
+ * Restore returns it as a draft so going live is an explicit decision.
+ */
+export async function setAdvertorialArchived(args: { id: string; archived: boolean }) {
+  const user = await getCurrentUser()
+  if (!user) return { ok: false, error: 'unauthenticated' }
+  const payload = await getPayload({ config })
+  try {
+    await payload.update({
+      collection: 'funnel-advertorials',
+      id: args.id,
+      data: { status: args.archived ? 'archived' : 'draft' },
+      user,
+      overrideAccess: false,
+    })
+    revalidatePath(PATH)
+    return { ok: true }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'archive failed' }
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Advertorial deployments
 // ---------------------------------------------------------------------------
@@ -126,6 +150,12 @@ export async function saveAdvertorialDeployment(args: { deployment: Record<strin
   })
   if (!availability.ok) return { ok: false, error: availability.error }
 
+  const existing = isExisting
+    ? await payload.findByID({ collection: 'funnel-advertorial-deployments', id: dep.id, depth: 0, overrideAccess: true }).catch(() => null)
+    : null
+  const currentStatus = existing && typeof existing.status === 'string' ? existing.status : 'draft'
+  const goingLive = status === 'live' && currentStatus !== 'live'
+
   const data = {
     name: dep.name || '',
     advertorial: dep.advertorialId && /^\d+$/.test(String(dep.advertorialId)) ? Number(dep.advertorialId) : null,
@@ -136,7 +166,7 @@ export async function saveAdvertorialDeployment(args: { deployment: Record<strin
     path,
     quiz_deployment_id: dep.quizDeploymentId || '',
     cta_mode: dep.ctaMode || 'button',
-    status,
+    status: goingLive ? currentStatus : status,
     utm: dep.utm ?? {},
     pixels: dep.pixels ?? {},
   }
@@ -149,6 +179,13 @@ export async function saveAdvertorialDeployment(args: { deployment: Record<strin
     } else {
       const created = await payload.create({ collection: 'funnel-advertorial-deployments', data, user, overrideAccess: false })
       id = String(created.id)
+    }
+    if (goingLive) {
+      const flip = await setAdvertorialDeploymentStatus({ id, to: 'live' })
+      if (!flip.ok) {
+        revalidatePath(PATH)
+        return { ok: false, error: `Saved, but not published: ${flip.error}`, status: flip.status ?? currentStatus }
+      }
     }
     revalidatePath(PATH)
     return { ok: true, id }

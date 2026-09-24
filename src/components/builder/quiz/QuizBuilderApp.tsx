@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation'
 import {
   ChevronLeft, Settings, Eye, Power, PowerOff, ListChecks, Rocket, Edit3, Copy, Trash2,
   Plus, Code2, Save, X, Undo2, Redo2, Archive, ArchiveRestore, Loader2, Check, AlertTriangle, LayoutTemplate,
-  Sparkles,
+  Sparkles, RefreshCw,
 } from 'lucide-react'
 import { T, Btn, Input, Select, Label, Pill, IconBtn, ConfirmDialog, Toast, PageHeader } from '../ui'
 import { NODE_TYPE_FOR_QTYPE, RENDER_MODES, PIXEL_PROVIDERS } from './config'
@@ -32,6 +32,8 @@ import {
   createQuiz, saveQuiz, cloneQuiz, deleteQuiz, setQuizArchived,
   saveQuizDeployment, deleteQuizDeployment,
 } from '@/app/(app)/admin/(top)/quizzes/actions'
+import { setQuizPublished, setQuizDeploymentStatus } from '@/app/(app)/admin/(top)/publish-actions'
+import { displayDeploymentUrl, effectiveDeploymentUrl } from '@/lib/deployment-url'
 import { settleAction, commitOptimistic, failureMessage } from '../server-action'
 import { buildQuizEmbedSnippet, QUIZ_EMBED_INCOMPLETE } from '@/lib/quiz-embed'
 import { selectableOptions } from '@/lib/selectable'
@@ -239,7 +241,7 @@ const QuizListView = ({
   </div>
 }
 
-const DeploymentListView = ({ deployments, quizzes, brands, templates, onOpen, onClone, onDelete, onToggleStatus, onCopyEmbed, onPreview, onRename }) => {
+const DeploymentListView = ({ deployments, quizzes, brands, templates, onOpen, onClone, onDelete, onToggleStatus, onRepublish, onCopyEmbed, onPreview, onRename }) => {
   const [renamingId, setRenamingId] = useState(null)
   const [renameDraft, setRenameDraft] = useState('')
   const startRename = (d) => { setRenamingId(d.id); setRenameDraft(d.name || '') }
@@ -251,7 +253,7 @@ const DeploymentListView = ({ deployments, quizzes, brands, templates, onOpen, o
         const brand = brands.find((x) => x.id === d.brandId)
         const orphaned = !!d.brandId && !brand
         const domainStr = d.domain || ''
-        const url = domainStr ? `https://${domainStr}${d.path || ''}` : `https://preview.legenex.com/q/${d.id}`
+        const url = displayDeploymentUrl(effectiveDeploymentUrl({ boundHost: domainStr, brandDomains: brand?.__domains ?? [], path: d.path }))
         const depName = d.name || (q ? `${q.name} · ${brand?.displayName || 'No brand'}` : 'Untitled deployment')
         const primary = brand?.colors?.primary
         const background = brand?.colors?.background
@@ -301,6 +303,7 @@ const DeploymentListView = ({ deployments, quizzes, brands, templates, onOpen, o
             {d.renderMode === 'embed' && <Btn variant="secondary" size="sm" icon={Code2} onClick={() => onCopyEmbed(d.id)} aria-label="Copy embed code">Embed Code</Btn>}
             <Btn variant="primary" size="sm" icon={Edit3} onClick={() => onOpen(d.id)} aria-label="Edit deployment">Edit</Btn>
             <IconBtn icon={Copy} onClick={() => onClone(d.id)} aria-label="Duplicate deployment" />
+            {d.status === 'live' && <IconBtn icon={RefreshCw} onClick={() => onRepublish(d.id)} aria-label="Republish deployment" title="Push current master to live" />}
             <IconBtn icon={d.status === 'live' ? PowerOff : Power} onClick={() => onToggleStatus(d.id)} aria-label={d.status === 'live' ? 'Unpublish deployment' : 'Publish deployment'} />
             <IconBtn icon={Trash2} onClick={() => onDelete(d.id)} style={{ color: T.danger }} aria-label="Delete deployment" />
           </div>
@@ -593,6 +596,12 @@ const DeploymentEditor = ({ deployment, isDraft, quizzes, brands, templates, onB
               </div>
               <div><Label>Path</Label><Input mono value={draft.path} onChange={(e) => update({ path: e.target.value })} placeholder="/s/mva" /></div>
             </div>
+            <div>
+              <Label>Final URL</Label>
+              <div style={{ fontSize: 12, color: T.text, fontFamily: '"JetBrains Mono", monospace', marginTop: 4 }}>
+                {displayDeploymentUrl(effectiveDeploymentUrl({ boundHost: draft.domain, brandDomains, path: draft.path }))}
+              </div>
+            </div>
             <div><Label>Status</Label><Select value={draft.status} onChange={(e) => update({ status: e.target.value })}><option value="draft">Draft</option><option value="live">Live</option><option value="paused">Paused</option></Select></div>
           </Section>
 
@@ -822,7 +831,7 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
     setDeployments(initialDeployments)
   }, [initialQuizzes, initialDeployments, view, saveState])
 
-  const quizPatch = (q) => ({ name: q.name, slug: q.slug, is_published: q.isPublished, tiers: q.tiers, steps: q.steps, nodes: q.nodes, custom_fields: q.customFields })
+  const quizPatch = (q) => ({ name: q.name, slug: q.slug, tiers: q.tiers, steps: q.steps, nodes: q.nodes, custom_fields: q.customFields })
 
   const currentQuiz = quizzes.find((q) => q.id === currentQuizId)
   const currentDeployment = draftDeployment || deployments.find((d) => d.id === currentDeploymentId)
@@ -1007,7 +1016,7 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
     // not accept - and re-read the row, because a call that never came back is
     // not evidence that the flip failed to land.
     void commitOptimistic({
-      action: () => saveQuiz({ id, patch: { is_published: isPublished } }),
+      action: () => setQuizPublished({ id, published: isPublished }),
       rollback: () => applyQuizzes(quizzesRef.current.map((x) => (x.id === id ? { ...x, isPublished: !isPublished } : x))),
       onError: (message) => setToast({ message: `Could not ${isPublished ? 'publish' : 'unpublish'}: ${message}`, type: 'error' }),
       reconcile: () => router.refresh(),
@@ -1055,6 +1064,17 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
   const openDeployment = (id) => { setDraftDeployment(null); setCurrentDeploymentId(id); setView('deploymentEdit') }
   const cloneDeploymentHandler = (id) => { const d = deployments.find((x) => x.id === id); if (!d) return; setDraftDeployment({ ...JSON.parse(JSON.stringify(d)), id: '', path: `${d.path}-copy`, status: 'draft' }); setCurrentDeploymentId(null); setView('deploymentEdit') }
   const deleteDeploymentHandler = (id) => setPendingDelete({ kind: 'deployment', id })
+  const republishDeployment = (id) => {
+    const d = deployments.find((x) => x.id === id)
+    if (!d) return
+    void commitOptimistic({
+      action: () => setQuizDeploymentStatus({ id, to: 'live', republish: true }),
+      rollback: () => {},
+      onError: (message) => setToast({ message: `Could not republish: ${message}`, type: 'error' }),
+      reconcile: () => router.refresh(),
+      onSuccess: () => { setToast({ message: 'Live pin updated from current master.', type: 'success' }); router.refresh() },
+    })
+  }
   const toggleDeploymentStatus = (id) => {
     const d = deployments.find((x) => x.id === id)
     if (!d) return
@@ -1315,7 +1335,7 @@ export function QuizBuilderApp({ initialQuizzes, initialDeployments, brands: ini
         onToast={setToast}
         onChanged={() => router.refresh()}
       />}
-      {tab === 'deployments' && <DeploymentListView deployments={deployments} quizzes={quizzes} brands={brands} templates={templates} onOpen={openDeployment} onClone={cloneDeploymentHandler} onDelete={deleteDeploymentHandler} onToggleStatus={toggleDeploymentStatus} onCopyEmbed={(id) => setShowEmbed(id)} onPreview={(id) => { const dep = deployments.find((d) => d.id === id); if (!dep) return; openQuiz(dep.quizId); setPreviewSource('list-deployments'); setPreviewDeploymentId(id); setView('preview') }} onRename={(id, name) => { const d = deployments.find((x) => x.id === id); if (!d) return; setDeployments((ds) => ds.map((x) => x.id === id ? { ...x, name } : x)); void commitOptimistic({ action: () => saveQuizDeployment({ deployment: { ...d, name } }), rollback: () => setDeployments((ds) => ds.map((x) => (x.id === id ? d : x))), onError: (message) => setToast({ message, type: 'error' }), reconcile: () => router.refresh() }) }} />}
+      {tab === 'deployments' && <DeploymentListView deployments={deployments} quizzes={quizzes} brands={brands} templates={templates} onOpen={openDeployment} onClone={cloneDeploymentHandler} onDelete={deleteDeploymentHandler} onToggleStatus={toggleDeploymentStatus} onRepublish={republishDeployment} onCopyEmbed={(id) => setShowEmbed(id)} onPreview={(id) => { const dep = deployments.find((d) => d.id === id); if (!dep) return; openQuiz(dep.quizId); setPreviewSource('list-deployments'); setPreviewDeploymentId(id); setView('preview') }} onRename={(id, name) => { const d = deployments.find((x) => x.id === id); if (!d) return; setDeployments((ds) => ds.map((x) => x.id === id ? { ...x, name } : x)); void commitOptimistic({ action: () => saveQuizDeployment({ deployment: { ...d, name } }), rollback: () => setDeployments((ds) => ds.map((x) => (x.id === id ? d : x))), onError: (message) => setToast({ message, type: 'error' }), reconcile: () => router.refresh() }) }} />}
     </ListShell>}
 
     {view === 'builder' && currentQuiz && <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>

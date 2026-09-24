@@ -24,7 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Rocket, Eye, Edit3, Sparkles, X, Plus, Loader2, Palette, ChevronRight, Plug,
-  Power, PowerOff, Trash2,
+  Power, PowerOff, Trash2, RefreshCw,
 } from 'lucide-react'
 
 import { selectableOptions } from '@/lib/selectable'
@@ -103,7 +103,7 @@ const LpTabBar = ({ active, onChange, tabs }) => (
 // ============================================================================
 // LP DEPLOYMENT LIST VIEW
 // ============================================================================
-const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDeployments, domains, publishFailures = {}, onOpen, onDelete, onToggleStatus, onPreview, onRename }) => {
+const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDeployments, domains, publishFailures = {}, onOpen, onDelete, onToggleStatus, onRepublish, onPreview, onRename }) => {
   const [renamingId, setRenamingId] = useState(null)
   const [renameDraft, setRenameDraft] = useState('')
   if (deployments.length === 0) {
@@ -196,6 +196,7 @@ const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDep
             <div style={{ display: 'flex', gap: 6 }}>
               <Btn variant="ghost" size="sm" icon={Eye} onClick={() => onPreview(dep)} aria-label="Preview deployment">Preview</Btn>
               <Btn variant="secondary" size="sm" icon={Edit3} onClick={() => onOpen(dep)} aria-label="Edit deployment">Edit</Btn>
+              {dep.status === 'live' && <IconBtn icon={RefreshCw} onClick={() => onRepublish(dep.id)} aria-label="Republish deployment" title="Push current master to live" />}
               <IconBtn icon={dep.status === 'live' ? PowerOff : Power} onClick={() => onToggleStatus(dep.id)} aria-label={dep.status === 'live' ? 'Pause deployment' : 'Publish deployment'} />
               <IconBtn icon={Trash2} onClick={() => onDelete(dep.id)} style={{ color: T.danger }} aria-label="Delete deployment" />
             </div>
@@ -1213,6 +1214,20 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
    * and nothing else, runs the preflight on the way up, and is never gated on
    * the way down.
    */
+  const republishDep = (id) => {
+    const dep = lpDeployments.find((d) => d.id === id)
+    if (!dep) return
+    void commitOptimistic({
+      action: () => setLpDeploymentStatus({ id, to: 'live', republish: true }),
+      rollback: () => {},
+      onError: (message) => setToast({ message: `Could not republish: ${message}`, type: 'error' }),
+      reconcile: () => router.refresh(),
+      onSuccess: () => {
+        setToast({ message: 'Live pin updated from current master.', type: 'success' })
+        router.refresh()
+      },
+    })
+  }
   const toggleDepStatus = (id) => {
     const dep = lpDeployments.find((d) => d.id === id)
     if (!dep) return
@@ -1369,6 +1384,7 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
               onOpen={(dep) => { setEditingDeployment(dep); setSubView('lp_deployment_edit') }}
               onDelete={deleteDeploymentHandler}
               onToggleStatus={toggleDepStatus}
+              onRepublish={republishDep}
               onPreview={(dep) => setPreviewState({ deploymentId: dep.id })}
               onRename={renameDeployment}
             />

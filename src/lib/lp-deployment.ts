@@ -7,6 +7,7 @@ import { isClaimedByAuthoredContent, pathVariantsFor } from './public-path-claim
 import { resolveEmbeddedQuiz, resolveQuizDeploymentById, type ResolvedQuizDeployment } from './quiz-deployment'
 import { recommendedQuizTemplateFor, resolveTemplate } from './template-registry'
 import { asSlotted } from './lp-templates'
+import { parseDeploymentSnapshot } from './deployment-snapshot'
 
 /**
  * Server-side resolution of a public funnel landing page.
@@ -183,6 +184,9 @@ const resolveLpDeploymentUncached = async (
   // everywhere, not only where someone remembered to pause a deployment.
   if (!includeUnpublished && !lpDoc.is_published) return null
 
+  const pin = !includeUnpublished ? parseDeploymentSnapshot(doc.published_snapshot) : null
+  const lpSnap = pin?.kind === 'lp' ? pin.master : null
+
   /*
    * The template is resolved BEFORE the content gate, because which content a
    * page needs depends on which renderer draws it.
@@ -193,7 +197,7 @@ const resolveLpDeploymentUncached = async (
    * evidence was that the page looked wrong. On a legal-advertising page,
    * serving nothing is the better side of that trade.
    */
-  const templateRes = resolveTemplate('lp', lpDoc.template_id)
+  const templateRes = resolveTemplate('lp', lpSnap?.templateId || lpDoc.template_id)
   if (!templateRes.ok || templateRes.template.kind !== 'lp') {
     console.warn(
       `${LP_TEMPLATE_REFUSED}: deployment ${doc.id} (page ${lpDoc.id}) stores template_id ` +
@@ -214,11 +218,15 @@ const resolveLpDeploymentUncached = async (
    * are records. The four identity templates genuinely have nothing to draw
    * without sections, and still refuse.
    */
-  const sections = Array.isArray(lpDoc.sections) ? (lpDoc.sections as unknown[]) : []
+  const sections = lpSnap
+    ? lpSnap.sections
+    : Array.isArray(lpDoc.sections)
+      ? (lpDoc.sections as unknown[])
+      : []
   if (template.renderer === 'identity' && sections.length === 0) return null
 
   /** The template's OWN copy. A deployment layers its copy over this. */
-  const templateSlotOverrides = normalizeOverrides(lpDoc.slot_overrides)
+  const templateSlotOverrides = lpSnap ? lpSnap.slotOverrides : normalizeOverrides(lpDoc.slot_overrides)
 
   const siteDoc = await payload
     .findByID({ collection: 'sites', id: siteId, depth: 0, overrideAccess: true })
@@ -250,8 +258,16 @@ const resolveLpDeploymentUncached = async (
    * would keep serving the standalone deployment's template and destinations
    * after somebody deliberately chose otherwise.
    */
-  const ownQuizId = relId(doc.quiz)
-  const quizDeploymentId = String(doc.quiz_deployment_id ?? '')
+  const ownQuizId = (pin?.kind === 'lp' && pin.quizId) || relId(doc.quiz)
+  const quizDeploymentId = pin?.kind === 'lp' && pin.quizDeploymentId
+    ? pin.quizDeploymentId
+    : String(doc.quiz_deployment_id ?? '')
+  const embeddedTemplateId =
+    (pin?.kind === 'lp' && pin.embeddedQuizTemplateId) ||
+    String(doc.embedded_quiz_template_id || '') ||
+    recommendedQuizTemplateFor(lpSnap?.templateId || lpDoc.template_id)
+  const embeddedProgress =
+    pin?.kind === 'lp' ? pin.embeddedProgressForm : typeof doc.embedded_progress_form === 'string' && doc.embedded_progress_form ? doc.embedded_progress_form : null
 
   const quiz = ownQuizId
     ? await resolveEmbeddedQuiz({
@@ -260,9 +276,10 @@ const resolveLpDeploymentUncached = async (
         siteId,
         // The landing page's recommended skin when the deployment has not
         // chosen one, so an embed is never drawn in a template nobody picked.
-        templateId: String(doc.embedded_quiz_template_id || '') || recommendedQuizTemplateFor(lpDoc.template_id),
-        progressForm: typeof doc.embedded_progress_form === 'string' && doc.embedded_progress_form ? doc.embedded_progress_form : null,
+        templateId: embeddedTemplateId,
+        progressForm: embeddedProgress,
         includeUnpublished,
+        publishedSnapshot: pin,
       })
     : quizDeploymentId
       ? await resolveQuizDeploymentById(quizDeploymentId, siteId, includeUnpublished)
@@ -327,8 +344,8 @@ const resolveLpDeploymentUncached = async (
     },
     landingPage: {
       id: String(lpDoc.id),
-      name: String(lpDoc.name ?? ''),
-      slug: String(lpDoc.slug ?? ''),
+      name: lpSnap?.name ?? String(lpDoc.name ?? ''),
+      slug: lpSnap?.slug ?? String(lpDoc.slug ?? ''),
       templateId: template.id,
       // Resolution is strict now, so this can only be false. The field stays
       // because the shared publish preflight reads it for both kinds and the

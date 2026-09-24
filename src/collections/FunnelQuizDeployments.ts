@@ -66,6 +66,30 @@ export const FunnelQuizDeployments: CollectionConfig = {
         { label: 'Paused', value: 'paused' },
       ],
     },
+    {
+      name: 'published_snapshot',
+      type: 'json',
+      admin: {
+        readOnly: true,
+        description: 'Master graph captured at last publish. Public render reads this until republish.',
+      },
+    },
+    {
+      name: 'last_published_at',
+      type: 'date',
+      admin: {
+        readOnly: true,
+        description: 'When this deployment last passed the publish preflight. Set only by the publish action.',
+      },
+    },
+    {
+      name: 'published_fingerprint',
+      type: 'text',
+      admin: {
+        readOnly: true,
+        description: 'Digest of the published pin. Unequal to HEAD means live is stale until republish.',
+      },
+    },
     { name: 'embed_preview_bg', type: 'text' },
     // Per-deployment destination URLs (thank you, did-not-qualify, legal
     // links). Overrides the brand's own URLs for this placement only. Quiz
