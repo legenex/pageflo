@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { isAuthenticated } from '../access'
+import { isAuthenticated, siteScopedRead } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
 import { enforceDeploymentTenancy, enforceDeploymentTenancyOnDelete } from '../hooks/deployment-tenancy'
 import { validateStoredQuizTemplateId } from '../lib/template-records/id'
@@ -30,7 +30,7 @@ export const FunnelQuizDeployments: CollectionConfig = {
     group: 'Funnel Builder',
   },
   access: {
-    read: isAuthenticated,
+    read: siteScopedRead,
     create: isAuthenticated,
     update: isAuthenticated,
     delete: isAuthenticated,

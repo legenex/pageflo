@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUser, isBoundToSite } from '@/lib/auth'
+import { homeBlocksForVertical } from '@/lib/starter-content'
 
 type Result = { ok: true } | { ok: false; error: string }
 
@@ -108,6 +109,71 @@ export async function createPage(args: {
     return { ok: true, id: created.id }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : 'create failed' }
+  }
+}
+
+/**
+ * Create a published Home `/` from the Brand's vertical starter if none exists.
+ * Used to repair Brands that reached Ready without a Home, and by operators
+ * who hit the publish-brand preflight.
+ */
+export async function ensurePublishedHomePage(args: {
+  siteId: number | string
+  siteSlug: string
+}): Promise<{ ok: true; created: boolean; id: string } | { ok: false; error: string }> {
+  const user = await getCurrentUser()
+  if (!user) return { ok: false, error: 'unauthenticated' }
+  const payload = await getPayload({ config })
+  const site = await payload.findByID({ collection: 'sites', id: args.siteId, depth: 0, overrideAccess: true }).catch(() => null)
+  if (!site) return { ok: false, error: 'brand not found' }
+  if (!isBoundToSite(user, site.id)) return { ok: false, error: 'not authorized for this brand' }
+
+  const existing = await payload.find({
+    collection: 'pages',
+    where: { and: [{ site: { equals: site.id } }, { slug: { equals: '/' } }] },
+    limit: 1,
+    overrideAccess: true,
+  })
+  if (existing.docs[0]) {
+    const row = existing.docs[0]
+    if (row.status !== 'published') {
+      await payload.update({
+        collection: 'pages',
+        id: row.id,
+        data: { status: 'published', published_at: new Date().toISOString() } as never,
+        user: user as never,
+        overrideAccess: false,
+      })
+    }
+    revalidatePath(`/admin/sites/${args.siteSlug}`)
+    revalidatePath(`/admin/sites/${args.siteSlug}/pages`)
+    return { ok: true, created: false, id: String(row.id) }
+  }
+
+  const vertical = typeof site.vertical === 'string' ? site.vertical : 'other'
+  const body_blocks = homeBlocksForVertical(vertical)
+  try {
+    const created = await payload.create({
+      collection: 'pages',
+      data: {
+        site: site.id,
+        title: 'Home',
+        slug: '/',
+        status: 'published',
+        template_key: 'home',
+        uses_shared_template: false,
+        body_blocks,
+        published_blocks: body_blocks,
+        published_at: new Date().toISOString(),
+      } as never,
+      user: user as never,
+      overrideAccess: false,
+    })
+    revalidatePath(`/admin/sites/${args.siteSlug}`)
+    revalidatePath(`/admin/sites/${args.siteSlug}/pages`)
+    return { ok: true, created: true, id: String(created.id) }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : 'could not create Home' }
   }
 }
 

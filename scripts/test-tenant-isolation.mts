@@ -390,8 +390,16 @@ try {
       context: { pagefloPreflighted: true },
       ...asUserB,
     }))
-  await allowed('an advertorial deployment goes live without the marker - advertorials have no preflight door, by design', () =>
+  await refused('the raw door refuses an UNPREFLIGHTED go-live of an advertorial deployment', () =>
     payload.update({ collection: 'funnel-advertorial-deployments', id: advDepA.id, data: { status: 'live' } as never, ...asUser }))
+  await allowed('the preflighted door can put the brand\'s own advertorial deployment live', () =>
+    payload.update({
+      collection: 'funnel-advertorial-deployments',
+      id: advDepA.id,
+      data: { status: 'live' } as never,
+      context: { pagefloPreflighted: true },
+      ...asUser,
+    }))
 
   // Deletes: a delete carries no incoming site, so the record's own is the
   // subject. Own-brand deletes stay possible or the hook is a lockout.

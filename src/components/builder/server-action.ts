@@ -44,7 +44,7 @@ export const actionErrorMessage = (err: unknown): string => {
   // The shape production is actually producing. The tab holds a build the server
   // no longer serves, so the action id resolves to nothing and the call never
   // reaches our code — reloading is the whole fix, so lead with it.
-  if (/server action/i.test(raw)) {
+  if (/server action|failed to parse body|formdata/i.test(raw)) {
     return 'This tab is running an older version of the app, so the change did not go through. Reload the page and try again.'
   }
   if (/failed to fetch|networkerror|network request failed|load failed|err_(?:connection|network|internet)/i.test(raw)) {

@@ -1,7 +1,9 @@
 // @ts-nocheck -- new funnel-* collection slugs are not in the committed
 // payload-types yet; run `pnpm generate:types` on the server to restore typing.
 import { getPayload } from 'payload'
+import { redirect } from 'next/navigation'
 import config from '@payload-config'
+import { getCurrentUser } from '@/lib/auth'
 import { LandingPagesApp } from '@/components/builder/lp/LandingPagesApp'
 import { buildBrandsFromSites } from '@/lib/brand-map'
 import { ensureFunnelSamples, ensureStarterFunnelsForAllBrands } from '@/lib/funnel-samples'
@@ -34,6 +36,8 @@ const asObject = (v: unknown): Record<string, unknown> =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
 
 export default async function LandingPagesPage() {
+  const user = await getCurrentUser()
+  if (!user) redirect('/sign-in')
   const payload = await getPayload({ config })
 
   // ORDER IS LOAD-BEARING. `ensureTemplateLibrary` materialises the twelve stock
@@ -52,7 +56,7 @@ export default async function LandingPagesPage() {
     // rename, disable or delete is a row, and this is the one place that knows.
     listLpTemplateRecords(payload),
     listQuizTemplateRecords(payload),
-    payload.find({ collection: 'funnel-lp-deployments', limit: 1000, depth: 0, overrideAccess: true }),
+    payload.find({ collection: 'funnel-lp-deployments', limit: 1000, depth: 0, user, overrideAccess: false }),
     payload.find({ collection: 'sites', limit: 500, sort: 'name', overrideAccess: true }),
     payload.find({ collection: 'domains', limit: 1000, sort: ['-primary'], overrideAccess: true }),
     payload.find({ collection: 'funnel-quizzes', limit: 500, overrideAccess: true }),
@@ -60,7 +64,7 @@ export default async function LandingPagesPage() {
     // `quiz_deployment_id` pointer can be resolved to a flow — or flagged as
     // dangling when its target was deleted, which is the state three of four
     // live rows were found in.
-    payload.find({ collection: 'funnel-quiz-deployments', limit: 1000, depth: 0, overrideAccess: true }),
+    payload.find({ collection: 'funnel-quiz-deployments', limit: 1000, depth: 0, user, overrideAccess: false }),
   ])
 
   const brands = buildBrandsFromSites(

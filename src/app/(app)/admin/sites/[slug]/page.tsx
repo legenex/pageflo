@@ -5,6 +5,7 @@ import config from '@payload-config'
 import { AlertCircle, CheckCircle2, ExternalLink, FileText, Globe, Inbox, Layers, Pencil } from 'lucide-react'
 import { TestCaptureButton } from '@/components/app/TestCaptureModal'
 import { SitePublishControl } from '@/components/app/SitePublishControl'
+import { EnsureHomeButton } from '@/components/app/EnsureHomeButton'
 import { PRODUCT_NAME } from '@/lib/pageflo/product'
 
 export const dynamic = 'force-dynamic'
@@ -42,7 +43,7 @@ export default async function SiteOverviewPage({ params }: Props) {
     and: [{ site: { equals: site.id } }, { status: { equals: 'live' } }],
   }
 
-  const [pagesPub, domainsCount, leads30d, primaryDomain, lpDeployments, quizDeployments, advertorialDeployments] =
+  const [pagesPub, domainsCount, leads30d, primaryDomain, lpDeployments, quizDeployments, advertorialDeployments, homePage] =
     await Promise.all([
       payload.count({
         collection: 'pages',
@@ -99,6 +100,12 @@ export default async function SiteOverviewPage({ params }: Props) {
           overrideAccess: true,
         })
         .catch(() => null),
+      payload.find({
+        collection: 'pages',
+        where: { and: [{ site: { equals: site.id } }, { slug: { equals: '/' } }] },
+        limit: 1,
+        overrideAccess: true,
+      }),
     ])
 
   type DeploymentRow = { id: string | number; name?: string | null; path?: string | null }
@@ -186,6 +193,12 @@ export default async function SiteOverviewPage({ params }: Props) {
           <ExternalLink className="w-3.5 h-3.5" /> {site.status === 'active' ? 'View Live Site' : 'Preview site'}
         </Link>
       </header>
+
+      {homePage.docs.length === 0 || homePage.docs[0]?.status !== 'published' ? (
+        <div className="mb-4">
+          <EnsureHomeButton siteId={site.id} siteSlug={slug} />
+        </div>
+      ) : null}
 
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPI icon={<FileText className="w-4 h-4" />} value={pagesPub.totalDocs} label="Active Pages" />

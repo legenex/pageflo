@@ -45,8 +45,8 @@ export default function AdminError({
         </span>
         <h1 className="mt-4 text-[18px] font-bold tracking-[-0.02em] text-ink">This screen failed to load</h1>
         <p className="mx-auto mt-2 max-w-[360px] text-[13px] leading-[1.6] text-ink-muted">
-          Nothing was saved and no data was changed. Try again, and if it keeps failing send the reference below to
-          whoever runs this workspace.
+          Nothing was saved and no data was changed. Reload this tab and try again. If it keeps failing, send the
+          reference below to whoever runs this workspace.
         </p>
         {error.digest ? (
           <p className="mt-3.5 inline-block rounded-app border border-border bg-surface-deep px-2.5 py-1 font-mono text-[11px] text-ink-secondary">

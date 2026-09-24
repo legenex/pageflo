@@ -1,7 +1,9 @@
 // @ts-nocheck -- new funnel-* collection slugs are not in committed payload-types
 // yet; run `pnpm generate:types` on the server to restore typing.
 import { getPayload } from 'payload'
+import { redirect } from 'next/navigation'
 import config from '@payload-config'
+import { getCurrentUser } from '@/lib/auth'
 import { QuizBuilderApp } from '@/components/builder/quiz/QuizBuilderApp'
 import { buildBrandsFromSites } from '@/lib/brand-map'
 import { ensureFunnelSamples, ensureStarterFunnelsForAllBrands } from '@/lib/funnel-samples'
@@ -13,6 +15,8 @@ export const dynamic = 'force-dynamic'
 const relId = (v) => (v == null ? '' : typeof v === 'object' ? String(v.id) : String(v))
 
 export default async function QuizzesPage() {
+  const user = await getCurrentUser()
+  if (!user) redirect('/sign-in')
   const payload = await getPayload({ config })
   await ensureFunnelSamples(payload)
   await ensureStarterFunnelsForAllBrands(payload)
@@ -24,7 +28,7 @@ export default async function QuizzesPage() {
   await ensureTemplateLibrary(payload)
   const [qRes, depRes, sitesRes, domainsRes, quizTemplates] = await Promise.all([
     payload.find({ collection: 'funnel-quizzes', limit: 500, sort: '-updatedAt', overrideAccess: true }),
-    payload.find({ collection: 'funnel-quiz-deployments', limit: 1000, depth: 0, overrideAccess: true }),
+    payload.find({ collection: 'funnel-quiz-deployments', limit: 1000, depth: 0, user, overrideAccess: false }),
     payload.find({ collection: 'sites', limit: 500, sort: 'name', overrideAccess: true }),
     payload.find({ collection: 'domains', limit: 1000, sort: ['-primary'], overrideAccess: true }),
     // Tolerated rather than awaited blindly: on a database where the template

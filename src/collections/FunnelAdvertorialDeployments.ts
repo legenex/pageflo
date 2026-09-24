@@ -1,5 +1,5 @@
 import type { CollectionConfig } from 'payload'
-import { isAuthenticated } from '../access'
+import { isAuthenticated, siteScopedRead } from '../access'
 import { auditAfterChange, auditAfterDelete } from '../hooks/audit'
 import { enforceDeploymentTenancy, enforceDeploymentTenancyOnDelete } from '../hooks/deployment-tenancy'
 
@@ -15,7 +15,7 @@ export const FunnelAdvertorialDeployments: CollectionConfig = {
     group: 'Funnel Builder',
   },
   access: {
-    read: isAuthenticated,
+    read: siteScopedRead,
     create: isAuthenticated,
     update: isAuthenticated,
     delete: isAuthenticated,
