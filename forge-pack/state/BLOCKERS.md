@@ -18,7 +18,7 @@ Status: closed 2026-09-20. All listed PageFlo names resolve to `51.81.202.161`. 
 
 ## B-RESCUE-01 Production super-admin password drift
 
-Status: open. Human gate. `SUPER_ADMIN_PASSWORD` in `/var/www/vhosts/legenex.com/os.legenex.com/.env` does not match the stored hash for `team@legenex.com`. REST login 401. Five failures lock the row. Capture super-admin still works. Do not rotate from an agent. Operator must reset `team@legenex.com` through an approved credential change.
+Status: closed 2026-09-24. Operator authorized a Payload-supported reset of the existing `team@legenex.com` account. Login at `https://app.pageflo.io` succeeded. Temporary credentials are in `/home/legenex/.pageflo-admin-credentials` (mode 600). The production `.env` `SUPER_ADMIN_PASSWORD` was not rewritten.
 
 ## Standing, not V1
 

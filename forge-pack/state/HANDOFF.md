@@ -1,7 +1,7 @@
 # Handoff
 
-Current phase: POST-V1 rescue audit. W60 "complete" is withdrawn.
-HEAD: local Wave 1 repairs on `main` after `0818c76`. Production still `b54e8bd` until the Plesk sequence runs.
+Current phase: Rescue Wave 2 in progress. W60 "complete" is withdrawn.
+HEAD: `5d642c0` on `main` (Wave 2A snapshot pin, 2B visitor copy, 2C Home/tenancy/stale-action, 2E DNS copy). Production release of that SHA is in flight. Super-admin `team@legenex.com` password was reset; credentials at `/home/legenex/.pageflo-admin-credentials` (mode 600).
 Tests run this session:
 - `pnpm typecheck` pass
 - `pnpm test` all green
