@@ -78,6 +78,14 @@ export function middleware(req: NextRequest) {
     return NextResponse.redirect(target, 308)
   }
 
+  // Operator login is /sign-in. Payload's /cms/forgot is a blank shell with no
+  // email adapter. Keep /cms itself as the compatibility admin.
+  if (pathname === '/cms/forgot' || pathname.startsWith('/cms/forgot/')) {
+    const target = url.clone()
+    target.pathname = '/sign-in'
+    return stampHost(NextResponse.redirect(target, 308), host)
+  }
+
   if (isPassthrough(pathname) || isSystemPath(pathname)) return NextResponse.next()
 
   // Preview override: ?site=<slug> bypasses host lookup.

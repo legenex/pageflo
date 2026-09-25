@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { ArrowRight, Eye, EyeOff, Loader2, Lock, Mail } from 'lucide-react'
 import { signIn } from './actions'
 
@@ -106,9 +105,7 @@ export function SignInForm({ redirectTo, siteHref = '/' }: { redirectTo: string;
       </button>
 
       <div className="flex items-center justify-between pt-0.5 text-[11.5px]">
-        <Link href="/cms/forgot" className="text-ink-muted transition-colors hover:text-ink">
-          Forgot password?
-        </Link>
+        <span className="text-ink-muted">Password reset is done by a workspace owner.</span>
         <a href={siteHref} className="text-ink-muted transition-colors hover:text-ink">
           Back to site
         </a>

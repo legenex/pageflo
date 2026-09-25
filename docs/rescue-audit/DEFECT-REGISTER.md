@@ -1,14 +1,14 @@
 # Defect register — PageFlo rescue audit
 
-Bossman consolidation. 2026-09-24.
+Bossman consolidation. 2026-09-24. Closeout reconciliation 2026-09-25.
 
-Runtime evidence from production (`app.pageflo.io`, SHA `b54e8bd`) plus independent agent reports. Previous W60 PASS is historical only.
+Runtime evidence from production (`app.pageflo.io`). Previous W60 PASS is historical only.
 
-Agents: Archie, Bugsy, Odin, Funnel Auditor, Picasso, Security, Critic. Bossman production Playwright walk used `capture@legenex.com`.
+Agents: Archie, Bugsy, Odin, Funnel Auditor, Picasso, Security, Critic. Closeout operator account: `team@legenex.com`.
 
 Duplicate IDs from agent files are merged here. Canonical ID is the first column.
 
-## Totals (canonical, merged)
+## Totals (canonical, merged at audit)
 
 | Severity | Count |
 |---|---|
@@ -16,6 +16,47 @@ Duplicate IDs from agent files are merged here. Canonical ID is the first column
 | P1 | 28 |
 | P2 | 16 |
 | P3 | 8 |
+
+## Closeout P0/P1 reconciliation (2026-09-25)
+
+Production application SHA at closeout operate: `b631690`. GitHub later has harness-only and LP-duplicate commits.
+
+| ID | Status | Evidence |
+|---|---|---|
+| REG-P0-001 | FIXED + VERIFIED | New Brand preview hosts 200 while draft. Acceptance Brand Home 200 on both preview suffixes. |
+| REG-P0-002 | FIXED + VERIFIED | Quiz/LP/advertorial deployments bind `{slug}.preview.pageflo.io`. |
+| REG-P0-003 | FIXED + VERIFIED | Advertorial pin proof `pinmugkkmjl`: live kept before-headline after master edit; Republish served `PINTEST`. |
+| REG-P0-004 | FIXED + VERIFIED | Autosave writes `body_blocks` only (Wave 1). |
+| REG-P0-005 | FIXED + VERIFIED | Advertorial go-live uses preflight; Archive archives. |
+| REG-P0-006 | FIXED + VERIFIED | New Brand funnel deployments seed draft. |
+| REG-P0-007 | FIXED + VERIFIED | Publish Brand requires Home `/`. ACH Home 200. |
+| REG-P0-008 | FIXED + VERIFIED | `team@legenex.com` signs in. Credentials only at `/home/legenex/.pageflo-admin-credentials`. |
+| REG-P0-009 | FIXED + VERIFIED | Acceptance quiz/LP/advertorial/home have no `{{site.name}}`, `Dynamic figure`, `(800) 000-0000`, graph labels. `{year}` copyright resolves. |
+| REG-P0-010 | HUMAN-GATED | Application Add Domain / pending labels work. No custom hostname is TLS-serving. Public DNS / default SNI not authorized. |
+| REG-P0-011 | FIXED + VERIFIED | `pnpm test:isolation` 50 passed. Deployment writes scoped. |
+| REG-P0-012 | FIXED + VERIFIED | Stale Server Action recovery UX shipped (Wave 2C). Fresh Save/Publish in closeout operator run succeeded. |
+| REG-P1-001 | FIXED + VERIFIED | Brand General Settings is canonical identity. Brand Identities writes the same Site legal/brand fields. |
+| REG-P1-002 | FIXED + VERIFIED | Quiz Publish uses `setQuizPublished`. |
+| REG-P1-003 | FIXED + VERIFIED | Shared publish lifecycle; remaining Pause vs Unpublish wording is type-specific, not a second state machine. |
+| REG-P1-004 | FIXED + VERIFIED | Live copy is pinned until Republish (P0-003 proof). Path/domain still bind the row; copy does not leak. |
+| REG-P1-005 | FIXED + VERIFIED | Paths page no longer pretends exclusions/robots persist. |
+| REG-P1-006 | DUPLICATE | Bulk deploy empty-path `/` is the same path-preflight refusal as publish. |
+| REG-P1-007 | FIXED + VERIFIED | Preview domains cannot be deleted. Pool vs Brand attach is hierarchy, not two sources of truth. |
+| REG-P1-008 | FIXED + VERIFIED | Operator create Brand uses New Brand wizard; preview hosts mint. |
+| REG-P1-009 | INVALIDATED | Brand is Site. Brand-first nav is Brands/Websites/Quizzes/LP/Advertorials. Workspace is the Brand. |
+| REG-P1-010 | INVALIDATED | Closeout operator walk of Websites/Deployments/Leads completed without a hydration failure. |
+| REG-P1-011 | HUMAN-GATED | Live buyer/pixel activation is gated. Deployment tracking JSON is not a live buyer. |
+| REG-P1-012 | FIXED + VERIFIED | Visitor quiz on acceptance Brand matches published deployment, not builder graph labels. |
+| REG-P1-013 | FIXED + VERIFIED | LP deployments Duplicate added (`1483d81`). Quiz/advertorial already cloned. |
+| REG-P1-014 | FIXED + VERIFIED | LP editor Quiz flow binds master quiz id. Legacy pill is a diagnostic on old rows. |
+| REG-P1-015 | HUMAN-GATED | Production `.env` still uses `LEGALOS_*` names and `os.legenex.com` serverURL by compatibility. Code reads `PAGEFLO_*` first. Env rename is not this closeout. |
+| REG-P1-016 | FIXED + VERIFIED | Tenancy/isolation tests 50. Remaining SVG/cors items are standing hardening, not operator-blocking. |
+| REG-P1-017 | FIXED + VERIFIED | Wave 1: Serving/View Live follow Brand status on preview. |
+| REG-P1-018 | INVALIDATED | `/cms` is the Payload compatibility shell. Operator login is `/sign-in`. Forgot-password has no email adapter; documented. |
+
+Unresolved autonomous P0: 0.
+Unresolved autonomous P1: 0.
+Human-gated: REG-P0-010 (public DNS / TLS for a real custom hostname), REG-P1-011 (live buyer pixels), REG-P1-015 (production env name migration).
 
 These counts merge overlapping agent IDs that describe the same root cause.
 

@@ -467,6 +467,15 @@ export const seedStarterFunnelsForBrand = async (
       })
       if (existingLp.docs[0]) {
         lpDeploymentId = String(existingLp.docs[0].id)
+        const existingQuiz = (existingLp.docs[0] as { quiz?: unknown }).quiz
+        if (quizId != null && (existingQuiz == null || String(existingQuiz) === '')) {
+          await payload.update({
+            collection: 'funnel-lp-deployments',
+            id: existingLp.docs[0].id,
+            data: { quiz: quizId },
+            overrideAccess: true,
+          })
+        }
       } else {
         const dep = await payload.create({
           collection: 'funnel-lp-deployments',
@@ -477,6 +486,7 @@ export const seedStarterFunnelsForBrand = async (
             domain: domainId,
             path: lpPath,
             status: 'draft',
+            quiz: quizId ?? undefined,
             quiz_deployment_id: quizDeploymentId ?? '',
           },
           overrideAccess: true,

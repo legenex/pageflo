@@ -54,8 +54,12 @@ export type DeliveryState = 'delivered' | 'failed' | 'pending' | 'not-attempted'
  */
 export const deliveryState = (log: DeliveryEntry[] | null | undefined): DeliveryState => {
   const entries = log ?? []
-  const dispatch = entries.filter((e) => /webhook|deliver|dispatch|post/i.test(e.step ?? ''))
+  const dispatch = entries.filter((e) => isDeliveryStep(e.step))
   if (dispatch.length === 0) return entries.length === 0 ? 'not-attempted' : 'pending'
+  if (dispatch.some((e) => e.ok === true && /completed|deliver|webhook|dispatch|post/i.test(e.step ?? ''))) {
+    return 'delivered'
+  }
+  if (dispatch.some((e) => e.ok === true && /queued/i.test(e.step ?? ''))) return 'pending'
   if (dispatch.some((e) => e.ok === true)) return 'delivered'
   if (dispatch.every((e) => e.ok === false)) return 'failed'
   return 'pending'
@@ -81,7 +85,7 @@ export const isConversionStep = (step: string | null | undefined): boolean =>
 
 /** Entries a delivery view should show. */
 export const isDeliveryStep = (step: string | null | undefined): boolean =>
-  /webhook|deliver|dispatch|post|slack|notify/i.test(step ?? '')
+  /webhook|deliver|dispatch|post|slack|notify|downstream|queued/i.test(step ?? '')
 
 export type ConsentState = { label: string; tone: Tone }
 

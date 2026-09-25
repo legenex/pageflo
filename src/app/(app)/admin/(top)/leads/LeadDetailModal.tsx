@@ -269,7 +269,9 @@ export function LeadDetailModal({ lead, onClose }: { lead: LeadRow; onClose: () 
               empty={
                 tab === 'capi'
                   ? 'No conversion events were recorded for this lead. Events are written when a tracking configuration with a Conversions API destination is active for the Site.'
-                  : 'No delivery attempts were recorded for this lead. A disqualified lead is never dispatched, which is the expected state rather than a failure.'
+                  : lead.status === 'soft-dq' || lead.status === 'hard-dq'
+                    ? 'No delivery attempts were recorded. A disqualified lead is not dispatched to a buyer.'
+                    : 'No delivery log rows yet. Persist succeeded; downstream steps appear here when they run (queue, webhooks, Slack).'
               }
             />
           ) : null}

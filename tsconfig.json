@@ -36,5 +36,5 @@
     ".next/types/**/*.ts",
     "src/payload-types.ts"
   ],
-  "exclude": ["node_modules"]
+  "exclude": ["node_modules", "docs/rescue-audit/evidence"]
 }

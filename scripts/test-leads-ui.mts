@@ -5,7 +5,7 @@
  */
 import { readFileSync } from 'node:fs'
 
-import { consentState, deliveryState } from '../src/app/(app)/admin/(top)/leads/model.ts'
+import { consentState, deliveryState, isDeliveryStep } from '../src/app/(app)/admin/(top)/leads/model.ts'
 
 let pass = 0
 let fail = 0
@@ -32,6 +32,8 @@ t(modal.includes('jornaya_lead_id'), 'lead detail shows the Jornaya lead id')
 t(deliveryState([]) === 'not-attempted', 'an empty log is not-attempted, not a fake pending')
 t(deliveryState([{ step: 'webhook.dispatch', ok: true }]) === 'delivered', 'a successful webhook is delivered')
 t(deliveryState([{ step: 'webhook.dispatch', ok: false }]) === 'failed', 'a failed webhook is failed')
+t(deliveryState([{ step: 'downstream.completed', ok: true }]) === 'delivered', 'pipeline complete without a live buyer is delivered, not pending')
+t(isDeliveryStep('downstream.completed'), 'downstream.completed is a delivery-log row')
 t(consentState({ trustedform_cert_url: 'https://cert.trustedform.com/x' }).tone === 'pos', 'a TrustedForm URL is consent evidence')
 t(consentState({}).tone !== 'pos', 'missing consent is not presented as captured')
 
