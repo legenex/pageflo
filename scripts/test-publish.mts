@@ -1236,6 +1236,22 @@ const BOUND_LP_DEP = { ...GOOD_LP_DEP, quiz: 70 }
     t(pub.steps[0].label === 'How were you injured?', 'public quiz JSON replaces the graph name')
     t(pub.steps[1].label === '', 'public quiz JSON blanks endpoint path labels')
   }
+  {
+    const pub = sanitizePublicQuiz({
+      steps: [{ key: 'thanks', label: '/submitted (Qualified)' }],
+      nodes: [
+        {
+          stepKey: 'thanks',
+          type: 'endpoint',
+          headline: 'Thank You! An Attorney Will Reach Out Shortly.',
+          question: '/submitted',
+          subheadline: 'LeadByte + Meta/TikTok/Snap CAPI fire here',
+        },
+      ],
+    })
+    t(!JSON.stringify(pub).includes('LeadByte'), 'public quiz JSON drops LeadByte authoring notes')
+    t(!JSON.stringify(pub).includes('/submitted'), 'public quiz JSON drops endpoint path questions')
+  }
   t(safeConsentHtml('See our <a href="/tcpa">TCPA consent</a>.').includes('<a href="/tcpa">TCPA consent</a>'), 'consent HTML keeps a safe relative link')
   t(!safeConsentHtml('See our <a href="/tcpa">TCPA consent</a>.').includes('&lt;a'), 'consent HTML is not escaped as text')
   t(!safeConsentHtml('<a href="javascript:alert(1)">x</a>').includes('javascript:'), 'javascript hrefs are dropped')

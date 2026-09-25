@@ -33,10 +33,27 @@ const asArray = (v: unknown): Array<Record<string, unknown>> =>
  * Public quiz JSON is shipped in the page. Step.label is an authoring name.
  * Replace it with visitor-facing copy so view-source cannot leak the graph.
  */
+const AUTHORING_COPY = /LeadByte|CAPI fire|DQ data still flows|Webhook\s*>|Twilio HLR|BQ for revenue|hidden in live/i
+
+const sanitizeNode = (node: Record<string, unknown>): Record<string, unknown> => {
+  const next = { ...node }
+  for (const key of ['subheadline', 'question', 'headline', 'tagline'] as const) {
+    const value = next[key]
+    if (typeof value !== 'string') continue
+    if (AUTHORING_COPY.test(value)) {
+      next[key] = ''
+      continue
+    }
+    if ((key === 'question' || key === 'subheadline') && value.startsWith('/')) next[key] = ''
+  }
+  return next
+}
+
 export const sanitizePublicQuiz = <T extends { steps?: unknown; nodes?: unknown }>(quiz: T): T => {
   const steps = asArray(quiz.steps).map((step) => {
     const node = resolveNodeForStep(quiz as never, String(step.key ?? ''), null)
     return { ...step, label: visitorFacingStepLabel(node, step) }
   })
-  return { ...quiz, steps }
+  const nodes = asArray(quiz.nodes).map(sanitizeNode)
+  return { ...quiz, steps, nodes }
 }
