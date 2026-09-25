@@ -155,7 +155,18 @@ export type QuizViewModel = {
     readonly url: string | null
     readonly buttonLabel: string
   } | null
-  readonly legal: { readonly tcpa: string | null }
+  /**
+   * Consent. `tcpa` is the Brand's disclosure for this node (null when there is
+   * none to show). When there is one, the visitor must check the box before the
+   * form advances: `accepted` is the box's state, `invalid` is set once they try
+   * to continue without it, and `setAccepted` is the only way either changes.
+   */
+  readonly legal: {
+    readonly tcpa: string | null
+    readonly accepted: boolean
+    readonly invalid: boolean
+    readonly setAccepted: (next: boolean) => void
+  }
   /**
    * Brand-owned page chrome, pre-resolved.
    *

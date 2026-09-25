@@ -36,6 +36,7 @@ import {
   captureAttribution, newClientSubmissionId, readTrustedFormCert, readJornayaLeadId, firePixelEvents, submitLead,
 } from '@/lib/lead-capture-client'
 import { splitQuizAnswers, isDeliverableContact } from '@/lib/quiz-lead'
+import { extractQuizConsent } from '@/lib/lead-consent'
 import { SEED_CUSTOM_FIELDS } from '@/components/builder/quiz/seed-data'
 
 /**
@@ -114,7 +115,10 @@ export function QuizRuntime({
     // delivered to a buyer".
     submitLead: live
       ? async (values) => {
-        const { contact, quizAnswers } = splitQuizAnswers(values)
+        // Consent rides the answer map under reserved keys. It is lifted out here,
+        // so it is sent as its own typed object and never stored as an answer.
+        const { values: answerValues, consent } = extractQuizConsent(values)
+        const { contact, quizAnswers } = splitQuizAnswers(answerValues)
         if (!isDeliverableContact(contact)) {
           // Nothing to deliver: the visitor dropped before any contact question,
           // or this quiz collects none. Persisting an empty lead would put junk
@@ -131,6 +135,7 @@ export function QuizRuntime({
           client_submission_id: submissionId,
           contact,
           quiz_answers: quizAnswers,
+          consent,
           attribution: captureAttribution(),
           trustedform_cert_url: readTrustedFormCert() || undefined,
           jornaya_lead_id: readJornayaLeadId() || undefined,

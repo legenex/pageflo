@@ -50,6 +50,7 @@ import * as migration_20260901_233000_sites_vertical_general from './20260901_23
 import * as migration_20260919_120000_sites_vertical_debt from './20260919_120000_sites_vertical_debt'
 import * as migration_20260920_120000_pages_published_blocks from './20260920_120000_pages_published_blocks'
 import * as migration_20260924_120000_deployment_published_snapshot from './20260924_120000_deployment_published_snapshot'
+import * as migration_20260926_120000_lead_consent_and_delivery_state from './20260926_120000_lead_consent_and_delivery_state'
 
 export const migrations = [
   {
@@ -239,5 +240,10 @@ export const migrations = [
     up: migration_20260924_120000_deployment_published_snapshot.up,
     down: migration_20260924_120000_deployment_published_snapshot.down,
     name: '20260924_120000_deployment_published_snapshot',
+  },
+  {
+    up: migration_20260926_120000_lead_consent_and_delivery_state.up,
+    down: migration_20260926_120000_lead_consent_and_delivery_state.down,
+    name: '20260926_120000_lead_consent_and_delivery_state',
   },
 ];

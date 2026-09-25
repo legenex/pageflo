@@ -547,6 +547,18 @@ EB-1.
 
 ## Change log
 
+### 26 September 2026, explicit consent, honest delivery state, safe retry
+
+**Consent is an act, recorded end to end.** The Brand's TCPA text (`Site.legal.tcpa_text`) is now printed beside an UNCHECKED checkbox on every quiz form node and on the website Lead form block (`consent_md`), through one component (`src/components/public/ConsentCheckbox.tsx`). The form cannot advance while it is unchecked, shows a visible, announced validation message, and sends nothing. On accept the browser sends a typed `consent` object (`accepted: true`, the plain text of the disclosure the visitor read, the device timestamp). `/api/leads` rejects `accepted: false`, adds the server's own view of where it was collected (Brand, host, funnel type, path, deployment) and stores it in the new `leads.consent_*` columns (migration `20260926_120000_lead_consent_and_delivery_state`, additive, nullable, nothing backfilled). Leads without a record read "Not recorded" in the console. The disclosure is stored as plain text derived from the same sanitised markup the visitor saw (`consentPlainText`). `/api/leads` also no longer drops `extra` (custom form fields are stored with the answers). This is engineering evidence, not a legal claim: the copy stays Brand-configurable.
+
+**Delivery state is read from an append-only log.** `delivery_log` records `lead.captured`, `delivery.queued`, `delivery.processing`, `delivery.retry_requested`, `delivery.error`/`delivery.failed` and `downstream.completed`. `readDelivery()` (`src/lib/lead-pipeline/delivery-state.ts`) turns it into queued, processing, retry pending, stalled, delivered, partial, failed or no-destination. `downstream.completed` means the pass finished, not that a buyer received the lead: with no webhook or TrueCall destination the state is `no-destination`. The state is persisted on `leads.delivery_state` for filtering. The pipeline used to overwrite the log; every write now goes through `appendDeliveryLog`.
+
+**Retry.** Leads > Delivery Log > Retry delivery (`retryLeadDelivery`) is authorised as the signed-in user (editor or above on the Lead's Brand), refused unless delivery is failed, partial or stalled, writes the request to the history before enqueueing, uses a per-request queue job id, holds a per-lead Redis lock, and skips every step that already succeeded. Only destinations the Brand has configured are contacted.
+
+**Phone validation.** Stored HLR results carry `state`: valid, invalid, not_configured, provider_error. A failed lookup is no longer "Not checked", and no success is fabricated without provider credentials.
+
+Tests: `pnpm test:leads-ui` (read models), `pnpm test:delivery` (lifecycle, retry, idempotency, authorisation), `pnpm test:consent` (three public surfaces, console, retry, in a browser).
+
 ### 24 September 2026, Rescue Wave 2B
 
 Visitor pages no longer leak authoring junk. Shared legal titles run through `renderTemplateVars`. Consent HTML (TCPA links) renders as links via `safeConsentHtml`. Quiz progress rails use visitor-facing question copy. LP compose treats `(800) 000-0000`, `Dynamic figure`, and `This deployment` as reference placeholders on live. `pnpm test:publish` 282, `pnpm test:slots` 957, `pnpm typecheck`.

@@ -369,6 +369,9 @@ try {
     await page.fill('input[name="email"]', `${label}@example.test`)
     await page.fill('input[name="mobile"]', '5550100100')
     await page.fill('input[name="zip"]', '78701')
+    // Consent is an explicit act now: the box starts unchecked and the form will
+    // not advance until it is checked (proved in scripts/test-consent-e2e.mts).
+    await page.locator('[data-consent-checkbox]').check()
     await page.locator('[data-quiz-submit]').click()
 
     // The destination.

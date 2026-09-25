@@ -19,6 +19,14 @@ export type WebhookDispatchResult = {
   duration_ms?: number
 }
 
+// The transport is a seam so the delivery suite can prove send-once and retry
+// behaviour without contacting a real endpoint (the SSRF guard forbids the
+// loopback a local receiver would need, correctly). Production never sets it.
+let post: typeof safePost = safePost
+export const setWebhookPostForTests = (fn: typeof safePost | null): void => {
+  post = fn ?? safePost
+}
+
 const signBody = (body: string, secret: string): string => {
   return crypto.createHmac('sha256', secret).update(body).digest('hex')
 }
@@ -65,7 +73,7 @@ export const dispatchWebhooks = async (args: {
         // user-supplied address the server posts a LEAD to. Unguarded, it
         // doubles as a port scanner and a way to POST a signed payload at
         // anything on the private network. See lib/net/ssrf.
-        const resp = await safePost(w.url, { headers, body })
+        const resp = await post(w.url, { headers, body })
         if (!resp.ok) {
           return {
             webhook: w.name,

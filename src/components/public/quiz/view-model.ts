@@ -26,6 +26,8 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 
 import { applyDynamicContent, isNodeVisible, isWithin3MonthsOfToday } from '@/components/builder/quiz/seed-data'
 import { resolveRedirectUrl } from '@/lib/quiz-destinations'
+import { QUIZ_CONSENT_KEYS } from '@/lib/lead-consent'
+import { consentPlainText } from '@/lib/safe-consent-html'
 import type { QuizActions, QuizViewModel } from '@/lib/quiz-compositions/types'
 
 const INVISIBLE_TYPES = new Set(['decision', 'webhook', 'verification', 'transition'])
@@ -69,12 +71,17 @@ export const useQuizView = ({
   const [smartDate, setSmartDate] = useState<{ year?: number; month?: number; day?: number | null }>({})
   const [formValues, setFormValues] = useState<Record<string, string>>({})
   const [honeypot, setHoneypot] = useState('')
+  // Explicit consent. UNCHECKED on every form node until the visitor checks it,
+  // and `consentTried` only becomes true when they try to continue without.
+  const [consentAccepted, setConsentAccepted] = useState(false)
+  const [consentTried, setConsentTried] = useState(false)
 
   // Every input resets when the node changes. Held here rather than in seven
   // compositions, which is the difference between one reset rule and seven.
   useEffect(() => {
     setSelectedSingle(null); setMulti([]); setText(''); setDropdownVal('')
     setSmartDate({}); setFormValues({}); setHoneypot('')
+    setConsentAccepted(false); setConsentTried(false)
   }, [nodeId])
 
   const node = useMemo(() => (rawNode ? applyDynamicContent(rawNode, fieldValues) : null), [rawNode, fieldValues])
@@ -101,8 +108,30 @@ export const useQuizView = ({
     || text,
   )
 
+  // The Brand's disclosure for THIS node: only a form node ever shows one. The
+  // same string is rendered beside the box and recorded as the evidence.
+  const tcpa = node?.type === 'form' ? interp(brand?.legal?.tcpaText || '') || null : null
+
+  const setAccepted = useCallback((next: boolean) => {
+    setConsentAccepted(next)
+    if (next) setConsentTried(false)
+  }, [])
+
   const submit = useCallback(() => {
     if (!node) return
+    // The form does not advance without the visitor's act. Nothing is sent and
+    // the reason is shown next to the box; the fields keep what they typed.
+    if (tcpa && !consentAccepted) {
+      setConsentTried(true)
+      return
+    }
+    const consentMappings = tcpa
+      ? [
+        { key: QUIZ_CONSENT_KEYS.accepted, value: 'yes' },
+        { key: QUIZ_CONSENT_KEYS.text, value: consentPlainText(tcpa) },
+        { key: QUIZ_CONSENT_KEYS.at, value: new Date().toISOString() },
+      ]
+      : []
     const first = answers[0]
     if (selectedSingle) onAnswer(selectedSingle)
     else if (questionType === 'multi_select') onAnswer(first || { label: 'Continue' })
@@ -116,9 +145,13 @@ export const useQuizView = ({
       // A filled honeypot is a bot. Drop the submit silently rather than
       // telling it why.
       if (honeypot) return
-      onAnswer({ ...first, fieldMappings: Object.entries(formValues).map(([k, v]) => ({ key: k, value: v })) })
-    } else onAnswer({ nextStepKey: '' })
-  }, [node, answers, selectedSingle, questionType, smartDate, dropdownVal, text, formValues, honeypot, onAnswer])
+      onAnswer({
+        ...first,
+        fieldMappings: [...Object.entries(formValues).map(([k, v]) => ({ key: k, value: v })), ...consentMappings],
+      })
+    } else if (consentMappings.length) onAnswer({ nextStepKey: '', fieldMappings: consentMappings })
+    else onAnswer({ nextStepKey: '' })
+  }, [node, answers, selectedSingle, questionType, smartDate, dropdownVal, text, formValues, honeypot, onAnswer, tcpa, consentAccepted])
 
   /* --------------------------------------------------------------- redirect */
 
@@ -296,8 +329,9 @@ export const useQuizView = ({
       }
       : null,
     // The BRAND supplies the consent line, on every form node, everywhere. See
-    // `P.Consent` for why exactly one component may print it.
-    legal: { tcpa: node?.type === 'form' ? interp(brand?.legal?.tcpaText || '') || null : null },
+    // `P.Consent` for why exactly one component may print it. In a still or a
+    // builder preview the box is drawn and works, but nothing is ever submitted.
+    legal: { tcpa, accepted: consentAccepted, invalid: consentTried && !consentAccepted, setAccepted },
     chrome,
   }
 

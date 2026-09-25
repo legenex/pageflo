@@ -1,4 +1,12 @@
 import type { Tone } from '@/components/pageflo/primitives'
+import { consentView } from '@/lib/lead-consent'
+import {
+  isDestinationStep,
+  isLifecycleStep,
+  readDelivery,
+  type DeliveryEntry,
+  type DeliveryState,
+} from '@/lib/lead-pipeline/delivery-state'
 
 /**
  * Lead presentation model.
@@ -6,8 +14,7 @@ import type { Tone } from '@/components/pageflo/primitives'
  * Everything here is derived from fields that actually exist on the `leads`
  * collection. There is no invented pipeline event, no fabricated delivery state
  * and no scan result: a lead's delivery state is read from `delivery_log`, its
- * consent from `trustedform_cert_url` / `jornaya_lead_id`, and its phone
- * validity from `hlr_result`.
+ * consent from the `consent` record, and its phone validity from `hlr_result`.
  */
 
 export const LEAD_STATUSES = ['new', 'contacted', 'qualified', 'soft-dq', 'hard-dq', 'sold', 'archived'] as const
@@ -41,76 +48,106 @@ export const SOURCE_LABEL: Record<string, string> = {
   advertorial: 'Advertorial',
 }
 
-export type DeliveryEntry = { at?: string | null; step?: string | null; ok?: boolean | null; detail?: string | null }
-
-export type DeliveryState = 'delivered' | 'failed' | 'pending' | 'not-attempted'
+export type { DeliveryEntry, DeliveryState } from '@/lib/lead-pipeline/delivery-state'
+export { DELIVERY_LABEL, DELIVERY_TONE, DELIVERY_EXPLANATION } from '@/lib/lead-pipeline/delivery-state'
 
 /**
- * A lead's delivery state, derived from its log rather than stored.
- *
- * "not attempted" and "pending" are different answers and are kept apart: a
- * disqualified lead is never dispatched at all, which is correct behaviour, and
- * showing that as "pending" would look like a stuck queue.
+ * A lead's delivery reading, from its log. `readDelivery` is the one
+ * implementation; the persisted `delivery_state` column is only an index of it,
+ * so the console always reads the log and cannot drift from the pipeline.
  */
-export const deliveryState = (log: DeliveryEntry[] | null | undefined): DeliveryState => {
-  const entries = log ?? []
-  const dispatch = entries.filter((e) => isDeliveryStep(e.step))
-  if (dispatch.length === 0) return entries.length === 0 ? 'not-attempted' : 'pending'
-  if (dispatch.some((e) => e.ok === true && /completed|deliver|webhook|dispatch|post/i.test(e.step ?? ''))) {
-    return 'delivered'
-  }
-  if (dispatch.some((e) => e.ok === true && /queued/i.test(e.step ?? ''))) return 'pending'
-  if (dispatch.some((e) => e.ok === true)) return 'delivered'
-  if (dispatch.every((e) => e.ok === false)) return 'failed'
-  return 'pending'
-}
-
-export const DELIVERY_LABEL: Record<DeliveryState, string> = {
-  delivered: 'Delivered',
-  failed: 'Failed',
-  pending: 'Pending',
-  'not-attempted': 'Not sent',
-}
-
-export const DELIVERY_TONE: Record<DeliveryState, Tone> = {
-  delivered: 'pos',
-  failed: 'neg',
-  pending: 'warn',
-  'not-attempted': 'neutral',
-}
+export const deliveryState = (log: DeliveryEntry[] | null | undefined): DeliveryState => readDelivery(log).state
 
 /** Entries a conversion-event view should show. */
 export const isConversionStep = (step: string | null | undefined): boolean =>
   /capi|conversion|pixel|meta|event/i.test(step ?? '')
 
-/** Entries a delivery view should show. */
+/**
+ * Entries the delivery history shows: the lifecycle (captured, queued,
+ * processing, retry requested, completed, failed) and everything that leaves the
+ * system towards a destination or a notification.
+ */
 export const isDeliveryStep = (step: string | null | undefined): boolean =>
-  /webhook|deliver|dispatch|post|slack|notify|downstream|queued/i.test(step ?? '')
+  isLifecycleStep(step) || isDestinationStep(step) || /webhook|deliver|dispatch|post|slack|notify|downstream|queued/i.test(step ?? '')
 
-export type ConsentState = { label: string; tone: Tone }
+export type ConsentState = { label: string; tone: Tone; recorded: boolean }
 
 /**
- * Consent evidence. A lead either carries a certificate reference or it does
- * not; nothing here mints, substitutes or infers one. See AGENTS.md invariant 6.
+ * Consent, as recorded: an affirmative act with the disclosure the visitor
+ * accepted. A Lead without one, every Lead written before consent was recorded
+ * included, reads "Not recorded". A TrustedForm or Jornaya reference is a
+ * separate piece of evidence (`certificateEvidence`) and never stands in for it.
+ * See AGENTS.md invariant 6: nothing here mints or infers a certificate.
  */
-export const consentState = (lead: { trustedform_cert_url?: string | null; jornaya_lead_id?: string | null }): ConsentState => {
-  const tf = Boolean(lead.trustedform_cert_url)
-  const jl = Boolean(lead.jornaya_lead_id)
-  if (tf && jl) return { label: 'TrustedForm + Jornaya', tone: 'pos' }
-  if (tf) return { label: 'TrustedForm', tone: 'pos' }
-  if (jl) return { label: 'Jornaya', tone: 'pos' }
-  return { label: 'None recorded', tone: 'warn' }
+export const consentState = (lead: { consent?: Parameters<typeof consentView>[0] }): ConsentState => {
+  const v = consentView(lead.consent)
+  return v.recorded ? { label: 'Accepted', tone: 'pos', recorded: true } : { label: 'Not recorded', tone: 'warn', recorded: false }
 }
 
-/** Phone validation, read from the stored HLR result. */
-export const phoneState = (hlr: unknown): { label: string; tone: Tone } => {
-  if (!hlr || typeof hlr !== 'object') return { label: 'Not checked', tone: 'neutral' }
-  const r = hlr as Record<string, unknown>
-  const status = String(r.status ?? r.result ?? '').toLowerCase()
-  if (!status) return { label: 'Not checked', tone: 'neutral' }
-  if (/valid|reachable|ok|success/.test(status) && !/invalid/.test(status)) return { label: 'Valid', tone: 'pos' }
-  if (/invalid|unreachable|fail/.test(status)) return { label: 'Invalid', tone: 'neg' }
-  return { label: status, tone: 'neutral' }
+/** Third-party certificate references, shown apart from the consent record. */
+export const certificateEvidence = (lead: { trustedform_cert_url?: string | null; jornaya_lead_id?: string | null }): string => {
+  const tf = Boolean(lead.trustedform_cert_url)
+  const jl = Boolean(lead.jornaya_lead_id)
+  if (tf && jl) return 'TrustedForm + Jornaya'
+  if (tf) return 'TrustedForm'
+  if (jl) return 'Jornaya'
+  return 'None'
+}
+
+export type PhoneKind = 'not-checked' | 'valid' | 'invalid' | 'not-configured' | 'provider-error'
+export type PhoneReading = { kind: PhoneKind; label: string; tone: Tone; detail: string }
+
+/**
+ * Phone validation, read from the stored HLR result.
+ *
+ * Five outcomes, kept apart because they call for different action:
+ *  - not checked: no lookup has been recorded for this lead
+ *  - valid / invalid: the provider answered about the NUMBER
+ *  - not configured: nobody could be asked (no credentials); fix the setup
+ *  - provider error: the provider was asked and failed; the number is unknown
+ *
+ * A failed attempt is never "not checked": the result was stored precisely so
+ * it can be told apart from a lead nobody tried to validate.
+ */
+export const phoneState = (hlr: unknown): PhoneReading => {
+  if (!hlr || typeof hlr !== 'object') {
+    return { kind: 'not-checked', label: 'Not checked', tone: 'neutral', detail: 'No phone validation has been recorded for this lead.' }
+  }
+  const r = hlr as { ok?: unknown; state?: unknown; error?: unknown; provider?: unknown }
+  const error = typeof r.error === 'string' ? r.error : ''
+  // Rows stored before `state` existed carry `ok` and `error` only.
+  const state =
+    typeof r.state === 'string'
+      ? r.state
+      : r.ok === true
+        ? 'valid'
+        : /missing .*credentials|unsupported hlr provider/i.test(error)
+          ? 'not_configured'
+          : r.ok === false
+            ? 'provider_error'
+            : ''
+  switch (state) {
+    case 'valid':
+      return { kind: 'valid', label: 'Valid', tone: 'pos', detail: 'The provider resolved this number.' }
+    case 'invalid':
+      return { kind: 'invalid', label: 'Invalid', tone: 'neg', detail: 'The provider rejected this number.' }
+    case 'not_configured':
+      return {
+        kind: 'not-configured',
+        label: 'Unavailable: not configured',
+        tone: 'warn',
+        detail: `No lookup was made because the provider is not configured${error ? ` (${error})` : ''}. This says nothing about the number.`,
+      }
+    case 'provider_error':
+      return {
+        kind: 'provider-error',
+        label: 'Unavailable: provider error',
+        tone: 'warn',
+        detail: `The provider was asked and failed${error ? ` (${error})` : ''}. This says nothing about the number.`,
+      }
+    default:
+      return { kind: 'not-checked', label: 'Not checked', tone: 'neutral', detail: 'No phone validation has been recorded for this lead.' }
+  }
 }
 
 export const fullName = (c: { first_name?: string | null; last_name?: string | null } | null | undefined): string =>

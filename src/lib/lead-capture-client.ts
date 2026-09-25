@@ -16,6 +16,8 @@
  * Client-only: every function no-ops safely if called where there is no window.
  */
 
+import type { ConsentSubmission } from '@/lib/lead-consent'
+
 /** Field names that map into the canonical `contact` object the pipeline expects. */
 export const CONTACT_KEYS = new Set(['first_name', 'last_name', 'email', 'phone', 'state', 'zip'])
 
@@ -135,6 +137,8 @@ export type LeadSubmitPayload = {
   attribution?: Record<string, string>
   trustedform_cert_url?: string
   jornaya_lead_id?: string
+  /** Present only when the visitor checked the consent box. */
+  consent?: ConsentSubmission
 }
 
 export type LeadSubmitResult = {

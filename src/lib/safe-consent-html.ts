@@ -28,3 +28,18 @@ const escapeText = (s: string): string =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
 const escapeAttr = (s: string): string => escapeText(s).replace(/"/g, '&quot;')
+
+/**
+ * The disclosure exactly as a visitor reads it: the text `safeConsentHtml`
+ * renders, without tags. This is what a Lead's consent evidence records, so it
+ * is derived from the same sanitised markup the form draws rather than from the
+ * raw field, which may carry tags or a `javascript:` link the visitor never saw.
+ */
+export const consentPlainText = (raw: string): string =>
+  safeConsentHtml(raw)
+    .replace(/<[^>]+>/g, '')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim()

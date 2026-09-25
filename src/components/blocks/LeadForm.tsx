@@ -10,7 +10,8 @@ import {
   firePixelEvents,
   submitLead,
 } from '@/lib/lead-capture-client'
-import { safeConsentHtml } from '@/lib/safe-consent-html'
+import { ConsentCheckbox } from '@/components/public/ConsentCheckbox'
+import { consentPlainText } from '@/lib/safe-consent-html'
 
 type FormFieldDef = {
   name: string
@@ -49,6 +50,11 @@ export function LeadForm({ block, site }: { block: LeadFormBlock; site: Site }) 
   const formRef = useRef<HTMLFormElement>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Explicit consent, same contract as the quiz: an unchecked box the visitor
+  // must check when the block carries a disclosure. See ConsentCheckbox.
+  const [consentAccepted, setConsentAccepted] = useState(false)
+  const [consentTried, setConsentTried] = useState(false)
+  const disclosure = block.consent_md?.trim() ? block.consent_md : ''
 
   /*
    * The idempotency key, on the same contract QuizRuntime uses: minted ONCE per
@@ -94,6 +100,11 @@ export function LeadForm({ block, site }: { block: LeadFormBlock; site: Site }) 
     if (inFlightRef.current) return
     setError(null)
     if (!formRef.current) return
+    if (disclosure && !consentAccepted) {
+      // Nothing is sent, nothing is disabled, and the fields keep their values.
+      setConsentTried(true)
+      return
+    }
     inFlightRef.current = true
     setPending(true)
 
@@ -147,6 +158,9 @@ export function LeadForm({ block, site }: { block: LeadFormBlock; site: Site }) 
       client_submission_id: submissionIdRef.current,
       contact,
       extra: Object.keys(extra).length > 0 ? extra : undefined,
+      consent: disclosure
+        ? { accepted: true as const, disclosure_text: consentPlainText(disclosure), client_accepted_at: new Date().toISOString() }
+        : undefined,
       attribution,
       trustedform_cert_url: readTrustedFormCert() || undefined,
       jornaya_lead_id: readJornayaLeadId() || undefined,
@@ -234,10 +248,18 @@ export function LeadForm({ block, site }: { block: LeadFormBlock; site: Site }) 
               <input key={k} type="hidden" name={`attr_${k}`} defaultValue="" />
             ))}
 
-            {block.consent_md ? (
-              <p
-                style={{ fontSize: 12, color: 'var(--site-ink-muted)', lineHeight: 1.5, marginTop: 4 }}
-                dangerouslySetInnerHTML={{ __html: safeConsentHtml(block.consent_md) }}
+            {disclosure ? (
+              <ConsentCheckbox
+                disclosure={disclosure}
+                checked={consentAccepted}
+                invalid={consentTried && !consentAccepted}
+                onChange={(next) => {
+                  setConsentAccepted(next)
+                  if (next) setConsentTried(false)
+                }}
+                ringColor="var(--sys-danger)"
+                textStyle={{ fontSize: 12, color: 'var(--site-ink-muted)', lineHeight: 1.5 }}
+                errorStyle={{ fontSize: 13, color: 'var(--sys-danger)' }}
               />
             ) : null}
 

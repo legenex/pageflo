@@ -20,7 +20,11 @@ import {
 import type { LeadRow } from './types'
 
 export function LeadsTable({ leads, search }: { leads: LeadRow[]; search: Record<string, string> }) {
-  const [open, setOpen] = useState<LeadRow | null>(null)
+  // The id, not the row: the modal must follow the server's refreshed data after
+  // an action (a retry, a status change) rather than freeze the snapshot it opened on.
+  const [openId, setOpenId] = useState<string | null>(null)
+  const open = leads.find((l) => l.id === openId) ?? null
+  const setOpen = (l: LeadRow | null) => setOpenId(l ? l.id : null)
 
   if (leads.length === 0) {
     return (
@@ -94,17 +98,19 @@ export function LeadsTable({ leads, search }: { leads: LeadRow[]; search: Record
                   <StatusPill label={STATUS_LABEL[l.status]} tone={STATUS_TONE[l.status]} dot={false} />
                 </Td>
                 <Td className={`whitespace-nowrap text-[11.5px] ${consent.tone === 'pos' ? 'text-pos' : 'text-warn'}`}>
-                  {consent.label}
+                  <span data-lead-consent={consent.recorded ? 'accepted' : 'not-recorded'}>{consent.label}</span>
                 </Td>
                 <Td
                   className={`whitespace-nowrap text-[11.5px] ${
-                    phone.tone === 'pos' ? 'text-pos' : phone.tone === 'neg' ? 'text-neg' : 'text-ink-muted'
+                    phone.tone === 'pos' ? 'text-pos' : phone.tone === 'neg' ? 'text-neg' : phone.tone === 'warn' ? 'text-warn' : 'text-ink-muted'
                   }`}
                 >
-                  {phone.label}
+                  <span data-lead-phone-state={phone.kind}>{phone.label}</span>
                 </Td>
                 <Td className="whitespace-nowrap">
-                  <StatusPill label={DELIVERY_LABEL[delivery]} tone={DELIVERY_TONE[delivery]} />
+                  <span data-lead-delivery-state={delivery}>
+                    <StatusPill label={DELIVERY_LABEL[delivery]} tone={DELIVERY_TONE[delivery]} />
+                  </span>
                 </Td>
                 <Td className="text-right">
                   <button

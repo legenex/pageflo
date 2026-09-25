@@ -37,7 +37,7 @@ import { QuizProgress } from '@/components/public/quiz/forms/progress'
 import type { Surface } from '@/lib/lp-nodes/surface'
 import type { QuizFieldVariant, QuizPrimitives } from '@/lib/quiz-compositions/types'
 import type { QuizTheme } from '@/lib/quiz-templates/theme'
-import { safeConsentHtml } from '@/lib/safe-consent-html'
+import { ConsentCheckbox } from '@/components/public/ConsentCheckbox'
 
 const surfaceOf = (theme: QuizTheme, surface?: Surface): Surface => surface ?? theme.surface
 
@@ -377,7 +377,8 @@ const Nav: QuizPrimitives['Nav'] = ({ view, actions, theme, surface, radius = 8,
 /* ---------------------------------------------------------------- consent */
 
 /**
- * The consent line, and THE only place any composition renders it.
+ * The consent control, and THE only place any composition renders it: the
+ * Brand's disclosure beside an UNCHECKED box the visitor must check.
  *
  * The publish preflight and the flow validator both treat "the visitor reached
  * a form node" as equivalent to "the visitor saw the TCPA text", and that
@@ -389,10 +390,18 @@ const Consent: QuizPrimitives['Consent'] = ({ view, theme, surface, style }) => 
   if (view.phase !== 'form' || !view.legal.tcpa) return null
   const s = surfaceOf(theme, surface)
   return (
-    <div
-      style={{ fontSize: 11, color: s.muted, marginTop: 12, lineHeight: 1.45, fontFamily: theme.fonts.body, ...style }}
-      dangerouslySetInnerHTML={{ __html: safeConsentHtml(view.legal.tcpa) }}
-    />
+    <div style={style}>
+      <ConsentCheckbox
+        disclosure={view.legal.tcpa}
+        checked={view.legal.accepted}
+        invalid={view.legal.invalid}
+        onChange={view.legal.setAccepted}
+        ringColor={s.accent}
+        boxStyle={{ accentColor: s.accentFill }}
+        textStyle={{ fontSize: 12, color: s.muted, lineHeight: 1.45, fontFamily: theme.fonts.body }}
+        errorStyle={{ fontSize: 13, color: s.text, fontFamily: theme.fonts.body }}
+      />
+    </div>
   )
 }
 

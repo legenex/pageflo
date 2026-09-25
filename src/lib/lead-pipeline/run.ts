@@ -14,6 +14,15 @@ import { newEventId } from './event-id'
 import { reportError } from '@/lib/observability/report'
 import { appOrigin } from '@/lib/pageflo/hosts'
 import { enqueueLeadDelivery } from '@/queues/lead-delivery'
+import type { LeadConsentRecord } from '@/lib/lead-consent'
+import { appendDeliveryLog } from './log'
+import {
+  DELIVERY_STEPS,
+  passAlreadyCompleted,
+  readDelivery,
+  settledSteps,
+  type DeliveryEntry,
+} from './delivery-state'
 
 let leadAfterPersistHook: ((leadId: number) => Promise<void>) | null = null
 
@@ -58,6 +67,13 @@ export type LeadCaptureInput = {
 
   trustedform_cert_url?: string
   jornaya_lead_id?: string
+
+  /**
+   * Explicit consent evidence, built by the route from the visitor's submission
+   * and the server's own view of where it was collected. Absent when the visitor
+   * gave none: the Lead then carries no consent record and is shown as such.
+   */
+  consent?: LeadConsentRecord
 }
 
 export type PipelineStep = {
@@ -91,7 +107,7 @@ const t = (started: number): number => Date.now() - started
  */
 export const runLeadPipeline = async (
   input: LeadCaptureInput,
-  opts?: { resumeLeadId?: number },
+  opts?: { resumeLeadId?: number; trigger?: 'queue' | 'retry' | 'inline' },
 ): Promise<LeadPipelineResult> => {
   const payload = await getPayload({ config })
   let event_id = newEventId()
@@ -174,6 +190,23 @@ export const runLeadPipeline = async (
         trustedform_cert_url: input.trustedform_cert_url ?? null,
         jornaya_lead_id: input.jornaya_lead_id ?? null,
         client_submission_id: submissionKey,
+        ...(input.consent ? { consent: input.consent } : {}),
+        status_history: [
+          {
+            status: 'new',
+            changed_at: new Date().toISOString(),
+            note: input.test_capture ? 'Created via Test Capture' : 'Created via lead capture',
+          },
+        ],
+        // The lifecycle starts here, in the same write as the Lead. `queued` is
+        // written optimistically: a worker that picks the job up instantly must
+        // find it already in the log, or its own entries would sort before it.
+        // If the queue turns out to be unavailable the next entry says so.
+        delivery_log: [
+          { at: new Date().toISOString(), step: DELIVERY_STEPS.captured, ok: true, detail: 'lead row stored' },
+          { at: new Date().toISOString(), step: DELIVERY_STEPS.queued, ok: true, detail: 'waiting for the delivery worker' },
+        ],
+        delivery_state: 'queued',
       } as never,
       overrideAccess: true,
     })) as { id: number }
@@ -232,6 +265,11 @@ export const runLeadPipeline = async (
         steps.push({ step: 'delivery.queued', ok: true, detail: `lead ${leadId}` })
         return { ok: true, lead_id: leadId, event_id, steps }
       }
+      // No queue: say so on the Lead, then deliver in this request. The
+      // `queued` entry written with the row was optimistic and is corrected here.
+      await appendDeliveryLog(leadId, [
+        { step: DELIVERY_STEPS.queueUnavailable, ok: true, detail: 'no delivery queue available; delivering inline' },
+      ]).catch(() => null)
     }
   }
 
@@ -241,11 +279,23 @@ export const runLeadPipeline = async (
   const prior = await payload
     .findByID({ collection: 'leads', id: leadId!, depth: 0, overrideAccess: true })
     .catch(() => null)
-  const priorLog = ((prior as { delivery_log?: Array<{ step?: string }> } | null)?.delivery_log ?? [])
-  if (priorLog.some((entry) => entry.step === 'downstream.completed')) {
+  const priorLog = ((prior as { delivery_log?: DeliveryEntry[] } | null)?.delivery_log ?? [])
+  // A redelivered queue job for a pass that already finished must not send
+  // again. A retry the operator asked for AFTER that completion is a new pass.
+  if (passAlreadyCompleted(priorLog)) {
     steps.push({ step: 'delivery.deduplicated', ok: true, detail: `lead ${leadId}` })
     return { ok: true, lead_id: leadId, event_id, steps }
   }
+  // Steps that already succeeded are never repeated. On a first pass this set is
+  // empty; on a retry it is what keeps a buyer who already has the lead from
+  // receiving it twice while a failed one is tried again.
+  const settled = settledSteps(priorLog)
+  const priorHlr = (prior as { hlr_result?: { state?: string } | null } | null)?.hlr_result ?? null
+
+  const trigger = opts?.trigger ?? (opts?.resumeLeadId ? 'queue' : 'inline')
+  await appendDeliveryLog(leadId!, [
+    { step: DELIVERY_STEPS.processing, ok: true, detail: `${trigger} pass ${readDelivery(priorLog).retryCount + 1}` },
+  ]).catch(() => null)
 
   const leadPatch: Record<string, unknown> = {}
   const deliveryLog: Array<{ at: string; step: string; ok: boolean; detail?: string }> = []
@@ -284,6 +334,7 @@ export const runLeadPipeline = async (
   // TrustedForm claim
   const tfTask = (async () => {
     const started = Date.now()
+    if (settled.has('trustedform.claim')) return
     const tf = tc?.trustedform
     if (!tf?.enabled || !input.trustedform_cert_url) {
       steps.push({ step: 'trustedform.claim', ok: true, detail: 'skipped', duration_ms: t(started) })
@@ -312,6 +363,7 @@ export const runLeadPipeline = async (
   // Jornaya verification
   const jorTask = (async () => {
     const started = Date.now()
+    if (settled.has('jornaya.verify')) return
     const j = tc?.jornaya
     if (!j?.enabled || !input.jornaya_lead_id) {
       steps.push({ step: 'jornaya.verify', ok: true, detail: 'skipped', duration_ms: t(started) })
@@ -334,6 +386,7 @@ export const runLeadPipeline = async (
   // Meta CAPI
   const metaTask = (async () => {
     const started = Date.now()
+    if (settled.has('meta.capi')) return
     const m = tc?.meta_pixel
     if (!m?.enabled) {
       steps.push({ step: 'meta.capi', ok: true, detail: 'skipped', duration_ms: t(started) })
@@ -379,6 +432,7 @@ export const runLeadPipeline = async (
   // TikTok Events API (simplified — Meta-style POST)
   const tiktokTask = (async () => {
     const started = Date.now()
+    if (settled.has('tiktok.events_api')) return
     const tk = tc?.tiktok
     if (!tk?.enabled || !tk.pixel_code || !tk.access_token) {
       steps.push({ step: 'tiktok.events_api', ok: true, detail: tk?.enabled ? 'missing credentials' : 'skipped', duration_ms: t(started) })
@@ -427,6 +481,7 @@ export const runLeadPipeline = async (
   // GA4 Measurement Protocol
   const ga4Task = (async () => {
     const started = Date.now()
+    if (settled.has('ga4.mp')) return
     const ga = tc?.ga4
     if (!ga?.enabled || !ga.measurement_id || !ga.api_secret) {
       steps.push({ step: 'ga4.mp', ok: true, detail: ga?.enabled ? 'missing credentials' : 'skipped', duration_ms: t(started) })
@@ -465,6 +520,7 @@ export const runLeadPipeline = async (
   // TrueCall push
   const truecallTask = (async () => {
     const started = Date.now()
+    if (settled.has('truecall.push')) return
     const tk = tc?.truecall
     if (!tk?.enabled || !tk.api_key || !tk.account_id) {
       steps.push({ step: 'truecall.push', ok: true, detail: tk?.enabled ? 'missing credentials' : 'skipped', duration_ms: t(started) })
@@ -503,7 +559,7 @@ export const runLeadPipeline = async (
   // Custom webhooks
   const webhookTask = (async () => {
     const started = Date.now()
-    const webhooks = (tc?.custom_webhooks ?? []) as WebhookConfig[]
+    const webhooks = ((tc?.custom_webhooks ?? []) as WebhookConfig[]).filter((w) => !settled.has(`webhook.${w.name}`))
     if (webhooks.length === 0) {
       steps.push({ step: 'webhooks.dispatch', ok: true, detail: 'none configured', duration_ms: t(started) })
       return
@@ -522,6 +578,7 @@ export const runLeadPipeline = async (
         attribution,
         trustedform_cert_url: input.trustedform_cert_url ?? null,
         jornaya_lead_id: input.jornaya_lead_id ?? null,
+        consent: input.consent ?? null,
       },
     })
     for (const r of results) {
@@ -538,6 +595,7 @@ export const runLeadPipeline = async (
   // Slack notification (LegalOS-wide IntegrationConfig)
   const slackTask = (async () => {
     const started = Date.now()
+    if (settled.has('slack.notify')) return
     try {
       const integration = await payload.findGlobal({ slug: 'integration-config', overrideAccess: true })
       const webhooks = ((integration?.slack?.webhooks ?? []) as Array<{ label?: string; url: string; events?: string }>) ?? []
@@ -582,49 +640,61 @@ export const runLeadPipeline = async (
   await Promise.allSettled([tfTask, jorTask, metaTask, tiktokTask, ga4Task, truecallTask, webhookTask, slackTask])
 
   // ---------- 4. Persist delivery log + integration patches on the Lead row ----------
-  logDelivery('downstream.completed', true)
+  //
+  // `downstream.completed` says the PASS finished. It is not a delivery claim:
+  // whether a buyer got the lead is read from the destination steps above, and
+  // the detail here states that reading in words.
+  const passReading = readDelivery([
+    ...priorLog,
+    ...deliveryLog,
+  ])
+  const dest = passReading.destinations
+  logDelivery(
+    DELIVERY_STEPS.completed,
+    true,
+    dest.total === 0
+      ? 'no destination configured: nothing was sent to an outside party'
+      : `destinations: ${dest.delivered} delivered, ${dest.failed} failed of ${dest.total}`,
+  )
   try {
-    await payload.update({
-      collection: 'leads',
-      id: leadId!,
-      data: {
-        ...leadPatch,
-        status_history: [
-          {
-            status: 'new',
-            changed_at: new Date().toISOString(),
-            note: input.test_capture ? 'Created via Test Capture' : 'Created via lead capture',
-          },
-        ],
-        delivery_log: deliveryLog,
-        attribution: { ...attribution, event_id },
-      } as never,
-      overrideAccess: true,
+    await appendDeliveryLog(leadId!, deliveryLog, {
+      data: { ...leadPatch, attribution: { ...attribution, event_id } },
     })
   } catch (err) {
     steps.push({ step: 'lead.update', ok: false, detail: err instanceof Error ? err.message : 'unknown', duration_ms: 0 })
   }
 
   // ---------- 5. Fire-and-forget HLR enrichment (never blocks) ----------
-  if (input.contact.phone) {
+  //
+  // Every outcome is STORED, failures included. A lookup that failed used to be
+  // swallowed, leaving no `hlr_result`, which the console read as "not checked":
+  // an operator could not tell an unconfigured provider from one that never ran.
+  const hlrSettled = priorHlr?.state === 'valid' || priorHlr?.state === 'invalid'
+  if (input.contact.phone && !hlrSettled) {
     const phone = input.contact.phone
     const lid = leadId!
     void (async () => {
+      let res: unknown
       try {
-        const res = await enrichPhone(phone)
-        await payload.update({
-          collection: 'leads',
-          id: lid,
-          data: { hlr_result: res as never } as never,
-          overrideAccess: true,
-        })
+        res = await enrichPhone(phone)
+      } catch (err) {
+        res = {
+          ok: false,
+          state: 'provider_error',
+          provider: (process.env.HLR_PROVIDER ?? 'plivo').toLowerCase(),
+          checked_at: new Date().toISOString(),
+          error: err instanceof Error ? err.message : 'unknown error',
+        }
+      }
+      try {
+        await payload.update({ collection: 'leads', id: lid, data: { hlr_result: res as never } as never, overrideAccess: true })
       } catch {
-        // swallowed — HLR is best-effort
+        // the lead row is the record; a failed enrichment write loses only the enrichment
       }
     })()
     steps.push({ step: 'hlr.enqueue', ok: true, detail: 'fired async' })
   } else {
-    steps.push({ step: 'hlr.enqueue', ok: true, detail: 'no phone, skipped' })
+    steps.push({ step: 'hlr.enqueue', ok: true, detail: input.contact.phone ? 'already resolved' : 'no phone, skipped' })
   }
 
   /*
@@ -655,19 +725,25 @@ export const runLeadPipeline = async (
   return { ok: true, lead_id: leadId, event_id, steps }
 }
 
-export const deliverStoredLead = async (leadId: number): Promise<LeadPipelineResult> => {
+export const deliverStoredLead = async (
+  leadId: number,
+  opts?: { trigger?: 'queue' | 'retry' | 'inline' },
+): Promise<LeadPipelineResult> => {
   const payload = await getPayload({ config })
   const lead = await payload.findByID({ collection: 'leads', id: leadId, depth: 1, overrideAccess: true })
   const siteRaw = (lead as { site?: unknown }).site
   const site = siteRaw && typeof siteRaw === 'object' ? (siteRaw as { id: number; slug: string; name: string }) : null
   const siteId = Number(site?.id ?? siteRaw)
   const attribution = ((lead as { attribution?: Attribution }).attribution ?? {}) as Attribution
+  const consent = (lead as { consent?: Partial<LeadConsentRecord> | null }).consent ?? null
   const input: LeadCaptureInput = {
     siteId,
     siteSlug: site?.slug ?? '',
     siteName: site?.name ?? '',
-    primaryHost: null,
     funnel_type: ((lead as { source_entity_type?: LeadCaptureInput['funnel_type'] }).source_entity_type ?? 'quiz'),
+    primaryHost: consent?.source_host ?? null,
+    funnel_path: consent?.source_funnel_path ?? attribution.landing_path ?? undefined,
+    consent: consent?.accepted === true ? (consent as LeadConsentRecord) : undefined,
     funnel_id: (lead as { source_entity_id?: string }).source_entity_id ?? undefined,
     contact: ((lead as { contact?: LeadCaptureInput['contact'] }).contact ?? {}) as LeadCaptureInput['contact'],
     quiz_answers: (lead as { quiz_answers?: Record<string, unknown> }).quiz_answers,
@@ -676,5 +752,5 @@ export const deliverStoredLead = async (leadId: number): Promise<LeadPipelineRes
     jornaya_lead_id: (lead as { jornaya_lead_id?: string }).jornaya_lead_id,
     test_capture: Boolean((lead as { test_capture?: boolean }).test_capture),
   }
-  return runLeadPipeline(input, { resumeLeadId: leadId })
+  return runLeadPipeline(input, { resumeLeadId: leadId, trigger: opts?.trigger ?? 'queue' })
 }

@@ -31,3 +31,9 @@ export const getQueueRedis = (): Redis | null => {
   if (!conn) return null
   return conn.duplicate()
 }
+
+/**
+ * The shared, non-blocking connection, for short commands (locks). Distinct from
+ * `getQueueRedis`, whose duplicates exist for BullMQ's blocking use.
+ */
+export const getSharedRedis = (): Redis | null => getBase()

@@ -61,12 +61,8 @@ const adminUri = base.replace(/\/[^/?]+(\?|$)/, '/postgres$1')
 
 /** The migrations this release ADDS. Everything before them is "production". */
 const RELEASE_MIGRATIONS = [
-  '20260813_210000_locked_documents_funnel_rels',
-  '20260813_213000_integration_config_sample_markers',
-  '20260813_220000_template_records',
-  '20260813_230000_audit_log_user_nullable',
-  '20260814_120000_leads_idempotency_key',
-  '20260924_120000_deployment_published_snapshot',
+  // Lead consent evidence + persisted delivery state (additive, nullable).
+  '20260926_120000_lead_consent_and_delivery_state',
 ]
 
 const sh = (
@@ -165,17 +161,18 @@ try {
   }
 
   t(
-    !(await hasColumn('payload_locked_documents_rels', 'funnel_lp_deployments_id')),
+    !(await hasColumn('leads', 'consent_accepted')),
     'the scratch database is now at the PREVIOUS schema: the release\'s columns are absent',
   )
   t(
-    !(await hasColumn('integration_config', 'funnel_samples_seeded')),
+    !(await hasColumn('leads', 'delivery_state')),
     'and so is the other one',
   )
   // ...and the schema is otherwise complete, or "it fails to verify" would prove
   // nothing about ordering.
   t(await hasColumn('sites', 'brand_identity'), 'while everything from earlier releases is present')
-  t(await hasColumn('funnel_lp_deployments', 'quiz_id'), 'including the column the LAST release tripped over')
+  t(await hasColumn('funnel_lp_deployments', 'quiz_id'), 'including the column an earlier release tripped over')
+  t(await hasColumn('funnel_quiz_deployments', 'published_snapshot'), 'and the live-pin columns from the release before')
 
   /* --- 2. the new code does NOT verify against it ------------------------- */
 
@@ -186,19 +183,17 @@ try {
     'and says so in the words a release log will carry',
   )
   t(
-    /locked-documents|integration-config/.test(before.out),
-    `and names what is missing${/locked-documents|integration-config/.test(before.out) ? '' : `\n${before.out.slice(-800)}`}`,
+    /leads/.test(before.out),
+    `and names what is missing${/leads/.test(before.out) ? '' : `\n${before.out.slice(-800)}`}`,
   )
 
   /* --- 3. migrate, then it does ------------------------------------------ */
 
   const up = sh('pnpm', ['payload', 'migrate'], { DATABASE_URI: scratchUri, NODE_ENV: 'production' })
   t(up.ok, `the release's migrations apply to the previous schema${up.ok ? '' : '\n' + up.out.slice(-1500)}`)
-  t(await hasColumn('payload_locked_documents_rels', 'funnel_lp_deployments_id'), 'and the columns are there')
-  t(await hasColumn('integration_config', 'funnel_samples_seeded'), 'both of them')
-  t(await hasColumn('funnel_quiz_deployments', 'published_snapshot'), 'and the live-pin column on quiz deployments')
-  t(await hasColumn('funnel_lp_deployments', 'published_snapshot'), 'and on landing-page deployments')
-  t(await hasColumn('funnel_advertorial_deployments', 'published_snapshot'), 'and on advertorial deployments')
+  t(await hasColumn('leads', 'consent_accepted'), 'and the consent columns are there')
+  t(await hasColumn('leads', 'consent_disclosure_text') && await hasColumn('leads', 'consent_source_deployment_id'), 'including the disclosure text and the collecting deployment')
+  t(await hasColumn('leads', 'delivery_state'), 'and the persisted delivery state')
 
   const after = sh('pnpm', ['verify:schema'], { DATABASE_URI: scratchUri, NODE_ENV: 'production' })
   t(after.ok, `verify:schema now PASSES, before anything has been started${after.ok ? '' : '\n' + after.out.slice(-1500)}`)
@@ -224,8 +219,8 @@ try {
   {
     const down = sh('pnpm', ['payload', 'migrate:down'], { DATABASE_URI: scratchUri, NODE_ENV: 'production' })
     t(down.ok, `migrate:down reverses the release${down.ok ? '' : '\n' + down.out.slice(-1500)}`)
-    t(!(await hasColumn('payload_locked_documents_rels', 'funnel_lp_deployments_id')), 'and the columns are gone again')
-    t(!(await hasColumn('integration_config', 'funnel_samples_seeded')), 'both of them')
+    t(!(await hasColumn('leads', 'consent_accepted')), 'and the columns are gone again')
+    t(!(await hasColumn('leads', 'delivery_state')), 'both of them')
     t(await hasColumn('sites', 'brand_identity'), 'while the previous release is untouched')
 
     const afterDown = sh('pnpm', ['verify:schema'], { DATABASE_URI: scratchUri, NODE_ENV: 'production' })

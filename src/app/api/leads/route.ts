@@ -7,6 +7,7 @@ import { resolveSiteByHost } from '@/lib/site-resolver'
 import { pickAttributionFromObject } from '@/lib/lead-pipeline/attribution'
 import { getCurrentUser } from '@/lib/auth'
 import { trustedHost } from '@/lib/trusted-host'
+import { buildConsentRecord, CONSENT_TEXT_MAX } from '@/lib/lead-consent'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,6 +52,17 @@ const Body = z.object({
   attribution: z.record(z.unknown()).optional(),
   trustedform_cert_url: z.string().optional(),
   jornaya_lead_id: z.string().optional(),
+  // Explicit affirmative consent. `accepted` is a literal `true`: a body that
+  // says `false`, or omits the act, is not a consent record and is rejected
+  // rather than stored as one. Absence of the whole object is legitimate (a
+  // surface that shows no consent line) and leaves the Lead with no record.
+  consent: z
+    .object({
+      accepted: z.literal(true),
+      disclosure_text: z.string().min(1).max(CONSENT_TEXT_MAX * 2),
+      client_accepted_at: z.string().max(64).optional(),
+    })
+    .optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -122,6 +134,26 @@ export async function POST(req: NextRequest) {
   attribution.ip = (req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? attribution.ip) ?? undefined
   if (!attribution.landing_path && data.funnel_path) attribution.landing_path = data.funnel_path
 
+  // Custom form fields are stored, not dropped: a page author's extra inputs are
+  // answers like a quiz's, and this route used to accept `extra` and discard it.
+  // Explicit `quiz_answers` win a key collision.
+  const extraAnswers = data.extra && Object.keys(data.extra).length > 0 ? data.extra : null
+  const quizAnswers = extraAnswers || data.quiz_answers ? { ...(extraAnswers ?? {}), ...(data.quiz_answers ?? {}) } : undefined
+
+  // Where the consent was collected is the SERVER's knowledge (resolved tenant,
+  // trusted host), never a claim in the body.
+  const consent = data.consent
+    ? buildConsentRecord(data.consent, {
+        site_slug: siteSlug,
+        site_name: siteName,
+        host: primaryHost ?? host ?? null,
+        funnel_type: data.funnel_type,
+        funnel_id: data.funnel_id ?? null,
+        funnel_path: data.funnel_path ?? null,
+        deployment_id: data.source_entity_id ?? data.funnel_id ?? null,
+      })
+    : undefined
+
   const result = await runLeadPipeline({
     siteId,
     siteSlug,
@@ -134,8 +166,9 @@ export async function POST(req: NextRequest) {
     client_submission_id: data.client_submission_id,
     test_capture: data.test_capture,
     contact: { ...data.contact, email: data.contact.email || undefined },
-    quiz_answers: data.quiz_answers,
+    quiz_answers: quizAnswers,
     attribution,
+    consent,
     trustedform_cert_url: data.trustedform_cert_url,
     jornaya_lead_id: data.jornaya_lead_id,
   })

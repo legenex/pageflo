@@ -99,6 +99,8 @@ export default async function LeadsPage({ searchParams }: Props) {
       quiz_answers: lead.quiz_answers ?? null,
       attribution: lead.attribution ?? null,
       hlr_result: lead.hlr_result ?? null,
+      consent: lead.consent ?? null,
+      delivery_state: lead.delivery_state ?? null,
       trustedform_cert_url: lead.trustedform_cert_url ?? null,
       jornaya_lead_id: lead.jornaya_lead_id ?? null,
       client_submission_id: lead.client_submission_id ?? null,
@@ -306,9 +308,11 @@ function LeadFilters({ search, sites }: { search: LeadsSearch; sites: Array<Reco
       </label>
       <select id="lead-delivery" name="delivery" defaultValue={search.delivery} className={selectClass}>
         <option value="all">Any delivery</option>
+        <option value="queued">Queued or in progress</option>
         <option value="delivered">Delivered</option>
-        <option value="failed">Has a failure</option>
-        <option value="not-sent">Never dispatched</option>
+        <option value="no-destination">No destination configured</option>
+        <option value="failed">Failed or partial</option>
+        <option value="not-sent">No delivery record</option>
       </select>
 
       <label className="sr-only" htmlFor="lead-range">

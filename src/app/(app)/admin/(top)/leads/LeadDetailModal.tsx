@@ -3,16 +3,19 @@
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { Check, Copy, Loader2, X } from 'lucide-react'
 import { CodeBlock, Eyebrow, Mono, StatusPill } from '@/components/pageflo/primitives'
-import { setLeadStatus } from './actions'
+import { retryLeadDelivery, setLeadStatus } from './actions'
+import { consentView } from '@/lib/lead-consent'
+import { readDelivery } from '@/lib/lead-pipeline/delivery-state'
 import {
+  DELIVERY_EXPLANATION,
   DELIVERY_LABEL,
   DELIVERY_TONE,
   LEAD_STATUSES,
   SOURCE_LABEL,
   STATUS_LABEL,
   STATUS_TONE,
+  certificateEvidence,
   consentState,
-  deliveryState,
   fullName,
   isConversionStep,
   isDeliveryStep,
@@ -109,9 +112,12 @@ export function LeadDetailModal({ lead, onClose }: { lead: LeadRow; onClose: () 
     return () => document.removeEventListener('keydown', onKey)
   }, [onClose])
 
-  const delivery = deliveryState(lead.delivery_log)
+  const reading = readDelivery(lead.delivery_log)
+  const delivery = reading.state
   const consent = consentState(lead)
+  const consentRecord = consentView(lead.consent)
   const phone = phoneState(lead.hlr_result)
+  const [retryNote, setRetryNote] = useState<{ ok: boolean; text: string } | null>(null)
   const conversionRows = (lead.delivery_log ?? []).filter((e) => isConversionStep(e.step))
   const deliveryRows = (lead.delivery_log ?? []).filter((e) => isDeliveryStep(e.step))
 
@@ -120,6 +126,14 @@ export function LeadDetailModal({ lead, onClose }: { lead: LeadRow; onClose: () 
     null,
     2,
   )
+
+  const retry = () => {
+    setRetryNote(null)
+    start(async () => {
+      const res = await retryLeadDelivery(lead.id)
+      setRetryNote(res.ok ? { ok: true, text: res.message } : { ok: false, text: res.error })
+    })
+  }
 
   const changeStatus = (next: LeadStatus) => {
     setError(null)
@@ -146,7 +160,7 @@ export function LeadDetailModal({ lead, onClose }: { lead: LeadRow; onClose: () 
             <StatusPill label={STATUS_LABEL[lead.status]} tone={STATUS_TONE[lead.status]} />
             {lead.test_capture ? <StatusPill label="Test capture" tone="neutral" dot={false} /> : null}
             <span className="flex-1" />
-            <span className="text-[12.5px] text-ink-muted">
+            <span className="text-[12.5px] text-ink-muted" data-lead-delivery-state={delivery}>
               Delivery:{' '}
               <Mono
                 className={`font-semibold ${
@@ -208,12 +222,47 @@ export function LeadDetailModal({ lead, onClose }: { lead: LeadRow; onClose: () 
                 <Field k="Source id" v={lead.source_entity_id} />
                 <Field k="Site" v={lead.siteName} mono={false} />
                 <Field k="Consent" v={consent.label} mono={false} tone={consent.tone === 'pos' ? 'text-pos' : 'text-warn'} />
-                <Field k="Phone validation" v={phone.label} mono={false} tone={phone.tone === 'pos' ? 'text-pos' : phone.tone === 'neg' ? 'text-neg' : 'text-ink-muted'} />
+                <Field k="Phone validation" v={phone.label} mono={false} tone={phone.tone === 'pos' ? 'text-pos' : phone.tone === 'neg' ? 'text-neg' : phone.tone === 'warn' ? 'text-warn' : 'text-ink-muted'} />
+                <Field k="Delivery" v={DELIVERY_LABEL[delivery]} mono={false} />
+                <Field k="Certificates" v={certificateEvidence(lead)} mono={false} />
                 <Field k="Idempotency key" v={lead.client_submission_id} />
                 <Field k="TrustedForm certificate" v={lead.trustedform_cert_url} />
                 <Field k="Jornaya lead id" v={lead.jornaya_lead_id} />
                 {lead.buyer_id ? <Field k="Buyer" v={lead.buyer_id} /> : null}
                 {lead.sold_at ? <Field k="Sold at" v={ts(lead.sold_at)} /> : null}
+              </div>
+
+              <div className="mt-6 border-t border-border pt-4" data-lead-consent={consentRecord.recorded ? 'accepted' : 'not-recorded'}>
+                <Eyebrow className="mb-2.5 block">Consent evidence</Eyebrow>
+                {consentRecord.recorded ? (
+                  <div className="space-y-3">
+                    <div>
+                      <Eyebrow>Disclosure the visitor accepted</Eyebrow>
+                      <blockquote
+                        data-lead-consent-text=""
+                        className="mt-1 rounded-app border border-border bg-surface-deep px-3 py-2.5 text-[12.5px] leading-[1.55] text-ink-secondary"
+                      >
+                        {consentRecord.record.disclosure_text}
+                      </blockquote>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <Field k="Accepted" v="Yes, by checking an unchecked box" mono={false} tone="text-pos" />
+                      <Field k="Accepted at" v={consentRecord.record.accepted_at ? new Date(consentRecord.record.accepted_at).toISOString() : ''} />
+                      <Field k="Method" v={consentRecord.record.method} />
+                      <Field k="Brand" v={consentRecord.record.source_site_name} mono={false} />
+                      <Field k="Host" v={consentRecord.record.source_host} />
+                      <Field k="Funnel type" v={consentRecord.record.source_funnel_type} mono={false} />
+                      <Field k="Funnel" v={consentRecord.record.source_funnel_id} />
+                      <Field k="Deployment" v={consentRecord.record.source_deployment_id} />
+                      <Field k="Page path" v={consentRecord.record.source_funnel_path} />
+                    </div>
+                  </div>
+                ) : (
+                  <p className="max-w-[520px] text-[12.5px] leading-[1.6] text-ink-muted">
+                    Consent was not recorded for this lead. It was captured before affirmative consent was stored, or through a surface
+                    that showed no consent line. No consent is inferred from any other field.
+                  </p>
+                )}
               </div>
 
               <div className="mt-6 border-t border-border pt-4">
@@ -252,14 +301,52 @@ export function LeadDetailModal({ lead, onClose }: { lead: LeadRow; onClose: () 
           {tab === 'hlr' ? (
             <div className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field k="Result" v={phone.label} mono={false} tone={phone.tone === 'pos' ? 'text-pos' : phone.tone === 'neg' ? 'text-neg' : 'text-ink-muted'} />
+                <Field k="Result" v={phone.label} mono={false} tone={phone.tone === 'pos' ? 'text-pos' : phone.tone === 'neg' ? 'text-neg' : phone.tone === 'warn' ? 'text-warn' : 'text-ink-muted'} />
                 <Field k="Number" v={lead.contact?.phone} />
               </div>
+              <p className="max-w-[560px] text-[12.5px] leading-[1.6] text-ink-muted" data-lead-phone-state={phone.kind}>
+                {phone.detail}
+              </p>
               <CodeBlock label="Stored HLR response">
                 {lead.hlr_result
                   ? JSON.stringify(lead.hlr_result, null, 2)
-                  : 'No phone validation was recorded for this lead. Enrichment runs only when an HLR provider is configured and the lead carries a phone number.'}
+                  : 'No phone validation was recorded for this lead. A lookup is attempted for every lead that carries a phone number; when none is recorded the attempt has not finished or predates lookup recording.'}
               </CodeBlock>
+            </div>
+          ) : null}
+
+          {tab === 'delivery' ? (
+            <div className="mb-4 space-y-3" data-lead-delivery-panel={delivery}>
+              <div className="flex flex-wrap items-center gap-3">
+                <StatusPill label={DELIVERY_LABEL[delivery]} tone={DELIVERY_TONE[delivery]} />
+                <span className="text-[12px] text-ink-muted">
+                  {reading.destinations.total === 0
+                    ? 'No destination attempted'
+                    : `${reading.destinations.delivered} of ${reading.destinations.total} destinations delivered`}
+                  {reading.retryCount > 0 ? ` \u00b7 ${reading.retryCount} retr${reading.retryCount === 1 ? 'y' : 'ies'} requested` : ''}
+                </span>
+              </div>
+              <p className="max-w-[560px] text-[12.5px] leading-[1.6] text-ink-muted">{DELIVERY_EXPLANATION[delivery]}</p>
+              {reading.retryable ? (
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    data-lead-retry=""
+                    disabled={pending}
+                    onClick={retry}
+                    className="inline-flex h-[30px] items-center gap-2 rounded-app-sm bg-brand px-3 text-[12.5px] font-semibold text-white transition-colors hover:bg-brand-hover disabled:opacity-50"
+                  >
+                    {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : null}
+                    Retry delivery
+                  </button>
+                  <span className="text-[11.5px] text-ink-dim">Only failed steps run again. Steps that already succeeded are not repeated.</span>
+                </div>
+              ) : null}
+              {retryNote ? (
+                <p role="status" data-lead-retry-note={retryNote.ok ? 'ok' : 'error'} className={`text-[12.5px] ${retryNote.ok ? 'text-pos' : 'text-neg'}`}>
+                  {retryNote.text}
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -271,7 +358,7 @@ export function LeadDetailModal({ lead, onClose }: { lead: LeadRow; onClose: () 
                   ? 'No conversion events were recorded for this lead. Events are written when a tracking configuration with a Conversions API destination is active for the Site.'
                   : lead.status === 'soft-dq' || lead.status === 'hard-dq'
                     ? 'No delivery attempts were recorded. A disqualified lead is not dispatched to a buyer.'
-                    : 'No delivery log rows yet. Persist succeeded; downstream steps appear here when they run (queue, webhooks, Slack).'
+                    : 'This lead has no delivery history. It was stored before delivery steps were logged.'
               }
             />
           ) : null}

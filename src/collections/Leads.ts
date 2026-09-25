@@ -68,6 +68,30 @@ export const Leads: CollectionConfig = {
         { name: 'zip', type: 'text' },
       ],
     },
+    {
+      // Explicit affirmative consent, recorded at the moment the visitor checked
+      // an UNCHECKED-by-default box. Every field is nullable: a Lead written
+      // before this existed has no consent record and is displayed as "not
+      // recorded", never backfilled. `accepted` is only ever written as true;
+      // a submission without the act carries no consent group at all.
+      name: 'consent',
+      type: 'group',
+      admin: { description: 'Affirmative consent evidence: the exact disclosure the visitor accepted, when, and where it was collected.' },
+      fields: [
+        { name: 'accepted', type: 'checkbox', admin: { readOnly: true } },
+        { name: 'disclosure_text', type: 'textarea', admin: { readOnly: true, description: 'The disclosure exactly as rendered beside the checkbox, as plain text.' } },
+        { name: 'accepted_at', type: 'date', admin: { readOnly: true, description: 'Server clock when the consenting submission was received.' } },
+        { name: 'client_accepted_at', type: 'date', admin: { readOnly: true, description: "The visitor device's clock at the click. Informational." } },
+        { name: 'method', type: 'text', admin: { readOnly: true } },
+        { name: 'source_site_slug', type: 'text', admin: { readOnly: true } },
+        { name: 'source_site_name', type: 'text', admin: { readOnly: true } },
+        { name: 'source_host', type: 'text', admin: { readOnly: true } },
+        { name: 'source_funnel_type', type: 'text', admin: { readOnly: true } },
+        { name: 'source_funnel_id', type: 'text', admin: { readOnly: true } },
+        { name: 'source_funnel_path', type: 'text', admin: { readOnly: true } },
+        { name: 'source_deployment_id', type: 'text', admin: { readOnly: true } },
+      ],
+    },
     { name: 'quiz_answers', type: 'json' },
     { name: 'attribution', type: 'json', admin: { description: 'utm_*, fbclid, gclid, ttclid, referrer, landing_path, session_id, ip, user_agent.' } },
     { name: 'trustedform_cert_url', type: 'text' },
@@ -91,6 +115,15 @@ export const Leads: CollectionConfig = {
       admin: { readOnly: true, description: 'Idempotency key; dedupes retried submissions of the same lead.' },
     },
     { name: 'hlr_result', type: 'json', admin: { description: 'Async-populated phone enrichment result.' } },
+    {
+      // Derived from `delivery_log` by readDelivery() and persisted on every log
+      // append so the console can filter on it. Null on rows that predate it;
+      // the console then derives the state from the log itself.
+      name: 'delivery_state',
+      type: 'text',
+      index: true,
+      admin: { readOnly: true, description: 'Reading of delivery_log: queued, processing, delivered, failed, no-destination and so on.' },
+    },
     { name: 'buyer_id', type: 'text' },
     { name: 'sold_at', type: 'date' },
     { name: 'sale_price', type: 'number' },

@@ -252,8 +252,8 @@ const answerOf = (quiz: Quiz, nodeId: string, answerId: string): Answer => {
     'the consent line is printed in exactly one place (guard + render)',
   )
   t(
-    primitives.includes('safeConsentHtml(view.legal.tcpa)'),
-    'consent HTML is rendered, not escaped as text',
+    primitives.includes('disclosure={view.legal.tcpa}') && read('components/public/ConsentCheckbox.tsx').includes('safeConsentHtml(disclosure)'),
+    'consent HTML is rendered through the shared checkbox, sanitised, not escaped as text',
   )
 
   // `types.ts` DECLARES `legal.tcpa` on the view model, which is not rendering

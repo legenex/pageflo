@@ -5,7 +5,7 @@ export type LeadsSearch = {
   status: LeadStatus | 'all'
   site: string
   source: string
-  delivery: 'all' | 'failed' | 'delivered' | 'not-sent'
+  delivery: 'all' | 'failed' | 'delivered' | 'queued' | 'no-destination' | 'not-sent'
   q: string
   range: 'all' | '24h' | '7d' | '30d' | '90d'
   includeTest: boolean
@@ -38,7 +38,7 @@ export const parseSearch = (raw: Record<string, string | string[] | undefined>):
     status: (LEAD_STATUSES as readonly string[]).includes(status) ? (status as LeadStatus) : 'all',
     site: one(raw.site),
     source: one(raw.source),
-    delivery: delivery === 'failed' || delivery === 'delivered' || delivery === 'not-sent' ? delivery : 'all',
+    delivery: delivery === 'failed' || delivery === 'delivered' || delivery === 'queued' || delivery === 'no-destination' || delivery === 'not-sent' ? delivery : 'all',
     q: one(raw.q).trim().slice(0, 120),
     range: range in RANGES || range === 'all' ? (range as LeadsSearch['range']) : 'all',
     includeTest: one(raw.test) === '1',
@@ -72,12 +72,25 @@ export const buildWhere = (s: LeadsSearch): Where => {
     and.push({ createdAt: { greater_than_equal: since } })
   }
 
-  // Delivery is derived from the delivery_log rows rather than stored on the
-  // lead, so these filters query the log itself. "Not sent" means no dispatch
-  // row exists at all, which is the correct state for a disqualified lead.
-  if (s.delivery === 'failed') and.push({ 'delivery_log.ok': { equals: false } })
-  if (s.delivery === 'delivered') and.push({ 'delivery_log.ok': { equals: true } })
-  if (s.delivery === 'not-sent') and.push({ 'delivery_log.step': { exists: false } })
+  // Delivery filters read the persisted `delivery_state` (an index over the
+  // log, kept current by the pipeline). Rows that predate it have no state and
+  // are matched through the log itself, so the filter does not silently hide
+  // history. "No delivery record" means neither a state nor a single log row.
+  const noState: Where = { delivery_state: { exists: false } }
+  if (s.delivery === 'failed') {
+    and.push({
+      or: [
+        { delivery_state: { in: ['failed', 'partial', 'stalled'] } },
+        { and: [noState, { 'delivery_log.ok': { equals: false } }] },
+      ],
+    })
+  }
+  if (s.delivery === 'delivered') {
+    and.push({ or: [{ delivery_state: { equals: 'delivered' } }, { and: [noState, { 'delivery_log.ok': { equals: true } }] }] })
+  }
+  if (s.delivery === 'queued') and.push({ delivery_state: { in: ['captured', 'queued', 'processing', 'retry-pending'] } })
+  if (s.delivery === 'no-destination') and.push({ delivery_state: { equals: 'no-destination' } })
+  if (s.delivery === 'not-sent') and.push({ and: [noState, { 'delivery_log.step': { exists: false } }] })
 
   if (s.q) {
     and.push({
