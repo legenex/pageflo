@@ -8,7 +8,7 @@
  */
 import { readFileSync } from 'node:fs'
 
-import { siteToBrand } from '../src/lib/brand-map.ts'
+import { resolveBrandLegal, siteToBrand } from '../src/lib/brand-map.ts'
 import { refuseDeploymentCopyOverride } from '../src/lib/master-safety.ts'
 import { SEED_SITES } from '../src/seed/sites.ts'
 
@@ -89,6 +89,17 @@ const preview = readFileSync(new URL('../src/components/builder/lp/LandingPagesA
 t(
   !preview.includes('deployment?.contentOverrides'),
   'LP builder preview does not merge deployment copy over the master',
+)
+
+const year = String(new Date().getFullYear())
+const legalTokens = resolveBrandLegal({
+  name: 'Acme',
+  legal: { copyright: '(c) {year} {brand}', tcpa_text: 'By submitting you agree {{brand.displayName}} may contact you.' },
+})
+t(legalTokens.copyright === `(c) ${year} Acme`, 'single-brace {year} and {brand} resolve in copyright')
+t(
+  legalTokens.tcpaText.includes('Acme') && !legalTokens.tcpaText.includes('{{'),
+  'double-brace {{brand.displayName}} resolves in TCPA',
 )
 
 const quizTheme = readFileSync(new URL('../src/lib/quiz-theme.ts', import.meta.url), 'utf8')

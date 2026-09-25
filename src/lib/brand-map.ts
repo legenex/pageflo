@@ -265,11 +265,17 @@ export const renderBrandTokens = <T extends Record<string, string>>(
     year: String(new Date().getFullYear()),
   }
   const render = (text: string): string =>
-    text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key: string) => values[key] ?? '')
+    text
+      .replace(/\{\{\s*([\w.]+)\s*\}\}/g, (_, key: string) => values[key] ?? '')
+      .replace(/\{(year|brand)\}/g, (_, key: string) =>
+        key === 'year' ? values.year : values['brand.displayName'],
+      )
 
   const out = { ...copy }
   for (const [k, v] of Object.entries(out)) {
-    if (typeof v === 'string' && v.includes('{{')) (out as Record<string, string>)[k] = render(v)
+    if (typeof v === 'string' && (v.includes('{{') || v.includes('{year}') || v.includes('{brand}'))) {
+      ;(out as Record<string, string>)[k] = render(v)
+    }
   }
   return out
 }
