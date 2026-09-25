@@ -150,23 +150,37 @@ try {
 
   const advanceQuiz = async (): Promise<boolean> => {
     if (await page.locator('[data-quiz-form]').count()) return true
-    const selects = page.locator('[data-quiz-root] select')
+    const root = page.locator('[data-quiz-root]')
+    const textarea = root.locator('textarea').first()
+    if (await textarea.count()) {
+      const current = await textarea.inputValue().catch(() => '')
+      if (!current.trim()) {
+        await textarea.fill('QA test: rear-end collision, neck and back pain, treated at ER. PageFlo rescue closeout.')
+        await page.waitForTimeout(200)
+      }
+    }
+    const textInputs = root.locator('input[type="text"], input:not([type])')
+    const nText = await textInputs.count()
+    for (let i = 0; i < nText; i++) {
+      const inp = textInputs.nth(i)
+      const val = await inp.inputValue().catch(() => '')
+      if (!val.trim()) await inp.fill('QA').catch(() => null)
+    }
+    const selects = root.locator('select')
     const selectCount = await selects.count()
     if (selectCount > 0) {
       for (let i = 0; i < selectCount; i++) {
         const sel = selects.nth(i)
+        const current = await sel.inputValue().catch(() => '')
+        if (current) continue
         const values = await sel.locator('option').evaluateAll((os) =>
           os.map((o) => (o as HTMLOptionElement).value).filter((v) => v),
         )
         const pick =
           values.find((v) => /^(TX|Texas|CA|NY|2020|2019|01|1)$/i.test(v)) || values[0]
         if (pick) await sel.selectOption(pick).catch(() => null)
-        await page.waitForTimeout(250)
+        await page.waitForTimeout(200)
       }
-      const cont = page.getByRole('button', { name: /Next|Continue/i }).first()
-      if (await cont.count()) await cont.click().catch(() => null)
-      await page.waitForTimeout(700)
-      return (await page.locator('[data-quiz-form]').count()) > 0
     }
     const answers = page.locator('[data-quiz-answer]')
     if (await answers.count()) {
@@ -176,8 +190,8 @@ try {
     }
     const next = page.getByRole('button', { name: /Next|Continue/i }).first()
     if (await next.count()) {
-      await next.click()
-      await page.waitForTimeout(700)
+      await next.click({ force: true }).catch(() => null)
+      await page.waitForTimeout(800)
       return (await page.locator('[data-quiz-form]').count()) > 0
     }
     return false
@@ -201,12 +215,19 @@ try {
     }
   }
 
-  for (let i = 0; i < 28; i++) {
+  for (let i = 0; i < 40; i++) {
     if (await page.locator('[data-quiz-form]').count()) break
-    const moved = await advanceQuiz()
-    if (moved) break
-    const stuck = !(await page.locator('[data-quiz-answer]').count()) && !(await page.locator('[data-quiz-root] select').count())
-    if (stuck) break
+    const before = ((await page.locator('[data-quiz-question]').first().textContent()) ?? '').trim()
+    await advanceQuiz()
+    await page.waitForTimeout(400)
+    const after = ((await page.locator('[data-quiz-question]').first().textContent()) ?? '').trim()
+    const hasFormNow = (await page.locator('[data-quiz-form]').count()) > 0
+    if (hasFormNow) break
+    if (before && after === before) {
+      const next = page.getByRole('button', { name: /Next|Continue/i }).first()
+      if (await next.count()) await next.click({ force: true }).catch(() => null)
+      await page.waitForTimeout(800)
+    }
   }
   await shot(page, '11-quiz-form-or-mid')
   const hasForm = (await page.locator('[data-quiz-form]').count()) > 0
