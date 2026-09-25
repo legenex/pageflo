@@ -26,7 +26,7 @@ export const enqueueLeadDelivery = async (leadId: number): Promise<'queued' | 'u
       'deliver',
       { leadId },
       {
-        jobId: `lead:${leadId}`,
+        jobId: `lead-${leadId}`,
         attempts: 5,
         backoff: { type: 'exponential', delay: 2000 },
         removeOnComplete: 1000,
@@ -46,7 +46,13 @@ export const enqueueLeadDelivery = async (leadId: number): Promise<'queued' | 'u
 /**
  * Enqueue an operator-requested retry as a NEW job.
  *
- * The original job id (`lead:<id>`) is retained by the queue after completion
+ * Job ids use dashes, never colons: BullMQ rejects a custom id containing `:`
+ * unless it has exactly three colon-separated parts, so the original `lead:<id>`
+ * was rejected on EVERY add. `enqueueLeadDelivery` swallowed that as "queue
+ * unavailable", and every lead was delivered inline in the visitor's request;
+ * the worker never received a job. The delivery log now records which path ran.
+ *
+ * The original job id (`lead-<id>`) is retained by the queue after completion
  * (`removeOnComplete`), and BullMQ silently ignores an `add` whose id already
  * exists, so reusing it would make a retry a no-op that reports success. The
  * sequence number keeps ids unique per request while the same number, resent,
@@ -60,7 +66,7 @@ export const enqueueLeadRetry = async (leadId: number, sequence: number): Promis
       'deliver',
       { leadId },
       {
-        jobId: `lead:${leadId}:retry:${sequence}`,
+        jobId: `lead-${leadId}-retry-${sequence}`,
         attempts: 3,
         backoff: { type: 'exponential', delay: 2000 },
         removeOnComplete: 1000,

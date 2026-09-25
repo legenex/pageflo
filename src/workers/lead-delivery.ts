@@ -11,7 +11,7 @@ export const processLeadDeliveryJob = async (job: JobLike): Promise<void> => {
   const { appendDeliveryLog } = await import('@/lib/lead-pipeline/log')
   const { DELIVERY_STEPS } = await import('@/lib/lead-pipeline/delivery-state')
   const leadId = job.data.leadId
-  const trigger = typeof job.id === 'string' && job.id.includes(':retry:') ? 'retry' : 'queue'
+  const trigger = typeof job.id === 'string' && job.id.includes('-retry-') ? 'retry' : 'queue'
   try {
     await withLeadLock(leadId, () => deliverStoredLead(leadId, { trigger }))
   } catch (err) {

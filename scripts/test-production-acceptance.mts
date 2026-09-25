@@ -318,7 +318,7 @@ try {
     await (await only(page.getByRole('button', { name: 'New advertorial' }), 'E the New Advertorial control')).click()
     await page.waitForTimeout(1500)
     // The editor that just opened belongs to the master this click created.
-    await page.getByRole('button', { name: 'Settings', exact: true }).click()
+    await (await only(page.getByRole('button', { name: 'Article Settings' }), 'E Article Settings')).click()
     await page.waitForTimeout(500)
     const titleInput = await only(page.getByText('Title', { exact: true }).locator('xpath=following::input[1]'), 'E the Article Settings title field')
     await titleInput.fill(ADV_TITLE)
@@ -413,8 +413,8 @@ try {
   const domainsText = await visibleText(page)
   const claimsServing = domainsText.includes('Serves the site AND verifies ownership')
   t(!claimsServing, 'G the DNS copy does not claim a pending host serves', `phrase present: ${claimsServing}`)
-  const dialogInputs = await page.locator('[role="dialog"] input, input[name="host"], input[name="hostname"]').count()
-  t(dialogInputs > 0, 'G the Add Domain dialog offers a hostname field (nothing is submitted in this run)', `inputs: ${dialogInputs}`)
+  const hostnameField = await page.getByPlaceholder('example.com').count()
+  t(hostnameField === 1 && /Add Domain/.test(domainsText), 'G the Add Domain dialog offers exactly one hostname field (nothing is submitted in this run)', `hostname fields: ${hostnameField}`)
   await page.keyboard.press('Escape')
 
   /* ------------------------------------------------------------------ H Leads UI: the NEW QA lead */
@@ -449,6 +449,7 @@ try {
   await H.shot(page, '63-lead-delivery')
   const hist = (re: RegExp) => re.test(deliveryText)
   t(hist(/lead\.captured/) && hist(/delivery\.queued/), 'H the queue state is in the delivery history', `captured+queued listed: ${hist(/lead\.captured/) && hist(/delivery\.queued/)}`)
+  t(!hist(/queue_unavailable/), 'H the lead went through the real queue, not the inline fallback', `queue_unavailable listed: ${hist(/queue_unavailable/)}`)
   t(hist(/delivery\.processing/) && hist(/downstream\.completed/), "H and the worker's processing and completion", `processing+completed listed: ${hist(/delivery\.processing/) && hist(/downstream\.completed/)}`)
   t(settled.state === 'no-destination', 'H with no buyer configured the delivery state is "no destination", not "delivered"', `state=${settled.state}`)
   t(!hist(/retry delivery/i), 'H and no retry is offered where nothing failed', `retry control shown: ${hist(/retry delivery/i)}`)
@@ -499,7 +500,8 @@ try {
   await retryButton.click()
   await failed.dialog.locator('[data-lead-retry-note]').waitFor({ timeout: 40_000 })
   const noteKind = await failed.dialog.locator('[data-lead-retry-note]').getAttribute('data-lead-retry-note')
-  t(noteKind === 'ok', 'K the operator gets a retry confirmation', `note=${noteKind}: ${norm(await failed.dialog.locator('[data-lead-retry-note]').innerText())}`)
+  const noteText = norm(await failed.dialog.locator('[data-lead-retry-note]').innerText())
+  t(noteKind === 'ok' && /queued/i.test(noteText), 'K the operator gets a retry confirmation, and the retry went through the queue', `note=${noteKind}: ${noteText}`)
   let afterText = ''
   for (let i = 0; i < 20; i++) {
     const d = await openLead(page, lead2.leadId)

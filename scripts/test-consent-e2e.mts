@@ -405,6 +405,7 @@ try {
   t(Boolean(settled), 'the queue worker processed the lead')
   if (settled) {
     const steps = (settled.delivery_log as Array<{ step: string }>).map((e) => e.step)
+    t(!steps.includes('delivery.queue_unavailable'), 'the lead went through the REAL queue, not the inline fallback (a queue that rejects every job would have hidden here)')
     t(steps[0] === 'lead.captured' && steps.includes('delivery.queued') && steps.includes('delivery.processing'), `the lead's history shows capture, queue and processing (${steps.join(' > ')})`)
     t(settled.delivery_state === 'no-destination', `with no destination configured the state is no-destination, NOT delivered (was ${settled.delivery_state})`)
   }
@@ -505,7 +506,7 @@ try {
   await retryBtn.click()
   const note = fd.locator('[data-lead-retry-note]')
   await note.waitFor({ timeout: 30_000 })
-  t((await note.getAttribute('data-lead-retry-note')) === 'ok' && /Retry/.test(await note.innerText()), 'and the operator gets a confirmation')
+  t((await note.getAttribute('data-lead-retry-note')) === 'ok' && /queued/i.test(await note.innerText()), 'and the operator gets a confirmation that it was QUEUED, not run inline')
   const afterRetry = await waitFor(async () => {
     const d = await one('leads', failedLead.id)
     const log = (d.delivery_log ?? []) as Array<{ step: string }>
