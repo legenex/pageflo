@@ -269,7 +269,7 @@ const AdvertorialListView = ({ advertorials, brands, deployments, onOpen, onCrea
           const depCount = (deployments || []).filter(d => d.advertorialId === a.id).length;
           const statusColor = a.status === 'published' ? T.success : a.status === 'archived' ? T.textMute : T.warning;
           return (
-            <div key={a.id} style={{
+            <div key={a.id} data-adv-master={a.id} data-adv-master-status={a.status || 'draft'} style={{
               padding: '14px 18px',
               backgroundColor: T.bgElev,
               border: `1px solid ${T.border}`,
@@ -401,7 +401,7 @@ const AdvDeploymentListView = ({ deployments, advertorials, brands, domains, qui
           const depName = d.name || (ad ? `${ad.title?.slice(0, 40) || 'Untitled'} . ${brand?.displayName || 'No brand'}` : 'Untitled deployment');
           const primary = brand?.colors?.primary;
           const background = brand?.colors?.background;
-          return <div key={d.id} style={{ backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 10, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 20 }}>
+          return <div key={d.id} data-adv-deployment={d.id} data-adv-deployment-status={d.status || 'draft'} style={{ backgroundColor: T.bgElev, border: `1px solid ${T.border}`, borderRadius: 10, padding: '18px 22px', display: 'flex', alignItems: 'center', gap: 20 }}>
             <div style={{
               width: 40, height: 40, borderRadius: 8,
               background: primary ? `linear-gradient(135deg, ${primary}, ${background || primary})` : T.bgElev2,

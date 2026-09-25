@@ -77,16 +77,17 @@ await page.locator('button[type="submit"]').first().click()
 await page.waitForURL(/\/admin/, { timeout: 20000 }).catch(() => null)
 t(/\/admin/.test(page.url()), 'signed in at app.pageflo.io reaches /admin')
 
+// READ ONLY. This used to click "Create published Home" on the Accident
+// Compensation Helper Brand, a production write in a smoke test. A smoke test
+// reports; if the Home is missing that is a failure to look at, not a thing to
+// quietly repair on the way past.
 await page.goto('https://app.pageflo.io/admin/sites/accident-compensation-helper', { waitUntil: 'networkidle' })
-const createHome = page.getByRole('button', { name: /Create published Home/i })
-if (await createHome.count()) {
-  await createHome.click()
-  await page.waitForTimeout(2500)
-}
+const wouldCreateHome = await page.getByRole('button', { name: /Create published Home/i }).count()
 await browser.close()
 
 const ach = await fetchText('https://accident-compensation-helper.preview.pageflo.io/')
-t(ach.status === 200, 'ACH preview Home 200 after ensure-home')
+t(ach.status === 200, `ACH preview Home 200 (HTTP ${ach.status})`)
+t(wouldCreateHome === 0, 'ACH has a published Home, so nothing needs creating')
 
 console.log(`\n${pass} passed, ${fail} failed`)
 if (fail > 0) process.exit(1)
