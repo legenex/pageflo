@@ -24,7 +24,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Rocket, Eye, Edit3, Sparkles, X, Plus, Loader2, Palette, ChevronRight, Plug,
-  Power, PowerOff, Trash2, RefreshCw,
+  Power, PowerOff, Trash2, RefreshCw, Copy,
 } from 'lucide-react'
 
 import { selectableOptions } from '@/lib/selectable'
@@ -103,7 +103,7 @@ const LpTabBar = ({ active, onChange, tabs }) => (
 // ============================================================================
 // LP DEPLOYMENT LIST VIEW
 // ============================================================================
-const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDeployments, domains, publishFailures = {}, onOpen, onDelete, onToggleStatus, onRepublish, onPreview, onRename }) => {
+const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDeployments, domains, publishFailures = {}, onOpen, onClone, onDelete, onToggleStatus, onRepublish, onPreview, onRename }) => {
   const [renamingId, setRenamingId] = useState(null)
   const [renameDraft, setRenameDraft] = useState('')
   if (deployments.length === 0) {
@@ -196,6 +196,7 @@ const LPDeploymentListView = ({ deployments, templates, brands, quizzes, quizDep
             <div style={{ display: 'flex', gap: 6 }}>
               <Btn variant="ghost" size="sm" icon={Eye} onClick={() => onPreview(dep)} aria-label="Preview deployment">Preview</Btn>
               <Btn variant="secondary" size="sm" icon={Edit3} onClick={() => onOpen(dep)} aria-label="Edit deployment">Edit</Btn>
+              <IconBtn icon={Copy} onClick={() => onClone(dep)} aria-label="Duplicate deployment" />
               {dep.status === 'live' && <IconBtn icon={RefreshCw} onClick={() => onRepublish(dep.id)} aria-label="Republish deployment" title="Push current master to live" />}
               <IconBtn icon={dep.status === 'live' ? PowerOff : Power} onClick={() => onToggleStatus(dep.id)} aria-label={dep.status === 'live' ? 'Pause deployment' : 'Publish deployment'} />
               <IconBtn icon={Trash2} onClick={() => onDelete(dep.id)} style={{ color: T.danger }} aria-label="Delete deployment" />
@@ -1188,6 +1189,18 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
       return res
     })
 
+  const cloneDeploymentHandler = (dep) => {
+    if (!dep) return
+    setEditingDeployment({
+      ...JSON.parse(JSON.stringify(dep)),
+      id: '',
+      name: dep.name ? `${dep.name} (copy)` : '',
+      path: `${dep.path || ''}-copy`,
+      status: 'draft',
+    })
+    setSubView('lp_deployment_edit')
+  }
+
   const deleteDeploymentHandler = (id) => {
     setConfirm({
       title: 'Delete deployment?',
@@ -1382,6 +1395,7 @@ export function LandingPagesApp({ initialTemplates, initialDeployments, brands: 
               domains={domains}
               publishFailures={publishFailures}
               onOpen={(dep) => { setEditingDeployment(dep); setSubView('lp_deployment_edit') }}
+              onClone={cloneDeploymentHandler}
               onDelete={deleteDeploymentHandler}
               onToggleStatus={toggleDepStatus}
               onRepublish={republishDep}
