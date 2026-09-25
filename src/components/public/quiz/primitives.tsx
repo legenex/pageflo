@@ -489,6 +489,7 @@ const Complete: QuizPrimitives['Complete'] = ({ theme, surface }) => {
 /** Builder-only annotations. Never drawn on a live page. */
 const Badges: QuizPrimitives['Badges'] = ({ view, theme, surface }) => {
   const s = surfaceOf(theme, surface)
+  if (!view.builder) return null
   if (!view.node.hiddenInLive && !view.node.dynamic) return null
   return (
     <>

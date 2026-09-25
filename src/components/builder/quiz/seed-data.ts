@@ -277,11 +277,11 @@ export const buildSeedNodes = () => [
     answers: [], enterScript: '', exitScript: '' },
   { id: 'n_qual_thanks', stepKey: 'qualified_thanks', tiers: [], type: 'endpoint', fieldName: 'submitted', questionType: 'qualified_result', isVisible: true,
     headline: 'Thank You! An Attorney Will Reach Out Shortly.', question: '/submitted',
-    subheadline: 'LeadByte + Meta/TikTok/Snap CAPI fire here',
+    subheadline: 'We received your answers. A member of the team will be in touch.',
     answers: [], enterScript: '', exitScript: '' },
   { id: 'n_dq_thanks', stepKey: 'dq_thanks', tiers: [], type: 'endpoint', fieldName: 'thanks', questionType: 'dq_result', isVisible: true,
     headline: 'Thanks For Your Information', question: '/thanks',
-    subheadline: 'DQ data still flows to BQ for revenue',
+    subheadline: 'We received your answers.',
     answers: [], enterScript: '', exitScript: '' },
 ]
 

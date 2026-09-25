@@ -248,7 +248,11 @@ export const useQuizView = ({
   const total = machine.progress.total
   const index = machine.progress.index
 
+  const authoringNote = (s: string | null | undefined): boolean =>
+    /LeadByte|CAPI fire|DQ data still flows|Webhook\s*>|Twilio HLR|BQ for revenue/i.test(String(s ?? ''))
+  const live = machine.mode === 'live'
   const view: QuizViewModel = {
+    builder: !live,
     phase,
     step: {
       index,
@@ -263,7 +267,7 @@ export const useQuizView = ({
       headline: node?.headline ? interp(node.headline) : null,
       // The question is drawn only when it says something the headline did not.
       question: node?.question && node.question !== node.headline ? interp(node.question) : null,
-      subheadline: node?.subheadline ? interp(node.subheadline) : null,
+      subheadline: node?.subheadline && !(live && authoringNote(node.subheadline)) ? interp(node.subheadline) : null,
       hiddenInLive: Boolean(node) && !isNodeVisible(node),
       dynamic: (rawNode?.dynamicContent || []).length > 0,
     },

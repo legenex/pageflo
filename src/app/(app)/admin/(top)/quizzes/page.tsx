@@ -29,8 +29,8 @@ export default async function QuizzesPage() {
   const [qRes, depRes, sitesRes, domainsRes, quizTemplates] = await Promise.all([
     payload.find({ collection: 'funnel-quizzes', limit: 500, sort: '-updatedAt', overrideAccess: true }),
     payload.find({ collection: 'funnel-quiz-deployments', limit: 1000, depth: 0, user, overrideAccess: false }),
-    payload.find({ collection: 'sites', limit: 500, sort: 'name', overrideAccess: true }),
-    payload.find({ collection: 'domains', limit: 1000, sort: ['-primary'], overrideAccess: true }),
+    payload.find({ collection: 'sites', limit: 500, sort: 'name', user, overrideAccess: false }),
+    payload.find({ collection: 'domains', limit: 1000, sort: ['-primary'], user, overrideAccess: false }),
     // Tolerated rather than awaited blindly: on a database where the template
     // migration has not run the table is missing, and a builder that 500s is
     // worse than one whose gallery is empty and says so.

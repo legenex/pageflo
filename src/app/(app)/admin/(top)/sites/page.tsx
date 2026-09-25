@@ -19,6 +19,8 @@ import {
 import { verticalLabel } from '@/lib/verticals'
 import { SitesFilters } from './SitesFilters'
 import { NewSiteButton } from './CreateSiteWizard'
+import { getCurrentUser } from '@/lib/auth'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Brands' }
@@ -60,13 +62,15 @@ export default async function SitesPage({ searchParams }: { searchParams: Search
   const q = (params.q ?? '').trim()
 
   const payload = await getPayload({ config })
+  const user = await getCurrentUser()
+  if (!user) redirect('/sign-in')
 
   const [allCount, activeCount, draftCount, pausedCount, archivedCount] = await Promise.all([
-    payload.count({ collection: 'sites', overrideAccess: true }),
-    payload.count({ collection: 'sites', where: { status: { equals: 'active' } }, overrideAccess: true }),
-    payload.count({ collection: 'sites', where: { status: { equals: 'draft' } }, overrideAccess: true }),
-    payload.count({ collection: 'sites', where: { status: { equals: 'paused' } }, overrideAccess: true }),
-    payload.count({ collection: 'sites', where: { status: { equals: 'archived' } }, overrideAccess: true }),
+    payload.count({ collection: 'sites', user, overrideAccess: false }),
+    payload.count({ collection: 'sites', where: { status: { equals: 'active' } }, user, overrideAccess: false }),
+    payload.count({ collection: 'sites', where: { status: { equals: 'draft' } }, user, overrideAccess: false }),
+    payload.count({ collection: 'sites', where: { status: { equals: 'paused' } }, user, overrideAccess: false }),
+    payload.count({ collection: 'sites', where: { status: { equals: 'archived' } }, user, overrideAccess: false }),
   ])
 
   const ands: Where[] = []
@@ -80,7 +84,8 @@ export default async function SitesPage({ searchParams }: { searchParams: Search
     where,
     sort: '-updatedAt',
     limit: 100,
-    overrideAccess: true,
+    user,
+    overrideAccess: false,
   })
 
   const siteIds = sites.docs.map((s) => s.id)

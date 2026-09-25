@@ -21,8 +21,8 @@ export default async function AdvertorialsPage() {
   const [adRes, depRes, sitesRes, domainsRes, quizRes, quizDepRes] = await Promise.all([
     payload.find({ collection: 'funnel-advertorials', limit: 500, sort: '-updatedAt', overrideAccess: true }),
     payload.find({ collection: 'funnel-advertorial-deployments', limit: 1000, depth: 0, user, overrideAccess: false }),
-    payload.find({ collection: 'sites', limit: 500, sort: 'name', overrideAccess: true }),
-    payload.find({ collection: 'domains', limit: 1000, sort: ['-primary'], overrideAccess: true }),
+    payload.find({ collection: 'sites', limit: 500, sort: 'name', user, overrideAccess: false }),
+    payload.find({ collection: 'domains', limit: 1000, sort: ['-primary'], user, overrideAccess: false }),
     payload.find({ collection: 'funnel-quizzes', limit: 500, overrideAccess: true }),
     payload.find({ collection: 'funnel-quiz-deployments', limit: 1000, depth: 0, user, overrideAccess: false }),
   ])

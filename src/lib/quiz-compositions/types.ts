@@ -115,6 +115,8 @@ export type QuizInputModel =
   | { readonly kind: 'none' }
 
 export type QuizViewModel = {
+  /** True in the builder/preview. Live visitor pages never draw authoring badges. */
+  readonly builder: boolean
   /** Which shape of screen this is. Drives nothing else. */
   readonly phase: 'question' | 'form' | 'working' | 'endpoint' | 'complete'
   readonly step: {

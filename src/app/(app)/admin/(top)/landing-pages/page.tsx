@@ -57,8 +57,8 @@ export default async function LandingPagesPage() {
     listLpTemplateRecords(payload),
     listQuizTemplateRecords(payload),
     payload.find({ collection: 'funnel-lp-deployments', limit: 1000, depth: 0, user, overrideAccess: false }),
-    payload.find({ collection: 'sites', limit: 500, sort: 'name', overrideAccess: true }),
-    payload.find({ collection: 'domains', limit: 1000, sort: ['-primary'], overrideAccess: true }),
+    payload.find({ collection: 'sites', limit: 500, sort: 'name', user, overrideAccess: false }),
+    payload.find({ collection: 'domains', limit: 1000, sort: ['-primary'], user, overrideAccess: false }),
     payload.find({ collection: 'funnel-quizzes', limit: 500, overrideAccess: true }),
     // Standalone quiz deployments, so a row whose only binding is the legacy
     // `quiz_deployment_id` pointer can be resolved to a flow — or flagged as

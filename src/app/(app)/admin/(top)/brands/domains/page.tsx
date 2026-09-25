@@ -1,5 +1,7 @@
 import { getPayload } from 'payload'
+import { redirect } from 'next/navigation'
 import config from '@payload-config'
+import { getCurrentUser } from '@/lib/auth'
 import { Globe } from 'lucide-react'
 import { buildDnsRecords, type DnsRecord } from '@/lib/dns-records'
 import { Card, EmptyState, Mono, Page, PageHeader } from '@/components/pageflo/primitives'
@@ -40,14 +42,17 @@ const brandColorOf = (slug: string): string => {
 }
 
 export default async function DomainsIndexPage() {
+  const user = await getCurrentUser()
+  if (!user) redirect('/sign-in')
   const payload = await getPayload({ config })
   const [sitesRes, domainsRes] = await Promise.all([
-    payload.find({ collection: 'sites', limit: 500, overrideAccess: true }),
+    payload.find({ collection: 'sites', limit: 500, user, overrideAccess: false }),
     payload.find({
       collection: 'domains',
       sort: ['-primary', 'kind', 'host'],
       limit: 1000,
-      overrideAccess: true,
+      user,
+      overrideAccess: false,
     }),
   ])
 
