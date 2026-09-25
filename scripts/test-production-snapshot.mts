@@ -6,6 +6,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { launchChromium } from './lib/browser.ts'
+import type { Page } from 'playwright'
 
 const CRED = '/home/legenex/.pageflo-admin-credentials'
 const APP = 'https://app.pageflo.io'
@@ -14,7 +15,9 @@ const PREVIEW = `https://${BRAND_SLUG}.preview.pageflo.io`
 const EVIDENCE = path.resolve('docs/rescue-audit/evidence/closeout')
 const RUN = `pin${Date.now().toString(36)}`
 const MARKER = `PINTEST-${RUN}`
-const PATH = `/adv/${RUN}`
+const ADV_PATH = `/adv/${RUN}`
+const HEADLINE_BEFORE = `Snapshot before ${RUN}`
+const HEADLINE_AFTER = `Snapshot after ${MARKER}`
 
 mkdirSync(EVIDENCE, { recursive: true })
 
@@ -45,8 +48,33 @@ const creds = () => {
 }
 
 const fetchText = async (url: string) => {
-  const res = await fetch(url, { redirect: 'follow' })
+  const res = await fetch(url, { redirect: 'follow', cache: 'no-store' })
   return { status: res.status, body: await res.text() }
+}
+
+const shot = async (page: Page, name: string) => {
+  await page.screenshot({ path: path.join(EVIDENCE, `${name}.png`), fullPage: true }).catch(() => null)
+}
+
+const fillHeadline = async (page: Page, value: string) => {
+  const section = page.getByText('Your compelling headline here').first()
+  if (await section.count()) await section.click()
+  else {
+    const label = page.getByText('Headline', { exact: true }).first()
+    if (await label.count()) await label.click()
+  }
+  await page.waitForTimeout(400)
+  const box = page.getByPlaceholder('The $4,200 check that cost her $186,000').first()
+  if (await box.count()) {
+    await box.fill(value)
+    return true
+  }
+  const ta = page.locator('textarea').nth(0)
+  if (await ta.count()) {
+    await ta.fill(value)
+    return true
+  }
+  return false
 }
 
 const { email, password } = creds()
@@ -64,35 +92,20 @@ try {
   await page.goto(`${APP}/admin/advertorials`, { waitUntil: 'networkidle' })
   await page.getByRole('button', { name: /New Advertorial/i }).click()
   await page.waitForTimeout(1500)
-  await page.screenshot({ path: path.join(EVIDENCE, 'snap-01-new-adv.png'), fullPage: true }).catch(() => null)
+  t(await fillHeadline(page, HEADLINE_BEFORE), 'typed the before headline on the new master')
+  await page.getByRole('button', { name: /^Save$/i }).first().click()
+  await page.waitForTimeout(1800)
+  const pubMaster = page.getByRole('button', { name: /^Publish$/i }).first()
+  if (await pubMaster.count()) {
+    await pubMaster.click()
+    await page.waitForTimeout(1800)
+  }
+  await shot(page, 'snap-02-master-saved')
 
-  const settings = page.getByRole('button', { name: /^Settings$/i }).first()
-  if (await settings.count()) {
-    await settings.click()
-    await page.waitForTimeout(500)
-    const title = page.locator('input').first()
-    if (await title.count()) await title.fill(`Snapshot pin ${RUN}`)
-  }
-  // Seed a distinctive headline in the first text-ish control we can find.
-  const headline = page.locator('textarea, [contenteditable="true"], input').filter({ hasText: /headline|compelling/i }).first()
-  if (await headline.count()) await headline.fill(`Before pin ${RUN}`)
-  const save = page.getByRole('button', { name: /^Save$/i }).first()
-  if (await save.count()) {
-    await save.click()
-    await page.waitForTimeout(1500)
-  }
-  const publish = page.getByRole('button', { name: /^Publish$/i }).first()
-  if (await publish.count()) {
-    await publish.click()
-    await page.waitForTimeout(1500)
-  }
-  await page.screenshot({ path: path.join(EVIDENCE, 'snap-02-master-saved.png'), fullPage: true }).catch(() => null)
-
-  const back = page.getByRole('button', { name: /^Back$/i }).first()
-  if (await back.count()) await back.click()
-  await page.waitForTimeout(800)
+  await page.getByRole('button', { name: /^Back$/i }).first().click()
+  await page.waitForTimeout(1000)
   await page.getByRole('button', { name: /Deployments/i }).first().click()
-  await page.waitForTimeout(600)
+  await page.waitForTimeout(700)
   await page.getByRole('button', { name: /New Deployment/i }).click()
   await page.waitForTimeout(1200)
 
@@ -102,78 +115,63 @@ try {
     const sel = selects.nth(i)
     const options = await sel.locator('option').allTextContents()
     const brand = options.find((o) => o.includes('PageFlo Rescue Acceptance'))
-    const adv = options.find((o) => o.includes(`Snapshot pin ${RUN}`) || o.includes('Untitled Advertorial'))
     const domain = options.find((o) => o.includes(BRAND_SLUG) && o.includes('preview.pageflo.io'))
+    const untitled = options.find((o) => o.includes('Untitled Advertorial'))
     if (brand) await sel.selectOption({ label: brand }).catch(() => null)
-    else if (adv) await sel.selectOption({ label: adv }).catch(() => null)
     else if (domain) await sel.selectOption({ label: domain }).catch(() => null)
+    else if (untitled) await sel.selectOption({ label: untitled }).catch(() => null)
   }
   const pathField = page.getByPlaceholder(/\/adv\//).first()
-  if (await pathField.count()) await pathField.fill(PATH)
+  if (await pathField.count()) await pathField.fill(ADV_PATH)
   await page.getByRole('button', { name: /Create deployment|Save changes/i }).first().click()
   await page.waitForTimeout(2500)
-  await page.screenshot({ path: path.join(EVIDENCE, 'snap-03-deployment.png'), fullPage: true }).catch(() => null)
+  await shot(page, 'snap-03-deployment')
 
-  const pubDep = page.getByRole('button', { name: /Publish/i }).first()
-  if (await pubDep.count()) {
-    await pubDep.click()
-    await page.waitForTimeout(2500)
-  }
-  // List view publish
   await page.goto(`${APP}/admin/advertorials`, { waitUntil: 'networkidle' })
   await page.getByRole('button', { name: /Deployments/i }).first().click()
   await page.waitForTimeout(800)
-  const livePublish = page.getByRole('button', { name: /Publish/i })
-  if (await livePublish.count()) await livePublish.first().click().catch(() => null)
-  await page.waitForTimeout(2000)
+  const pinRow = page.locator('div').filter({ hasText: ADV_PATH }).first()
+  t(await pinRow.count() > 0, `deployment row for ${ADV_PATH} is listed`)
+  const publishOnRow = pinRow.getByRole('button', { name: /^Publish$/i }).first()
+  if (await publishOnRow.count()) {
+    await publishOnRow.click()
+    await page.waitForTimeout(2500)
+  }
 
-  const liveUrl = `${PREVIEW}${PATH}`
+  const liveUrl = `${PREVIEW}${ADV_PATH}`
   const beforeEdit = await fetchText(liveUrl)
-  t(beforeEdit.status === 200, `live URL 200 before master edit (${liveUrl})`)
-  const beforeHasMarker = beforeEdit.body.includes(MARKER)
-  t(!beforeHasMarker, 'live does not already contain the post-edit marker')
+  t(beforeEdit.status === 200, `live URL 200 (${liveUrl})`)
+  t(beforeEdit.body.includes(HEADLINE_BEFORE), 'live serves the before headline')
+  t(!beforeEdit.body.includes(MARKER), 'live does not contain the after marker yet')
   writeFileSync(path.join(EVIDENCE, 'snap-before.html'), beforeEdit.body.slice(0, 40000))
 
-  // Edit the master we just made.
   await page.goto(`${APP}/admin/advertorials`, { waitUntil: 'networkidle' })
-  const row = page.getByText(`Snapshot pin ${RUN}`).first()
-  if (await row.count()) await row.click()
-  else {
-    const untitled = page.getByText(/Untitled Advertorial/i).first()
-    if (await untitled.count()) await untitled.click()
-  }
-  await page.waitForTimeout(1200)
-  // Type the marker into a visible editor field.
-  const fields = page.locator('textarea, [contenteditable="true"]')
-  const fieldCount = await fields.count()
-  if (fieldCount > 0) {
-    const first = fields.first()
-    const current = await first.inputValue().catch(async () => (await first.innerText()) || '')
-    await first.fill(`${current} ${MARKER}`.trim()).catch(async () => {
-      await first.click()
-      await page.keyboard.type(` ${MARKER}`)
-    })
-  }
-  if (await save.count()) {
-    await page.getByRole('button', { name: /^Save$/i }).first().click()
-    await page.waitForTimeout(1500)
-  }
-  await page.screenshot({ path: path.join(EVIDENCE, 'snap-04-master-edited.png'), fullPage: true }).catch(() => null)
+  await page.getByRole('button', { name: /^Advertorials$/i }).first().click().catch(() => null)
+  await page.waitForTimeout(800)
+  await shot(page, 'snap-03b-masters')
+  const firstEdit = page.getByText('Edit', { exact: true }).first()
+  t(await firstEdit.count() > 0, 'Edit control on master list')
+  await firstEdit.click()
+  await page.waitForTimeout(1500)
+  t(await fillHeadline(page, HEADLINE_AFTER), 'typed the after headline on the master')
+  await page.getByRole('button', { name: /^Save$/i }).first().click()
+  await page.waitForTimeout(1800)
+  await shot(page, 'snap-04-master-edited')
 
   const afterEdit = await fetchText(liveUrl)
   t(afterEdit.status === 200, 'live URL still 200 after master edit')
+  t(afterEdit.body.includes(HEADLINE_BEFORE), 'live still serves the before headline')
   t(!afterEdit.body.includes(MARKER), 'live is unchanged after master edit (pin holds)')
 
   await page.goto(`${APP}/admin/advertorials`, { waitUntil: 'networkidle' })
   await page.getByRole('button', { name: /Deployments/i }).first().click()
   await page.waitForTimeout(800)
-  const republish = page.getByRole('button', { name: /Republish/i }).first()
-  t(await republish.count() > 0, 'Republish control exists on a live deployment')
-  if (await republish.count()) {
-    await republish.click()
-    await page.waitForTimeout(2500)
-  }
-  await page.screenshot({ path: path.join(EVIDENCE, 'snap-05-republish.png'), fullPage: true }).catch(() => null)
+  const row = page.locator('div').filter({ hasText: ADV_PATH }).first()
+  const republish = row.getByLabel('Republish deployment').first()
+  t(await republish.count() > 0, 'Republish control exists on the pin deployment')
+  await republish.click()
+  await page.waitForTimeout(3000)
+  await shot(page, 'snap-05-republish')
 
   const afterRepub = await fetchText(liveUrl)
   t(afterRepub.status === 200, 'live URL 200 after republish')
@@ -182,10 +180,10 @@ try {
 } catch (err) {
   fail++
   console.log('  FAIL uncaught', err)
-  await page.screenshot({ path: path.join(EVIDENCE, 'snap-zz.png'), fullPage: true }).catch(() => null)
+  await shot(page, 'snap-zz')
 } finally {
   await browser.close()
 }
 
-console.log(`\n${pass} passed, ${fail} failed  run=${RUN} path=${PATH}`)
+console.log(`\n${pass} passed, ${fail} failed  run=${RUN} path=${ADV_PATH}`)
 if (fail > 0) process.exit(1)
