@@ -806,7 +806,7 @@ export function MarketingSite({ appUrl }: { appUrl: string }) {
                   label: 'Platform',
                   links: [
                     { label: 'Deployments', href: '#how' },
-                    { label: 'Brand Kits', href: '#product' },
+                    { label: 'Brands', href: '#product' },
                     { label: 'Integrations', href: '#leads' },
                     { label: 'Campaign Integrity, soon', href: '#integrity' },
                   ],

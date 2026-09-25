@@ -17,5 +17,16 @@ export default async function BrandIdentitiesPage() {
     domainsRes.docs as unknown as Array<Record<string, unknown>>,
   )
 
-  return <BrandIdentitiesApp initialBrands={brands} />
+  return (
+    <div>
+      <div className="px-5 pt-5 sm:px-7">
+        <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-2)] px-4 py-3 text-[13px] text-[var(--color-ink)] leading-relaxed">
+          This extractor can fill a Brand from a URL or a description. Canonical identity is Brand
+          General Settings. Saves here write the same Brand document: name, colours, phone, and legal
+          copy.
+        </p>
+      </div>
+      <BrandIdentitiesApp initialBrands={brands} />
+    </div>
+  )
 }

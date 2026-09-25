@@ -43,13 +43,13 @@ export const APP_DESCRIPTION = `The ${PRODUCT_NAME} operator console: sites, lan
  * marketing site and the handbook so the two cannot drift.
  */
 export const PRODUCT_CONCEPTS = [
-  'Sites',
+  'Brands',
+  'Websites',
+  'Quizzes',
   'Landing Pages',
   'Advertorials',
-  'Quizzes',
-  'Brand Kits',
-  'Domains',
   'Deployments',
+  'Domains',
   'Leads',
 ] as const
 

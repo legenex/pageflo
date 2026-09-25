@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 import { Upload } from 'lucide-react'
 import { saveGeneralSettings } from './actions'
 import { VERTICALS, type VerticalGroup } from '@/lib/verticals'
@@ -17,7 +17,11 @@ type Site = {
   default_phone?: string | null
   default_phone_tel?: string | null
   default_disclaimer_md?: string | null
+  default_tone?: string | null
   tcpa_text?: string | null
+  copyright?: string | null
+  privacy_url?: string | null
+  terms_url?: string | null
   brand?: {
     logo_url?: string | null
     favicon_url?: string | null
@@ -65,7 +69,7 @@ export function GeneralForm({ site }: { site: Site }) {
             <input name="slug" defaultValue={site.slug} required className={inputClass} />
           </Field>
         </Grid2>
-        <Field label="Tagline">
+        <Field label="Tagline / description">
           <input name="tagline" defaultValue={site.tagline ?? ''} className={inputClass} />
         </Field>
         <Field label="Vertical">
@@ -85,52 +89,26 @@ export function GeneralForm({ site }: { site: Site }) {
 
       <Card title="Brand">
         <p className="text-[12px] text-[var(--color-ink-muted)] mb-4 -mt-2 leading-relaxed">
-          This Site&apos;s brand is the single source of truth across the platform. Changes here cascade to{' '}
-          <span className="text-white font-medium">Site Pages</span>, the{' '}
-          <span className="text-white font-medium">Quiz builder</span>, the{' '}
-          <span className="text-white font-medium">Landing Page builder</span>, and the{' '}
-          <span className="text-white font-medium">Advertorial builder</span> automatically. For the full set of
-          brand controls (logos, all colours, typography, contact CTAs, legal copy) use the centralised{' '}
-          <a
-            href="/admin/brands/brand-identities"
-            className="text-[var(--color-info)] hover:underline font-medium"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Brand Identities editor →
-          </a>
+          Brand identity lives here. Previews, published websites, quizzes, landing pages and advertorials
+          read these values. Custom domains are attached under Domains, not duplicated on this form.
         </p>
         <Grid2>
-          <Field label="Logo">
-            <div className="flex items-center gap-3">
-              <span
-                className="w-11 h-11 rounded-md flex items-center justify-center text-[12px] font-bold text-white shrink-0"
-                style={{ backgroundColor: primary }}
-              >
-                {site.name.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
-              </span>
-              <input name="logo_url" defaultValue={b.logo_url ?? ''} placeholder="https://… (image URL)" className={`${inputClass} flex-1`} />
-              <button type="button" className="text-[13px] font-medium px-3 py-2 rounded-md border border-[var(--color-border-strong)] hover:bg-[var(--color-surface-2)] text-white inline-flex items-center gap-1.5">
-                <Upload className="w-3.5 h-3.5" />
-                Upload
-              </button>
-            </div>
-          </Field>
-          <Field label="Favicon">
-            <div className="flex items-center gap-3">
-              <span
-                className="w-11 h-11 rounded-md flex items-center justify-center text-[12px] font-bold text-white shrink-0"
-                style={{ backgroundColor: primary }}
-              >
-                {site.name.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase()}
-              </span>
-              <input name="favicon_url" defaultValue={b.favicon_url ?? ''} placeholder="https://… (image URL)" className={`${inputClass} flex-1`} />
-              <button type="button" className="text-[13px] font-medium px-3 py-2 rounded-md border border-[var(--color-border-strong)] hover:bg-[var(--color-surface-2)] text-white inline-flex items-center gap-1.5">
-                <Upload className="w-3.5 h-3.5" />
-                Upload
-              </button>
-            </div>
-          </Field>
+          <ImageUrlField
+            label="Logo"
+            name="logo_url"
+            defaultValue={b.logo_url ?? ''}
+            placeholder="https://… (image URL)"
+            fallback={site.name}
+            color={primary}
+          />
+          <ImageUrlField
+            label="Favicon"
+            name="favicon_url"
+            defaultValue={b.favicon_url ?? ''}
+            placeholder="https://… (image URL)"
+            fallback={site.name}
+            color={primary}
+          />
         </Grid2>
 
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-1">
@@ -195,27 +173,50 @@ export function GeneralForm({ site }: { site: Site }) {
           />
           <p className="text-[12px] text-[var(--color-ink-muted)] mt-2">Tel: {toTel(phoneDisplay)}</p>
         </Field>
+        <Field label="Brand voice">
+          <select name="default_tone" defaultValue={site.default_tone ?? 'empathetic'} className={inputClass}>
+            <option value="empathetic">Empathetic</option>
+            <option value="direct">Direct</option>
+          </select>
+        </Field>
       </Card>
 
-      <Card title="Default Disclaimer">
-        <textarea
-          name="default_disclaimer_md"
-          defaultValue={site.default_disclaimer_md ?? ''}
-          rows={5}
-          className={`${inputClass} font-mono text-[13px]`}
-        />
-      </Card>
-
-      <Card title="TCPA consent">
-        <p className="text-[12px] text-[var(--color-ink-muted)] -mt-2">
-          Shown on lead forms. A Brand cannot publish a quiz without this or equivalent consent copy on the flow.
-        </p>
-        <textarea
-          name="tcpa_text"
-          defaultValue={site.tcpa_text ?? ''}
-          rows={4}
-          className={`${inputClass} font-mono text-[13px]`}
-        />
+      <Card title="Legal and consent">
+        <Grid2>
+          <Field label="Copyright">
+            <input
+              name="copyright"
+              defaultValue={site.copyright ?? ''}
+              placeholder="© {year} {brand}"
+              className={inputClass}
+            />
+          </Field>
+          <Field label="Privacy URL">
+            <input name="privacy_url" defaultValue={site.privacy_url ?? '/privacy'} className={inputClass} />
+          </Field>
+        </Grid2>
+        <Field label="Terms URL">
+          <input name="terms_url" defaultValue={site.terms_url ?? '/terms'} className={inputClass} />
+        </Field>
+        <Field label="Default disclaimer">
+          <textarea
+            name="default_disclaimer_md"
+            defaultValue={site.default_disclaimer_md ?? ''}
+            rows={5}
+            className={`${inputClass} font-mono text-[13px]`}
+          />
+        </Field>
+        <Field label="TCPA consent">
+          <p className="text-[12px] text-[var(--color-ink-muted)] mb-2 -mt-1">
+            Shown on lead forms. A Brand cannot publish a quiz without this or equivalent consent copy on the flow.
+          </p>
+          <textarea
+            name="tcpa_text"
+            defaultValue={site.tcpa_text ?? ''}
+            rows={4}
+            className={`${inputClass} font-mono text-[13px]`}
+          />
+        </Field>
       </Card>
 
       <footer className="flex items-center justify-end gap-3 pt-2">
@@ -302,4 +303,94 @@ function toTel(display: string): string {
   if (digits.length === 10) return `+1${digits}`
   if (digits.length === 11 && digits.startsWith('1')) return `+${digits}`
   return `+${digits}`
+}
+
+function ImageUrlField({
+  label,
+  name,
+  defaultValue,
+  placeholder,
+  fallback,
+  color,
+}: {
+  label: string
+  name: string
+  defaultValue: string
+  placeholder: string
+  fallback: string
+  color: string
+}) {
+  const [url, setUrl] = useState(defaultValue)
+  const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const initials = fallback
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
+
+  const onFile = async (file: File | undefined) => {
+    if (!file) return
+    setError(null)
+    setUploading(true)
+    try {
+      const body = new FormData()
+      body.append('file', file)
+      const res = await fetch('/api/media/upload', { method: 'POST', body })
+      const json = (await res.json()) as { ok?: boolean; url?: string; error?: string }
+      if (!res.ok || !json.ok || !json.url) {
+        setError(json.error || 'Upload failed')
+        return
+      }
+      setUrl(json.url)
+    } catch {
+      setError('Upload failed')
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ''
+    }
+  }
+
+  return (
+    <Field label={label}>
+      <div className="flex items-center gap-3">
+        <span
+          className="w-11 h-11 rounded-md flex items-center justify-center text-[12px] font-bold text-white shrink-0 overflow-hidden"
+          style={{ backgroundColor: color }}
+        >
+          {url ? (
+            <img src={url} alt="" className="w-full h-full object-contain bg-white" />
+          ) : (
+            initials
+          )}
+        </span>
+        <input
+          name={name}
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder={placeholder}
+          className={`${inputClass} flex-1`}
+        />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/svg+xml,image/x-icon,.ico"
+          className="hidden"
+          onChange={(e) => void onFile(e.target.files?.[0])}
+        />
+        <button
+          type="button"
+          disabled={uploading}
+          onClick={() => fileRef.current?.click()}
+          className="text-[13px] font-medium px-3 py-2 rounded-md border border-[var(--color-border-strong)] hover:bg-[var(--color-surface-2)] text-white inline-flex items-center gap-1.5 disabled:opacity-50"
+        >
+          <Upload className="w-3.5 h-3.5" />
+          {uploading ? 'Uploading…' : 'Upload'}
+        </button>
+      </div>
+      {error ? <p className="text-[12px] text-[var(--color-neg)] mt-2">{error}</p> : null}
+    </Field>
+  )
 }

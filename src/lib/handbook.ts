@@ -114,10 +114,10 @@ export const FIRST_RUN: Array<{ step: string; route: string; detail: string }> =
       'Name it and pick a vertical. It is not born empty: a home page, a qualifying quiz and a landing page are seeded from the vertical, themed by the brand tokens at render. A preview domain is issued at the same time. The Site is created in DRAFT, which means every one of its URLs returns 404 until you set it Active, so do that as soon as you want to look at it.',
   },
   {
-    step: 'Give it a brand',
-    route: '/admin/brands/brand-identities',
+    step: 'Configure the Brand',
+    route: '/admin/sites',
     detail:
-      'Read the brand off an existing URL, a written description or a logo image. Check the proposal, then accept it. Nothing publishes until the contrast audit passes, so do this before building pages rather than after.',
+      'Open the Brand, then Settings, then General. Name, colours, logo, phone, privacy, terms, disclaimer and TCPA live there. That is the Brand identity operators edit. The extractor at Brand Identities can fill those same fields from a URL or a description, then you still review them on General Settings.',
   },
   {
     step: 'Connect a domain',
@@ -410,7 +410,7 @@ export const SECTIONS: HandbookSection[] = [
         route: '/admin/brands/brand-identities',
         title: 'Brand Identities',
         status: 'working',
-        purpose: 'The single source of truth for how a brand looks, who it is, and where its legal pages live.',
+        purpose: 'An extractor that can fill Brand settings from a URL, a description or a logo. Canonical identity still lives on Brand General Settings.',
         use: [
           'Pick a Site, then work through the tabs: Identity, Colors, Typography, Contact, Domains, Legal and URLs.',
           'To fill it fast, use one of the three readers: from a URL, from a written description, or from a logo image.',

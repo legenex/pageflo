@@ -196,6 +196,18 @@ const phoneFields = (brand: Record<string, unknown>): Record<string, string> => 
   return tel ? { default_phone: raw, default_phone_tel: tel } : { default_phone: raw }
 }
 
+const legalFieldsFromIdentity = (brand: Record<string, unknown>): Record<string, string> => {
+  const legal = (brand.legal ?? {}) as Record<string, unknown>
+  const text = (v: unknown): string => (typeof v === 'string' ? v : '')
+  return {
+    copyright: text(legal.copyright),
+    tcpa_text: text(legal.tcpaText ?? legal.tcpa_text),
+    privacy_url: text(legal.privacyUrl ?? legal.privacy_url),
+    terms_url: text(legal.termsUrl ?? legal.terms_url),
+    default_disclaimer: text(legal.defaultDisclaimer ?? legal.default_disclaimer),
+  }
+}
+
 async function freeSlug(payload: Awaited<ReturnType<typeof getPayload>>, base: string): Promise<string> {
   const root = slugify(base) || 'brand'
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -220,13 +232,19 @@ export async function saveBrandIdentity(args: {
   const name = typeof brand.name === 'string' && brand.name.trim() ? brand.name.trim() : undefined
 
   try {
+    const legal = legalFieldsFromIdentity(brand)
     await payload.update({
       collection: 'sites',
       id: args.siteId,
-      // Mirror the brand name onto Site.name so the Sites list stays in sync,
-      // and re-theme Site.brand from the identity colors so content follows the
-      // brand palette; the rest lives in the brand_identity JSON.
-      data: { brand_identity: brand, brand: brandTokensFromIdentity(brand), ...(name ? { name } : {}), ...phoneFields(brand) } as never,
+      // Mirror identity onto the Brand document operators edit in General Settings.
+      // Site.legal / Site.brand win at render; this editor is an extractor, not a second store.
+      data: {
+        brand_identity: brand,
+        brand: brandTokensFromIdentity(brand),
+        ...(Object.values(legal).some((v) => v.trim()) ? { legal } : {}),
+        ...(name ? { name } : {}),
+        ...phoneFields(brand),
+      } as never,
       user: user as never,
       overrideAccess: false,
     })
@@ -281,7 +299,15 @@ export async function createBrandSite(args: {
       // 'active'. createSite defaults to 'draft' for raw CMS use; the public
       // router 404s drafts, which would otherwise leave a freshly created brand
       // showing "Page not found" at its own domain.
-      data: { status: 'active', brand_identity: brand, brand: brandTokensFromIdentity(brand), ...phoneFields(brand) } as never,
+      data: {
+        status: 'active',
+        brand_identity: brand,
+        brand: brandTokensFromIdentity(brand),
+        ...(Object.values(legalFieldsFromIdentity(brand)).some((v) => v.trim())
+          ? { legal: legalFieldsFromIdentity(brand) }
+          : {}),
+        ...phoneFields(brand),
+      } as never,
       user: user as never,
       overrideAccess: false,
     })

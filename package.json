@@ -2,7 +2,7 @@
   "name": "pageflo",
   "version": "0.1.0",
   "private": true,
-  "description": "PageFlo: dynamic acquisition infrastructure. Sites, landing pages, advertorials, quizzes, brand kits, domains, deployments and leads.",
+  "description": "PageFlo: dynamic acquisition infrastructure. Brands, websites, landing pages, advertorials, quizzes, domains, deployments and leads.",
   "repository": {
     "type": "git",
     "url": "https://github.com/legenex/pageflo.git"
@@ -65,7 +65,9 @@
     "test:wordpress-import": "tsx scripts/test-wordpress-import.mts",
     "test:lp-advertorial-fidelity": "tsx scripts/test-lp-advertorial-fidelity.mts",
     "test:rebrand": "tsx scripts/test-rebrand.mts",
-    "test:console": "cross-env NODE_ENV=production tsx scripts/test-console-walk.mts"
+    "test:console": "cross-env NODE_ENV=production tsx scripts/test-console-walk.mts",
+    "test:production-acceptance": "tsx scripts/test-production-acceptance.mts",
+    "test:production-smoke": "tsx scripts/test-production-smoke.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",

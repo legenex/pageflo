@@ -40,6 +40,10 @@ export async function saveGeneralSettings(formData: FormData): Promise<{ ok: boo
 
   const phoneDisplay = String(formData.get('default_phone') ?? '')
 
+  const headingFont = String(formData.get('font_heading') ?? 'Inter')
+  const bodyFont = String(formData.get('font_body') ?? 'Inter')
+  const toneRaw = String(formData.get('default_tone') ?? 'empathetic')
+  const default_tone: 'direct' | 'empathetic' = toneRaw === 'direct' ? 'direct' : 'empathetic'
   const data = {
     name: String(formData.get('name') ?? ''),
     slug: String(formData.get('slug') ?? ''),
@@ -54,6 +58,7 @@ export async function saveGeneralSettings(formData: FormData): Promise<{ ok: boo
     default_phone: phoneDisplay,
     default_phone_tel: toTel(phoneDisplay),
     default_disclaimer_md: String(formData.get('default_disclaimer_md') ?? ''),
+    default_tone,
     brand: {
       logo_url: String(formData.get('logo_url') ?? '') || null,
       favicon_url: String(formData.get('favicon_url') ?? '') || null,
@@ -62,8 +67,8 @@ export async function saveGeneralSettings(formData: FormData): Promise<{ ok: boo
       surface: String(formData.get('surface') ?? '#F7F5F0'),
       ink: String(formData.get('ink') ?? '#0E1116'),
       muted: String(formData.get('muted') ?? '#5C6470'),
-      font_heading: String(formData.get('font_heading') ?? 'Inter'),
-      font_body: String(formData.get('font_body') ?? 'Inter'),
+      font_heading: headingFont,
+      font_body: bodyFont,
     },
   }
 
@@ -73,15 +78,25 @@ export async function saveGeneralSettings(formData: FormData): Promise<{ ok: boo
     ...(((current as { legal?: Record<string, unknown> | null }).legal) ?? {}),
     tcpa_text: String(formData.get('tcpa_text') ?? ''),
     default_disclaimer: String(formData.get('default_disclaimer_md') ?? ''),
+    copyright: String(formData.get('copyright') ?? ''),
+    privacy_url: String(formData.get('privacy_url') ?? ''),
+    terms_url: String(formData.get('terms_url') ?? ''),
+  }
+  const currentTypography = ((current as { typography?: { base_size?: 'sm' | 'md' | 'lg' | null } | null }).typography) ?? {}
+  const typography = {
+    headline_font: headingFont,
+    body_font: bodyFont,
+    base_size: currentTypography.base_size ?? 'md',
   }
   await payload.update({
     collection: 'sites',
     id: siteId,
-    data: { ...data, legal },
+    data: { ...data, legal, typography },
     user: user as never,
     overrideAccess: false,
   })
 
+  invalidateHostCache()
   revalidatePath(`/admin/sites/${data.slug}/settings/general`)
   return { ok: true }
 }
