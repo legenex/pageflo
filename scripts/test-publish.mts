@@ -28,6 +28,7 @@ import {
   decideTransition,
   quizDeploymentPreflight,
   lpDeploymentPreflight,
+  advertorialDeploymentPreflight,
   DEPLOYMENT_TRANSITIONS,
   type DeploymentStatus,
 } from '../src/lib/publish-lifecycle.ts'
@@ -57,6 +58,7 @@ import { isReferencePlaceholder } from '../src/lib/lp-slots/model.ts'
 import { sanitizePublicQuiz, visitorFacingStepLabel } from '../src/lib/quiz-visitor-copy.ts'
 import { safeConsentHtml } from '../src/lib/safe-consent-html.ts'
 import { renderTemplateVars } from '../src/lib/template-vars.ts'
+import { advertorialSeedSections, findPlaceholderCopy } from '../src/lib/advertorial-seed.ts'
 
 let passed = 0
 let failed = 0
@@ -1256,6 +1258,47 @@ const BOUND_LP_DEP = { ...GOOD_LP_DEP, quiz: 70 }
   t(!safeConsentHtml('See our <a href="/tcpa">TCPA consent</a>.').includes('&lt;a'), 'consent HTML is not escaped as text')
   t(!safeConsentHtml('<a href="javascript:alert(1)">x</a>').includes('javascript:'), 'javascript hrefs are dropped')
   t(renderTemplateVars('Terms of Service | {{site.name}}', { name: 'Dont Settle' }) === 'Terms of Service | Dont Settle', 'legal titles resolve site.name')
+}
+
+
+/* ------------------------------------- advertorial: no starter copy goes live */
+//
+// A new advertorial is created with instructions to the author as its text, and
+// production served them ("[Author]", "X min read", "Opening paragraph that sets
+// the scene"). The go-live and republish gate must refuse them, and must not
+// refuse an article that has been written.
+{
+  const seed = advertorialSeedSections((p) => `${p}_x`, 'September 2026')
+  t(findPlaceholderCopy(seed).length >= 5, `the starter skeleton is recognised as placeholder copy (${findPlaceholderCopy(seed).length} markers)`)
+
+  const AD_DEP = { id: 40, site: 1, advertorial: 9, domain: null, path: '/adv/qa', status: 'draft', utm: {}, pixels: {} }
+  const adCase = (sections: unknown) =>
+    advertorialDeploymentPreflight(CTX(), { deployment: AD_DEP, advertorial: { id: 9, status: 'published', sections }, site: SITE, domain: null })
+
+  const untouched = await adCase(seed)
+  const gate = untouched.checks.find((c) => c.id === 'placeholder-copy')
+  t(gate && !gate.ok && gate.severity === 'block', 'an unedited advertorial FAILS the placeholder gate, as a blocker')
+  t(!untouched.ok, 'so it cannot go live or be republished')
+  t(/\[Author\]/.test(gate?.detail ?? '') && /Your compelling headline here/.test(gate?.detail ?? ''), 'and the refusal names what to replace')
+
+  // Half edited: the headline is real, the byline is still the skeleton.
+  const half = seed.map((s) => (s.type === 'headline' ? { ...s, content: 'The call insurers hope you never return' } : s))
+  const halfR = await adCase(half)
+  t(!halfR.checks.find((c) => c.id === 'placeholder-copy')!.ok, 'a half-edited advertorial still fails: one real headline does not clear the rest')
+
+  // Written: every skeleton text replaced.
+  const written = seed.map((s) => {
+    if (s.type === 'kicker') return { ...s, content: 'PERSONAL FINANCE · ACCIDENT CLAIMS' }
+    if (s.type === 'headline') return { ...s, content: 'The call insurers hope you never return' }
+    if (s.type === 'byline') return { ...s, content: 'By Dana Reyes, 6 min read, September 2026' }
+    if (s.type === 'lede') return { ...s, content: 'Three days after the crash, an adjuster called with a number.' }
+    if (s.type === 'paragraph') return { ...s, content: 'She almost said yes. Here is what changed her mind.' }
+    return s
+  })
+  const writtenR = await adCase(written)
+  t(writtenR.checks.find((c) => c.id === 'placeholder-copy')!.ok, 'an advertorial whose skeleton copy has been replaced passes the gate')
+  t(writtenR.ok, `and can publish${writtenR.ok ? '' : ' — ' + writtenR.blocking.map((c) => c.id + ':' + c.detail).join(', ')}`)
+  t(findPlaceholderCopy([{ type: 'cta_inline', content: { headline: 'See what your case is really worth' } }]).length === 0, 'ordinary CTA copy is not mistaken for a placeholder')
 }
 
 console.log(`\n${passed} passed, ${failed} failed`)

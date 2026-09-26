@@ -28,6 +28,7 @@
  *     must not take away the ability to look at it, or the only way to check a
  *     fix is to publish it.
  */
+import { findPlaceholderCopy } from '@/lib/advertorial-seed'
 import type { Payload } from 'payload'
 
 import type { AuthedUser } from '@/lib/auth'
@@ -652,6 +653,20 @@ export const advertorialDeploymentPreflight = async (
     sections.length > 0
       ? pass('body', 'The advertorial has article sections')
       : fail('body', 'The advertorial has article sections', 'there is nothing to render'),
+  )
+
+  // Authoring residue is never a public page. A brand-new advertorial is created
+  // with instructions to the author as its text; refuse to publish one that still
+  // says them.
+  const placeholders = findPlaceholderCopy(sections)
+  checks.push(
+    placeholders.length === 0
+      ? pass('placeholder-copy', 'The article has no template placeholder copy')
+      : fail(
+          'placeholder-copy',
+          'The article has no template placeholder copy',
+          `it still contains the starter text ${placeholders.map((p) => `"${p}"`).join(', ')}; write the real copy first`,
+        ),
   )
 
   for (const [key, label] of [['utm', 'UTM configuration'], ['pixels', 'Pixel configuration']] as const) {

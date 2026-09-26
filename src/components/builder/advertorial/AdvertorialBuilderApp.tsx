@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import { AlertCircle, AlertTriangle, Archive, ArrowRight, BookOpen, Calendar, Check, ChevronLeft, ChevronRight, Copy, Edit3, Eye, FileEdit, FileSearch, FileText, FileWarning, GripVertical, Hash, Heading1, Heading2, ImageIcon, List, ListChecks, ListOrdered, Loader2, MousePointer, Newspaper, Phone, Plus, Power, PowerOff, Quote, RefreshCw, Rocket, Save, ScrollText, Search, Settings, ShieldAlert, Sparkles, Tag, Trash2, User, Wand2, X } from 'lucide-react'
+import { advertorialSeedSections } from '@/lib/advertorial-seed'
 import { T, genId, brandShortName, Btn, Input, Textarea, Select, Label, Pill, IconBtn, ConfirmDialog, Toast, Modal, PageHeader } from '../ui'
 import { resolveTokens } from '../lp/render'
 import { selectableOptions } from '@/lib/selectable'
@@ -1833,15 +1834,7 @@ const AdvertorialBuilderApp = ({
       templateId: 'personal_story',
       defaultBrandId: brands[0]?.id || '',
       status: 'draft',
-      sections: [
-        { id: genId('sec'), type: 'kicker', content: 'CATEGORY · TOPIC' },
-        { id: genId('sec'), type: 'headline', content: 'Your compelling headline here' },
-        { id: genId('sec'), type: 'byline', content: 'By [Author] · X min read · ' + new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) },
-        { id: genId('sec'), type: 'lede', content: 'Opening paragraph that sets the scene and hooks the reader.' },
-        { id: genId('sec'), type: 'paragraph', content: 'Body paragraph. Use {{brand.displayName}} and other tokens for dynamic content.' },
-        { id: genId('sec'), type: 'cta_inline', content: { headline: 'See what your case is really worth', subline: 'Free 60-second case review.', buttonText: 'Check My Case', linkType: 'quiz' } },
-        { id: genId('sec'), type: 'disclaimer', content: { useDefault: true } },
-      ],
+      sections: advertorialSeedSections(genId, new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' })),
     }
     const res = await settleAction(svCreateAdvertorial({ advertorial: base }))
     if (!res.ok) { setToast({ message: failureMessage(res), type: 'error' }); return }

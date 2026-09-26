@@ -88,6 +88,41 @@ const selectStartingWith = async (scope: Page, prefix: string, what: string): Pr
   return hits[0].text
 }
 
+
+/**
+ * A new advertorial starts as a skeleton of instructions to the author, and the
+ * go-live / republish gate REFUSES an article that still says them. This writes
+ * real copy over each skeleton section of the master that is open in the editor
+ * (the QA advertorial, and only that: the caller has already identified it).
+ * Sections that already hold real copy are left exactly as they are.
+ */
+const QA_COPY: Array<{ seed: string; copy: string }> = [
+  { seed: 'CATEGORY · TOPIC', copy: 'PAGEFLO QA · PRODUCTION ACCEPTANCE' },
+  { seed: 'Your compelling headline here', copy: 'PageFlo production acceptance article' },
+  { seed: 'By [Author]', copy: 'By PageFlo QA, 2 min read, September 2026' },
+  { seed: 'Opening paragraph that sets the scene', copy: 'This article exists to prove the acceptance run can publish, edit and republish.' },
+  { seed: 'Body paragraph. Use', copy: 'It carries no offer and is served only on the acceptance Brand.' },
+]
+const ensureRealCopy = async (p: Page): Promise<number> => {
+  let replaced = 0
+  for (const { seed, copy } of QA_COPY) {
+    const card = p.getByText(seed, { exact: false })
+    if ((await card.count()) === 0) continue
+    await card.first().click()
+    await p.waitForTimeout(300)
+    const fields = p.locator('textarea, input[type="text"], input:not([type])')
+    const n = await fields.count()
+    for (let i = 0; i < n; i++) {
+      if ((await fields.nth(i).inputValue().catch(() => '')).startsWith(seed)) {
+        await fields.nth(i).fill(copy)
+        replaced++
+        break
+      }
+    }
+  }
+  return replaced
+}
+
 /** The visitor quiz, walked to its lead form. */
 const walkQuizToForm = async (p: Page, url: string): Promise<{ startQuestion: string }> => {
   await p.goto(url, { waitUntil: 'networkidle' })
@@ -322,6 +357,9 @@ try {
     await page.waitForTimeout(500)
     const titleInput = await only(page.getByText('Title', { exact: true }).locator('xpath=following::input[1]'), 'E the Article Settings title field')
     await titleInput.fill(ADV_TITLE)
+    await (await only(page.getByRole('button', { name: 'Close' }), 'E close Article Settings')).click()
+    const written = await ensureRealCopy(page)
+    t(written >= 5, 'E the new advertorial\'s starter copy was replaced with real copy before it could be published', `sections rewritten: ${written}`)
     await (await only(page.getByRole('button', { name: /^Save$/i }), 'E Save on the new advertorial')).click()
     await page.waitForTimeout(1800)
     const pubMaster = page.getByRole('button', { name: /^Publish$/i })
@@ -380,6 +418,10 @@ try {
   const edit = await actOn(masterCard, [ADV_TITLE], (r) => r.getByRole('button', { name: 'Edit advertorial' }), 'F edit the QA advertorial master')
   await edit.click()
   await page.waitForTimeout(1500)
+  // Any starter copy left in the QA master is replaced first: the republish gate
+  // refuses starter text, and the republish assertion below is what proves it ran.
+  const rewritten = await ensureRealCopy(page)
+  console.log(`  note: starter sections rewritten in the QA master: ${rewritten}`)
   if ((await page.getByPlaceholder('The $4,200 check that cost her $186,000').count()) === 0) {
     const label = page.getByText('Headline', { exact: true })
     if ((await label.count()) >= 1) await label.first().click()
