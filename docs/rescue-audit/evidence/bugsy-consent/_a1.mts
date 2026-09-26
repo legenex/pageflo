@@ -1,0 +1,10 @@
+import { launchChromium, walk, PREVIEW, E, norm } from './_lib.mts'
+const b = await launchChromium()
+const p = await (await b.newContext({viewport:{width:390,height:844}})).newPage()
+p.on('console', m=>{ if(m.type()==='error') console.log('CONSOLE', m.text()) })
+p.on('pageerror', e=>console.log('PAGEERROR', e.message))
+const n = await walk(p, PREVIEW+'/s/pageflo-rescue-acceptance-944138?utm_source=bugsy&utm_medium=qa&utm_campaign=b0926a')
+console.log('steps', n)
+console.log(await p.locator('[data-quiz-form]').evaluate(e=>e.outerHTML))
+await p.screenshot({path:E+'/a-quiz-form-390.png', fullPage:true})
+await b.close()

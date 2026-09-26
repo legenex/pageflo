@@ -1,0 +1,4 @@
+LOST-UPDATE rounds with a dropped entry: 8 of 8
+EDITOR-FORGERY: consent.disclosure_text="REAL" log_len=9 state=retry-pending
+TENANCY read: refused (Not Found)
+TENANCY write: refused (You are not allowed to perform this action.)

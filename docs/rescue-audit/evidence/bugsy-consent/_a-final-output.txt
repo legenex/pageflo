@@ -1,0 +1,43 @@
+HTTP 502 https://pageflo-rescue-acceptance-944138.preview.pageflo.io/api/pageflo/quiz-webhook
+checkbox count 1 checked false
+submit selector 1
+error count 1 visible true role alert text ⚠ Please check the box to agree before continuing.
+aria-invalid true describedby _r_0_-error
+POSTs after unchecked submit 0
+tab order from zip BUTTON:← Back > BUTTON:Next → > INPUT:checkbox focused is checkbox true
+after Space checked true error still 0
+after Space 2 checked false
+click text checked true
+click text again checked false
+final checked before back true
+after Back, on form? 0
+re-entered form 1 checkbox checked on re-entry false first_name 
+POSTs so far 0
+HTTP 502 https://pageflo-rescue-acceptance-944138.preview.pageflo.io/api/pageflo/quiz-webhook
+552ms ep=0 posts=0
+1056ms ep=0 posts=1
+1558ms ep=0 posts=1
+2061ms ep=0 posts=1
+2564ms ep=0 posts=1
+3086ms ep=0 posts=1
+3591ms ep=0 posts=1
+4094ms ep=0 posts=1
+4598ms ep=0 posts=1
+5101ms ep=0 posts=1
+5605ms ep=0 posts=1
+6108ms ep=0 posts=1
+6611ms ep=0 posts=1
+7114ms ep=0 posts=1
+7620ms ep=1 posts=1
+8124ms ep=1 posts=1
+8630ms ep=1 posts=1
+9133ms ep=1 posts=1
+endpoint first visible at 7620 ms
+POST bodies [
+ {
+  "url": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/api/leads",
+  "body": "{\"site_slug\":\"pageflo-rescue-acceptance-944138\",\"funnel_type\":\"quiz\",\"funnel_id\":\"mva\",\"funnel_path\":\"/s/pageflo-rescue-acceptance-944138\",\"source_entity_id\":\"25\",\"client_submission_id\":\"b668774e-a268-429a-84d9-489fb99874a0\",\"contact\":{\"first_name\":\"Bugsy\",\"last_name\":\"Consent b0926a\",\"email\":\"bugsy-b0926a@legenex.test\",\"phone\":\"5550100177\",\"state\":\"CA\",\"zip\":\"78701\"},\"quiz_answers\":{\"accident_type\":\"auto\",\"incident_date\":\"2026-01\",\"accident_details\":\"Bugsy QA: rear-end collision, neck pain.\",\"injury_type\":\"fatality\",\"treatment_type\":\"surgery\",\"treatment_time\":\"still_treating\",\"fault\":\"no\",\"fault_type\":\"someone_else\",\"attorney\":\"never\",\"insurance\":\"both\"},\"consent\":{\"accepted\":true,\"disclosure_text\":\"By checking this box, I agree that PageFlo QA may contact me by phone, text message or email about my request. Message and data rates may apply. Consent is not a condition of purchase.\",\"client_accepted_at\":\"2026-09-26T00:32:15.631Z\"},\"attribution\":{\"utm_source\":\"bugsy\",\"utm_medium\":\"qa\",\"utm_campaign\":\"b0926a\",\"landing_path\":\"/s/pageflo-rescue-acceptance-944138\",\"session_id\":\"s-1790382736409-2rt0m0ui\"}}"
+ }
+]
+endpoint stable after 3s 1
+Thank You! An Attorney Will Reach Out Shortly.

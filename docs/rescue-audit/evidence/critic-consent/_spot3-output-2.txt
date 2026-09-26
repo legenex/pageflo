@@ -1,0 +1,28 @@
+FILTER delivered: 0 rows
+FILTER failed: 6 rows
+   26 Sept, 20:07 34 PageFlo QA q || failed
+   26 Sept, 19:55 32 Bugsy Consen || failed
+   26 Sept, 02:24 25 PageFlo QA q || failed
+   26 Sept, 02:08 23 PageFlo QA q || failed
+   26 Sept, 01:58 21 PageFlo QA q || failed
+   26 Sept, 01:52 19 PageFlo QA q || failed
+FILTER no-destination: 16 rows
+   26 Sept, 20:08 38 Bugsy Api R8 || no-destination
+   26 Sept, 20:08 37 Bugsy Api R7 || no-destination
+   26 Sept, 20:08 36 Bugsy Api R6 || no-destination
+   26 Sept, 20:08 35 Bugsy Api R5 || no-destination
+   26 Sept, 20:05 33 PageFlo QA q || no-destination
+   26 Sept, 19:53 31 =Bugsy1+1 Bu || no-destination
+   26 Sept, 02:33 30 Bugsy Api 8  || no-destination
+   26 Sept, 02:33 29 Bugsy Api 7  || no-destination
+   26 Sept, 02:32 28 Bugsy Api 6  || no-destination
+   26 Sept, 02:32 27 Bugsy Api 5  || no-destination
+   26 Sept, 02:32 26 Bugsy Consen || no-destination
+   26 Sept, 02:22 24 PageFlo QA q || no-destination
+   26 Sept, 02:06 22 PageFlo QA q || no-destination
+   26 Sept, 01:57 20 PageFlo QA q || no-destination
+   26 Sept, 01:49 18 PageFlo QA q || no-destination
+   26 Sept, 01:47 17 PageFlo QA q || no-destination
+FILTER not-sent: 1 rows
+   15 Aug, 05:20 11 Ada Lovelace  || not-attempted
+FILTER queued: 0 rows

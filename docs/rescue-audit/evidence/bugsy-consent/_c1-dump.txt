@@ -1,0 +1,972 @@
+
+=== LEAD 39 SUMMARY
+39
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:09
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+LEAD DETAILS
+CREATED
+26 Sept, 20:09
+LAST UPDATED
+26 Sept, 20:09
+NAME
+Bugsy Consent b0926a-emb
+EMAIL
+bugsy-b0926a-emb@legenex.test
+PHONE
+5550100177
+STATE / ZIP
+CA / 78701
+SOURCE
+Quiz
+SOURCE ID
+lp:28
+SITE
+PageFlo Rescue Acceptance 944138
+CONSENT
+Accepted
+PHONE VALIDATION
+Unavailable: not configured
+DELIVERY
+No destination configured
+CERTIFICATES
+None
+IDEMPOTENCY KEY
+9430c0dc-1a53-42f2-b7e4-f07b7fb510c6
+TRUSTEDFORM CERTIFICATE
+Not set
+JORNAYA LEAD ID
+Not set
+CONSENT EVIDENCE
+DISCLOSURE THE VISITOR ACCEPTED
+By checking this box, I agree that PageFlo QA may contact me by phone, text message or email about my request. Message and data rates may apply. Consent is not a condition of purchase.
+ACCEPTED
+Yes, by checking an unchecked box; the text matches this Brand’s TCPA text
+ACCEPTED AT
+2026-09-26T18:09:31.253Z
+METHOD
+checkbox_unchecked_default
+BRAND
+PageFlo Rescue Acceptance 944138
+HOST
+pageflo-rescue-acceptance-944138.preview.pageflo.io
+FUNNEL TYPE
+quiz
+FUNNEL
+mva
+DEPLOYMENT
+lp:28
+PAGE PATH
+/c/pageflo-rescue-acceptance-944138
+STATUS HISTORY
+New · Created via lead capture
+26 Sept, 20:09
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 39 System Response
+39
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:09
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+CAPTURED ANSWERS
+{
+  "fault": "no",
+  "attorney": "never",
+  "insurance": "both",
+  "fault_type": "someone_else",
+  "injury_type": "fatality",
+  "accident_type": "auto",
+  "incident_date": "2026-01",
+  "treatment_time": "still_treating",
+  "treatment_type": "surgery",
+  "accident_details": "Bugsy QA: rear-end collision, neck pain."
+}
+ATTRIBUTION
+{
+  "ip": "102.219.111.19",
+  "event_id": "5858cef680097b1d19393fbb73201a43",
+  "session_id": "s-1790446165095-knu1y8cw",
+  "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+  "utm_medium": "qa",
+  "utm_source": "bugsy",
+  "captured_at": "2026-09-26T18:09:31.290Z",
+  "landing_path": "/c/pageflo-rescue-acceptance-944138",
+  "utm_campaign": "b0926a"
+}
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 39 HLR Trace
+39
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:09
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+RESULT
+Unavailable: not configured
+NUMBER
+5550100177
+
+No lookup was made because the provider is not configured (missing plivo credentials). This says nothing about the number.
+
+STORED HLR RESPONSE
+{
+  "ok": false,
+  "error": "missing plivo credentials",
+  "state": "not_configured",
+  "provider": "plivo",
+  "checked_at": "2026-09-26T18:09:31.372Z"
+}
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 39 Delivery Log
+39
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:09
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+No destination configured
+No destination attempted
+
+The pipeline finished, but no buyer or webhook destination is configured for this Brand, so nothing was sent to an outside party.
+
+lead.captured
+ok
+26 Sept, 20:09
+
+lead row stored
+
+delivery.queued
+ok
+26 Sept, 20:09
+
+waiting for the delivery worker
+
+delivery.processing
+ok
+26 Sept, 20:09
+
+queue pass 1
+
+downstream.completed
+ok
+26 Sept, 20:09
+
+no destination configured: nothing was sent to an outside party
+
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+=== LEAD 35 SUMMARY
+35
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+LEAD DETAILS
+CREATED
+26 Sept, 20:08
+LAST UPDATED
+26 Sept, 20:08
+NAME
+Bugsy Api R5
+EMAIL
+bugsy-b0926a-r2-5@legenex.test
+PHONE
+Not set
+STATE / ZIP
+Not set
+SOURCE
+Quiz
+SOURCE ID
+25
+SITE
+PageFlo Rescue Acceptance 944138
+CONSENT
+Accepted
+PHONE VALIDATION
+Not checked
+DELIVERY
+No destination configured
+CERTIFICATES
+None
+IDEMPOTENCY KEY
+Not set
+TRUSTEDFORM CERTIFICATE
+Not set
+JORNAYA LEAD ID
+Not set
+CONSENT EVIDENCE
+DISCLOSURE THE VISITOR ACCEPTED
+By checking this box, I agree that PageFlo QA may contact me by phone, text message or email about my request. Message and data rates may apply. Consent is not a condition of purchase.
+ACCEPTED
+Yes, by checking an unchecked box; the text matches this Brand’s TCPA text
+ACCEPTED AT
+2026-09-26T18:08:31.593Z
+METHOD
+checkbox_unchecked_default
+BRAND
+PageFlo Rescue Acceptance 944138
+HOST
+pageflo-rescue-acceptance-944138.preview.pageflo.io
+FUNNEL TYPE
+quiz
+FUNNEL
+mva
+DEPLOYMENT
+25
+PAGE PATH
+/s/pageflo-rescue-acceptance-944138
+STATUS HISTORY
+New · Created via lead capture
+26 Sept, 20:08
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 35 System Response
+35
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+CAPTURED ANSWERS
+{
+  "bugsy_extra_field": "kept-r2"
+}
+ATTRIBUTION
+{
+  "ip": "102.219.111.19",
+  "event_id": "30771912c06a0728b1eda794cf06982a",
+  "user_agent": "curl/8.5.0",
+  "captured_at": "2026-09-26T18:08:31.637Z",
+  "landing_path": "/s/pageflo-rescue-acceptance-944138"
+}
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 35 HLR Trace
+35
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+RESULT
+Not checked
+NUMBER
+Not set
+
+No phone validation has been recorded for this lead.
+
+STORED HLR RESPONSE
+No phone validation was recorded for this lead. A lookup is attempted for every lead that carries a phone number; when none is recorded the attempt has not finished or predates lookup recording.
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 35 Delivery Log
+35
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+No destination configured
+No destination attempted
+
+The pipeline finished, but no buyer or webhook destination is configured for this Brand, so nothing was sent to an outside party.
+
+lead.captured
+ok
+26 Sept, 20:08
+
+lead row stored
+
+delivery.queued
+ok
+26 Sept, 20:08
+
+waiting for the delivery worker
+
+delivery.processing
+ok
+26 Sept, 20:08
+
+queue pass 1
+
+downstream.completed
+ok
+26 Sept, 20:08
+
+no destination configured: nothing was sent to an outside party
+
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+=== LEAD 36 SUMMARY
+36
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+LEAD DETAILS
+CREATED
+26 Sept, 20:08
+LAST UPDATED
+26 Sept, 20:08
+NAME
+Bugsy Api R6
+EMAIL
+bugsy-b0926a-r2-6@legenex.test
+PHONE
+Not set
+STATE / ZIP
+Not set
+SOURCE
+Quiz
+SOURCE ID
+25
+SITE
+PageFlo Rescue Acceptance 944138
+CONSENT
+Accepted
+PHONE VALIDATION
+Not checked
+DELIVERY
+No destination configured
+CERTIFICATES
+None
+IDEMPOTENCY KEY
+Not set
+TRUSTEDFORM CERTIFICATE
+Not set
+JORNAYA LEAD ID
+Not set
+CONSENT EVIDENCE
+DISCLOSURE THE VISITOR ACCEPTED
+<img src=x onerror=alert(1)>I agree
+ACCEPTED
+Yes, by checking an unchecked box; the text could NOT be verified against this Brand’s TCPA text
+ACCEPTED AT
+2026-09-26T18:08:32.514Z
+METHOD
+checkbox_disclosure_unverified
+BRAND
+PageFlo Rescue Acceptance 944138
+HOST
+pageflo-rescue-acceptance-944138.preview.pageflo.io
+FUNNEL TYPE
+quiz
+FUNNEL
+mva
+DEPLOYMENT
+25
+PAGE PATH
+/s/pageflo-rescue-acceptance-944138
+STATUS HISTORY
+New · Created via lead capture
+26 Sept, 20:08
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 36 System Response
+36
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+CAPTURED ANSWERS
+No answers stored for this lead.
+ATTRIBUTION
+{
+  "ip": "102.219.111.19",
+  "event_id": "15f4d3ca848b75230ca3b54b8fa2ae8e",
+  "user_agent": "curl/8.5.0",
+  "captured_at": "2026-09-26T18:08:32.546Z",
+  "landing_path": "/s/pageflo-rescue-acceptance-944138"
+}
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 36 HLR Trace
+36
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+RESULT
+Not checked
+NUMBER
+Not set
+
+No phone validation has been recorded for this lead.
+
+STORED HLR RESPONSE
+No phone validation was recorded for this lead. A lookup is attempted for every lead that carries a phone number; when none is recorded the attempt has not finished or predates lookup recording.
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 36 Delivery Log
+36
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+No destination configured
+No destination attempted
+
+The pipeline finished, but no buyer or webhook destination is configured for this Brand, so nothing was sent to an outside party.
+
+lead.captured
+ok
+26 Sept, 20:08
+
+lead row stored
+
+delivery.queued
+ok
+26 Sept, 20:08
+
+waiting for the delivery worker
+
+delivery.processing
+ok
+26 Sept, 20:08
+
+queue pass 1
+
+downstream.completed
+ok
+26 Sept, 20:08
+
+no destination configured: nothing was sent to an outside party
+
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+=== LEAD 37 SUMMARY
+37
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+LEAD DETAILS
+CREATED
+26 Sept, 20:08
+LAST UPDATED
+26 Sept, 20:08
+NAME
+Bugsy Api R7
+EMAIL
+bugsy-b0926a-r2-7@legenex.test
+PHONE
+Not set
+STATE / ZIP
+Not set
+SOURCE
+Quiz
+SOURCE ID
+25
+SITE
+PageFlo Rescue Acceptance 944138
+CONSENT
+Not recorded
+PHONE VALIDATION
+Not checked
+DELIVERY
+No destination configured
+CERTIFICATES
+None
+IDEMPOTENCY KEY
+Not set
+TRUSTEDFORM CERTIFICATE
+Not set
+JORNAYA LEAD ID
+Not set
+CONSENT EVIDENCE
+
+Consent was not recorded for this lead. It was captured before affirmative consent was stored, or through a surface that showed no consent line. No consent is inferred from any other field.
+
+STATUS HISTORY
+New · Created via lead capture
+26 Sept, 20:08
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 37 System Response
+37
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+CAPTURED ANSWERS
+No answers stored for this lead.
+ATTRIBUTION
+{
+  "ip": "102.219.111.19",
+  "event_id": "f105384672c6ba9f687918f1e1fc9c58",
+  "user_agent": "curl/8.5.0",
+  "captured_at": "2026-09-26T18:08:33.460Z",
+  "landing_path": "/s/pageflo-rescue-acceptance-944138"
+}
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 37 HLR Trace
+37
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+RESULT
+Not checked
+NUMBER
+Not set
+
+No phone validation has been recorded for this lead.
+
+STORED HLR RESPONSE
+No phone validation was recorded for this lead. A lookup is attempted for every lead that carries a phone number; when none is recorded the attempt has not finished or predates lookup recording.
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 37 Delivery Log
+37
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+No destination configured
+No destination attempted
+
+The pipeline finished, but no buyer or webhook destination is configured for this Brand, so nothing was sent to an outside party.
+
+lead.captured
+ok
+26 Sept, 20:08
+
+lead row stored
+
+delivery.queued
+ok
+26 Sept, 20:08
+
+waiting for the delivery worker
+
+delivery.processing
+ok
+26 Sept, 20:08
+
+queue pass 1
+
+downstream.completed
+ok
+26 Sept, 20:08
+
+no destination configured: nothing was sent to an outside party
+
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+=== LEAD 38 SUMMARY
+38
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+LEAD DETAILS
+CREATED
+26 Sept, 20:08
+LAST UPDATED
+26 Sept, 20:08
+NAME
+Bugsy Api R8
+EMAIL
+bugsy-b0926a-r2-8@legenex.test
+PHONE
+Not set
+STATE / ZIP
+Not set
+SOURCE
+Quiz
+SOURCE ID
+25
+SITE
+PageFlo Rescue Acceptance 944138
+CONSENT
+Accepted
+PHONE VALIDATION
+Not checked
+DELIVERY
+No destination configured
+CERTIFICATES
+None
+IDEMPOTENCY KEY
+Not set
+TRUSTEDFORM CERTIFICATE
+Not set
+JORNAYA LEAD ID
+Not set
+CONSENT EVIDENCE
+DISCLOSURE THE VISITOR ACCEPTED
+Bugsy forged: visitor never saw this text.
+ACCEPTED
+Yes, by checking an unchecked box; the text could NOT be verified against this Brand’s TCPA text
+ACCEPTED AT
+2026-09-26T18:08:34.338Z
+METHOD
+checkbox_disclosure_unverified
+BRAND
+PageFlo Rescue Acceptance 944138
+HOST
+pageflo-rescue-acceptance-944138.preview.pageflo.io
+FUNNEL TYPE
+quiz
+FUNNEL
+mva
+DEPLOYMENT
+25
+PAGE PATH
+/s/pageflo-rescue-acceptance-944138
+STATUS HISTORY
+New · Created via lead capture
+26 Sept, 20:08
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 38 System Response
+38
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+CAPTURED ANSWERS
+No answers stored for this lead.
+ATTRIBUTION
+{
+  "ip": "102.219.111.19",
+  "event_id": "f4bcd1cc7e62dfc2a4c26cefac7ad577",
+  "user_agent": "curl/8.5.0",
+  "captured_at": "2026-09-26T18:08:34.370Z",
+  "landing_path": "/s/pageflo-rescue-acceptance-944138"
+}
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 38 HLR Trace
+38
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+RESULT
+Not checked
+NUMBER
+Not set
+
+No phone validation has been recorded for this lead.
+
+STORED HLR RESPONSE
+No phone validation was recorded for this lead. A lookup is attempted for every lead that carries a phone number; when none is recorded the attempt has not finished or predates lookup recording.
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
+--- LEAD 38 Delivery Log
+38
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:08
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+No destination configured
+No destination attempted
+
+The pipeline finished, but no buyer or webhook destination is configured for this Brand, so nothing was sent to an outside party.
+
+lead.captured
+ok
+26 Sept, 20:08
+
+lead row stored
+
+delivery.queued
+ok
+26 Sept, 20:08
+
+waiting for the delivery worker
+
+delivery.processing
+ok
+26 Sept, 20:08
+
+queue pass 1
+
+downstream.completed
+ok
+26 Sept, 20:08
+
+no destination configured: nothing was sent to an outside party
+
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id

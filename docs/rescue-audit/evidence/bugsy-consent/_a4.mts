@@ -1,0 +1,15 @@
+import { launchChromium, PREVIEW, E, norm } from './_lib.mts'
+const b = await launchChromium()
+const p = await (await b.newContext({viewport:{width:390,height:844}})).newPage()
+const posts:string[]=[]; p.on('request',r=>{if(r.method()==='POST'&&r.url().includes('/api/leads'))posts.push(r.url())})
+await p.goto(PREVIEW+'/',{waitUntil:'networkidle'})
+const f=p.locator('form'); const box=p.locator('[data-consent-checkbox]')
+console.log('unchecked', !(await box.isChecked()))
+for (const n of ['first_name','last_name','email','phone','zip']) { const i=f.locator(`[name=${n}]`); if(await i.count()) await i.fill(n==='email'?'bugsy-b0926a-home@legenex.test':'Bugsy') }
+await f.locator('button[type=submit]').click(); await p.waitForTimeout(1000)
+const err=p.locator('[data-consent-error]')
+console.log('error', await err.count(), await err.getAttribute('role').catch(()=>null), norm(await err.innerText().catch(()=>'')), 'posts', posts.length)
+await p.locator('[data-consent-text]').click(); console.log('label click checked', await box.isChecked())
+await p.locator('[data-consent-text]').click(); console.log('label click 2', await box.isChecked())
+await p.screenshot({path:`${E}/a-home-leadform-error-390.png`,fullPage:true})
+await b.close()

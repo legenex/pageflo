@@ -1,10 +1,10 @@
 {
-  "run": "qamuhmowsr",
+  "run": "qamuipl811",
   "brand": "pageflo-rescue-acceptance-944138",
   "preview": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io",
-  "qaLeadId": "22",
-  "qaLeadEmail": "pageflo-qa-qamuhmowsr@legenex.test",
-  "retryLeadId": "23",
+  "qaLeadId": "40",
+  "qaLeadEmail": "pageflo-qa-qamuipl811@legenex.test",
+  "retryLeadId": "41",
   "pass": 77,
   "fail": 0,
   "failures": [],
@@ -37,7 +37,7 @@
     {
       "label": "A the tagline persists after reload",
       "ok": true,
-      "evidence": "read back \"Rescue closeout qamuhmowsr\""
+      "evidence": "read back \"Rescue closeout qamuipl811\""
     },
     {
       "label": "A and so does the TCPA consent copy",
@@ -122,7 +122,7 @@
     {
       "label": "C quiz: with consent the lead is accepted",
       "ok": true,
-      "evidence": "HTTP 200 lead_id=22"
+      "evidence": "HTTP 200 lead_id=40"
     },
     {
       "label": "C quiz: exactly one POST",
@@ -192,7 +192,7 @@
     {
       "label": "F before the edit, live does not contain this run's marker",
       "ok": true,
-      "evidence": "marker PINTEST-qamuhmowsr present: false"
+      "evidence": "marker PINTEST-qamuipl811 present: false"
     },
     {
       "label": "F editing the master does not change the live page (the pin holds)",
@@ -217,7 +217,7 @@
     {
       "label": "H the QA lead's contact data is in the Leads UI",
       "ok": true,
-      "evidence": "email pageflo-qa-qamuhmowsr@legenex.test present: true"
+      "evidence": "email pageflo-qa-qamuipl811@legenex.test present: true"
     },
     {
       "label": "H under the correct Brand",
@@ -247,7 +247,7 @@
     {
       "label": "H with an accepted-at timestamp from this run",
       "ok": true,
-      "evidence": "timestamp 2026-09-26T00:06:10.623Z"
+      "evidence": "timestamp 2026-09-26T18:15:04.958Z"
     },
     {
       "label": "H and a phone validation state",
@@ -257,7 +257,7 @@
     {
       "label": "H UTMs and attribution are stored",
       "ok": true,
-      "evidence": "campaign qamuhmowsr present: true"
+      "evidence": "campaign qamuipl811 present: true"
     },
     {
       "label": "H the qualification answers are stored",
@@ -352,7 +352,7 @@
     {
       "label": "K quiz: with consent the lead is accepted",
       "ok": true,
-      "evidence": "HTTP 200 lead_id=23"
+      "evidence": "HTTP 200 lead_id=41"
     },
     {
       "label": "K quiz: exactly one POST",
