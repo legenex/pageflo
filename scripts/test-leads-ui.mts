@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs'
 
 import { certificateEvidence, consentState, deliveryState, isDeliveryStep, phoneState } from '../src/app/(app)/admin/(top)/leads/model.ts'
 import { passAlreadyCompleted, readDelivery, settledSteps, STALL_AFTER_MS } from '../src/lib/lead-pipeline/delivery-state.ts'
-import { buildConsentRecord, consentView, extractQuizConsent, QUIZ_CONSENT_KEYS, validConsentSubmission } from '../src/lib/lead-consent.ts'
+import { disclosureMatchesBrand, CONSENT_METHOD, CONSENT_METHOD_UNVERIFIED, buildConsentRecord, consentView, extractQuizConsent, QUIZ_CONSENT_KEYS, validConsentSubmission } from '../src/lib/lead-consent.ts'
 import { consentPlainText, safeConsentHtml } from '../src/lib/safe-consent-html.ts'
 
 let pass = 0
@@ -156,6 +156,20 @@ t(lifted.consent?.accepted === true && lifted.consent.disclosure_text === 'I agr
 t(Object.keys(lifted.values).join(',') === 'first_name', 'and never left behind in the stored answers')
 t(extractQuizConsent({ first_name: 'Ada' }).consent === undefined, 'no consent keys, no consent')
 t(extractQuizConsent({ [QUIZ_CONSENT_KEYS.accepted]: 'no', [QUIZ_CONSENT_KEYS.text]: 'x' }).consent === undefined, 'a value other than yes is not consent')
+
+/* ---------------------------------------------- forged consent over the API */
+const BRAND = 'By checking this box I agree {{brand.displayName}} may call me. <a href="/tcpa">TCPA terms</a>'
+t(disclosureMatchesBrand('By checking this box I agree Acme may call me. TCPA terms', BRAND), 'the Brand text, with its {{token}} filled in and its link as plain text, is verified')
+t(!disclosureMatchesBrand('I agree to anything at all', BRAND), 'arbitrary text is NOT verified against the Brand')
+t(!disclosureMatchesBrand('x', ''), 'a Brand with no text verifies nothing')
+const src = { site_slug: 'a', site_name: 'A', host: 'h', funnel_type: 'quiz', funnel_id: null, funnel_path: null, deployment_id: null }
+const now = new Date('2026-09-26T10:00:00Z')
+const forged = buildConsentRecord({ accepted: true, disclosure_text: 'I agree <script>alert(1)</script>', client_accepted_at: '1999-01-01T00:00:00Z' }, src, now, BRAND)
+t(forged.method === CONSENT_METHOD_UNVERIFIED, 'a forged disclosure is recorded as unverified')
+t(forged.client_accepted_at === null, 'a 1999 device clock is discarded')
+t(!/script|alert/.test(forged.disclosure_text), 'and a script body is never stored')
+const good = buildConsentRecord({ accepted: true, disclosure_text: 'By checking this box I agree Acme may call me. TCPA terms', client_accepted_at: '2026-09-26T09:59:00Z' }, src, now, BRAND)
+t(good.method === CONSENT_METHOD && good.client_accepted_at !== null, 'the genuine text is verified and keeps a plausible device clock')
 
 /* ----------------------------------------------------- disclosure safety */
 

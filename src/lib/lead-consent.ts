@@ -1,3 +1,5 @@
+import { consentPlainText } from '@/lib/safe-consent-html'
+
 /**
  * Explicit lead consent: one contract shared by every public surface, the
  * capture route, the Lead row and the Leads console.
@@ -12,8 +14,26 @@
  * Pure and isomorphic: imported by the browser forms, the route and the console.
  */
 
-/** The only consent method V1 records. Bumping it is a data-contract change. */
+/** Consent method: the disclosure the visitor accepted matched the collecting Brand's own TCPA text. */
 export const CONSENT_METHOD = 'checkbox_unchecked_default' as const
+/**
+ * Consent method when the submitted disclosure did NOT match the Brand's text (or
+ * the Brand has none, as on a website block with its own copy). The act is still
+ * recorded, but the console says the words could not be verified server-side,
+ * because a public POST can carry any text and any client clock.
+ */
+export const CONSENT_METHOD_UNVERIFIED = 'checkbox_disclosure_unverified' as const
+
+/** Does the submitted disclosure equal the Brand's, ignoring {{tokens}} the browser filled in? */
+export const disclosureMatchesBrand = (submitted: string, brandText: string | null | undefined): boolean => {
+  const brand = consentPlainText(brandText ?? '')
+  if (!brand) return false
+  const pattern = brand
+    .split(/\{\{[^}]*\}\}/)
+    .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+    .join('.{0,200}?')
+  return new RegExp(`^${pattern}$`, 'i').test(normaliseDisclosure(submitted))
+}
 
 /** Upper bound on a stored disclosure. Long enough for a full TCPA paragraph. */
 export const CONSENT_TEXT_MAX = 4000
@@ -46,7 +66,7 @@ export type LeadConsentRecord = {
   /** Server clock when the submission carrying the consent was received. */
   accepted_at: string
   client_accepted_at: string | null
-  method: typeof CONSENT_METHOD
+  method: typeof CONSENT_METHOD | typeof CONSENT_METHOD_UNVERIFIED
   source_site_slug: string
   source_site_name: string
   source_host: string | null
@@ -76,14 +96,20 @@ export const buildConsentRecord = (
   submission: ConsentSubmission,
   source: ConsentSource,
   now: Date = new Date(),
+  brandText?: string | null,
 ): LeadConsentRecord => {
   const client = submission.client_accepted_at ? new Date(submission.client_accepted_at) : null
+  // The device clock is informational and forgeable: keep it only when it is
+  // within ten minutes of the server's own.
+  const clientOk = client && !Number.isNaN(client.getTime()) && Math.abs(client.getTime() - now.getTime()) < 10 * 60_000
   return {
     accepted: true,
-    disclosure_text: normaliseDisclosure(submission.disclosure_text),
+    // Plain text through the same sanitiser the visitor's page uses: a <script>
+    // or handler in a forged body is never stored as something a visitor read.
+    disclosure_text: normaliseDisclosure(consentPlainText(submission.disclosure_text)),
     accepted_at: now.toISOString(),
-    client_accepted_at: client && !Number.isNaN(client.getTime()) ? client.toISOString() : null,
-    method: CONSENT_METHOD,
+    client_accepted_at: clientOk ? client!.toISOString() : null,
+    method: disclosureMatchesBrand(submission.disclosure_text, brandText) ? CONSENT_METHOD : CONSENT_METHOD_UNVERIFIED,
     source_site_slug: source.site_slug,
     source_site_name: source.site_name,
     source_host: source.host,

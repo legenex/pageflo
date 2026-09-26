@@ -246,7 +246,7 @@ export function LeadDetailModal({ lead, onClose }: { lead: LeadRow; onClose: () 
                       </blockquote>
                     </div>
                     <div className="grid gap-4 sm:grid-cols-2">
-                      <Field k="Accepted" v="Yes, by checking an unchecked box" mono={false} tone="text-pos" />
+                      <Field k="Accepted" v={consentRecord.record.method === 'checkbox_unchecked_default' ? 'Yes, by checking an unchecked box; the text matches this Brand\u2019s TCPA text' : 'Yes, by checking an unchecked box; the text could NOT be verified against this Brand\u2019s TCPA text'} mono={false} tone={consentRecord.record.method === 'checkbox_unchecked_default' ? 'text-pos' : 'text-warn'} />
                       <Field k="Accepted at" v={consentRecord.record.accepted_at ? new Date(consentRecord.record.accepted_at).toISOString() : ''} />
                       <Field k="Method" v={consentRecord.record.method} />
                       <Field k="Brand" v={consentRecord.record.source_site_name} mono={false} />

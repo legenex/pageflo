@@ -8,6 +8,7 @@ import { pickAttributionFromObject } from '@/lib/lead-pipeline/attribution'
 import { getCurrentUser } from '@/lib/auth'
 import { trustedHost } from '@/lib/trusted-host'
 import { buildConsentRecord, CONSENT_TEXT_MAX } from '@/lib/lead-consent'
+import { resolveBrandLegal } from '@/lib/brand-map'
 
 export const dynamic = 'force-dynamic'
 
@@ -93,6 +94,7 @@ export async function POST(req: NextRequest) {
   let siteId: number | null = null
   let siteSlug = ''
   let siteName = ''
+  let brandTcpa = ''
   let primaryHost: string | null = null
 
   // Resolve by host first — that's the trustworthy signal for a public submit,
@@ -105,6 +107,7 @@ export async function POST(req: NextRequest) {
     siteId = Number(s.id)
     siteSlug = s.slug
     siteName = s.name
+    brandTcpa = resolveBrandLegal(s as unknown as Record<string, unknown>).tcpaText
     primaryHost = resolved.primaryHost
   } else if (data.site_slug) {
     const user = await getCurrentUser()
@@ -151,7 +154,7 @@ export async function POST(req: NextRequest) {
         funnel_id: data.funnel_id ?? null,
         funnel_path: data.funnel_path ?? null,
         deployment_id: data.source_entity_id ?? data.funnel_id ?? null,
-      })
+      }, new Date(), brandTcpa)
     : undefined
 
   const result = await runLeadPipeline({
