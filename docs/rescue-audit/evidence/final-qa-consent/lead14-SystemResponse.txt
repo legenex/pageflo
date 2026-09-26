@@ -1,0 +1,46 @@
+14
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 25 Sept, 08:34
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+CAPTURED ANSWERS
+{
+  "fault": "no",
+  "attorney": "never",
+  "insurance": "both",
+  "fault_type": "someone_else",
+  "injury_type": "fatality",
+  "accident_type": "auto",
+  "incident_date": "2024-03",
+  "treatment_time": "still_treating",
+  "treatment_type": "surgery",
+  "accident_details": "FinalQA rear-end collision, neck pain, ER same day. Safe test submission."
+}
+ATTRIBUTION
+{
+  "ip": "102.219.111.19",
+  "event_id": "7e29433ec4b414b645b20d97433f696e",
+  "session_id": "s-1790318035743-vw92cdod",
+  "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+  "utm_medium": "browser",
+  "utm_source": "finalqa",
+  "captured_at": "2026-09-25T06:34:18.882Z",
+  "landing_path": "/s/pageflo-rescue-acceptance-944138",
+  "utm_campaign": "finalqamugl3wah"
+}
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id

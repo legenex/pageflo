@@ -1,0 +1,12 @@
+import * as L from './_lib.mts'
+const b = await L.browser(); const ctx = await b.newContext({viewport:{width:1440,height:900}}); const p = await ctx.newPage()
+p.on('pageerror', e=>console.log('PAGEERROR', String(e).slice(0,200)))
+await L.login(p)
+await p.goto(L.APP+'/admin/sites',{waitUntil:'domcontentloaded'}); await p.waitForTimeout(1500)
+await L.shot(p,'03-brands')
+console.log((await L.text(p)).slice(0,1200))
+const a = p.locator('a:visible').filter({hasText:/Rescue Acceptance/}).first()
+console.log('brandlinks', JSON.stringify(await p.locator('a').evaluateAll(as=>as.map(a=>a.textContent?.trim().slice(0,50)+' -> '+a.getAttribute('href')).filter(s=>/accept|sites\//i.test(s)))))
+await a.click(); await p.waitForTimeout(2000); await L.shot(p,'04-brand-open'); console.log(p.url()); console.log((await L.text(p)).slice(0,1500))
+console.log('TABS', JSON.stringify(await p.locator('a,button,[role=tab]').evaluateAll(as=>as.map(a=>a.textContent?.trim().slice(0,30)+'|'+a.getAttribute('href')).filter(s=>/setting|general|preview|home/i.test(s)))))
+await b.close()

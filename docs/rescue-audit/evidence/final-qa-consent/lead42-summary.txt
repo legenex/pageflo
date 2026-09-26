@@ -1,0 +1,78 @@
+42
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:29
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+LEAD DETAILS
+CREATED
+26 Sept, 20:29
+LAST UPDATED
+26 Sept, 20:29
+NAME
+FinalQA Consent cq260926a
+EMAIL
+finalqa-cq260926a@legenex.test
+PHONE
+(512) 555-0147
+STATE / ZIP
+TX / 78701
+SOURCE
+Quiz
+SOURCE ID
+25
+SITE
+PageFlo Rescue Acceptance 944138
+CONSENT
+Accepted
+PHONE VALIDATION
+Unavailable: not configured
+DELIVERY
+No destination configured
+CERTIFICATES
+None
+IDEMPOTENCY KEY
+8a923a12-712a-4531-bbc9-6d5844053095
+TRUSTEDFORM CERTIFICATE
+Not set
+JORNAYA LEAD ID
+Not set
+CONSENT EVIDENCE
+DISCLOSURE THE VISITOR ACCEPTED
+By checking this box, I agree that PageFlo QA may contact me by phone, text message or email about my request. Message and data rates may apply. Consent is not a condition of purchase.
+ACCEPTED
+Yes, by checking an unchecked box; the text matches this Brand’s TCPA text
+ACCEPTED AT
+2026-09-26T18:29:05.789Z
+METHOD
+checkbox_unchecked_default
+BRAND
+PageFlo Rescue Acceptance 944138
+HOST
+pageflo-rescue-acceptance-944138.preview.pageflo.io
+FUNNEL TYPE
+quiz
+FUNNEL
+mva
+DEPLOYMENT
+25
+PAGE PATH
+/s/pageflo-rescue-acceptance-944138
+STATUS HISTORY
+New · Created via lead capture
+26 Sept, 20:29
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id

@@ -1,0 +1,61 @@
+12
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 25 Sept, 08:09
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+LEAD DETAILS
+CREATED
+25 Sept, 08:09
+LAST UPDATED
+25 Sept, 08:09
+NAME
+PageFlo QA qamugk8e9r
+EMAIL
+pageflo-qa-qamugk8e9r@legenex.test
+PHONE
+5550100199
+STATE / ZIP
+CA / 78701
+SOURCE
+Quiz
+SOURCE ID
+25
+SITE
+PageFlo Rescue Acceptance 944138
+CONSENT
+Not recorded
+PHONE VALIDATION
+Unavailable: not configured
+DELIVERY
+No destination configured
+CERTIFICATES
+None
+IDEMPOTENCY KEY
+71d0f8b9-166a-4421-8fde-d7377f343296
+TRUSTEDFORM CERTIFICATE
+Not set
+JORNAYA LEAD ID
+Not set
+CONSENT EVIDENCE
+
+Consent was not recorded for this lead. It was captured before affirmative consent was stored, or through a surface that showed no consent line. No consent is inferred from any other field.
+
+STATUS HISTORY
+New · Created via lead capture
+25 Sept, 08:09
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id

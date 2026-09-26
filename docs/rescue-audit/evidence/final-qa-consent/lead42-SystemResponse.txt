@@ -1,0 +1,46 @@
+42
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:29
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+CAPTURED ANSWERS
+{
+  "fault": "no",
+  "attorney": "never",
+  "insurance": "both",
+  "fault_type": "someone_else",
+  "injury_type": "fatality",
+  "accident_type": "auto",
+  "incident_date": "2026-08-01",
+  "treatment_time": "still_treating",
+  "treatment_type": "surgery",
+  "accident_details": "Rear-ended at a red light, neck and back pain, treated at an urgent care. Final QA test run."
+}
+ATTRIBUTION
+{
+  "ip": "102.219.111.19",
+  "event_id": "48b9b99d0a3cbe4e1d7ac7d0a758b067",
+  "session_id": "s-1790447345623-7kfkwsag",
+  "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+  "utm_medium": "browser",
+  "utm_source": "finalqa",
+  "captured_at": "2026-09-26T18:29:05.854Z",
+  "landing_path": "/s/pageflo-rescue-acceptance-944138",
+  "utm_campaign": "cq260926a"
+}
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id

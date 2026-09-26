@@ -1,0 +1,10 @@
+import * as L from './_lib.mts'
+const b = await L.browser(); const ctx = await b.newContext({viewport:{width:1440,height:900}}); const p = await ctx.newPage()
+p.on('pageerror', e=>console.log('PAGEERROR', String(e).slice(0,200)))
+await L.login(p)
+await p.goto(L.APP+'/admin/sites/'+L.SLUG,{waitUntil:'domcontentloaded'}); await p.waitForTimeout(1500)
+await p.getByRole('link',{name:'General'}).first().click(); await p.waitForTimeout(2000)
+await L.shot(p,'05-brand-general-settings'); console.log(p.url())
+console.log(await L.text(p))
+console.log('FIELDS', JSON.stringify(await p.locator('input,textarea,select').evaluateAll(as=>as.map((a:any)=>[a.name,a.id,a.getAttribute('aria-label'),a.type,(a.value||'').slice(0,400)]))))
+await b.close()

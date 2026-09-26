@@ -1,0 +1,46 @@
+12
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 25 Sept, 08:09
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+CAPTURED ANSWERS
+{
+  "fault": "no",
+  "attorney": "never",
+  "insurance": "both",
+  "fault_type": "someone_else",
+  "injury_type": "fatality",
+  "accident_type": "commercial",
+  "incident_date": "2026-01",
+  "treatment_time": "still_treating",
+  "treatment_type": "surgery",
+  "accident_details": "QA test: rear-end collision, neck and back pain, treated at ER. PageFlo rescue closeout."
+}
+ATTRIBUTION
+{
+  "ip": "102.219.111.19",
+  "event_id": "5360112fea955522a2d0048763a33ffe",
+  "session_id": "s-1790316553728-17dm5dib",
+  "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+  "utm_medium": "closeout",
+  "utm_source": "rescue-qa",
+  "captured_at": "2026-09-25T06:09:13.897Z",
+  "landing_path": "/s/pageflo-rescue-acceptance-944138",
+  "utm_campaign": "qamugk8e9r"
+}
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id

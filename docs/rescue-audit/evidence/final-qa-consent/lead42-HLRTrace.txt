@@ -1,0 +1,36 @@
+42
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:29
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+RESULT
+Unavailable: not configured
+NUMBER
+(512) 555-0147
+
+No lookup was made because the provider is not configured (missing plivo credentials). This says nothing about the number.
+
+STORED HLR RESPONSE
+{
+  "ok": false,
+  "error": "missing plivo credentials",
+  "state": "not_configured",
+  "provider": "plivo",
+  "checked_at": "2026-09-26T18:29:05.977Z"
+}
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id

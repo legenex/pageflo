@@ -1,0 +1,50 @@
+42
+New
+Delivery: No destination configured
+
+PageFlo Rescue Acceptance 944138 · 26 Sept, 20:29
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+No destination configured
+No destination attempted
+
+The pipeline finished, but no buyer or webhook destination is configured for this Brand, so nothing was sent to an outside party.
+
+lead.captured
+ok
+26 Sept, 20:29
+
+lead row stored
+
+delivery.queued
+ok
+26 Sept, 20:29
+
+waiting for the delivery worker
+
+delivery.processing
+ok
+26 Sept, 20:29
+
+queue pass 1
+
+downstream.completed
+ok
+26 Sept, 20:29
+
+no destination configured: nothing was sent to an outside party
+
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id
