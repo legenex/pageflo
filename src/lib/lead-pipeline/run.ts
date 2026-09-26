@@ -13,7 +13,7 @@ import { deriveFbc, type Attribution } from './attribution'
 import { newEventId } from './event-id'
 import { reportError } from '@/lib/observability/report'
 import { appOrigin } from '@/lib/pageflo/hosts'
-import { enqueueLeadDelivery } from '@/queues/lead-delivery'
+import { enqueueLeadDelivery, LeadLockedError, withLeadLock } from '@/queues/lead-delivery'
 import type { LeadConsentRecord } from '@/lib/lead-consent'
 import { appendDeliveryLog } from './log'
 import {
@@ -270,6 +270,22 @@ export const runLeadPipeline = async (
       await appendDeliveryLog(leadId, [
         { step: DELIVERY_STEPS.queueUnavailable, ok: true, detail: 'no delivery queue available; delivering inline' },
       ]).catch(() => null)
+      // "Unavailable" includes an enqueue that merely timed out, where the job may
+      // still land. Deliver under the per-Lead lock, as the worker does: whichever
+      // pass runs second finds the first one's completion and does nothing, and if
+      // the worker already holds the lock the inline pass stands down.
+      try {
+        const inline = await withLeadLock(leadId, () =>
+          runLeadPipeline(input, { resumeLeadId: leadId!, trigger: 'inline' }),
+        )
+        return { ...inline, event_id, steps: [...steps, ...inline.steps] }
+      } catch (err) {
+        if (err instanceof LeadLockedError) {
+          steps.push({ step: 'delivery.deferred', ok: true, detail: 'the queue worker holds this lead' })
+          return { ok: true, lead_id: leadId, event_id, steps }
+        }
+        throw err
+      }
     }
   }
 

@@ -2,8 +2,7 @@
 
 ## 2026-09-26 consent, delivery, retry, harness closeout
 
-Production SHA: see the newest "Production SHA" line below.
-Production SHA: 797d9c4 (superseded by the Critic-repair release recorded next, if present).
+Production SHA: see the final line of this block.
 - `pnpm typecheck` pass; `pnpm test` all green; `pnpm test:e2e` 34 (6 of 6 runs after the endpoint fix); `pnpm test:consent` 133; `pnpm test:delivery`, `pnpm test:leads-ui` 68, `pnpm test:publish` 294, `pnpm test:release` 29, `pnpm verify:schema`, `pnpm test:isolation` 50, `pnpm test:console` 327
 - production `pnpm test:production-acceptance` A-K: 77 passed, 0 failed (run qamuhn9vsc; QA leads 24 and 25)
 - Critic (2026-09-26) FAIL with two P1s (Delivered filter matched legacy rows; consent/delivery fields editable by any Brand editor); repaired in the next release.
