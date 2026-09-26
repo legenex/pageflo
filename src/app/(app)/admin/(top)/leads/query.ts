@@ -72,25 +72,16 @@ export const buildWhere = (s: LeadsSearch): Where => {
     and.push({ createdAt: { greater_than_equal: since } })
   }
 
-  // Delivery filters read the persisted `delivery_state` (an index over the
-  // log, kept current by the pipeline). Rows that predate it have no state and
-  // are matched through the log itself, so the filter does not silently hide
-  // history. "No delivery record" means neither a state nor a single log row.
-  const noState: Where = { delivery_state: { exists: false } }
-  if (s.delivery === 'failed') {
-    and.push({
-      or: [
-        { delivery_state: { in: ['failed', 'partial', 'stalled'] } },
-        { and: [noState, { 'delivery_log.ok': { equals: false } }] },
-      ],
-    })
-  }
-  if (s.delivery === 'delivered') {
-    and.push({ or: [{ delivery_state: { equals: 'delivered' } }, { and: [noState, { 'delivery_log.ok': { equals: true } }] }] })
-  }
+  // Delivery filters read ONLY the persisted `delivery_state`. An earlier version
+  // also matched legacy rows through `delivery_log.ok`, which listed leads that
+  // read "No destination configured" under Delivered. Rows written before the
+  // state existed are still in the list and open with their derived state; they
+  // are simply not matched by a state filter they cannot be proven to belong to.
+  if (s.delivery === 'failed') and.push({ delivery_state: { in: ['failed', 'partial', 'stalled'] } })
+  if (s.delivery === 'delivered') and.push({ delivery_state: { equals: 'delivered' } })
   if (s.delivery === 'queued') and.push({ delivery_state: { in: ['captured', 'queued', 'processing', 'retry-pending'] } })
   if (s.delivery === 'no-destination') and.push({ delivery_state: { equals: 'no-destination' } })
-  if (s.delivery === 'not-sent') and.push({ and: [noState, { 'delivery_log.step': { exists: false } }] })
+  if (s.delivery === 'not-sent') and.push({ and: [{ delivery_state: { exists: false } }, { 'delivery_log.step': { exists: false } }] })
 
   if (s.q) {
     and.push({

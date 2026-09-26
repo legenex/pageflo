@@ -4,6 +4,7 @@ import { getPayload } from 'payload'
 import config from '@payload-config'
 import { revalidatePath } from 'next/cache'
 import { getCurrentUser } from '@/lib/auth'
+import { canEditSite } from '@/access'
 import { LEAD_STATUSES, type LeadStatus } from './model'
 import { buildWhere, parseSearch } from './query'
 import { appendDeliveryLog } from '@/lib/lead-pipeline/log'
@@ -46,11 +47,15 @@ export async function setLeadStatus(
     })
 
     const history = Array.isArray(existing.status_history) ? existing.status_history : []
+    // status_history is locked against direct edits (field access), so this
+    // authorises as the user and then writes as the system.
+    const siteRaw = (existing as { site?: unknown }).site
+    const siteId = typeof siteRaw === 'object' && siteRaw ? (siteRaw as { id: number | string }).id : (siteRaw as number | string)
+    if (!canEditSite(user, siteId)) throw new Error('Forbidden: you do not have write access to this lead')
     await payload.update({
       collection: 'leads',
       id: leadId,
-      user,
-      overrideAccess: false,
+      overrideAccess: true,
       data: {
         status: status as LeadStatus,
         status_history: [

@@ -19,6 +19,12 @@ export const Leads: CollectionConfig = {
     afterChange: [auditAfterChange],
     afterDelete: [auditAfterDelete],
   },
+  // consent, status_history, delivery_log and delivery_state are EVIDENCE. Their
+  // field access denies create and update to every user request, so a Brand
+  // editor cannot rewrite a disclosure or empty a delivery history with a
+  // direct update. The pipeline writes with overrideAccess (no user), and the two
+  // operator actions that append (status change, retry) authorise with
+  // canEditSite() and then write as the system.
   fields: [
     { name: 'site', type: 'relationship', relationTo: 'sites', required: true, index: true },
     {
@@ -76,6 +82,7 @@ export const Leads: CollectionConfig = {
       // a submission without the act carries no consent group at all.
       name: 'consent',
       type: 'group',
+      access: { create: () => false, update: () => false },
       admin: { description: 'Affirmative consent evidence: the exact disclosure the visitor accepted, when, and where it was collected.' },
       fields: [
         { name: 'accepted', type: 'checkbox', admin: { readOnly: true } },
@@ -121,6 +128,7 @@ export const Leads: CollectionConfig = {
       // the console then derives the state from the log itself.
       name: 'delivery_state',
       type: 'text',
+      access: { create: () => false, update: () => false },
       index: true,
       admin: { readOnly: true, description: 'Reading of delivery_log: queued, processing, delivered, failed, no-destination and so on.' },
     },
@@ -130,6 +138,7 @@ export const Leads: CollectionConfig = {
     {
       name: 'status_history',
       type: 'array',
+      access: { create: () => false, update: () => false },
       admin: { description: 'Audit trail of status transitions for this Lead.' },
       fields: [
         { name: 'status', type: 'text', required: true },
@@ -141,6 +150,7 @@ export const Leads: CollectionConfig = {
     {
       name: 'delivery_log',
       type: 'array',
+      access: { create: () => false, update: () => false },
       admin: { description: 'Per-pipeline-step delivery results: TrustedForm, CAPI, webhooks, Slack, etc.' },
       fields: [
         { name: 'at', type: 'date', required: true },

@@ -77,3 +77,16 @@ export const siteScopedAdmin: Access = (args) => {
 }
 
 export const anyAuthenticatedRead: Access = (args) => Boolean(getUser(args))
+
+/**
+ * May this user WRITE to records of `siteId` (editor or above, or super admin)?
+ * For server actions that must write a field the collection deliberately locks
+ * against direct edits (a Lead's consent and delivery record): they authorise
+ * with this, then write as the system.
+ */
+export const canEditSite = (user: unknown, siteId: string | number): boolean => {
+  const u = user as UserLike | null
+  if (!u) return false
+  if (u.super_admin) return true
+  return siteIdsForUser(u, 'editor').includes(Number(siteId))
+}

@@ -31,6 +31,7 @@ import { runLeadPipeline, deliverStoredLead } from '../src/lib/lead-pipeline/run
 import { appendDeliveryLog } from '../src/lib/lead-pipeline/log.ts'
 import { readDelivery, DELIVERY_STEPS } from '../src/lib/lead-pipeline/delivery-state.ts'
 import { setWebhookPostForTests } from '../src/lib/lead-pipeline/dispatch-webhooks.ts'
+import { buildWhere, parseSearch } from '../src/app/(app)/admin/(top)/leads/query.ts'
 import { buildConsentRecord } from '../src/lib/lead-consent.ts'
 
 let pass = 0
@@ -206,7 +207,21 @@ const main = async (): Promise<void> => {
   t((await attempt(editor, id4)) === 'ok', 'an editor of the lead\'s own Brand can')
   t(readDelivery(await logOf(id4)).retryCount === countBefore + 1, 'and it is recorded')
 
+  /* ---- 4b. the evidence cannot be rewritten by a direct edit -------------- */
+  {
+    const before = await leadDoc(id4)
+    await payload.update({
+      collection: 'leads', id: id4, user: editor as never, overrideAccess: false,
+      data: { consent: { accepted: true, disclosure_text: 'FORGED' }, delivery_log: [], delivery_state: 'delivered', status_history: [] } as never,
+    }).catch(() => null)
+    const after = await leadDoc(id4)
+    t(after.consent?.disclosure_text === before.consent?.disclosure_text && after.consent?.disclosure_text !== 'FORGED', 'an editor cannot rewrite the stored disclosure with a direct update')
+    t((after.delivery_log as Log).length === (before.delivery_log as Log).length && after.delivery_state === before.delivery_state, 'nor empty the delivery log or set its state')
+    t((after.status_history?.length ?? 0) === (before.status_history?.length ?? 0), 'nor the status history')
+  }
+
   /* ---- 5. old leads stay readable ------------------------------------------- */
+  t(!JSON.stringify(buildWhere(parseSearch({ delivery: 'delivered' }))).includes('delivery_log'), 'the Delivered filter reads only the persisted state, never legacy log rows')
   const old = await payload.create({
     collection: 'leads',
     data: { site: siteId, source_entity_type: 'quiz', status: 'new', contact: { email: `${RUN}-old@example.test` } } as never,
