@@ -1,0 +1,7 @@
+iso row count=1
+save toast/body has Saved or updated=true
+iso login url=https://app.pageflo.io/admin/overview
+iso brands foreignHits=[] hasAcceptance=true
+iso brands snippet=PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all B bugsy-iso-bugsymugkw2g5 Editor · 1 brand 08:53 GMT+2 Open raw Payload admin → Brands Every Brand you operate. A Brand is the tenant root: website, quizzes, domains, numbers and leads all belong to one. Identity is edited on the Brand, not as a separate Brand Kit. New Brand All 1 Active 1 Draft 0 Paused 0 Archived 0 All verticals Multi-vertical Financial Services Debt Insurance Home Services Health & Wellness Education Automotive Solar & Energy B2B & SaaS Other Mass Tort Motor Vehicle Accident Workers Comp Personal Injury Medic
+direct dont-settle url=https://app.pageflo.io/admin/sites/dont-settle text=404 There is nothing at this address The record was deleted, its slug was changed, or the link predates a move. Nothing is broken and nothing was lost. Overview All Sites dev
+GET /api/sites status=403 hasDontSettle=false

@@ -1,0 +1,15 @@
+leads 14 (FinalQA prior) and 16 (this retest optional submit)
+
+ id | status | test_capture | contact_first_name |            contact_email             
+----+--------+--------------+--------------------+--------------------------------------
+ 14 | new    | f            | FinalQA            | finalqa-finalqamugl3wah@legenex.test
+ 16 | new    | f            | FinalQA            | finalqa-retestmuglra3k@legenex.test
+(2 rows)
+
+ _parent_id |         step         | ok |             at             
+------------+----------------------+----+----------------------------
+         12 | downstream.completed | t  | 2026-09-25 06:09:13.945+00
+         13 | downstream.completed | t  | 2026-09-25 06:28:21.132+00
+         14 | downstream.completed | t  | 2026-09-25 06:34:18.911+00
+         16 | downstream.completed | t  | 2026-09-25 06:51:47.876+00
+(4 rows)

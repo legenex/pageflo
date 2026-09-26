@@ -1,0 +1,398 @@
+{
+  "run": "qamuhmowsr",
+  "brand": "pageflo-rescue-acceptance-944138",
+  "preview": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io",
+  "qaLeadId": "22",
+  "qaLeadEmail": "pageflo-qa-qamuhmowsr@legenex.test",
+  "retryLeadId": "23",
+  "pass": 77,
+  "fail": 0,
+  "failures": [],
+  "assertions": [
+    {
+      "label": "A login reaches /admin",
+      "ok": true,
+      "evidence": "url=https://app.pageflo.io/admin/overview"
+    },
+    {
+      "label": "A Brand general settings loads for the acceptance Brand",
+      "ok": true,
+      "evidence": "url=https://app.pageflo.io/admin/sites/pageflo-rescue-acceptance-944138/settings/general headings=1"
+    },
+    {
+      "label": "A and the page names the acceptance Brand, so the save cannot land elsewhere",
+      "ok": true,
+      "evidence": "contains \"PageFlo Rescue Acceptance 944138\": true"
+    },
+    {
+      "label": "A the Brand TCPA field is present and was set",
+      "ok": true,
+      "evidence": "textarea[name=tcpa_text] found=true"
+    },
+    {
+      "label": "A Brand settings save reports success",
+      "ok": true,
+      "evidence": "page shows \"Saved\": true"
+    },
+    {
+      "label": "A the tagline persists after reload",
+      "ok": true,
+      "evidence": "read back \"Rescue closeout qamuhmowsr\""
+    },
+    {
+      "label": "A and so does the TCPA consent copy",
+      "ok": true,
+      "evidence": "read back \"By checking this box, I agree that PageFlo QA may contact me...\""
+    },
+    {
+      "label": "B preview Home 200",
+      "ok": true,
+      "evidence": "HTTP 200"
+    },
+    {
+      "label": "B preview Home renders the Brand",
+      "ok": true,
+      "evidence": "contains Brand name: true"
+    },
+    {
+      "label": "B preview Home has no authoring junk",
+      "ok": true,
+      "evidence": "hits: none"
+    },
+    {
+      "label": "B legacy preview Home 200",
+      "ok": true,
+      "evidence": "HTTP 200"
+    },
+    {
+      "label": "B preview /privacy 200",
+      "ok": true,
+      "evidence": "HTTP 200"
+    },
+    {
+      "label": "B an unknown path 404s",
+      "ok": true,
+      "evidence": "HTTP 404"
+    },
+    {
+      "label": "B an unknown Brand host fails closed",
+      "ok": true,
+      "evidence": "HTTP 404"
+    },
+    {
+      "label": "C quiz URL 200",
+      "ok": true,
+      "evidence": "HTTP 200"
+    },
+    {
+      "label": "C quiz URL has no authoring junk",
+      "ok": true,
+      "evidence": "hits: none"
+    },
+    {
+      "label": "C the first question is visible",
+      "ok": true,
+      "evidence": "\"How Were You Injured?\""
+    },
+    {
+      "label": "C the visitor quiz shows no graph labels",
+      "ok": true,
+      "evidence": "graph label leaked: false"
+    },
+    {
+      "label": "C quiz: the consent checkbox starts UNCHECKED",
+      "ok": true,
+      "evidence": "checked=false"
+    },
+    {
+      "label": "C quiz: the Brand's TCPA text is displayed beside the checkbox",
+      "ok": true,
+      "evidence": "shown=\"By checking this box, I agree that PageFlo QA may contact me by phone,...\""
+    },
+    {
+      "label": "C quiz: submitting unchecked shows a visible validation message",
+      "ok": true,
+      "evidence": "error text=\"⚠ Please check the box to agree before continuing.\""
+    },
+    {
+      "label": "C quiz: and sends nothing",
+      "ok": true,
+      "evidence": "POSTs to /api/leads before consent: 0"
+    },
+    {
+      "label": "C quiz: with consent the lead is accepted",
+      "ok": true,
+      "evidence": "HTTP 200 lead_id=22"
+    },
+    {
+      "label": "C quiz: exactly one POST",
+      "ok": true,
+      "evidence": "POSTs: 1"
+    },
+    {
+      "label": "C quiz: the thank-you endpoint renders",
+      "ok": true,
+      "evidence": "endpoint elements: 1"
+    },
+    {
+      "label": "D LP visitor URL 200",
+      "ok": true,
+      "evidence": "HTTP 200"
+    },
+    {
+      "label": "D LP has no authoring junk",
+      "ok": true,
+      "evidence": "hits: none"
+    },
+    {
+      "label": "D the embedded quiz starts UNCHECKED too",
+      "ok": true,
+      "evidence": "checked=false"
+    },
+    {
+      "label": "D and shows the identical disclosure as the standalone quiz",
+      "ok": true,
+      "evidence": "\"By checking this box, I agree that PageFlo QA may contact me...\""
+    },
+    {
+      "label": "D the acceptance LP deployment is identified by id",
+      "ok": true,
+      "evidence": "id=28 status=live"
+    },
+    {
+      "label": "D it is bound to a quiz flow",
+      "ok": true,
+      "evidence": "card says \"Quiz: MVA Tiered Quiz T4 Serving changes that have not been through a publish check. The last version that passed was published Sep 25, 2026, 8:30 AM. Preview Edit\""
+    },
+    {
+      "label": "D the acceptance LP deployment is live",
+      "ok": true,
+      "evidence": "card 28 status=live (already live, not touched)"
+    },
+    {
+      "label": "E the QA advertorial master exists and is identified",
+      "ok": true,
+      "evidence": "id=20"
+    },
+    {
+      "label": "E the QA advertorial deployment is live",
+      "ok": true,
+      "evidence": "deployment 12 status=live"
+    },
+    {
+      "label": "E its visitor URL serves",
+      "ok": true,
+      "evidence": "HTTP 200 https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/qa-acceptance"
+    },
+    {
+      "label": "E and has no authoring junk",
+      "ok": true,
+      "evidence": "hits: none"
+    },
+    {
+      "label": "F before the edit, live does not contain this run's marker",
+      "ok": true,
+      "evidence": "marker PINTEST-qamuhmowsr present: false"
+    },
+    {
+      "label": "F editing the master does not change the live page (the pin holds)",
+      "ok": true,
+      "evidence": "HTTP 200, marker present: false"
+    },
+    {
+      "label": "F an explicit Republish publishes the edit",
+      "ok": true,
+      "evidence": "HTTP 200, marker present: true"
+    },
+    {
+      "label": "G the DNS copy does not claim a pending host serves",
+      "ok": true,
+      "evidence": "phrase present: false"
+    },
+    {
+      "label": "G the Add Domain dialog offers exactly one hostname field (nothing is submitted in this run)",
+      "ok": true,
+      "evidence": "hostname fields: 1"
+    },
+    {
+      "label": "H the QA lead's contact data is in the Leads UI",
+      "ok": true,
+      "evidence": "email pageflo-qa-qamuhmowsr@legenex.test present: true"
+    },
+    {
+      "label": "H under the correct Brand",
+      "ok": true,
+      "evidence": "contains \"PageFlo Rescue Acceptance 944138\": true"
+    },
+    {
+      "label": "H and the correct source path",
+      "ok": true,
+      "evidence": "contains /s/pageflo-rescue-acceptance-944138: true"
+    },
+    {
+      "label": "H the collecting deployment is recorded",
+      "ok": true,
+      "evidence": "deployment id \"25\""
+    },
+    {
+      "label": "H the consent evidence is the EXACT disclosure shown to the visitor",
+      "ok": true,
+      "evidence": "stored=\"By checking this box, I agree that PageFlo QA may contact me...\""
+    },
+    {
+      "label": "H consent is recorded as an affirmative act",
+      "ok": true,
+      "evidence": "mentions accepted + unchecked box: true"
+    },
+    {
+      "label": "H with an accepted-at timestamp from this run",
+      "ok": true,
+      "evidence": "timestamp 2026-09-26T00:06:10.623Z"
+    },
+    {
+      "label": "H and a phone validation state",
+      "ok": true,
+      "evidence": "label present: true"
+    },
+    {
+      "label": "H UTMs and attribution are stored",
+      "ok": true,
+      "evidence": "campaign qamuhmowsr present: true"
+    },
+    {
+      "label": "H the qualification answers are stored",
+      "ok": true,
+      "evidence": "answers present: true"
+    },
+    {
+      "label": "H the phone validation is an honest recorded state, not \"not checked\", after an attempt",
+      "ok": true,
+      "evidence": "state=not-configured"
+    },
+    {
+      "label": "H the queue state is in the delivery history",
+      "ok": true,
+      "evidence": "captured+queued listed: true"
+    },
+    {
+      "label": "H the lead went through the real queue, not the inline fallback",
+      "ok": true,
+      "evidence": "queue_unavailable listed: false"
+    },
+    {
+      "label": "H and the worker's processing and completion",
+      "ok": true,
+      "evidence": "processing+completed listed: true"
+    },
+    {
+      "label": "H with no buyer configured the delivery state is \"no destination\", not \"delivered\"",
+      "ok": true,
+      "evidence": "state=no-destination"
+    },
+    {
+      "label": "H and no retry is offered where nothing failed",
+      "ok": true,
+      "evidence": "retry control shown: false"
+    },
+    {
+      "label": "I the super-admin sees the other Brands (read only in this run)",
+      "ok": true,
+      "evidence": "Don't Settle listed: true"
+    },
+    {
+      "label": "J preview Home is still 200 after the Brand save",
+      "ok": true,
+      "evidence": "HTTP 200"
+    },
+    {
+      "label": "J the saved copyright, with {{year}} resolved, is what the public page renders",
+      "ok": true,
+      "evidence": "footer contains \"2026 PageFlo Rescue Acceptance 944138\": true"
+    },
+    {
+      "label": "J and no template token reaches a visitor",
+      "ok": true,
+      "evidence": "\"{{year}}\" present: false"
+    },
+    {
+      "label": "K the tracking settings page names the acceptance Brand",
+      "ok": true,
+      "evidence": "contains Brand name: true"
+    },
+    {
+      "label": "K the acceptance Brand has no webhook to begin with, so no real buyer can be involved",
+      "ok": true,
+      "evidence": "existing webhooks: 0"
+    },
+    {
+      "label": "K the unresolvable QA webhook is saved (its host is .invalid, it cannot reach anyone)",
+      "ok": true,
+      "evidence": "url=https://qa-buyer.pageflo-qa.invalid/hook saved=true"
+    },
+    {
+      "label": "K quiz: the consent checkbox starts UNCHECKED",
+      "ok": true,
+      "evidence": "checked=false"
+    },
+    {
+      "label": "K quiz: the Brand's TCPA text is displayed beside the checkbox",
+      "ok": true,
+      "evidence": "shown=\"By checking this box, I agree that PageFlo QA may contact me by phone,...\""
+    },
+    {
+      "label": "K quiz: submitting unchecked shows a visible validation message",
+      "ok": true,
+      "evidence": "error text=\"⚠ Please check the box to agree before continuing.\""
+    },
+    {
+      "label": "K quiz: and sends nothing",
+      "ok": true,
+      "evidence": "POSTs to /api/leads before consent: 0"
+    },
+    {
+      "label": "K quiz: with consent the lead is accepted",
+      "ok": true,
+      "evidence": "HTTP 200 lead_id=23"
+    },
+    {
+      "label": "K quiz: exactly one POST",
+      "ok": true,
+      "evidence": "POSTs: 1"
+    },
+    {
+      "label": "K quiz: the thank-you endpoint renders",
+      "ok": true,
+      "evidence": "endpoint elements: 1"
+    },
+    {
+      "label": "K the second QA lead's delivery failed honestly against the unresolvable name",
+      "ok": true,
+      "evidence": "state=failed"
+    },
+    {
+      "label": "K the operator gets a retry confirmation, and the retry went through the queue",
+      "ok": true,
+      "evidence": "note=ok: Retry queued. Steps that already succeeded will not be repeated."
+    },
+    {
+      "label": "K the retry request is in the delivery history",
+      "ok": true,
+      "evidence": "retry_requested listed: true"
+    },
+    {
+      "label": "K and the second attempt sits next to the first, not over it",
+      "ok": true,
+      "evidence": "attempts recorded: 2"
+    },
+    {
+      "label": "K and the original history is intact",
+      "ok": true,
+      "evidence": "captured+queued listed: true"
+    },
+    {
+      "label": "K the QA webhook is removed again; the Brand is as it was found",
+      "ok": true,
+      "evidence": "webhooks remaining: 0"
+    }
+  ]
+}

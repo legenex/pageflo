@@ -1,0 +1,20 @@
+{
+  "notes": [
+    "iso login url=https://app.pageflo.io/admin/overview sidebar=PageFlo\nOverview\nBrands\nWebsites\nQuizzes\nLanding Pages\nAdvertorials\nDeployments\nDomains\nLeads\nAnalytics\nSOON\nCampaign In",
+    "iso brands sees Dont Settle=true ACH=true count8=false",
+    "dont-settle link count=1",
+    "dont-settle click err locator.click: Element is not visible\nCall log:\n\u001b[2m  - waiting for locator('a[href=\"/admin/sites/dont-settle\"]').first()\u001b[22m\n\u001b[2m    - locator resolved to <a href=\"/admin/sites/dont-settle\" class=\"block truncate text-[13.5px] font-semibold text-ink\">Dont Settle</a>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n",
+    "after click Dont Settle url=https://app.pageflo.io/admin/sites text=PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all B bugsy-iso-bugsymugkw2g5 Editor · 1 brand 08:32 GMT+2 Open raw Payload ad",
+    "direct /admin/sites/dont-settle url=https://app.pageflo.io/admin/sites/dont-settle text=404 There is nothing at this address The record was deleted, its slug was changed, or the link predates a move. Nothing is broken and nothing was lost. Overview All Sites dev",
+    "iso leads has Dont Settle=false has Ada=false has Bugsy=true",
+    "iso advertorial deployments has Dont Settle=false has /adv/letter=false",
+    "iso domains vis=PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all B bugsy-iso-bugsymugkw2g5 Editor · 1 brand 08:32 GMT+2 Open raw Payload admin → Domains Every hostname pointed at a Site: add one, ve",
+    "GET /api/sites 403 has dont-settle=false docs=0",
+    "GET /api/leads 405 has Lovelace=false has Bugsy=false",
+    "lead 13 detail: PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all T team Owner · all brands 08:32 GMT+2 Open raw Payload admin → Leads Every captured lead with its answers, acquisition path, consent evidence and delivery trace. 3 leads Export CSV VIEWS All Leads 3 New 3 Contacted 0 Qualified 0 Soft DQ 0 Hard DQ 0 Sold 0 Search leads Site All sites Accident Compensation Helper Dont Settle PageFlo Rescue Acceptance 944138 Rescue Funnel 20260923 Rescue Odin 20260923 Rescue QA 20260924 Rescue Sec ",
+    "pin before status=200 hasMarker=false headline=true",
+    "edit buttons=1",
+    "pin after save-no-republish leaked=false stillHasOld=true"
+  ],
+  "findings": []
+}

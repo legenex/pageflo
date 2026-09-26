@@ -424,7 +424,12 @@ export const useQuizMachine = ({
   const showSpinner =
     busyReason !== null ||
     Boolean(currentNode && INVISIBLE_NODE_TYPES.has(currentNode.type)) ||
-    (currentNode?.type === 'endpoint' && submitState === 'sending')
+    // Until the lead has landed, NOT merely while it is in flight: the endpoint
+    // used to paint for the one render before `submitOnce` set 'sending', then
+    // vanish behind the spinner, then paint again. A thank-you that flashes and
+    // disappears reads as a failed submit, and a redirecting endpoint would
+    // have started its timer for a lead that had not been stored yet.
+    (currentNode?.type === 'endpoint' && submitState !== 'done')
 
   return {
     mode,

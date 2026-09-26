@@ -70,7 +70,7 @@ Current stack, verified in this repository:
 
 - Payload CMS 3.83.0 on Next.js 15.4.11, App Router, React 19.1.2
 - PostgreSQL 16, via `@payloadcms/db-postgres`
-- Redis 7, currently used only for a health-check ping
+- Redis 7: health-check ping, the BullMQ `lead-delivery` queue (worker started from `instrumentation.node.ts` inside the app process) and a short per-Lead delivery lock. BullMQ job ids must not contain `:`
 - Anthropic SDK for AI generation, wrapped by `src/lib/ai/invoke.ts`
 - TypeScript 5.7.3, Tailwind CSS 4, `pnpm@9.15.0`, Node `>=20.9`
 - Playwright, used server-side for screenshot and fidelity harnesses

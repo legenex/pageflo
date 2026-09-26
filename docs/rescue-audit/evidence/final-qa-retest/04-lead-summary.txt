@@ -1,0 +1,53 @@
+14
+New
+Delivery: Delivered
+
+PageFlo Rescue Acceptance 944138 · 25 Sept, 08:34
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+LEAD DETAILS
+CREATED
+25 Sept, 08:34
+LAST UPDATED
+25 Sept, 08:34
+NAME
+FinalQA Browser finalqamugl3wah
+EMAIL
+finalqa-finalqamugl3wah@legenex.test
+PHONE
+5125550199
+STATE / ZIP
+TX / 78701
+SOURCE
+Quiz
+SOURCE ID
+25
+SITE
+PageFlo Rescue Acceptance 944138
+CONSENT
+None recorded
+PHONE VALIDATION
+Not checked
+IDEMPOTENCY KEY
+81ee8eb2-a254-4dc9-be87-6f17657fbb9b
+TRUSTEDFORM CERTIFICATE
+Not set
+JORNAYA LEAD ID
+Not set
+STATUS HISTORY
+New · Created via lead capture
+25 Sept, 08:34
+Set status
+New
+Contacted
+Qualified
+Soft DQ
+Hard DQ
+Sold
+Archived
+Copy payload
+Copy lead id

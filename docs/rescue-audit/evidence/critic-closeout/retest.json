@@ -1,0 +1,99 @@
+{
+  "run": "critic2muglqjmb",
+  "shaExpected": "d605006",
+  "browser": "chromium, playwright-managed build",
+  "checks": [
+    {
+      "id": "RU-P1-018.forgot",
+      "ok": true,
+      "detail": "/cms/forgot status=308 location=/sign-in"
+    },
+    {
+      "id": "pin.live",
+      "ok": true,
+      "detail": "status=200 PINTEST=true title=true"
+    },
+    {
+      "id": "RU-P1-018.signin",
+      "ok": true,
+      "detail": "Forgot password=false cms/forgot=false owner-copy=true"
+    },
+    {
+      "id": "login",
+      "ok": true,
+      "detail": "url=https://app.pageflo.io/admin/overview"
+    },
+    {
+      "id": "lead.open",
+      "ok": true,
+      "detail": "opened=14"
+    },
+    {
+      "id": "lead.not-dq-pending",
+      "ok": true,
+      "detail": "has Pending=false dqCopy=true deliveryLabel=Delivery: Delivered PageFlo Rescue Acceptance "
+    },
+    {
+      "id": "RU-LEAD-DELIVERY-UI",
+      "ok": false,
+      "detail": "lead=14 completed=true dqCopy=true snippet=Delivery Any delivery Delivered Has a failure Never dispatched Date range All time Last 24h Last 7 days Last 30 days Last 90 days Include test captures Apply Reset CREATED LEAD ID NAME SOURCE SITE STATUS CONSENT PHONE DELIVERY 25 Sept, 08:34 14 FinalQA Browser finalqamugl3wah Quiz PageFlo Rescue Acceptance 944138 New None recorded Not checked Delivered 25 Sept, 08:28 13 Bugsy QA Closeout bugsymugkw2g5 Quiz PageFlo Re"
+    },
+    {
+      "id": "RU-P1-014",
+      "ok": true,
+      "detail": "legacy binding present=false acc=Rescue Acceptance 944138 · Human Recovery Story LIVE UNCHECKED EDITS ARE LIVE https://pageflo-rescue-acceptance-944138.preview.pageflo.io/c/pageflo-rescue-acceptance-944138 Template: Human Recovery Story · PageFlo Rescue Acceptance 944138 · Quiz: MVA Tiered Quiz T4 Serving changes that have not been through a publish check. The last version that passed was published Sep 25, 2026, 8:30 AM. Preview Edit RO2 Rescue Odin 20260923 · Human Recovery Story LIVE https://rescue-odin-20260923.preview.pagef"
+    },
+    {
+      "id": "iso.login",
+      "ok": false,
+      "detail": "url=https://app.pageflo.io/sign-in user=bugsy-iso-bugsymugkw2g5@legenex.test"
+    },
+    {
+      "id": "BUGSY-P0-brand-list",
+      "ok": null,
+      "detail": "isolation user exists but login failed; Brands list not re-proved in browser"
+    },
+    {
+      "id": "quiz.mount",
+      "ok": true,
+      "detail": "url=https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=critic2&utm_medium=retest&utm_campaign=critic2muglqjmb"
+    },
+    {
+      "id": "quiz.form",
+      "ok": true,
+      "detail": "outcome=form"
+    },
+    {
+      "id": "BUGSY-quiz-LeadByte",
+      "ok": true,
+      "detail": "visible=false inRawHtml=false post=200 thanks=PageFlo Rescue Acceptance 944138 CLICK HERE TO CALL Thank You! An Attorney Will Reach Out Shortly. (c) 2026 PageFlo Rescue Acceptance 944138"
+    }
+  ],
+  "notes": [
+    "browser=chromium, playwright-managed build run=critic2muglqjmb operator=team@legenex.com",
+    "PASS [RU-P1-018.forgot] /cms/forgot status=308 location=/sign-in",
+    "PASS [pin.live] status=200 PINTEST=true title=true",
+    "SHOT v2-01-sign-in https://app.pageflo.io/sign-in",
+    "PASS [RU-P1-018.signin] Forgot password=false cms/forgot=false owner-copy=true",
+    "PASS [login] url=https://app.pageflo.io/admin/overview",
+    "SHOT v2-02-after-login https://app.pageflo.io/admin/overview",
+    "SHOT v2-03-leads https://app.pageflo.io/admin/leads",
+    "PASS [lead.open] opened=14",
+    "SHOT v2-04-lead-modal https://app.pageflo.io/admin/leads",
+    "PASS [lead.not-dq-pending] has Pending=false dqCopy=true deliveryLabel=Delivery: Delivered PageFlo Rescue Acceptance ",
+    "SHOT v2-05-lead-delivery https://app.pageflo.io/admin/leads",
+    "FAIL [RU-LEAD-DELIVERY-UI] lead=14 completed=true dqCopy=true snippet=Delivery Any delivery Delivered Has a failure Never dispatched Date range All time Last 24h Last 7 days Last 30 days Last 90 days Include test captures Apply Reset CREATED LEAD ID NAME SOURCE SITE STATUS CONSENT PHONE DELIVERY 25 Sept, 08:34 14 FinalQA Browser finalqamugl3wah Quiz PageFlo Rescue Acceptance 944138 New None recorded Not checked Delivered 25 Sept, 08:28 13 Bugsy QA Closeout bugsymugkw2g5 Quiz PageFlo Re",
+    "SHOT v2-06-lp-deployments https://app.pageflo.io/admin/landing-pages",
+    "PASS [RU-P1-014] legacy binding present=false acc=Rescue Acceptance 944138 · Human Recovery Story LIVE UNCHECKED EDITS ARE LIVE https://pageflo-rescue-acceptance-944138.preview.pageflo.io/c/pageflo-rescue-acceptance-944138 Template: Human Recovery Story · PageFlo Rescue Acceptance 944138 · Quiz: MVA Tiered Quiz T4 Serving changes that have not been through a publish check. The last version that passed was published Sep 25, 2026, 8:30 AM. Preview Edit RO2 Rescue Odin 20260923 · Human Recovery Story LIVE https://rescue-odin-20260923.preview.pagef",
+    "FAIL [iso.login] url=https://app.pageflo.io/sign-in user=bugsy-iso-bugsymugkw2g5@legenex.test",
+    "SHOT v2-07-iso-login https://app.pageflo.io/sign-in",
+    "INFO [BUGSY-P0-brand-list] isolation user exists but login failed; Brands list not re-proved in browser",
+    "PASS [quiz.mount] url=https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=critic2&utm_medium=retest&utm_campaign=critic2muglqjmb",
+    "SHOT v2-10-quiz-start https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=critic2&utm_medium=retest&utm_campaign=critic2muglqjmb",
+    "PASS [quiz.form] outcome=form",
+    "SHOT v2-11-quiz-form-or-mid https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=critic2&utm_medium=retest&utm_campaign=critic2muglqjmb",
+    "SHOT v2-12-quiz-form-filled https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=critic2&utm_medium=retest&utm_campaign=critic2muglqjmb",
+    "SHOT v2-13-quiz-thanks https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=critic2&utm_medium=retest&utm_campaign=critic2muglqjmb",
+    "PASS [BUGSY-quiz-LeadByte] visible=false inRawHtml=false post=200 thanks=PageFlo Rescue Acceptance 944138 CLICK HERE TO CALL Thank You! An Attorney Will Reach Out Shortly. (c) 2026 PageFlo Rescue Acceptance 944138"
+  ]
+}

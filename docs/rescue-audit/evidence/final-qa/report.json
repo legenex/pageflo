@@ -1,0 +1,211 @@
+{
+  "run": "finalqamugl3wah",
+  "brandSlug": "pageflo-rescue-acceptance-944138",
+  "brandName": "PageFlo Rescue Acceptance 944138",
+  "leadId": "14",
+  "leadEmail": "finalqa-finalqamugl3wah@legenex.test",
+  "urls": {
+    "signIn": "https://app.pageflo.io/sign-in",
+    "afterLogin": "https://app.pageflo.io/admin/overview",
+    "brands": "https://app.pageflo.io/admin/sites",
+    "brandDashboard": "https://app.pageflo.io/admin/sites/pageflo-rescue-acceptance-944138",
+    "settings": "https://app.pageflo.io/admin/sites/pageflo-rescue-acceptance-944138/settings/general",
+    "websitePreviewControl": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io",
+    "websitePreview": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/",
+    "websitePages": "https://app.pageflo.io/admin/sites/pageflo-rescue-acceptance-944138/pages",
+    "quizAdmin": "https://app.pageflo.io/admin/quizzes",
+    "lpAdmin": "https://app.pageflo.io/admin/landing-pages",
+    "advAdmin": "https://app.pageflo.io/admin/advertorials",
+    "deploymentsIndex": "https://app.pageflo.io/admin/deployments",
+    "previewPagefloHome": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/",
+    "previewLegenexHome": "https://pageflo-rescue-acceptance-944138.preview.legenex.com/",
+    "quizPublic": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138",
+    "lpPublic": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/c/pageflo-rescue-acceptance-944138",
+    "lpPublicLegacy": "https://pageflo-rescue-acceptance-944138.preview.legenex.com/c/pageflo-rescue-acceptance-944138",
+    "advPublic": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/rescue-qamugk8e9r",
+    "advPublicLegacy": "https://pageflo-rescue-acceptance-944138.preview.legenex.com/adv/rescue-qamugk8e9r",
+    "leads": "https://app.pageflo.io/admin/leads?q=FinalQA&range=24h"
+  },
+  "steps": [
+    {
+      "id": "login.page",
+      "ok": true,
+      "detail": "sign-in loaded title=Sign in · PageFlo Console",
+      "url": "https://app.pageflo.io/sign-in"
+    },
+    {
+      "id": "login",
+      "ok": true,
+      "detail": "reached https://app.pageflo.io/admin/overview"
+    },
+    {
+      "id": "brand.list",
+      "ok": true,
+      "detail": "found pageflo-rescue-acceptance-944138"
+    },
+    {
+      "id": "brand.dashboard",
+      "ok": true,
+      "detail": "heading/body has brand=Back to PageFlo PR PageFlo Rescue Acceptance 944138 pageflo-rescue-acceptance-944138 View Live Site Overview Pages Blog Numbers SETTINGS General Domains Paths SEO Tracking Users Da",
+      "url": "https://app.pageflo.io/admin/sites/pageflo-rescue-acceptance-944138"
+    },
+    {
+      "id": "settings.load",
+      "ok": true,
+      "detail": "general settings heading count=1"
+    },
+    {
+      "id": "settings.save",
+      "ok": true,
+      "detail": "Saved confirmation visible"
+    },
+    {
+      "id": "settings.reload",
+      "ok": true,
+      "detail": "tagline after reload=\"FinalQA tagline finalqamugl3wah\""
+    },
+    {
+      "id": "website.preview.click",
+      "ok": true,
+      "detail": "popup rendered PageFlo Rescue Acceptance 944138 How it works Our partners FAQ Check my case Free claim check Were you in an accident? See if you qualify. A two-minute claim ch",
+      "url": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/"
+    },
+    {
+      "id": "website.pagePreview",
+      "ok": false,
+      "detail": "Preview page link missing in menu"
+    },
+    {
+      "id": "quiz.deployments.list",
+      "ok": true,
+      "detail": "8 quiz deployments visible"
+    },
+    {
+      "id": "deploy.quiz.publish",
+      "ok": true,
+      "detail": "acceptance quiz deployment already LIVE"
+    },
+    {
+      "id": "lp.deployments.list",
+      "ok": true,
+      "detail": "lp deployments body=PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all T team Owner · all brands 08:33 GM"
+    },
+    {
+      "id": "deploy.lp.publish",
+      "ok": true,
+      "detail": "acceptance LP deployment already LIVE; did not toggle another brand"
+    },
+    {
+      "id": "deploy.adv.publish",
+      "ok": true,
+      "detail": "clicked Publish on advertorial"
+    },
+    {
+      "id": "deploy.index",
+      "ok": true,
+      "detail": "deployments index https://app.pageflo.io/admin/deployments"
+    },
+    {
+      "id": "preview.pageflo.home",
+      "ok": true,
+      "detail": "status=200 PageFlo Rescue Acceptance 944138 How it works Our partners FAQ Check my case Free claim check Were you in an accident? See if you qualify. A",
+      "url": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/"
+    },
+    {
+      "id": "preview.legenex.home",
+      "ok": true,
+      "detail": "status=200 PageFlo Rescue Acceptance 944138 How it works Our partners FAQ Check my case Free claim check Were you in an accident? See if you qualify. A",
+      "url": "https://pageflo-rescue-acceptance-944138.preview.legenex.com/"
+    },
+    {
+      "id": "quiz.mount",
+      "ok": true,
+      "detail": "mounted node=question",
+      "url": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=browser&utm_campaign=finalqamugl3wah"
+    },
+    {
+      "id": "quiz.branchA",
+      "ok": true,
+      "detail": "clicked \"Auto / Motorcycle Accident\" now=\"What State Did The Accident Happen In?\""
+    },
+    {
+      "id": "quiz.branchB",
+      "ok": true,
+      "detail": "clicked \"Commercial / Semi Accident\" now=\"What State Did The Accident Happen In?\""
+    },
+    {
+      "id": "quiz.hiddenLiveBadge",
+      "ok": false,
+      "detail": "visitor live quiz showed builder-only \"Hidden in live quiz · preview only\""
+    },
+    {
+      "id": "quiz.reachForm",
+      "ok": true,
+      "detail": "walk outcome=form"
+    },
+    {
+      "id": "quiz.submit",
+      "ok": true,
+      "detail": "thanks=true post=200 leadId=14"
+    },
+    {
+      "id": "lp.public",
+      "ok": true,
+      "detail": "status=200 PageFlo Rescue Acceptance 944138 PageFlo Rescue Acceptance 944138 Talk to someone · (833) 555-0422 YOU DIDN’T ASK FOR THIS Healing should be your only job right",
+      "url": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/c/pageflo-rescue-acceptance-944138"
+    },
+    {
+      "id": "lp.cta",
+      "ok": true,
+      "detail": "clicked CTA now https://pageflo-rescue-acceptance-944138.preview.pageflo.io/c/pageflo-rescue-acceptance-944138",
+      "url": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/c/pageflo-rescue-acceptance-944138"
+    },
+    {
+      "id": "lp.public.legenex",
+      "ok": true,
+      "detail": "status=200 PageFlo Rescue Acceptance 944138 PageFlo Rescue Acceptance 944138 Talk to someone · (833) 555-0422 YOU DIDN’T ASK FOR TH",
+      "url": "https://pageflo-rescue-acceptance-944138.preview.legenex.com/c/pageflo-rescue-acceptance-944138"
+    },
+    {
+      "id": "adv.public",
+      "ok": true,
+      "detail": "status=200 FINALQA TAGLINE FINALQAMUGL3WAH PageFlo Rescue Acceptance 944138 Friday, September 25, 2026 (833) 555-0422 CONSUMER ALERT The Phone Call Insurance Companies Pra",
+      "url": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/rescue-qamugk8e9r"
+    },
+    {
+      "id": "adv.public.legenex",
+      "ok": true,
+      "detail": "status=200 FINALQA TAGLINE FINALQAMUGL3WAH PageFlo Rescue Acceptance 944138 Friday, September 25, 2026 (833) 555-0422 CONSUMER ALER",
+      "url": "https://pageflo-rescue-acceptance-944138.preview.legenex.com/adv/rescue-qamugk8e9r"
+    },
+    {
+      "id": "leads.list",
+      "ok": true,
+      "detail": "lead visible (finalqa-finalqamugl3wah@legenex.test)"
+    },
+    {
+      "id": "leads.detail",
+      "ok": true,
+      "detail": "dialog opened id=14 ours=true"
+    },
+    {
+      "id": "leads.consent",
+      "ok": true,
+      "detail": "Consent present"
+    },
+    {
+      "id": "leads.attribution",
+      "ok": true,
+      "detail": "attribution=14\nNew\nDelivery: Pending\n\nPageFlo Rescue Acceptance 944138 · 25 Sept, 08:34\n\nSummary\nSystem Response\nHLR Trace\nCAPI Log\nDelivery Log\nCAPTURED ANSWERS\n{\n  \"fault\": \"no\",\n  \"attorney\": \"never\",\n  \"insurance\": \"both\",\n  \"fa"
+    },
+    {
+      "id": "leads.delivery",
+      "ok": true,
+      "detail": "14\nNew\nDelivery: Pending\n\nPageFlo Rescue Acceptance 944138 · 25 Sept, 08:34\n\nSummary\nSystem Response\nHLR Trace\nCAPI Log\nDelivery Log\n\nNo delivery attempts were recorded for this lead. A disqualified lead is never dispatched, which is the ex"
+    }
+  ],
+  "failures": [
+    "website.pagePreview: Preview page link missing in menu",
+    "quiz.hiddenLiveBadge: visitor live quiz showed builder-only \"Hidden in live quiz · preview only\""
+  ]
+}

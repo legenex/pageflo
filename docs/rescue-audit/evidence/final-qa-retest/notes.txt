@@ -1,0 +1,52 @@
+browser: chromium, playwright-managed build
+run=retestmuglra3k operator=team@legenex.com sha-target=d605006
+SHOT 01-sign-in https://app.pageflo.io/sign-in
+PASS [login.page] title=Sign in · PageFlo Console @ https://app.pageflo.io/sign-in
+SHOT 02-after-login https://app.pageflo.io/admin/overview
+PASS [login] reached https://app.pageflo.io/admin/overview
+SHOT 03-leads https://app.pageflo.io/admin/leads?q=FinalQA&range=24h
+leads list slice: PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all T team Owner · all brands 08:51 GMT+2 Open raw Payload admin → Leads Every captured lead with its answers, acquisition path, consent evidence and delivery trace. 1 leads Export CSV VIEWS All Leads 1 New 1 Contacted 0 Qualified 0 Soft 
+SHOT 04-lead-summary https://app.pageflo.io/admin/leads?q=FinalQA&range=24h
+PASS [leads.detail] dialog opened id=14 slice=14 New Delivery: Delivered PageFlo Rescue Acceptance 944138 · 25 Sept, 08:34 Summary System Response HLR Trace CAPI Log Delivery Log LEAD DETAILS CREATED 25 Sept, 08:34 LAST UPDATED 25 Sept, 08:34 NAME FinalQA Browser finalqamugl3wah EMAIL finalqa-finalqamugl3wah@legenex.test PHO
+header delivery="Delivered" status="New" consent=""
+PASS [leads.consent] Consent field not visible (noted, not a fail)
+SHOT 05-lead-delivery https://app.pageflo.io/admin/leads?q=FinalQA&range=24h
+delivery body: 14 New Delivery: Delivered PageFlo Rescue Acceptance 944138 · 25 Sept, 08:34 Summary System Response HLR Trace CAPI Log Delivery Log downstream.completed ok 25 Sept, 08:34 Set status New Contacted Qualified Soft DQ Hard DQ Sold Archived Copy payload Copy lead id
+PASS [leads.delivery.completed] Delivery Log lists downstream.completed
+PASS [leads.delivery.notDq] no disqualified empty-state copy
+PASS [leads.delivery.notPendingDq] Delivery header=Delivered
+SHOT 06-quiz-start https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=retest&utm_campaign=retestmuglra3k
+PUBLIC 200 https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=retest&utm_campaign=retestmuglra3k body=PageFlo Rescue Acceptance 944138 CLICK HERE TO CALL 8% TAKE THE 30 SECOND QUIZ TO START THE PROCESS OF SEEING HOW MUCH YOUR CLAIM COULD BE WORTH Get The Maximum Cash Payout For Your Accident Injury!!! How Were You Injured? Select The Type Of Accident You Were Involved In: Auto / 
+PASS [quiz.mount] status=200 node=question @ https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=retest&utm_campaign=retestmuglra3k
+PASS [quiz.start.leadbyte] no LeadByte / CAPI-fire copy in visible text
+PASS [quiz.start.hiddenLive] no Hidden-in-live badge in visible text
+quiz step 0 type=question "Get The Maximum Cash Payout For Your Accident Injury!!!"
+quiz step 1 type=question "What State Did The Accident Happen In?"
+quiz select -> Texas
+quiz step 2 type=question "When Did The Accident Happen?"
+quiz select -> 2024
+quiz select -> March
+quiz working/spinner hiddenLive=false
+SHOT 07-quiz-working-2 https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=retest&utm_campaign=retestmuglra3k
+VISITOR-CONSOLE Failed to load resource: the server responded with a status of 502 ()
+quiz step 3 type=question "Please Briefly Describe Your Accident & Injuries"
+quiz step 4 type=question "What Injuries Did You Suffer In The Accident?"
+quiz select -> Fatality / Wrongful Death
+quiz step 5 type=question "What Type Of Medical Treatment Did You Receive?"
+quiz step 6 type=question "When Were You Treated For Your Injuries?"
+quiz select -> I Am Still Having Treatment
+quiz step 7 type=question "Were You At Fault For This Accident?"
+quiz step 8 type=question "Have You Ever Worked With An Attorney For This Accident Claim?"
+quiz step 9 type=question "Does Anyone Involved Have Vehicle Insurance?"
+SHOT 08-quiz-form-or-mid https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=retest&utm_campaign=retestmuglra3k
+PASS [quiz.walk] walk outcome=form hidden=false leadByte=false
+PASS [quiz.hiddenLive.during] no Hidden-in-live badge during walk
+PASS [quiz.leadbyte.during] no LeadByte leftover during walk
+SHOT 09-quiz-form-filled https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=retest&utm_campaign=retestmuglra3k
+CLICKED quiz submit
+VISITOR-CONSOLE Failed to load resource: the server responded with a status of 502 ()
+LEAD POST 200 {"ok":true,"lead_id":16,"event_id":"6b5d90e0437c52542c7880d8da6cfde2","steps":[{"step":"lead.created","ok":true,"detail":"id=16","duration_ms":16},{"step":"trustedform.claim","ok":true,"detail":"skipped","duration_ms":0},{"step":"jornaya.verify","ok":true,"detail":"skipped","duration_ms":0},{"step":"meta.capi","ok":true,"detail":"skipped","duration_ms":0},{"step":"tiktok.events_api","ok":true,"det
+SHOT 10-quiz-thankyou https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=retest&utm_campaign=retestmuglra3k
+PASS [quiz.submit] thanks=true post=200 leadId=16
+PASS [quiz.thankyou.leadbyte] no LeadByte / CAPI-fire copy in visible text
+PASS [quiz.thankyou.hiddenLive] no Hidden-in-live badge in visible text

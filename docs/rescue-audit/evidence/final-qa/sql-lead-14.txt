@@ -1,0 +1,10 @@
+ id | status | source_entity_type | test_capture | contact_first_name |            contact_email             | contact_state | has_tf | has_jornaya |                                hlr_result                                | utm_source |   utm_campaign    
+----+--------+--------------------+--------------+--------------------+--------------------------------------+---------------+--------+-------------+--------------------------------------------------------------------------+------------+-------------------
+ 14 | new    | quiz               | f            | FinalQA            | finalqa-finalqamugl3wah@legenex.test | TX            | f      | f           | {"ok": false, "error": "missing plivo credentials", "provider": "plivo"} | "finalqa"  | "finalqamugl3wah"
+(1 row)
+
+         step         | ok | detail |             at             
+----------------------+----+--------+----------------------------
+ downstream.completed | t  |        | 2026-09-25 06:34:18.911+00
+(1 row)
+

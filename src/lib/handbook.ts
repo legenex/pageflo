@@ -172,13 +172,17 @@ export const SECTIONS: HandbookSection[] = [
         purpose: 'The cross-Site lead inbox: every lead this account can see, with its delivery, enrichment and consent evidence.',
         use: [
           'Use the status rail to move between all leads and the delivery states. The counts on it are live.',
-          'Open a lead to read its full record: summary, system response, HLR trace, CAPI log and delivery log.',
+          'Open a lead to read its full record: summary (with the consent evidence), system response, HLR trace, CAPI log and delivery log.',
+          'On a failed or partly failed delivery, open the Delivery Log tab and use Retry delivery. It needs editor access on that Brand, runs only the steps that did not succeed, and the request and its result are added to the history.',
           'Filter by Site, funnel and date when you are looking for a specific capture rather than reading the stream.',
         ],
         mechanism: [
-          'Capture runs synchronously inside the request. A public form POST to /api/leads runs attribution, consent capture, HLR enrichment, CAPI, webhooks and Slack notify, then persists the row.',
+          'The lead is stored first. A public form POST to /api/leads records attribution and the visitor\u2019s explicit consent (the exact disclosure they accepted, when, and which Brand, funnel and deployment collected it), writes the row, then queues delivery: conversion events, webhooks, TrueCall and the Slack notice run in a worker, and the phone lookup runs after that.',
+          'Consent is recorded only when the visitor checked the box. A lead without that record, including every lead captured before it was recorded, reads "Not recorded". A TrustedForm or Jornaya reference is shown separately and is never treated as consent.',
+          'Delivery state is read from the log: queued, processing, retry pending, delivered, partially delivered, failed, or "no destination configured". A finished pass with no webhook or TrueCall destination is not "delivered": nothing was sent to an outside party.',
+          'Phone validation shows Valid, Invalid, or Unavailable (not configured, or provider error). Unavailable says nothing about the number.',
           'Everything you see is scoped by your bindings. A user bound to two Sites sees those two Sites, not the platform.',
-          'The delivery log is the real dispatch record, not a re-derivation: it is what the pipeline wrote at the time.',
+          'The delivery log is the real dispatch record and it is append-only: a retry adds to it, it never rewrites it.',
         ],
         watchOut: [
           'Deleting a Site deletes its leads, including their consent certificates. Export first if you need to retain them.',
@@ -471,11 +475,12 @@ export const SECTIONS: HandbookSection[] = [
           'The preview renders with the deployment’s real brand tokens, so what you see is what a visitor gets rather than a generic theme.',
           'Destinations resolve in a cascade: the deployment’s own URL, then the brand’s configured URL, then a page on the Site. Whichever is set most specifically wins.',
           'A destination is validated after any {{field}} placeholders are filled in, not before, so a value injected at runtime cannot smuggle in a script URL.',
-          'A submission runs the full lead pipeline inside the request: attribution, the shared event id, consent certificate claim, phone enrichment, the saved lead, the conversion calls, outbound webhooks and the notification.',
+          'A submission stores the lead in the request, with attribution, the shared event id and the visitor\u2019s explicit consent. Delivery (conversion calls, outbound webhooks, the notification) then runs from a queue, so a slow third party does not hold the visitor.',
+          'A form node shows the Brand\u2019s TCPA text beside an unchecked box. The visitor must check it to continue; nothing is sent until they do.',
         ],
         watchOut: [
           'Archiving hides a quiz from the picker but does not break deployments already using it. A picker never silently drops a record you already saved: it shows it, marked archived.',
-          'Because the pipeline is synchronous, a slow third party makes the visitor wait. That is a deliberate trade for knowing immediately whether a lead was handled.',
+          'Delivery is queued, so the thank-you page does not wait for a buyer. Whether a lead was delivered is on the lead, in the Leads console, not on the visitor\u2019s screen.',
         ],
       },
       {

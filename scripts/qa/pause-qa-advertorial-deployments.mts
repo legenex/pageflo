@@ -46,7 +46,12 @@ try {
       { timeout: 30_000 },
     ).catch(() => null)
     const status = await page.locator(`[data-adv-deployment="${target.id}"]`).getAttribute('data-adv-deployment-status')
-    const live = await fetchText(`${ACCEPTANCE.preview}${target.path}`)
+    // The console flips optimistically; the server action lands a moment later.
+    let live = await fetchText(`${ACCEPTANCE.preview}${target.path}`)
+    for (let i = 0; i < 10 && live.status !== 404; i++) {
+      await page.waitForTimeout(1500)
+      live = await fetchText(`${ACCEPTANCE.preview}${target.path}`)
+    }
     H.t(status !== 'live', `${target.path} is no longer live in the console`, `deployment ${target.id} status=${status}`)
     H.t(live.status === 404, `${target.path} no longer serves visitors`, `HTTP ${live.status}`)
   }

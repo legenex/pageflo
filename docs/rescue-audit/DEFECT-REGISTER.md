@@ -62,6 +62,26 @@ These counts merge overlapping agent IDs that describe the same root cause.
 
 ---
 
+## Consent, delivery and harness closeout (2026-09-26)
+
+Found by tracing a live QA lead through consent, queue, delivery and the Leads UI, then by the production acceptance run. Production SHA when each was verified is in `forge-pack/state/EVIDENCE.md`.
+
+| ID | Status | Evidence |
+|---|---|---|
+| REG-P1-019 | FIXED + VERIFIED | Consent was copy under a form with no act and nothing stored. Now: unchecked checkbox beside the Brand's TCPA text on every quiz form node and the website Lead form; the form will not advance while unchecked and shows an announced validation message; `/api/leads` rejects `accepted:false` and stores the typed record (`leads.consent_*`: accepted, exact disclosure as plain text, server timestamp, method, Brand, host, funnel, path, deployment). Old Leads read "Not recorded"; nothing backfilled. `pnpm test:consent` (browser, three surfaces + console) and production lead 22 / 20 / 18. `/api/leads` also no longer drops `extra`. |
+| REG-P1-020 | FIXED + VERIFIED | `downstream.completed` was read as "Delivered". Delivery is now derived from an append-only log (`readDelivery`): captured, queued, processing, retry pending, stalled, delivered, partial, failed, no-destination. With no configured destination the state is "No destination configured". `pnpm test:leads-ui`, `pnpm test:delivery`, production Leads UI. |
+| REG-P1-021 | FIXED + VERIFIED | The lead-delivery queue had never accepted a job: BullMQ rejects a custom job id containing `:` unless it has exactly three colon-separated parts, `lead:<id>` has two, and the failure was swallowed as "queue unavailable", so every Lead was delivered inline. Job ids use dashes; the log records which path ran; the browser suite and the production run assert the real queue was used. |
+| REG-P1-022 | FIXED + VERIFIED | No retry existed, and a queued Lead looked like nothing happened. Retry is an authorised operator action (editor+ on the Lead's Brand), refused unless delivery failed / partial / stalled, written to the history first, unique per request, locked per Lead, and skips every step that already succeeded. Proved with a stubbed transport (`pnpm test:delivery`), in a browser (`pnpm test:consent`) and on production against an unresolvable `.invalid` webhook (acceptance step K, webhook removed afterwards). No live buyer was contacted. |
+| REG-P1-023 | FIXED + VERIFIED | A failed phone lookup read "Not checked". HLR results now carry `state` (valid, invalid, not_configured, provider_error). Production has no Plivo credentials and shows "Unavailable: not configured"; no success is fabricated. |
+| REG-P1-024 | FIXED + VERIFIED | The acceptance harness passed step F with a hard-coded `true`, clicked the first Publish control on a list that mixed Brands (republishing a live Dont Settle deployment), edited "the first Edit", and created a quiz clone, a master, a deployment and a domain on every run. Now: `Harness.t()` needs a real boolean and evidence; `actOn()` proves one record naming the acceptance Brand before any click; one reusable QA advertorial; no clone, no domain; `pnpm test:harness-hygiene` fails on hard-coded acceptances and `first()` side-effect clicks. Production acceptance A-K: 77 passed, 0 failed. |
+| REG-P1-025 | FIXED + VERIFIED | Final QA failure 7: advertorial deployments went live serving starter text (`[Author]`, `X min read`, "Opening paragraph that sets the scene"). Go-live and Republish now run a blocking `placeholder-copy` check (`advertorial-seed.ts`); the five QA pin deployments still live with starter text were paused by exact card and now 404. `pnpm test:publish` 294. |
+
+Residual, not autonomous: REG-P0-010 (custom hostname DNS/TLS), REG-P1-011 (live buyer / pixel activation), REG-P1-015 (production env naming). Left in place, not deleted: 18 "Untitled Advertorial" masters and a few QA quiz copies created by earlier harness runs (Archive/Delete of production business data is not an autonomous action).
+
+Unresolved autonomous P0: 0. Unresolved autonomous P1: 0.
+
+---
+
 ## P0
 
 ### REG-P0-001 — New Brand preview 404s until Brand is published, and the console still says it is live

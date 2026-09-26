@@ -1,0 +1,97 @@
+{
+  "run": "retestmuglra3k",
+  "shaTarget": "d605006",
+  "operator": "team@legenex.com",
+  "leadIdOpened": "14",
+  "newLeadId": "16",
+  "leadEmail": "finalqa-retestmuglra3k@legenex.test",
+  "consoleHits": [
+    "Failed to load resource: the server responded with a status of 502 ()",
+    "Failed to load resource: the server responded with a status of 502 ()"
+  ],
+  "steps": [
+    {
+      "id": "login.page",
+      "ok": true,
+      "detail": "title=Sign in · PageFlo Console",
+      "url": "https://app.pageflo.io/sign-in"
+    },
+    {
+      "id": "login",
+      "ok": true,
+      "detail": "reached https://app.pageflo.io/admin/overview"
+    },
+    {
+      "id": "leads.detail",
+      "ok": true,
+      "detail": "dialog opened id=14 slice=14 New Delivery: Delivered PageFlo Rescue Acceptance 944138 · 25 Sept, 08:34 Summary System Response HLR Trace CAPI Log Delivery Log LEAD DETAILS CREATED 25 Sept, 08:34 LAST UPDATED 25 Sept, 08:34 NAME FinalQA Browser finalqamugl3wah EMAIL finalqa-finalqamugl3wah@legenex.test PHO"
+    },
+    {
+      "id": "leads.consent",
+      "ok": true,
+      "detail": "Consent field not visible (noted, not a fail)"
+    },
+    {
+      "id": "leads.delivery.completed",
+      "ok": true,
+      "detail": "Delivery Log lists downstream.completed"
+    },
+    {
+      "id": "leads.delivery.notDq",
+      "ok": true,
+      "detail": "no disqualified empty-state copy"
+    },
+    {
+      "id": "leads.delivery.notPendingDq",
+      "ok": true,
+      "detail": "Delivery header=Delivered"
+    },
+    {
+      "id": "quiz.mount",
+      "ok": true,
+      "detail": "status=200 node=question",
+      "url": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=retest&utm_campaign=retestmuglra3k"
+    },
+    {
+      "id": "quiz.start.leadbyte",
+      "ok": true,
+      "detail": "no LeadByte / CAPI-fire copy in visible text"
+    },
+    {
+      "id": "quiz.start.hiddenLive",
+      "ok": true,
+      "detail": "no Hidden-in-live badge in visible text"
+    },
+    {
+      "id": "quiz.walk",
+      "ok": true,
+      "detail": "walk outcome=form hidden=false leadByte=false"
+    },
+    {
+      "id": "quiz.hiddenLive.during",
+      "ok": true,
+      "detail": "no Hidden-in-live badge during walk"
+    },
+    {
+      "id": "quiz.leadbyte.during",
+      "ok": true,
+      "detail": "no LeadByte leftover during walk"
+    },
+    {
+      "id": "quiz.submit",
+      "ok": true,
+      "detail": "thanks=true post=200 leadId=16"
+    },
+    {
+      "id": "quiz.thankyou.leadbyte",
+      "ok": true,
+      "detail": "no LeadByte / CAPI-fire copy in visible text"
+    },
+    {
+      "id": "quiz.thankyou.hiddenLive",
+      "ok": true,
+      "detail": "no Hidden-in-live badge in visible text"
+    }
+  ],
+  "failures": []
+}

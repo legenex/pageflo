@@ -290,8 +290,21 @@ try {
     await page.route('**://fonts.gstatic.com/**', (route) => route.abort())
 
     const leadPosts: string[] = []
+    const leadTimes: string[] = []
+    const startedAt = new Map<string, number>()
     page.on('request', (req) => {
-      if (req.method() === 'POST' && req.url().includes('/api/leads')) leadPosts.push(req.url())
+      if (req.method() === 'POST' && req.url().includes('/api/leads')) {
+        leadPosts.push(req.url())
+        startedAt.set(req.url() + leadPosts.length, Date.now())
+      }
+    })
+    page.on('response', async (res) => {
+      if (res.request().method() === 'POST' && res.url().includes('/api/leads')) {
+        leadTimes.push(`${res.status()} after ${Date.now() - (startedAt.get(res.url() + leadPosts.length) ?? Date.now())}ms ${(await res.text().catch(() => '')).slice(0, 200)}`)
+      }
+    })
+    page.on('requestfailed', (req) => {
+      if (req.url().includes('/api/leads')) leadTimes.push(`FAILED ${req.failure()?.errorText}`)
     })
     const consoleErrors: string[] = []
     page.on('pageerror', (err) => consoleErrors.push(String(err)))
@@ -376,10 +389,30 @@ try {
 
     // The destination.
     await page.waitForSelector('[data-quiz-endpoint]', { timeout: 30_000 }).catch(() => null)
+    // Then let it SETTLE. Counting the instant the selector first matches raced
+    // the submit spinner that briefly replaced the endpoint card, and reported a
+    // rendered thank-you page as missing about half the time.
+    await page.waitForTimeout(600)
     const endpointCount = await page.locator('[data-quiz-endpoint]').count()
+    const resources = endpointCount === 1 ? [] : await page.evaluate(() =>
+      performance.getEntriesByType('resource').filter((e) => e.name.includes('/api/')).map((e) => `${e.name.split('/api/')[1]} dur=${Math.round(e.duration)} status=${(e as PerformanceResourceTiming & { responseStatus?: number }).responseStatus} start=${Math.round(e.startTime)}`))
+    let probe = ''
+    if (endpointCount !== 1) {
+      const t0 = Date.now()
+      try {
+        const ctrl = new AbortController()
+        const to = setTimeout(() => ctrl.abort(), 10_000)
+        const r = await fetch(`${ORIGIN}/api/leads`, { method: 'POST', signal: ctrl.signal, headers: { 'content-type': 'application/json' }, body: '{}' })
+        clearTimeout(to)
+        probe = `probe /api/leads ${r.status} ${Date.now() - t0}ms`
+      } catch (e) {
+        probe = `probe /api/leads ${(e as Error).name} after ${Date.now() - t0}ms`
+      }
+      await page.screenshot({ path: `/tmp/e2e-fail-${label}.png` }).catch(() => null)
+    }
     const destDebug = endpointCount === 1
       ? ''
-      : ` (url=${page.url()} posts=${leadPosts.length} node=${await page.locator('[data-quiz-root]').getAttribute('data-quiz-node-type')} text=${JSON.stringify(((await page.locator('body').innerText()) ?? '').slice(0, 180))})`
+      : ` (${probe} resources=${JSON.stringify(resources)} url=${page.url()} posts=${leadPosts.length} responses=${JSON.stringify(leadTimes)} node=${await page.locator('[data-quiz-root]').getAttribute('data-quiz-node-type')} text=${JSON.stringify(((await page.locator('body').innerText()) ?? '').slice(0, 180))} server=${JSON.stringify(serverLog.join('').slice(-900))})`
     t(endpointCount === 1, `${label}: the destination renders after submitting${destDebug}`)
 
     // Settle, so a late duplicate would be counted rather than missed.

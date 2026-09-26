@@ -1,0 +1,76 @@
+{
+  "agent": "BUGSY",
+  "run": "bugsymugkw2g5",
+  "verdict": "FAIL",
+  "testedSha": "b631690",
+  "shaAfterConcurrentRelease": "a0af965",
+  "leadId": "13",
+  "leadEmail": "pageflo-bugsy-closeout-bugsymugkw2g5@legenex.test",
+  "brand": "pageflo-rescue-acceptance-944138",
+  "preview": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io",
+  "isolationUser": "bugsy-iso-bugsymugkw2g5@legenex.test",
+  "localIsolationSuite": "50 passed, 0 failed (pnpm test:isolation, local DATABASE_URI)",
+  "p0": ["BUGSY-P0-006"],
+  "p1": [
+    "BUGSY-P1-001",
+    "BUGSY-P1-002",
+    "BUGSY-P1-003",
+    "BUGSY-P1-004",
+    "BUGSY-P1-005",
+    "BUGSY-P1-007"
+  ],
+  "findings": [
+    {
+      "id": "BUGSY-P1-001",
+      "sev": "P1",
+      "title": "unknown preview host 404 is a blank Next error document",
+      "detail": "https://no-such-brand-bugsymugkw2g5.preview.pageflo.io/ returns HTTP 404 (fail-closed) but the body is an empty Next __next_error__ document, not a branded not-found page.",
+      "shot": "04-unknown-host.png"
+    },
+    {
+      "id": "BUGSY-P1-002",
+      "sev": "P1",
+      "title": "acceptance About page is empty starter copy",
+      "detail": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/about is HTTP 200 with only 'This page has no content blocks yet.'",
+      "shot": "13-about.png"
+    },
+    {
+      "id": "BUGSY-P1-003",
+      "sev": "P1",
+      "title": "visitor quiz CTA has no phone number",
+      "detail": "Header button is 'CLICK HERE TO CALL' with no number on the acceptance quiz. Brand phone (833) 555-0422 is used on advertorials.",
+      "url": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138",
+      "shot": "14-quiz.png"
+    },
+    {
+      "id": "BUGSY-P1-004",
+      "sev": "P1",
+      "title": "live pin advertorial still has template leftovers",
+      "detail": "Visible CATEGORY · TOPIC and By [Author] · X min read on /adv/pinmugkkmjl. {{brand.displayName}} is substituted in the body.",
+      "url": "https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/pinmugkkmjl",
+      "shot": "17-adv-pin.png"
+    },
+    {
+      "id": "BUGSY-P1-005",
+      "sev": "P1",
+      "title": "Dont Settle quiz CTA has no phone number",
+      "detail": "Same CLICK HERE TO CALL with no number. Visitor answers are real; no graph labels.",
+      "url": "https://dont-settle.preview.pageflo.io/s/dont-settle",
+      "shot": "18-ds-quiz.png"
+    },
+    {
+      "id": "BUGSY-P0-006",
+      "sev": "P0",
+      "title": "brand-bound editor lists every Brand",
+      "detail": "Invited Editor bound to PageFlo Rescue Acceptance 944138 only. Sidebar: Editor · 1 brand. /admin/sites still renders All 8 Brands including Dont Settle, ACH, and other rescue Brands, with primary domains. Root cause: src/app/(app)/admin/(top)/sites/page.tsx payload.find/count overrideAccess: true. Direct /admin/sites/dont-settle 404s via isBoundToSite. Leads UI scoped (SITES IN SCOPE 1, Ada Lovelace hidden). Advertorial deployments in this probe did not show Dont Settle /adv/letter. GET /api/sites 403. Local pnpm test:isolation 50/0. Listing is the hole; mutation of Brand settings was blocked.",
+      "shot": "f02-iso-brands.png"
+    },
+    {
+      "id": "BUGSY-P1-007",
+      "sev": "P1",
+      "title": "live advertorial deployments warn Domain missing",
+      "detail": "Every live acceptance advertorial row shows 'Domain missing, falling back to preview URL' even though the preview host is selected and the visitor URL 200s.",
+      "shot": "54-after-publish-collision.png"
+    }
+  ]
+}

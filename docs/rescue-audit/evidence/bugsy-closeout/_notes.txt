@@ -1,0 +1,66 @@
+BUGSY closeout 2026-09-25 run=bugsymugkw2g5
+Production SHA at start: b631690 (service active, both health endpoints 200).
+Concurrent release during follow-up stopped legalos-dev (502). Came back as a0af965. Post-release public smoke still 200, no listed junk.
+
+Lead id 13
+Lead email pageflo-bugsy-closeout-bugsymugkw2g5@legenex.test
+Isolation user bugsy-iso-bugsymugkw2g5@legenex.test (Editor, 1 brand). Disable when done.
+
+CLICKS
+- Sign in with wrong email/password
+- Open visitor quiz; answer Auto / Motorcycle; Back; Commercial / Semi
+- quiz Next after select, textarea, four auto answers
+- quiz Submit lead
+- Sign in as team@legenex.com
+- Open Leads
+- Advertorials → Deployments → New Deployment → colliding path /adv/rescue-qamugk8e9r → Create → Publish
+- New Advertorial → Save → Archive first row → Confirm
+- Invite User → Add binding → Invite
+- Sign in as brand-bound isolation user
+- Save Brand settings (stale-save probe)
+- Follow-up: iso Brands, direct /admin/sites/dont-settle, iso Leads, iso advertorial deployments, iso Domains, GET /api/sites, Open lead 13
+
+URLS
+- https://app.pageflo.io/sign-in
+- https://app.pageflo.io/cms/forgot
+- https://no-such-brand-bugsymugkw2g5.preview.pageflo.io/
+- https://pageflo-rescue-acceptance-944138.preview.pageflo.io/
+- /privacy /terms /about
+- /s/pageflo-rescue-acceptance-944138
+- /c/pageflo-rescue-acceptance-944138
+- /adv/rescue-qamugk8e9r
+- /adv/pinmugkkmjl
+- https://dont-settle.preview.pageflo.io/s/dont-settle
+- https://dont-settle.preview.pageflo.io/c
+- https://dont-settle.preview.pageflo.io/adv/letter
+- https://dont-settle.preview.pageflo.io/terms
+- https://app.pageflo.io/admin/leads
+- https://app.pageflo.io/admin/advertorials
+- https://app.pageflo.io/admin/settings/users
+- https://app.pageflo.io/admin/sites
+- https://app.pageflo.io/admin/sites/dont-settle (iso user, 404)
+
+HELD
+- Bad login fail-closed
+- Unknown host HTTP 404
+- No {{site.name}}, Dynamic figure, (800) 000-0000, Injury Type12121212, /submitted (Qualified) on visitor surfaces
+- Visitor quiz has visitor questions only; no internal graph labels
+- Lead capture POST /api/leads + thank-you + lead 13 in UI
+- Second publish on /adv/rescue-qamugk8e9r refused: already served by deployment 5
+- Advertorial archive sets ARCHIVED, does not delete
+- Brand save persisted; no stale Server Action this session
+- Brand-bound user cannot open another Brand (404). Leads scoped. REST /api/sites 403
+- Local pnpm test:isolation 50/0
+- Dont Settle /terms substitutes the Brand name
+- Dont Settle /c uses (833) 555-0444, not (800) 000-0000
+
+BROKE / STILL BROKEN
+- Brands index overrideAccess: true lists all 8 Brands to a 1-brand editor (P0-006)
+- Quiz CTA no phone (P1-003, P1-005)
+- Empty About (P1-002)
+- Pin advertorial template leftovers (P1-004)
+- Blank 404 document for unknown preview host (P1-001)
+- Domain missing warning on live advertorial rows (P1-007)
+
+UNPROVEN
+- Independent edit of the LIVE pin master (list locators kept opening the ARCHIVED probe). Saving that archived master did not change /adv/pinmugkkmjl. Stale save after a real deploy not reproduced (save worked on b631690).

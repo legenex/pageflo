@@ -1,0 +1,145 @@
+browser: chromium, playwright-managed build
+run=finalqamugl3wah operator=team@legenex.com brand=pageflo-rescue-acceptance-944138
+SHOT 01-sign-in https://app.pageflo.io/sign-in
+PASS [login.page] sign-in loaded title=Sign in · PageFlo Console @ https://app.pageflo.io/sign-in
+SHOT 01b-sign-in-filled https://app.pageflo.io/sign-in
+SHOT 02-after-login https://app.pageflo.io/admin/overview
+PASS [login] reached https://app.pageflo.io/admin/overview
+SHOT 03-brands https://app.pageflo.io/admin/sites
+PASS [brand.list] found pageflo-rescue-acceptance-944138
+SHOT 03a-brands-searched https://app.pageflo.io/admin/sites?q=pageflo-rescue-acceptance
+CLICKED acceptance brand row
+SHOT 04-brand-dashboard https://app.pageflo.io/admin/sites/pageflo-rescue-acceptance-944138
+PASS [brand.dashboard] heading/body has brand=Back to PageFlo PR PageFlo Rescue Acceptance 944138 pageflo-rescue-acceptance-944138 View Live Site Overview Pages Blog Numbers SETTINGS General Domains Paths SEO Tracking Users Da @ https://app.pageflo.io/admin/sites/pageflo-rescue-acceptance-944138
+SHOT 05-settings-general https://app.pageflo.io/admin/sites/pageflo-rescue-acceptance-944138/settings/general
+PASS [settings.load] general settings heading count=1
+SHOT 05b-settings-filled https://app.pageflo.io/admin/sites/pageflo-rescue-acceptance-944138/settings/general
+CLICKED Save Settings
+SHOT 06-settings-saved https://app.pageflo.io/admin/sites/pageflo-rescue-acceptance-944138/settings/general
+PASS [settings.save] Saved confirmation visible
+SHOT 07-settings-reloaded https://app.pageflo.io/admin/sites/pageflo-rescue-acceptance-944138/settings/general
+PASS [settings.reload] tagline after reload="FinalQA tagline finalqamugl3wah"
+SHOT 08-website-preview-popup https://pageflo-rescue-acceptance-944138.preview.pageflo.io/
+PASS [website.preview.click] popup rendered PageFlo Rescue Acceptance 944138 How it works Our partners FAQ Check my case Free claim check Were you in an accident? See if you qualify. A two-minute claim ch @ https://pageflo-rescue-acceptance-944138.preview.pageflo.io/
+SHOT 09-websites https://app.pageflo.io/admin/websites
+SHOT 10-website-pages https://app.pageflo.io/admin/sites/pageflo-rescue-acceptance-944138/pages
+SHOT 10b-page-menu https://app.pageflo.io/admin/sites/pageflo-rescue-acceptance-944138/pages
+FAIL [website.pagePreview] Preview page link missing in menu
+SHOT 20-quizzes https://app.pageflo.io/admin/quizzes
+SHOT 21-quiz-deployments https://app.pageflo.io/admin/quizzes
+quiz deployment urls: ["https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138","https://rescue-odin-20260923.preview.pageflo.io/s/rescue-odin-20260923","https://rescue-sec-b-20260923.preview.pageflo.io/s/rescue-sec-b-20260923","https://rescue-sec-a-20260923.preview.pageflo.io/s/rescue-sec-a-20260923","https://rescue-funnel-20260923.preview.pageflo.io/s/rescue-funnel-20260923","https://rescue-qa-20260923.preview.pageflo.io/s/rescue-qa-20260923","https://accident-compensation-helper.preview.pageflo.io/s/accident-compensation-helper","https://dont-settle.preview.legenex.com/s/dont-settle"]
+PASS [quiz.deployments.list] 8 quiz deployments visible
+PASS [deploy.quiz.publish] acceptance quiz deployment already LIVE
+SHOT 21b-quiz-inapp-preview https://app.pageflo.io/admin/quizzes
+SHOT 30-landing-pages https://app.pageflo.io/admin/landing-pages
+SHOT 31-lp-deployments https://app.pageflo.io/admin/landing-pages
+lp deployment urls: ["https://pageflo-rescue-acceptance-944138.preview.pageflo.io/c/pageflo-rescue-acceptance-944138","https://rescue-odin-20260923.preview.pageflo.io/c/rescue-odin-20260923","https://rescue-sec-b-20260923.preview.pageflo.io/c/rescue-sec-b-20260923","https://rescue-sec-a-20260923.preview.pageflo.io/c/rescue-sec-a-20260923","https://rescue-funnel-20260923.preview.pageflo.io/c/rescue-funnel-20260923","https://rescue-qa-20260923.preview.pageflo.io/c/rescue-qa-20260923","https://accident-compensation-helper.preview.pageflo.io/c/accident-compensation-helper","https://dont-settle.preview.legenex.com/c/dont-settle","https://dont-settle.preview.legenex.com/c"]
+PASS [lp.deployments.list] lp deployments body=PageFlo Overview Brands Websites Quizzes Landing Pages Advertorials Deployments Domains Leads Analytics SOON Campaign Integrity SOON Integrations Settings Expand all T team Owner · all brands 08:33 GM
+PASS [deploy.lp.publish] acceptance LP deployment already LIVE; did not toggle another brand
+SHOT 33-lp-inapp-preview https://app.pageflo.io/admin/landing-pages
+SHOT 40-advertorials https://app.pageflo.io/admin/advertorials
+SHOT 41-adv-deployments https://app.pageflo.io/admin/advertorials
+adv deployment urls: ["https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/rescue-qamugk8e9r","https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/pinmugkkmjl","https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/pinmugkiiro","https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/pinmugkh0lh","https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/pinmugkfdmm","https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/pinmugkd5k7","https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/rescue-qamugk5cyn","https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/rescue-qamugjya5z","https://dont-settle.preview.legenex.com/adv/letter","advertorial: Untitled Advertorial·brand: PageFlo Rescue Acceptance 944138·quiz: pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138","advertorial: The Phone Call Insurance Companies Pray ...·brand: PageFlo Rescue Acceptance 944138·quiz: pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138","advertorial: The Settlement Letter That Sat on Their ...·brand: Dont Settle·quiz: dont-settle.preview.legenex.com/s/dont-settle"]
+SHOT 42-adv-publish-clicked https://app.pageflo.io/admin/advertorials
+PASS [deploy.adv.publish] clicked Publish on advertorial
+SHOT 43-deployments-index https://app.pageflo.io/admin/deployments
+PASS [deploy.index] deployments index https://app.pageflo.io/admin/deployments
+SHOT 50-preview-pageflo-home https://pageflo-rescue-acceptance-944138.preview.pageflo.io/
+PUBLIC 200 https://pageflo-rescue-acceptance-944138.preview.pageflo.io/ title="Home | PageFlo Rescue Acceptance 944138" body=PageFlo Rescue Acceptance 944138 How it works Our partners FAQ Check my case Free claim check Were you in an accident? See if you qualify. A two-minute claim check matches you with a personal injury attorney at no cost. Check my claim FREE CASE REVIEW Check your claim in two minu
+PASS [preview.pageflo.home] status=200 PageFlo Rescue Acceptance 944138 How it works Our partners FAQ Check my case Free claim check Were you in an accident? See if you qualify. A @ https://pageflo-rescue-acceptance-944138.preview.pageflo.io/
+SHOT 51-preview-legenex-home https://pageflo-rescue-acceptance-944138.preview.legenex.com/
+PUBLIC 200 https://pageflo-rescue-acceptance-944138.preview.legenex.com/ title="Home | PageFlo Rescue Acceptance 944138" body=PageFlo Rescue Acceptance 944138 How it works Our partners FAQ Check my case Free claim check Were you in an accident? See if you qualify. A two-minute claim check matches you with a personal injury attorney at no cost. Check my claim FREE CASE REVIEW Check your claim in two minu
+PASS [preview.legenex.home] status=200 PageFlo Rescue Acceptance 944138 How it works Our partners FAQ Check my case Free claim check Were you in an accident? See if you qualify. A @ https://pageflo-rescue-acceptance-944138.preview.legenex.com/
+clicked in-site link #how-it-works
+SHOT 52-website-inpage-click https://pageflo-rescue-acceptance-944138.preview.legenex.com/#how-it-works
+SHOT 60-quiz-start https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=browser&utm_campaign=finalqamugl3wah
+PUBLIC 200 https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=browser&utm_campaign=finalqamugl3wah title="PageFlo Rescue Acceptance 944138 · MVA Tiered Quiz | PageFlo Rescue Acceptance 944138" body=PageFlo Rescue Acceptance 944138 CLICK HERE TO CALL 8% TAKE THE 30 SECOND QUIZ TO START THE PROCESS OF SEEING HOW MUCH YOUR CLAIM COULD BE WORTH Get The Maximum Cash Payout For Your Accident Injury!!! How Were You Injured? Select The Type Of Accident You Were Involved In: Auto / 
+PASS [quiz.mount] mounted node=question @ https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=browser&utm_campaign=finalqamugl3wah
+quiz first question: Get The Maximum Cash Payout For Your Accident Injury!!!
+quiz answers on start: 4
+SHOT 61-quiz-branch-a https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=browser&utm_campaign=finalqamugl3wah
+PASS [quiz.branchA] clicked "Auto / Motorcycle Accident" now="What State Did The Accident Happen In?"
+SHOT 62-quiz-back https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=browser&utm_campaign=finalqamugl3wah
+SHOT 63-quiz-branch-b https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=browser&utm_campaign=finalqamugl3wah
+PASS [quiz.branchB] clicked "Commercial / Semi Accident" now="What State Did The Accident Happen In?"
+SHOT 63b-quiz-restart-auto https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=browser&utm_campaign=finalqamugl3wah
+PUBLIC 200 https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=browser&utm_campaign=finalqamugl3wah title="PageFlo Rescue Acceptance 944138 · MVA Tiered Quiz | PageFlo Rescue Acceptance 944138" body=PageFlo Rescue Acceptance 944138 CLICK HERE TO CALL 8% TAKE THE 30 SECOND QUIZ TO START THE PROCESS OF SEEING HOW MUCH YOUR CLAIM COULD BE WORTH Get The Maximum Cash Payout For Your Accident Injury!!! How Were You Injured? Select The Type Of Accident You Were Involved In: Auto / 
+restarted quiz on qualified branch "Auto / Motorcycle Accident"
+quiz step 0 type=question "What State Did The Accident Happen In?"
+quiz select -> Texas
+quiz step 1 type=question "When Did The Accident Happen?"
+quiz select -> 2024
+quiz select -> March
+quiz working/spinner hiddenLive=true; waiting for next node (1)
+FAIL [quiz.hiddenLiveBadge] visitor live quiz showed builder-only "Hidden in live quiz · preview only"
+SHOT 64b-quiz-working-1 https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=browser&utm_campaign=finalqamugl3wah
+VISITOR-CONSOLE Failed to load resource: the server responded with a status of 502 ()
+quiz step 2 type=question "Please Briefly Describe Your Accident & Injuries"
+quiz step 3 type=question "What Injuries Did You Suffer In The Accident?"
+quiz select -> Fatality / Wrongful Death
+quiz step 4 type=question "When Were You Treated For Your Injuries?"
+quiz select -> I Am Still Having Treatment
+quiz step 5 type=question "Have You Ever Worked With An Attorney For This Accident Claim?"
+quiz step 6 type=question "Does Anyone Involved Have Vehicle Insurance?"
+SHOT 65-quiz-form-or-mid https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=browser&utm_campaign=finalqamugl3wah
+PASS [quiz.reachForm] walk outcome=form
+SHOT 66-quiz-form-filled https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=browser&utm_campaign=finalqamugl3wah
+CLICKED quiz submit
+VISITOR-CONSOLE Failed to load resource: the server responded with a status of 502 ()
+LEAD POST 200 {"ok":true,"lead_id":14,"event_id":"7e29433ec4b414b645b20d97433f696e","steps":[{"step":"lead.created","ok":true,"detail":"id=14","duration_ms":12},{"step":"trustedform.claim","ok":true,"detail":"skipped","duration_ms":0},{"step":"jornaya.verify","ok":true,"detail":"skipped","duration_ms":0},{"step":"meta.capi","ok":true,"detail":"skipped","duration_ms":0},{"step":"tiktok.events_api","ok":true,"det
+SHOT 67-quiz-submitted https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138?utm_source=finalqa&utm_medium=browser&utm_campaign=finalqamugl3wah
+PASS [quiz.submit] thanks=true post=200 leadId=14
+SHOT 70-lp-public https://pageflo-rescue-acceptance-944138.preview.pageflo.io/c/pageflo-rescue-acceptance-944138
+PUBLIC 200 https://pageflo-rescue-acceptance-944138.preview.pageflo.io/c/pageflo-rescue-acceptance-944138 title="Healing should be your only job right now. The claim shouldn’t become a second injury. | PageFlo Rescue Acceptance 94413" body=PageFlo Rescue Acceptance 944138 PageFlo Rescue Acceptance 944138 Talk to someone · (833) 555-0422 YOU DIDN’T ASK FOR THIS Healing should be your only job right now. The claim shouldn’t become a second injury. If you were hurt in a crash, you deserve to know what support you’re e
+PASS [lp.public] status=200 PageFlo Rescue Acceptance 944138 PageFlo Rescue Acceptance 944138 Talk to someone · (833) 555-0422 YOU DIDN’T ASK FOR THIS Healing should be your only job right @ https://pageflo-rescue-acceptance-944138.preview.pageflo.io/c/pageflo-rescue-acceptance-944138
+SHOT 71-lp-cta-clicked https://pageflo-rescue-acceptance-944138.preview.pageflo.io/c/pageflo-rescue-acceptance-944138
+PASS [lp.cta] clicked CTA now https://pageflo-rescue-acceptance-944138.preview.pageflo.io/c/pageflo-rescue-acceptance-944138 @ https://pageflo-rescue-acceptance-944138.preview.pageflo.io/c/pageflo-rescue-acceptance-944138
+SHOT 72-lp-public-legenex https://pageflo-rescue-acceptance-944138.preview.legenex.com/c/pageflo-rescue-acceptance-944138
+PUBLIC 200 https://pageflo-rescue-acceptance-944138.preview.legenex.com/c/pageflo-rescue-acceptance-944138 title="Healing should be your only job right now. The claim shouldn’t become a second injury. | PageFlo Rescue Acceptance 94413" body=PageFlo Rescue Acceptance 944138 PageFlo Rescue Acceptance 944138 Talk to someone · (833) 555-0422 YOU DIDN’T ASK FOR THIS Healing should be your only job right now. The claim shouldn’t become a second injury. If you were hurt in a crash, you deserve to know what support you’re e
+PASS [lp.public.legenex] status=200 PageFlo Rescue Acceptance 944138 PageFlo Rescue Acceptance 944138 Talk to someone · (833) 555-0422 YOU DIDN’T ASK FOR TH @ https://pageflo-rescue-acceptance-944138.preview.legenex.com/c/pageflo-rescue-acceptance-944138
+SHOT 80-adv-public https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/rescue-qamugk8e9r
+PUBLIC 200 https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/rescue-qamugk8e9r title="The Phone Call Insurance Companies Pray You'll Take | PageFlo Rescue Acceptance 944138" body=FINALQA TAGLINE FINALQAMUGL3WAH PageFlo Rescue Acceptance 944138 Friday, September 25, 2026 (833) 555-0422 CONSUMER ALERT The Phone Call Insurance Companies Pray You'll Take NEW YORK · MAY 2026 It usually comes within 72 hours of the crash. The number is unfamiliar. The voice on 
+PASS [adv.public] status=200 FINALQA TAGLINE FINALQAMUGL3WAH PageFlo Rescue Acceptance 944138 Friday, September 25, 2026 (833) 555-0422 CONSUMER ALERT The Phone Call Insurance Companies Pra @ https://pageflo-rescue-acceptance-944138.preview.pageflo.io/adv/rescue-qamugk8e9r
+SHOT 81-adv-click https://pageflo-rescue-acceptance-944138.preview.pageflo.io/s/pageflo-rescue-acceptance-944138
+SHOT 82-adv-public-legenex https://pageflo-rescue-acceptance-944138.preview.legenex.com/adv/rescue-qamugk8e9r
+PUBLIC 200 https://pageflo-rescue-acceptance-944138.preview.legenex.com/adv/rescue-qamugk8e9r title="The Phone Call Insurance Companies Pray You'll Take | PageFlo Rescue Acceptance 944138" body=FINALQA TAGLINE FINALQAMUGL3WAH PageFlo Rescue Acceptance 944138 Friday, September 25, 2026 (833) 555-0422 CONSUMER ALERT The Phone Call Insurance Companies Pray You'll Take NEW YORK · MAY 2026 It usually comes within 72 hours of the crash. The number is unfamiliar. The voice on 
+PASS [adv.public.legenex] status=200 FINALQA TAGLINE FINALQAMUGL3WAH PageFlo Rescue Acceptance 944138 Friday, September 25, 2026 (833) 555-0422 CONSUMER ALER @ https://pageflo-rescue-acceptance-944138.preview.legenex.com/adv/rescue-qamugk8e9r
+SHOT 90-leads-search https://app.pageflo.io/admin/leads?q=FinalQA&range=24h
+PASS [leads.list] lead visible (finalqa-finalqamugl3wah@legenex.test)
+SHOT 91-lead-detail-summary https://app.pageflo.io/admin/leads?q=FinalQA&range=24h
+PASS [leads.detail] dialog opened id=14 ours=true
+PASS [leads.consent] Consent present
+SHOT 92-lead-response https://app.pageflo.io/admin/leads?q=FinalQA&range=24h
+PASS [leads.attribution] attribution=14
+New
+Delivery: Pending
+
+PageFlo Rescue Acceptance 944138 · 25 Sept, 08:34
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+CAPTURED ANSWERS
+{
+  "fault": "no",
+  "attorney": "never",
+  "insurance": "both",
+  "fa
+SHOT 93-lead-delivery https://app.pageflo.io/admin/leads?q=FinalQA&range=24h
+PASS [leads.delivery] 14
+New
+Delivery: Pending
+
+PageFlo Rescue Acceptance 944138 · 25 Sept, 08:34
+
+Summary
+System Response
+HLR Trace
+CAPI Log
+Delivery Log
+
+No delivery attempts were recorded for this lead. A disqualified lead is never dispatched, which is the ex
+SHOT 94-lead-hlr https://app.pageflo.io/admin/leads?q=FinalQA&range=24h
+SHOT 95-lead-capi https://app.pageflo.io/admin/leads?q=FinalQA&range=24h
